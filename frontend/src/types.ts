@@ -134,6 +134,14 @@ export interface CreditApplication {
   documents: CreditDocument[];
 }
 
+export interface Customer360 {
+  customer: Customer;
+  quotes: Quote[];
+  creditApplications: CreditApplication[];
+  deals: Deal[];
+  activities: Activity[];
+}
+
 export interface Dashboard {
   openPipelineValue: number;
   weightedPipelineValue: number;

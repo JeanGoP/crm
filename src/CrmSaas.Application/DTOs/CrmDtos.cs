@@ -70,5 +70,12 @@ public sealed record CreditDocumentDto(Guid Id, TipoDocumentoCredito Type, strin
 public sealed record UpsertCreditDocumentDto(TipoDocumentoCredito Type, string Name, EstadoDocumentoCredito Status, DateTime? ReceivedAt, string? Notes);
 public sealed record ChangeCreditApplicationStatusDto(EstadoSolicitudCredito Status);
 
+public sealed record Customer360Dto(
+    CustomerDto Customer,
+    IReadOnlyCollection<QuoteDto> Quotes,
+    IReadOnlyCollection<CreditApplicationDto> CreditApplications,
+    IReadOnlyCollection<DealDto> Deals,
+    IReadOnlyCollection<ActivityDto> Activities);
+
 public sealed record DashboardDto(decimal OpenPipelineValue, decimal WeightedPipelineValue, int ActiveCustomers, int OpenLeads, int PendingActivities, IReadOnlyCollection<RecentActivityDto> RecentActivities);
 public sealed record RecentActivityDto(string Title, DateTime ScheduledAt, EstadoActividad Status);

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Navigate, NavLink, Route, Routes, useNavigate } from 'react-router-dom';
+import { Navigate, NavLink, Route, Routes, useNavigate, useParams } from 'react-router-dom';
 import {
   Alert, AppBar, Box, Button, Card, CardContent, Chip, CssBaseline, Dialog, DialogActions,
   DialogContent, DialogTitle, Divider, Drawer, Grid, IconButton, LinearProgress, MenuItem,
@@ -23,10 +23,12 @@ import Inventory2 from '@mui/icons-material/Inventory2';
 import ReceiptLong from '@mui/icons-material/ReceiptLong';
 import Download from '@mui/icons-material/Download';
 import Assignment from '@mui/icons-material/Assignment';
+import Visibility from '@mui/icons-material/Visibility';
+import AddTask from '@mui/icons-material/AddTask';
 import { AxiosError } from 'axios';
 import { api } from './api';
 import { useAuthStore } from './store';
-import { Activity, Company, CreditApplication, CreditDocument, Customer, Dashboard, Deal, DealStage, Lead, Product, Quote, User } from './types';
+import { Activity, Company, CreditApplication, CreditDocument, Customer, Customer360, Dashboard, Deal, DealStage, Lead, Product, Quote, User } from './types';
 
 const drawerWidth = 248;
 const today = new Date().toISOString().slice(0, 10);
@@ -103,6 +105,7 @@ function Layout() {
           <Routes>
             <Route path="/" element={<DashboardPage />} />
             <Route path="/clientes" element={<CustomersPage />} />
+            <Route path="/clientes/:id" element={<Customer360Page />} />
             <Route path="/productos" element={<ProductsPage />} />
             <Route path="/cotizaciones" element={<QuotesPage />} />
             <Route path="/solicitudes-credito" element={<CreditApplicationsPage />} />
@@ -181,6 +184,7 @@ function CustomersPage() {
   const [confirm, setConfirm] = useState<Customer>();
   const [notice, setNotice] = useState<Notice>();
   const canDelete = useCanManage();
+  const navigate = useNavigate();
 
   const save = async (payload: typeof emptyCustomer) => {
     const body = { ...payload, status: Number(payload.status) };
@@ -213,12 +217,56 @@ function CustomersPage() {
         r.phone,
         <StatusChip label={statusLabel(r.status)} tone={r.status === 1 ? 'success' : 'default'} />,
         r.tags,
-        <Actions onEdit={() => setForm({ open: true, item: r })} onDelete={canDelete ? () => setConfirm(r) : undefined} />
+        <Actions onView={() => navigate(`/clientes/${r.id}`)} onEdit={() => setForm({ open: true, item: r })} onDelete={canDelete ? () => setConfirm(r) : undefined} />
       ])}
     />
     <CustomerDialog form={form} onClose={() => setForm({ open: false })} onSave={save} />
     <ConfirmDialog title="Eliminar cliente" text={`Se eliminara ${confirm?.name}.`} open={!!confirm} onClose={() => setConfirm(undefined)} onConfirm={remove} />
     <Notice notice={notice} onClose={() => setNotice(undefined)} />
+  </Stack>;
+}
+
+function Customer360Page() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const { data, loading, error, reload } = useResource<Customer360>(`/api/customers/${id}/summary`);
+  const customer = data?.customer;
+
+  return <Stack spacing={3}>
+    <Header title={customer ? `${customer.firstNames || customer.name} ${customer.lastNames}`.trim() : 'Cliente 360'} onRefresh={reload} secondaryAction={{ label: 'Volver', onClick: () => navigate('/clientes') }} />
+    <StatusBar loading={loading} error={error} />
+    {customer && <Grid container spacing={2}>
+      <Grid item xs={12} md={3}><Metric label="Telefono / WhatsApp" value={customer.phone || '-'} /></Grid>
+      <Grid item xs={12} md={3}><Metric label="Email" value={customer.email || '-'} /></Grid>
+      <Grid item xs={12} md={3}><Metric label="Estado" value={statusLabel(customer.status)} /></Grid>
+      <Grid item xs={12} md={3}><Metric label="Etiquetas" value={customer.tags || '-'} /></Grid>
+    </Grid>}
+    <Grid container spacing={2}>
+      <Grid item xs={12} md={6}>
+        <Card><CardContent>
+          <Typography variant="h6" fontWeight={900}>Cotizaciones</Typography>
+          {data?.quotes.length ? data.quotes.map((q) => <Row key={q.id} primary={`${q.number} - ${q.productName}`} secondary={`${money(q.productPrice)} · ${new Date(q.quoteDate).toLocaleDateString()}`} />) : <EmptyState text="Sin cotizaciones" />}
+        </CardContent></Card>
+      </Grid>
+      <Grid item xs={12} md={6}>
+        <Card><CardContent>
+          <Typography variant="h6" fontWeight={900}>Solicitudes de credito</Typography>
+          {data?.creditApplications.length ? data.creditApplications.map((s) => <Row key={s.id} primary={`${s.number} - ${s.productName}`} secondary={`${creditStatus(s.status)} · ${money(s.motorcycleValue)}`} />) : <EmptyState text="Sin solicitudes" />}
+        </CardContent></Card>
+      </Grid>
+      <Grid item xs={12} md={6}>
+        <Card><CardContent>
+          <Typography variant="h6" fontWeight={900}>Pipeline</Typography>
+          {data?.deals.length ? data.deals.map((d) => <Row key={d.id} primary={d.title} secondary={`${dealStatus(d.status)} · ${money(d.value)} · ${d.closeProbability}%`} />) : <EmptyState text="Sin negocios" />}
+        </CardContent></Card>
+      </Grid>
+      <Grid item xs={12} md={6}>
+        <Card><CardContent>
+          <Typography variant="h6" fontWeight={900}>Actividades</Typography>
+          {data?.activities.length ? data.activities.map((a) => <Row key={a.id} primary={a.title} secondary={`${activityStatus(a.status)} · ${new Date(a.scheduledAt).toLocaleString()}`} />) : <EmptyState text="Sin actividades" />}
+        </CardContent></Card>
+      </Grid>
+    </Grid>
   </Stack>;
 }
 
@@ -466,9 +514,11 @@ function PipelinePage() {
   const { data: customers = [] } = useResource<Customer[]>('/api/customers', []);
   const [form, setForm] = useState<FormMode<Deal>>({ open: false });
   const [stageForm, setStageForm] = useState<FormMode<DealStage>>({ open: false });
+  const [activityForm, setActivityForm] = useState<FormMode<Activity>>({ open: false });
   const [confirm, setConfirm] = useState<Deal>();
   const [notice, setNotice] = useState<Notice>();
   const canManage = useCanManage();
+  const navigate = useNavigate();
 
   const saveDeal = async (payload: typeof emptyDeal) => {
     const body = {
@@ -506,6 +556,22 @@ function PipelinePage() {
     setConfirm(undefined);
   };
 
+  const saveActivity = async (payload: typeof emptyActivity) => {
+    const body = {
+      ...payload,
+      type: Number(payload.type),
+      status: Number(payload.status),
+      customerId: payload.customerId || null,
+      dealId: payload.dealId || null,
+      assignedUserId: payload.assignedUserId || null,
+      scheduledAt: new Date(payload.scheduledAt).toISOString(),
+      reminderAt: payload.reminderAt ? new Date(payload.reminderAt).toISOString() : null
+    };
+    await api.post<Activity>('/api/activities', body);
+    setNotice({ type: 'success', text: 'Actividad registrada.' });
+    setActivityForm({ open: false });
+  };
+
   const defaultStageId = stages[0]?.id ?? '';
   return <Stack spacing={3}>
     <Header title="Pipeline de motos a credito" action="Nueva venta" onAction={() => setForm({ open: true })} onRefresh={() => { reloadStages(); reloadDeals(); }} secondaryAction={canManage ? { label: 'Nueva etapa', onClick: () => setStageForm({ open: true }) } : undefined} />
@@ -526,12 +592,19 @@ function PipelinePage() {
           </Stack>
           <Typography color="text.secondary">{money(deal.value)}</Typography>
           <LinearProgress variant="determinate" value={deal.closeProbability} sx={{ mt: 1 }} />
-          <Actions onEdit={() => setForm({ open: true, item: deal })} onDelete={canManage ? () => setConfirm(deal) : undefined} compact />
+          <Actions
+            onView={deal.customerId ? () => navigate(`/clientes/${deal.customerId}`) : undefined}
+            onActivity={() => setActivityForm({ open: true, item: { ...emptyActivity, title: `Seguimiento: ${deal.title}`, customerId: deal.customerId ?? '', dealId: deal.id } as Activity })}
+            onEdit={() => setForm({ open: true, item: deal })}
+            onDelete={canManage ? () => setConfirm(deal) : undefined}
+            compact
+          />
         </CardContent>
       </Card>)}
     </Paper>)}</Box>
     <DealDialog form={form} stages={stages} customers={customers} defaultStageId={defaultStageId} onClose={() => setForm({ open: false })} onSave={saveDeal} />
     <StageDialog form={stageForm} onClose={() => setStageForm({ open: false })} onSave={saveStage} />
+    <ActivityDialog form={activityForm} customers={customers} deals={deals} onClose={() => setActivityForm({ open: false })} onSave={saveActivity} />
     <ConfirmDialog title="Eliminar negocio" text={`Se eliminara ${confirm?.title}.`} open={!!confirm} onClose={() => setConfirm(undefined)} onConfirm={remove} />
     <Notice notice={notice} onClose={() => setNotice(undefined)} />
   </Stack>;
@@ -982,8 +1055,10 @@ function EntityTable({ headers, rows, empty }: { headers: string[]; rows: ReactN
   return <Card><Table><TableHead><TableRow>{headers.map((h) => <TableCell key={h}>{h}</TableCell>)}</TableRow></TableHead><TableBody>{rows.length ? rows.map((row, i) => <TableRow key={i}>{row.map((c, j) => <TableCell key={j}>{c ?? '-'}</TableCell>)}</TableRow>) : <TableRow><TableCell colSpan={headers.length}><EmptyState text={empty} /></TableCell></TableRow>}</TableBody></Table></Card>;
 }
 
-function Actions({ onEdit, onDelete, onConvert, onDownload, compact }: { onEdit?: () => void; onDelete?: () => void; onConvert?: () => void; onDownload?: () => void; compact?: boolean }) {
+function Actions({ onView, onEdit, onDelete, onConvert, onDownload, onActivity, compact }: { onView?: () => void; onEdit?: () => void; onDelete?: () => void; onConvert?: () => void; onDownload?: () => void; onActivity?: () => void; compact?: boolean }) {
   return <Stack direction="row" gap={compact ? .5 : 1} sx={{ mt: compact ? 1 : 0 }}>
+    {onView && <Tooltip title="Ver cliente 360"><IconButton size="small" onClick={onView}><Visibility fontSize="small" /></IconButton></Tooltip>}
+    {onActivity && <Tooltip title="Registrar actividad"><IconButton size="small" onClick={onActivity}><AddTask fontSize="small" /></IconButton></Tooltip>}
     {onEdit && <Tooltip title="Editar"><IconButton size="small" onClick={onEdit}><Edit fontSize="small" /></IconButton></Tooltip>}
     {onConvert && <Tooltip title="Convertir a cliente"><IconButton size="small" onClick={onConvert}><SyncAlt fontSize="small" /></IconButton></Tooltip>}
     {onDownload && <Tooltip title="Descargar PDF"><IconButton size="small" onClick={onDownload}><Download fontSize="small" /></IconButton></Tooltip>}
