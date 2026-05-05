@@ -66,6 +66,7 @@ public sealed class CreditApplicationsController(CrmDbContext db) : ControllerBa
         }
 
         db.SolicitudesCredito.Add(entity);
+        await SyncPipelineAsync(entity, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         entity.Cliente = customer;
         entity.Producto = product;
@@ -105,6 +106,7 @@ public sealed class CreditApplicationsController(CrmDbContext db) : ControllerBa
         entity.Estado = dto.Status;
         entity.Observaciones = dto.Notes;
 
+        await SyncPipelineAsync(entity, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         entity.Producto = product;
         return Ok(ToDto(entity));
@@ -121,6 +123,7 @@ public sealed class CreditApplicationsController(CrmDbContext db) : ControllerBa
             ?? throw new KeyNotFoundException("Solicitud de credito no encontrada.");
 
         entity.Estado = dto.Status;
+        await SyncPipelineAsync(entity, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         return Ok(ToDto(entity));
     }
@@ -144,6 +147,13 @@ public sealed class CreditApplicationsController(CrmDbContext db) : ControllerBa
             ? dto.ReceivedAt ?? DateTime.UtcNow
             : dto.ReceivedAt;
         document.Observaciones = dto.Notes;
+
+        if (entity.Documentos.Count > 0 && entity.Documentos.All(x => x.Estado is EstadoDocumentoCredito.Recibido or EstadoDocumentoCredito.Validado))
+        {
+            entity.Estado = EstadoSolicitudCredito.DocumentosRecibidos;
+        }
+
+        await SyncPipelineAsync(entity, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         return Ok(ToDto(entity));
     }
@@ -166,6 +176,43 @@ public sealed class CreditApplicationsController(CrmDbContext db) : ControllerBa
         new() { Tipo = TipoDocumentoCredito.ReciboServicio, Nombre = "Recibo de servicio o direccion" },
         new() { Tipo = TipoDocumentoCredito.Referencias, Nombre = "Referencias" }
     ];
+
+    private async Task SyncPipelineAsync(SolicitudCredito application, CancellationToken cancellationToken)
+    {
+        if (!application.NegocioId.HasValue) return;
+
+        var deal = await db.Negocios.FirstOrDefaultAsync(x => x.Id == application.NegocioId.Value, cancellationToken);
+        if (deal is null) return;
+
+        var stageName = application.Estado switch
+        {
+            EstadoSolicitudCredito.DocumentosPendientes => "Preaprobacion",
+            EstadoSolicitudCredito.DocumentosRecibidos => "Documentos recibidos",
+            EstadoSolicitudCredito.EnEstudio => "Estudio de credito",
+            EstadoSolicitudCredito.Aprobada => "Aprobado",
+            EstadoSolicitudCredito.Rechazada => "Perdido",
+            EstadoSolicitudCredito.Desembolsada => "Entregada",
+            _ => null
+        };
+
+        if (stageName is not null)
+        {
+            var stage = await db.EtapasNegocio
+                .FirstOrDefaultAsync(x => x.Activa && x.Nombre == stageName, cancellationToken);
+            if (stage is not null)
+            {
+                deal.EtapaNegocioId = stage.Id;
+                deal.ProbabilidadCierre = stage.ProbabilidadPredeterminada;
+            }
+        }
+
+        deal.Estado = application.Estado switch
+        {
+            EstadoSolicitudCredito.Rechazada => EstadoNegocio.Perdido,
+            EstadoSolicitudCredito.Desembolsada => EstadoNegocio.Ganado,
+            _ => EstadoNegocio.Abierto
+        };
+    }
 
     private static CreditApplicationDto ToDto(SolicitudCredito x)
     {

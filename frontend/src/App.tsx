@@ -25,6 +25,7 @@ import Download from '@mui/icons-material/Download';
 import Assignment from '@mui/icons-material/Assignment';
 import Visibility from '@mui/icons-material/Visibility';
 import AddTask from '@mui/icons-material/AddTask';
+import WhatsApp from '@mui/icons-material/WhatsApp';
 import { AxiosError } from 'axios';
 import { api } from './api';
 import { useAuthStore } from './store';
@@ -236,7 +237,7 @@ function Customer360Page() {
     <Header title={customer ? `${customer.firstNames || customer.name} ${customer.lastNames}`.trim() : 'Cliente 360'} onRefresh={reload} secondaryAction={{ label: 'Volver', onClick: () => navigate('/clientes') }} />
     <StatusBar loading={loading} error={error} />
     {customer && <Grid container spacing={2}>
-      <Grid item xs={12} md={3}><Metric label="Telefono / WhatsApp" value={customer.phone || '-'} /></Grid>
+      <Grid item xs={12} md={3}><Metric label="Telefono / WhatsApp" value={customer.phone ? <Button size="small" startIcon={<WhatsApp />} href={whatsappUrl(customer.phone)} target="_blank" rel="noreferrer">{customer.phone}</Button> : '-'} /></Grid>
       <Grid item xs={12} md={3}><Metric label="Email" value={customer.email || '-'} /></Grid>
       <Grid item xs={12} md={3}><Metric label="Estado" value={statusLabel(customer.status)} /></Grid>
       <Grid item xs={12} md={3}><Metric label="Etiquetas" value={customer.tags || '-'} /></Grid>
@@ -584,7 +585,10 @@ function PipelinePage() {
         </Stack>
         {canManage && <Tooltip title="Editar etapa"><IconButton size="small" onClick={() => setStageForm({ open: true, item: stage })}><Edit fontSize="small" /></IconButton></Tooltip>}
       </Stack>
-      {deals.filter((d) => d.stageId === stage.id).map((deal) => <Card key={deal.id} sx={{ mt: 1 }}>
+      {deals.filter((d) => d.stageId === stage.id).map((deal) => {
+        const dealCustomer = customers.find((x) => x.id === deal.customerId);
+        const dealCustomerPhone = dealCustomer?.phone;
+        return <Card key={deal.id} sx={{ mt: 1 }}>
         <CardContent>
           <Stack direction="row" justifyContent="space-between" gap={1}>
             <Typography fontWeight={800}>{deal.title}</Typography>
@@ -594,13 +598,15 @@ function PipelinePage() {
           <LinearProgress variant="determinate" value={deal.closeProbability} sx={{ mt: 1 }} />
           <Actions
             onView={deal.customerId ? () => navigate(`/clientes/${deal.customerId}`) : undefined}
+            onWhatsapp={dealCustomerPhone ? () => window.open(whatsappUrl(dealCustomerPhone), '_blank', 'noopener,noreferrer') : undefined}
             onActivity={() => setActivityForm({ open: true, item: { ...emptyActivity, title: `Seguimiento: ${deal.title}`, customerId: deal.customerId ?? '', dealId: deal.id } as Activity })}
             onEdit={() => setForm({ open: true, item: deal })}
             onDelete={canManage ? () => setConfirm(deal) : undefined}
             compact
           />
         </CardContent>
-      </Card>)}
+      </Card>;
+      })}
     </Paper>)}</Box>
     <DealDialog form={form} stages={stages} customers={customers} defaultStageId={defaultStageId} onClose={() => setForm({ open: false })} onSave={saveDeal} />
     <StageDialog form={stageForm} onClose={() => setStageForm({ open: false })} onSave={saveStage} />
@@ -1055,9 +1061,10 @@ function EntityTable({ headers, rows, empty }: { headers: string[]; rows: ReactN
   return <Card><Table><TableHead><TableRow>{headers.map((h) => <TableCell key={h}>{h}</TableCell>)}</TableRow></TableHead><TableBody>{rows.length ? rows.map((row, i) => <TableRow key={i}>{row.map((c, j) => <TableCell key={j}>{c ?? '-'}</TableCell>)}</TableRow>) : <TableRow><TableCell colSpan={headers.length}><EmptyState text={empty} /></TableCell></TableRow>}</TableBody></Table></Card>;
 }
 
-function Actions({ onView, onEdit, onDelete, onConvert, onDownload, onActivity, compact }: { onView?: () => void; onEdit?: () => void; onDelete?: () => void; onConvert?: () => void; onDownload?: () => void; onActivity?: () => void; compact?: boolean }) {
+function Actions({ onView, onEdit, onDelete, onConvert, onDownload, onActivity, onWhatsapp, compact }: { onView?: () => void; onEdit?: () => void; onDelete?: () => void; onConvert?: () => void; onDownload?: () => void; onActivity?: () => void; onWhatsapp?: () => void; compact?: boolean }) {
   return <Stack direction="row" gap={compact ? .5 : 1} sx={{ mt: compact ? 1 : 0 }}>
     {onView && <Tooltip title="Ver cliente 360"><IconButton size="small" onClick={onView}><Visibility fontSize="small" /></IconButton></Tooltip>}
+    {onWhatsapp && <Tooltip title="Abrir WhatsApp"><IconButton size="small" onClick={onWhatsapp}><WhatsApp fontSize="small" /></IconButton></Tooltip>}
     {onActivity && <Tooltip title="Registrar actividad"><IconButton size="small" onClick={onActivity}><AddTask fontSize="small" /></IconButton></Tooltip>}
     {onEdit && <Tooltip title="Editar"><IconButton size="small" onClick={onEdit}><Edit fontSize="small" /></IconButton></Tooltip>}
     {onConvert && <Tooltip title="Convertir a cliente"><IconButton size="small" onClick={onConvert}><SyncAlt fontSize="small" /></IconButton></Tooltip>}
@@ -1131,6 +1138,11 @@ function toInputDateTime(value: string) {
 }
 
 function money(value?: number) { return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(value ?? 0); }
+function whatsappUrl(value: string) {
+  const digits = value.replace(/\D/g, '');
+  const withCountry = digits.startsWith('57') ? digits : `57${digits}`;
+  return `https://wa.me/${withCountry}`;
+}
 function statusLabel(value: number) { return ['-', 'Activo', 'Inactivo', 'Suspendido'][value] ?? 'Activo'; }
 function ratingLabel(value: number) { return ['-', 'Frio', 'Tibio', 'Caliente'][value] ?? 'Frio'; }
 function typeLabel(value: number) { return ['-', 'Tarea', 'Llamada', 'Reunion'][value] ?? 'Tarea'; }
