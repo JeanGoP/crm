@@ -116,6 +116,17 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
             x.ValorMoto,
             x.Estado,
             x.Observaciones,
-            x.Documentos.OrderBy(d => d.Tipo).Select(d => new CreditDocumentDto(d.Id, d.Tipo, d.Nombre, d.Estado, d.FechaRecepcion, d.Observaciones)).ToList());
+            x.Documentos.OrderBy(d => d.Tipo).Select(d => new CreditDocumentDto(
+                d.Id,
+                d.Tipo,
+                d.Nombre,
+                d.Estado,
+                d.FechaRecepcion,
+                d.Observaciones,
+                !string.IsNullOrWhiteSpace(d.RutaArchivo),
+                d.NombreArchivo,
+                d.ContentType,
+                d.TamanoBytes,
+                d.FechaCarga)).ToList());
     }
 }

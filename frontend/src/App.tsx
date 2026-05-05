@@ -22,6 +22,7 @@ import Close from '@mui/icons-material/Close';
 import Inventory2 from '@mui/icons-material/Inventory2';
 import ReceiptLong from '@mui/icons-material/ReceiptLong';
 import Download from '@mui/icons-material/Download';
+import UploadFile from '@mui/icons-material/UploadFile';
 import Assignment from '@mui/icons-material/Assignment';
 import Visibility from '@mui/icons-material/Visibility';
 import AddTask from '@mui/icons-material/AddTask';
@@ -427,6 +428,32 @@ function CreditApplicationsPage() {
     setData(rows.map((x) => x.id === data.id ? data : x));
   };
 
+  const uploadDocument = async (application: CreditApplication, document: CreditDocument, file: File) => {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const { data } = await api.post<CreditApplication>(`/api/credit-applications/${application.id}/documents/${document.id}/file`, formData);
+      setData(rows.map((x) => x.id === data.id ? data : x));
+      setNotice({ type: 'success', text: `${document.name} cargado correctamente.` });
+    } catch (err) {
+      setNotice({ type: 'error', text: apiError(err) });
+    }
+  };
+
+  const downloadDocument = async (application: CreditApplication, document: CreditDocument) => {
+    try {
+      const response = await api.get<Blob>(`/api/credit-applications/${application.id}/documents/${document.id}/file`, { responseType: 'blob' });
+      const url = URL.createObjectURL(response.data);
+      const anchor = window.document.createElement('a');
+      anchor.href = url;
+      anchor.download = document.fileName || document.name;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setNotice({ type: 'error', text: apiError(err) });
+    }
+  };
+
   return <Stack spacing={3}>
     <Header title="Solicitudes de credito" action="Nueva solicitud" onAction={() => setForm({ open: true })} onRefresh={reload} />
     <StatusBar loading={loading} error={error} />
@@ -441,7 +468,7 @@ function CreditApplicationsPage() {
         money(r.monthlyIncome),
         money(r.downPayment),
         `${r.termMonths} meses`,
-        <DocumentSummary application={r} onUpdate={updateDocument} />,
+        <DocumentSummary application={r} onUpdate={updateDocument} onUpload={uploadDocument} onDownload={downloadDocument} />,
         <Stack direction="row" gap={1} alignItems="center">
           <Actions onEdit={() => setForm({ open: true, item: r })} />
           <TextField select size="small" label="Estado" value={r.status} onChange={(e) => changeStatus(r, Number(e.target.value))} sx={{ minWidth: 160 }}>
@@ -910,13 +937,38 @@ function CreditApplicationDialog({ form, customers, products, quotes, deals, onC
   </FormDialog>;
 }
 
-function DocumentSummary({ application, onUpdate }: { application: CreditApplication; onUpdate: (application: CreditApplication, document: CreditDocument, status: number) => Promise<void> }) {
+function DocumentSummary({ application, onUpdate, onUpload, onDownload }: {
+  application: CreditApplication;
+  onUpdate: (application: CreditApplication, document: CreditDocument, status: number) => Promise<void>;
+  onUpload: (application: CreditApplication, document: CreditDocument, file: File) => Promise<void>;
+  onDownload: (application: CreditApplication, document: CreditDocument) => Promise<void>;
+}) {
   return <Stack spacing={.75}>
     {application.documents.map((document) => <Stack key={document.id} direction="row" alignItems="center" justifyContent="space-between" gap={1}>
-      <Chip size="small" label={`${document.name}: ${documentStatus(document.status)}`} color={document.status === 3 ? 'success' : document.status === 4 ? 'error' : undefined} variant={document.status === 1 ? 'outlined' : 'filled'} />
-      <TextField select size="small" value={document.status} onChange={(e) => onUpdate(application, document, Number(e.target.value))} sx={{ width: 122 }}>
-        {[1, 2, 3, 4].map((status) => <MenuItem key={status} value={status}>{documentStatus(status)}</MenuItem>)}
-      </TextField>
+      <Stack spacing={.25} sx={{ minWidth: 180 }}>
+        <Chip size="small" label={`${document.name}: ${documentStatus(document.status)}`} color={document.status === 3 ? 'success' : document.status === 4 ? 'error' : undefined} variant={document.status === 1 ? 'outlined' : 'filled'} />
+        {document.hasFile && <Typography variant="caption" color="text.secondary" noWrap>{document.fileName}</Typography>}
+      </Stack>
+      <Stack direction="row" alignItems="center" gap={.5}>
+        <Tooltip title="Subir documento">
+          <IconButton component="label" size="small" color={document.hasFile ? 'success' : 'primary'}>
+            <UploadFile fontSize="small" />
+            <input hidden type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,image/*" onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) onUpload(application, document, file);
+              e.currentTarget.value = '';
+            }} />
+          </IconButton>
+        </Tooltip>
+        {document.hasFile && <Tooltip title="Descargar documento">
+          <IconButton size="small" onClick={() => onDownload(application, document)}>
+            <Download fontSize="small" />
+          </IconButton>
+        </Tooltip>}
+        <TextField select size="small" value={document.status} onChange={(e) => onUpdate(application, document, Number(e.target.value))} sx={{ width: 122 }}>
+          {[1, 2, 3, 4].map((status) => <MenuItem key={status} value={status}>{documentStatus(status)}</MenuItem>)}
+        </TextField>
+      </Stack>
     </Stack>)}
   </Stack>;
 }

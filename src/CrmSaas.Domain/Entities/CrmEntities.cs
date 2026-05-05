@@ -151,4 +151,9 @@ public sealed class DocumentoSolicitudCredito : AuditableTenantEntity
     public EstadoDocumentoCredito Estado { get; set; } = EstadoDocumentoCredito.Pendiente;
     public DateTime? FechaRecepcion { get; set; }
     public string? Observaciones { get; set; }
+    public string? NombreArchivo { get; set; }
+    public string? RutaArchivo { get; set; }
+    public string? ContentType { get; set; }
+    public long? TamanoBytes { get; set; }
+    public DateTime? FechaCarga { get; set; }
 }

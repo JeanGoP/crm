@@ -107,6 +107,11 @@ export interface CreditDocument {
   status: number;
   receivedAt?: string;
   notes?: string;
+  hasFile: boolean;
+  fileName?: string;
+  contentType?: string;
+  sizeBytes?: number;
+  uploadedAt?: string;
 }
 
 export interface CreditApplication {

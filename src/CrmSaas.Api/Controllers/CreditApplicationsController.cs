@@ -12,8 +12,19 @@ namespace CrmSaas.Api.Controllers;
 [ApiController]
 [Authorize]
 [Route("api/credit-applications")]
-public sealed class CreditApplicationsController(CrmDbContext db) : ControllerBase
+public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnvironment env) : ControllerBase
 {
+    private static readonly HashSet<string> AllowedFileExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".pdf",
+        ".jpg",
+        ".jpeg",
+        ".png",
+        ".webp"
+    };
+
+    private const long MaxFileSizeBytes = 10 * 1024 * 1024;
+
     [HttpGet]
     public async Task<ActionResult<IReadOnlyCollection<CreditApplicationDto>>> Get(CancellationToken cancellationToken)
     {
@@ -148,14 +159,79 @@ public sealed class CreditApplicationsController(CrmDbContext db) : ControllerBa
             : dto.ReceivedAt;
         document.Observaciones = dto.Notes;
 
-        if (entity.Documentos.Count > 0 && entity.Documentos.All(x => x.Estado is EstadoDocumentoCredito.Recibido or EstadoDocumentoCredito.Validado))
-        {
-            entity.Estado = EstadoSolicitudCredito.DocumentosRecibidos;
-        }
+        MarkReadyIfDocumentsComplete(entity);
 
         await SyncPipelineAsync(entity, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         return Ok(ToDto(entity));
+    }
+
+    [HttpPost("{id:guid}/documents/{documentId:guid}/file")]
+    [RequestSizeLimit(MaxFileSizeBytes)]
+    public async Task<ActionResult<CreditApplicationDto>> UploadDocument(Guid id, Guid documentId, IFormFile file, CancellationToken cancellationToken)
+    {
+        if (file is null || file.Length == 0) throw new ValidationException("Debe seleccionar un archivo.");
+        if (file.Length > MaxFileSizeBytes) throw new ValidationException("El archivo no puede superar 10 MB.");
+
+        var extension = Path.GetExtension(file.FileName);
+        if (!AllowedFileExtensions.Contains(extension))
+        {
+            throw new ValidationException("Solo se permiten archivos PDF o imagenes JPG, PNG y WEBP.");
+        }
+
+        var entity = await db.SolicitudesCredito
+            .Include(x => x.Cliente)
+            .Include(x => x.Producto)
+            .Include(x => x.Documentos)
+            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
+            ?? throw new KeyNotFoundException("Solicitud de credito no encontrada.");
+        var document = entity.Documentos.FirstOrDefault(x => x.Id == documentId)
+            ?? throw new KeyNotFoundException("Documento no encontrado.");
+
+        var originalName = Path.GetFileName(file.FileName);
+        var folder = Path.Combine(StorageRoot, "credit-documents", entity.EmpresaId.ToString("N"), entity.Id.ToString("N"));
+        Directory.CreateDirectory(folder);
+        var storedName = $"{document.Id:N}-{Guid.NewGuid():N}{extension.ToLowerInvariant()}";
+        var path = Path.Combine(folder, storedName);
+
+        await using (var stream = System.IO.File.Create(path))
+        {
+            await file.CopyToAsync(stream, cancellationToken);
+        }
+
+        DeleteStoredFile(document.RutaArchivo);
+
+        document.NombreArchivo = originalName;
+        document.RutaArchivo = path;
+        document.ContentType = string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType;
+        document.TamanoBytes = file.Length;
+        document.FechaCarga = DateTime.UtcNow;
+        document.Estado = EstadoDocumentoCredito.Recibido;
+        document.FechaRecepcion = DateTime.UtcNow;
+
+        MarkReadyIfDocumentsComplete(entity);
+        await SyncPipelineAsync(entity, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+        return Ok(ToDto(entity));
+    }
+
+    [HttpGet("{id:guid}/documents/{documentId:guid}/file")]
+    public async Task<IActionResult> DownloadDocument(Guid id, Guid documentId, CancellationToken cancellationToken)
+    {
+        var document = await db.DocumentosSolicitudCredito
+            .Where(x => x.SolicitudCreditoId == id && x.Id == documentId)
+            .FirstOrDefaultAsync(cancellationToken)
+            ?? throw new KeyNotFoundException("Documento no encontrado.");
+
+        if (string.IsNullOrWhiteSpace(document.RutaArchivo) || !IsStoredPath(document.RutaArchivo) || !System.IO.File.Exists(document.RutaArchivo))
+        {
+            throw new KeyNotFoundException("El archivo no esta disponible en el servidor.");
+        }
+
+        return PhysicalFile(
+            document.RutaArchivo,
+            string.IsNullOrWhiteSpace(document.ContentType) ? "application/octet-stream" : document.ContentType,
+            string.IsNullOrWhiteSpace(document.NombreArchivo) ? document.Nombre : document.NombreArchivo);
     }
 
     private static void Validate(UpsertCreditApplicationDto dto)
@@ -176,6 +252,29 @@ public sealed class CreditApplicationsController(CrmDbContext db) : ControllerBa
         new() { Tipo = TipoDocumentoCredito.ReciboServicio, Nombre = "Recibo de servicio o direccion" },
         new() { Tipo = TipoDocumentoCredito.Referencias, Nombre = "Referencias" }
     ];
+
+    private static void MarkReadyIfDocumentsComplete(SolicitudCredito entity)
+    {
+        if (entity.Documentos.Count > 0 && entity.Documentos.All(x => x.Estado is EstadoDocumentoCredito.Recibido or EstadoDocumentoCredito.Validado))
+        {
+            entity.Estado = EstadoSolicitudCredito.DocumentosRecibidos;
+        }
+    }
+
+    private string StorageRoot => Path.Combine(env.ContentRootPath, "App_Data", "uploads");
+
+    private bool IsStoredPath(string path)
+    {
+        var fullRoot = Path.GetFullPath(StorageRoot);
+        var fullPath = Path.GetFullPath(path);
+        return fullPath.StartsWith(fullRoot, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void DeleteStoredFile(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path) || !IsStoredPath(path) || !System.IO.File.Exists(path)) return;
+        System.IO.File.Delete(path);
+    }
 
     private async Task SyncPipelineAsync(SolicitudCredito application, CancellationToken cancellationToken)
     {
@@ -241,6 +340,20 @@ public sealed class CreditApplicationsController(CrmDbContext db) : ControllerBa
             x.ValorMoto,
             x.Estado,
             x.Observaciones,
-            x.Documentos.OrderBy(d => d.Tipo).Select(d => new CreditDocumentDto(d.Id, d.Tipo, d.Nombre, d.Estado, d.FechaRecepcion, d.Observaciones)).ToList());
+            x.Documentos.OrderBy(d => d.Tipo).Select(ToDocumentDto).ToList());
     }
+
+    private static CreditDocumentDto ToDocumentDto(DocumentoSolicitudCredito d) =>
+        new(
+            d.Id,
+            d.Tipo,
+            d.Nombre,
+            d.Estado,
+            d.FechaRecepcion,
+            d.Observaciones,
+            !string.IsNullOrWhiteSpace(d.RutaArchivo),
+            d.NombreArchivo,
+            d.ContentType,
+            d.TamanoBytes,
+            d.FechaCarga);
 }

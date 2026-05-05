@@ -66,7 +66,18 @@ public sealed record UpsertCreditApplicationDto(
     EstadoSolicitudCredito Status,
     string? Notes);
 
-public sealed record CreditDocumentDto(Guid Id, TipoDocumentoCredito Type, string Name, EstadoDocumentoCredito Status, DateTime? ReceivedAt, string? Notes);
+public sealed record CreditDocumentDto(
+    Guid Id,
+    TipoDocumentoCredito Type,
+    string Name,
+    EstadoDocumentoCredito Status,
+    DateTime? ReceivedAt,
+    string? Notes,
+    bool HasFile,
+    string? FileName,
+    string? ContentType,
+    long? SizeBytes,
+    DateTime? UploadedAt);
 public sealed record UpsertCreditDocumentDto(TipoDocumentoCredito Type, string Name, EstadoDocumentoCredito Status, DateTime? ReceivedAt, string? Notes);
 public sealed record ChangeCreditApplicationStatusDto(EstadoSolicitudCredito Status);
 
