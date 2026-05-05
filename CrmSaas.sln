@@ -1,0 +1,48 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{9BF3318E-EACC-46B4-82E8-E18819990E3F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CrmSaas.Domain", "src\CrmSaas.Domain\CrmSaas.Domain.csproj", "{CA2C33DE-9335-4D88-9ACC-C67683F37B4B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CrmSaas.Application", "src\CrmSaas.Application\CrmSaas.Application.csproj", "{7F2E1F08-11BB-47A7-B55F-E83589E07241}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CrmSaas.Infrastructure", "src\CrmSaas.Infrastructure\CrmSaas.Infrastructure.csproj", "{591C61F4-7593-4EF0-B23F-D7C02A5CEEB4}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CrmSaas.Api", "src\CrmSaas.Api\CrmSaas.Api.csproj", "{6C073DF1-23F4-4580-9013-313B918E25B9}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{CA2C33DE-9335-4D88-9ACC-C67683F37B4B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CA2C33DE-9335-4D88-9ACC-C67683F37B4B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CA2C33DE-9335-4D88-9ACC-C67683F37B4B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CA2C33DE-9335-4D88-9ACC-C67683F37B4B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7F2E1F08-11BB-47A7-B55F-E83589E07241}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7F2E1F08-11BB-47A7-B55F-E83589E07241}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7F2E1F08-11BB-47A7-B55F-E83589E07241}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7F2E1F08-11BB-47A7-B55F-E83589E07241}.Release|Any CPU.Build.0 = Release|Any CPU
+		{591C61F4-7593-4EF0-B23F-D7C02A5CEEB4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{591C61F4-7593-4EF0-B23F-D7C02A5CEEB4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{591C61F4-7593-4EF0-B23F-D7C02A5CEEB4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{591C61F4-7593-4EF0-B23F-D7C02A5CEEB4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6C073DF1-23F4-4580-9013-313B918E25B9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6C073DF1-23F4-4580-9013-313B918E25B9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6C073DF1-23F4-4580-9013-313B918E25B9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6C073DF1-23F4-4580-9013-313B918E25B9}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{CA2C33DE-9335-4D88-9ACC-C67683F37B4B} = {9BF3318E-EACC-46B4-82E8-E18819990E3F}
+		{7F2E1F08-11BB-47A7-B55F-E83589E07241} = {9BF3318E-EACC-46B4-82E8-E18819990E3F}
+		{591C61F4-7593-4EF0-B23F-D7C02A5CEEB4} = {9BF3318E-EACC-46B4-82E8-E18819990E3F}
+		{6C073DF1-23F4-4580-9013-313B918E25B9} = {9BF3318E-EACC-46B4-82E8-E18819990E3F}
+	EndGlobalSection
+EndGlobal
