@@ -41,7 +41,7 @@ Puede trabajar sobre clientes, cotizaciones, solicitudes, actividades y pipeline
 
 Pantalla de inicio de sesion:
 
-![Login](assets/manual/01-login.png)
+![Login](./assets/manual/01-login.png)
 
 ### Para que sirve
 
@@ -76,7 +76,7 @@ En la barra superior se muestra el usuario autenticado, su rol principal y el bo
 
 ## 6. Dashboard
 
-![Dashboard](assets/manual/02-dashboard.png)
+![Dashboard](./assets/manual/02-dashboard.png)
 
 ### Para que sirve
 
@@ -100,7 +100,7 @@ Resume el estado comercial de la empresa: valor del pipeline, clientes activos, 
 
 ## 7. Clientes
 
-![Clientes](assets/manual/03-clientes.png)
+![Clientes](./assets/manual/03-clientes.png)
 
 ### Para que sirve
 
@@ -142,7 +142,7 @@ Desde el cliente se puede acceder a su resumen completo: cotizaciones, solicitud
 
 ## 8. Productos
 
-![Productos](assets/manual/04-productos.png)
+![Productos](./assets/manual/04-productos.png)
 
 ### Para que sirve
 
@@ -175,7 +175,7 @@ Los productos activos aparecen disponibles para crear cotizaciones y solicitudes
 
 ## 9. Cotizaciones
 
-![Cotizaciones](assets/manual/05-cotizaciones.png)
+![Cotizaciones](./assets/manual/05-cotizaciones.png)
 
 ### Para que sirve
 
@@ -212,7 +212,7 @@ Cuando se crea una cotizacion, el cliente queda disponible en **Clientes** para 
 
 ## 10. Solicitudes de credito
 
-![Solicitudes credito](assets/manual/06-solicitudes-credito.png)
+![Solicitudes credito](./assets/manual/06-solicitudes-credito.png)
 
 ### Para que sirve
 
@@ -283,7 +283,7 @@ Cuando la solicitud cambia de estado, el negocio relacionado puede moverse autom
 
 ## 11. Prospectos
 
-![Prospectos](assets/manual/07-prospectos.png)
+![Prospectos](./assets/manual/07-prospectos.png)
 
 ### Para que sirve
 
@@ -322,7 +322,7 @@ Permite registrar personas interesadas que aun no son clientes. Un prospecto rep
 
 ## 12. Pipeline
 
-![Pipeline](assets/manual/08-pipeline.png)
+![Pipeline](./assets/manual/08-pipeline.png)
 
 ### Para que sirve
 
@@ -364,7 +364,7 @@ Si una solicitud de credito esta relacionada con un negocio, los cambios de esta
 
 ## 13. Actividades
 
-![Actividades](assets/manual/09-actividades.png)
+![Actividades](./assets/manual/09-actividades.png)
 
 ### Para que sirve
 
@@ -402,7 +402,7 @@ Permite programar tareas, llamadas y reuniones para hacer seguimiento comercial.
 
 ## 14. Configuracion
 
-![Configuracion](assets/manual/10-configuracion.png)
+![Configuracion](./assets/manual/10-configuracion.png)
 
 ### Para que sirve
 
@@ -481,4 +481,3 @@ Si aparece un error, revise primero los datos ingresados. Si el error persiste, 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
 | 2026-05-05 | 1.0 | Creacion inicial del manual con capturas reales y documentacion de modulos actuales. |
-
