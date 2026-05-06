@@ -1,7 +1,7 @@
 # Manual del Sistema CRM SaaS
 
 Ultima actualizacion: 2026-05-06  
-Version del manual: 1.3  
+Version del manual: 1.4  
 Sistema: CRM SaaS para ventas de motos a credito  
 Ambiente documentado: Desarrollo local conectado a SQL Server
 
@@ -141,6 +141,8 @@ Segun los permisos del usuario, el sistema permite eliminar o marcar registros p
 ### Vista 360 del cliente
 
 Desde el cliente se puede acceder a su resumen completo: cotizaciones, solicitudes de credito, negocios del pipeline, actividades relacionadas e historial completo.
+
+Tambien permite crear un **Nuevo seguimiento** directamente desde la ficha del cliente. La actividad queda relacionada automaticamente con el cliente para que aparezca en su historial y en el modulo de Actividades.
 
 ### Historial del cliente
 
@@ -433,7 +435,7 @@ Si una solicitud de credito esta relacionada con un negocio, los cambios de esta
 
 ### Para que sirve
 
-Permite programar tareas, llamadas y reuniones para hacer seguimiento comercial.
+Permite programar tareas, llamadas y reuniones para hacer seguimiento comercial. El modulo esta pensado como agenda diaria del vendedor y supervisor.
 
 ### Tipos
 
@@ -448,6 +450,17 @@ Permite programar tareas, llamadas y reuniones para hacer seguimiento comercial.
 - Completada
 - Cancelada
 
+### Indicadores y filtros
+
+La pantalla muestra indicadores de seguimiento:
+
+- **Vencidas:** actividades abiertas con fecha anterior a hoy.
+- **Para hoy:** actividades abiertas programadas para el dia actual.
+- **Proximas:** actividades abiertas con fecha futura.
+- **Completadas:** actividades finalizadas.
+
+Tambien incluye filtros rapidos por estado y vencimiento para trabajar primero lo urgente.
+
 ### Crear actividad
 
 1. Abra **Actividades**.
@@ -458,6 +471,17 @@ Permite programar tareas, llamadas y reuniones para hacer seguimiento comercial.
 6. Configure recordatorio si aplica.
 7. Relacione cliente o negocio si corresponde.
 8. Guarde.
+
+### Acciones rapidas
+
+Desde la tabla de actividades se puede:
+
+- Marcar una actividad como **En proceso**.
+- Marcarla como **Completada**.
+- Reprogramarla para manana.
+- Cancelarla.
+- Editarla.
+- Eliminarla si el rol tiene permisos.
 
 ### Buenas practicas
 
@@ -545,6 +569,7 @@ Si aparece un error, revise primero los datos ingresados. Si el error persiste, 
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-05-06 | 1.4 | Se mejora gestion de actividades con indicadores, filtros por vencimiento, nombres de cliente/negocio, acciones rapidas y creacion de seguimientos desde Cliente 360. |
 | 2026-05-06 | 1.3 | Se agrega historial completo del cliente en Cliente 360 con timeline cronologico de cotizaciones, solicitudes, documentos, decisiones, pipeline, actividades y notas. |
 | 2026-05-06 | 1.2 | Se agrega flujo formal de aprobaciones para solicitudes de credito con fechas, usuario de decision y acciones controladas. |
 | 2026-05-06 | 1.1 | Se agrega simulador de credito en cotizaciones, cuota estimada en listado y PDF con informacion financiera. |

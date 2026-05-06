@@ -33,6 +33,7 @@ public sealed class CrmMappingProfile : Profile
 
         CreateMap<UpsertDealDto, Negocio>()
             .ForMember(dest => dest.Titulo, opt => opt.MapFrom(src => src.Title))
+            .ForMember(dest => dest.ClienteId, opt => opt.MapFrom(src => src.CustomerId))
             .ForMember(dest => dest.EtapaNegocioId, opt => opt.MapFrom(src => src.StageId))
             .ForMember(dest => dest.ProbabilidadCierre, opt => opt.MapFrom(src => src.CloseProbability))
             .ForMember(dest => dest.FechaEstimadaCierre, opt => opt.MapFrom(src => src.EstimatedCloseDate))
@@ -45,6 +46,8 @@ public sealed class CrmMappingProfile : Profile
             .ForMember(dest => dest.Estado, opt => opt.MapFrom(src => src.Status))
             .ForMember(dest => dest.FechaProgramada, opt => opt.MapFrom(src => src.ScheduledAt))
             .ForMember(dest => dest.RecordatorioEn, opt => opt.MapFrom(src => src.ReminderAt))
+            .ForMember(dest => dest.ClienteId, opt => opt.MapFrom(src => src.CustomerId))
+            .ForMember(dest => dest.NegocioId, opt => opt.MapFrom(src => src.DealId))
             .ForMember(dest => dest.UsuarioAsignadoId, opt => opt.MapFrom(src => src.AssignedUserId));
     }
 

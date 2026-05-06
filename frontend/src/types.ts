@@ -70,6 +70,8 @@ export interface Activity {
   customerId?: string;
   dealId?: string;
   assignedUserId?: string;
+  customerName?: string;
+  dealTitle?: string;
 }
 
 export interface Product {

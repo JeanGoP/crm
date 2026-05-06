@@ -47,7 +47,7 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
         var activities = await db.Actividades
             .Where(x => x.ClienteId == id)
             .OrderByDescending(x => x.FechaProgramada)
-            .Select(x => new ActivityDto(x.Id, x.Titulo, x.Descripcion, x.Tipo, x.Estado, x.FechaProgramada, x.RecordatorioEn, x.ClienteId, x.NegocioId, x.UsuarioAsignadoId))
+            .Select(x => new ActivityDto(x.Id, x.Titulo, x.Descripcion, x.Tipo, x.Estado, x.FechaProgramada, x.RecordatorioEn, x.ClienteId, x.NegocioId, x.UsuarioAsignadoId, null, null))
             .ToListAsync(cancellationToken);
         var notes = await db.Notas
             .Where(x => x.ClienteId == id)

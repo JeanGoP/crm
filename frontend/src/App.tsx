@@ -233,9 +233,24 @@ function Customer360Page() {
   const navigate = useNavigate();
   const { data, loading, error, reload } = useResource<Customer360>(`/api/customers/${id}/summary`);
   const customer = data?.customer;
+  const [activityForm, setActivityForm] = useState<FormMode<Activity>>({ open: false });
+  const [notice, setNotice] = useState<Notice>();
+
+  const saveActivity = async (payload: typeof emptyActivity) => {
+    await api.post<Activity>('/api/activities', toActivityPayload(payload));
+    setNotice({ type: 'success', text: 'Seguimiento registrado.' });
+    setActivityForm({ open: false });
+    reload();
+  };
 
   return <Stack spacing={3}>
-    <Header title={customer ? `${customer.firstNames || customer.name} ${customer.lastNames}`.trim() : 'Cliente 360'} onRefresh={reload} secondaryAction={{ label: 'Volver', onClick: () => navigate('/clientes') }} />
+    <Header
+      title={customer ? `${customer.firstNames || customer.name} ${customer.lastNames}`.trim() : 'Cliente 360'}
+      action={customer ? 'Nuevo seguimiento' : undefined}
+      onAction={() => customer && setActivityForm({ open: true, item: { ...emptyActivity, title: `Seguimiento: ${customer.name}`, customerId: customer.id } as Activity })}
+      onRefresh={reload}
+      secondaryAction={{ label: 'Volver', onClick: () => navigate('/clientes') }}
+    />
     <StatusBar loading={loading} error={error} />
     {customer && <Grid container spacing={2}>
       <Grid item xs={12} md={3}><Metric label="Telefono / WhatsApp" value={customer.phone ? <Button size="small" startIcon={<WhatsApp />} href={whatsappUrl(customer.phone)} target="_blank" rel="noreferrer">{customer.phone}</Button> : '-'} /></Grid>
@@ -276,6 +291,8 @@ function Customer360Page() {
         </CardContent></Card>
       </Grid>
     </Grid>
+    <ActivityDialog form={activityForm} customers={customer ? [customer] : []} deals={data?.deals ?? []} onClose={() => setActivityForm({ open: false })} onSave={saveActivity} />
+    <Notice notice={notice} onClose={() => setNotice(undefined)} />
   </Stack>;
 }
 
@@ -647,17 +664,7 @@ function PipelinePage() {
   };
 
   const saveActivity = async (payload: typeof emptyActivity) => {
-    const body = {
-      ...payload,
-      type: Number(payload.type),
-      status: Number(payload.status),
-      customerId: payload.customerId || null,
-      dealId: payload.dealId || null,
-      assignedUserId: payload.assignedUserId || null,
-      scheduledAt: new Date(payload.scheduledAt).toISOString(),
-      reminderAt: payload.reminderAt ? new Date(payload.reminderAt).toISOString() : null
-    };
-    await api.post<Activity>('/api/activities', body);
+    await api.post<Activity>('/api/activities', toActivityPayload(payload));
     setNotice({ type: 'success', text: 'Actividad registrada.' });
     setActivityForm({ open: false });
   };
@@ -712,25 +719,32 @@ function ActivitiesPage() {
   const [form, setForm] = useState<FormMode<Activity>>({ open: false });
   const [confirm, setConfirm] = useState<Activity>();
   const [notice, setNotice] = useState<Notice>();
+  const [statusFilter, setStatusFilter] = useState<'open' | 'all' | 'done'>('open');
+  const [dueFilter, setDueFilter] = useState<'all' | 'overdue' | 'today' | 'upcoming'>('all');
   const canDelete = useCanManage();
+  const overdueCount = rows.filter((x) => activityDueState(x) === 'overdue').length;
+  const todayCount = rows.filter((x) => activityDueState(x) === 'today').length;
+  const upcomingCount = rows.filter((x) => activityDueState(x) === 'upcoming').length;
+  const completedCount = rows.filter((x) => x.status === 3).length;
+  const visibleRows = rows.filter((row) => {
+    const statusMatch = statusFilter === 'all' || (statusFilter === 'open' ? row.status === 1 || row.status === 2 : row.status === 3 || row.status === 4);
+    const dueMatch = dueFilter === 'all' || activityDueState(row) === dueFilter;
+    return statusMatch && dueMatch;
+  });
 
   const save = async (payload: typeof emptyActivity) => {
-    const body = {
-      ...payload,
-      type: Number(payload.type),
-      status: Number(payload.status),
-      customerId: payload.customerId || null,
-      dealId: payload.dealId || null,
-      assignedUserId: payload.assignedUserId || null,
-      scheduledAt: new Date(payload.scheduledAt).toISOString(),
-      reminderAt: payload.reminderAt ? new Date(payload.reminderAt).toISOString() : null
-    };
     const { data } = form.item
-      ? await api.put<Activity>(`/api/activities/${form.item.id}`, body)
-      : await api.post<Activity>('/api/activities', body);
+      ? await api.put<Activity>(`/api/activities/${form.item.id}`, toActivityPayload(payload))
+      : await api.post<Activity>('/api/activities', toActivityPayload(payload));
     setData(form.item ? rows.map((x) => x.id === data.id ? data : x) : [data, ...rows]);
     setNotice({ type: 'success', text: form.item ? 'Actividad actualizada.' : 'Actividad creada.' });
     setForm({ open: false });
+  };
+
+  const updateActivity = async (activity: Activity, patch: Partial<Activity>, message: string) => {
+    const { data } = await api.put<Activity>(`/api/activities/${activity.id}`, toActivityPayload({ ...activity, ...patch }));
+    setData(rows.map((x) => x.id === data.id ? data : x));
+    setNotice({ type: 'success', text: message });
   };
 
   const remove = async () => {
@@ -744,16 +758,48 @@ function ActivitiesPage() {
   return <Stack spacing={3}>
     <Header title="Actividades" action="Nueva actividad" onAction={() => setForm({ open: true })} onRefresh={reload} />
     <StatusBar loading={loading} error={error} />
+    <Grid container spacing={2}>
+      <Grid item xs={12} md={3}><Metric label="Vencidas" value={overdueCount} /></Grid>
+      <Grid item xs={12} md={3}><Metric label="Para hoy" value={todayCount} /></Grid>
+      <Grid item xs={12} md={3}><Metric label="Proximas" value={upcomingCount} /></Grid>
+      <Grid item xs={12} md={3}><Metric label="Completadas" value={completedCount} /></Grid>
+    </Grid>
+    <Card><CardContent>
+      <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" gap={2}>
+        <Stack direction="row" gap={1} flexWrap="wrap">
+          {[
+            ['open', 'Abiertas'],
+            ['all', 'Todas'],
+            ['done', 'Cerradas']
+          ].map(([value, label]) => <Button key={value} variant={statusFilter === value ? 'contained' : 'outlined'} onClick={() => setStatusFilter(value as typeof statusFilter)}>{label}</Button>)}
+        </Stack>
+        <Stack direction="row" gap={1} flexWrap="wrap">
+          {[
+            ['all', 'Todas las fechas'],
+            ['overdue', 'Vencidas'],
+            ['today', 'Hoy'],
+            ['upcoming', 'Proximas']
+          ].map(([value, label]) => <Button key={value} variant={dueFilter === value ? 'contained' : 'outlined'} onClick={() => setDueFilter(value as typeof dueFilter)}>{label}</Button>)}
+        </Stack>
+      </Stack>
+    </CardContent></Card>
     <EntityTable
-      headers={['Titulo', 'Tipo', 'Estado', 'Fecha', 'Recordatorio', 'Acciones']}
+      headers={['Seguimiento', 'Cliente', 'Negocio', 'Estado', 'Vence', 'Acciones']}
       empty="No hay actividades registradas"
-      rows={rows.map((r) => [
-        r.title,
-        typeLabel(r.type),
-        <StatusChip label={activityStatus(r.status)} tone={r.status === 3 ? 'success' : r.status === 1 ? 'warning' : 'default'} />,
-        new Date(r.scheduledAt).toLocaleString(),
-        r.reminderAt ? new Date(r.reminderAt).toLocaleString() : undefined,
-        <Actions onEdit={() => setForm({ open: true, item: r })} onDelete={canDelete ? () => setConfirm(r) : undefined} />
+      rows={visibleRows.map((r) => [
+        <Stack><Typography fontWeight={800}>{r.title}</Typography><Typography color="text.secondary" fontSize={13}>{typeLabel(r.type)}{r.description ? ` - ${r.description}` : ''}</Typography></Stack>,
+        r.customerName || customers.find((x) => x.id === r.customerId)?.name,
+        r.dealTitle || deals.find((x) => x.id === r.dealId)?.title,
+        <StatusChip label={activityStatus(r.status)} tone={activityTone(r)} />,
+        <Stack><Typography>{new Date(r.scheduledAt).toLocaleString()}</Typography><Typography color={activityDueState(r) === 'overdue' ? 'error.main' : 'text.secondary'} fontSize={13}>{activityDueLabel(r)}</Typography></Stack>,
+        <Actions
+          onStart={r.status === 1 ? () => updateActivity(r, { status: 2 }, 'Actividad marcada en proceso.') : undefined}
+          onComplete={r.status !== 3 ? () => updateActivity(r, { status: 3 }, 'Actividad completada.') : undefined}
+          onReschedule={r.status === 1 || r.status === 2 ? () => updateActivity(r, { scheduledAt: addDaysIso(r.scheduledAt, 1), reminderAt: r.reminderAt ? addDaysIso(r.reminderAt, 1) : undefined }, 'Actividad reprogramada para manana.') : undefined}
+          onCancel={r.status !== 4 ? () => updateActivity(r, { status: 4 }, 'Actividad cancelada.') : undefined}
+          onEdit={() => setForm({ open: true, item: r })}
+          onDelete={canDelete ? () => setConfirm(r) : undefined}
+        />
       ])}
     />
     <ActivityDialog form={form} customers={customers} deals={deals} onClose={() => setForm({ open: false })} onSave={save} />
@@ -1200,11 +1246,15 @@ function EntityTable({ headers, rows, empty }: { headers: string[]; rows: ReactN
   return <Card><Table><TableHead><TableRow>{headers.map((h) => <TableCell key={h}>{h}</TableCell>)}</TableRow></TableHead><TableBody>{rows.length ? rows.map((row, i) => <TableRow key={i}>{row.map((c, j) => <TableCell key={j}>{c ?? '-'}</TableCell>)}</TableRow>) : <TableRow><TableCell colSpan={headers.length}><EmptyState text={empty} /></TableCell></TableRow>}</TableBody></Table></Card>;
 }
 
-function Actions({ onView, onEdit, onDelete, onConvert, onDownload, onActivity, onWhatsapp, compact }: { onView?: () => void; onEdit?: () => void; onDelete?: () => void; onConvert?: () => void; onDownload?: () => void; onActivity?: () => void; onWhatsapp?: () => void; compact?: boolean }) {
+function Actions({ onView, onEdit, onDelete, onConvert, onDownload, onActivity, onWhatsapp, onStart, onComplete, onReschedule, onCancel, compact }: { onView?: () => void; onEdit?: () => void; onDelete?: () => void; onConvert?: () => void; onDownload?: () => void; onActivity?: () => void; onWhatsapp?: () => void; onStart?: () => void; onComplete?: () => void; onReschedule?: () => void; onCancel?: () => void; compact?: boolean }) {
   return <Stack direction="row" gap={compact ? .5 : 1} sx={{ mt: compact ? 1 : 0 }}>
     {onView && <Tooltip title="Ver cliente 360"><IconButton size="small" onClick={onView}><Visibility fontSize="small" /></IconButton></Tooltip>}
     {onWhatsapp && <Tooltip title="Abrir WhatsApp"><IconButton size="small" onClick={onWhatsapp}><WhatsApp fontSize="small" /></IconButton></Tooltip>}
     {onActivity && <Tooltip title="Registrar actividad"><IconButton size="small" onClick={onActivity}><AddTask fontSize="small" /></IconButton></Tooltip>}
+    {onStart && <Tooltip title="Marcar en proceso"><IconButton size="small" onClick={onStart}><SyncAlt fontSize="small" /></IconButton></Tooltip>}
+    {onComplete && <Tooltip title="Completar"><IconButton size="small" color="success" onClick={onComplete}><CheckCircle fontSize="small" /></IconButton></Tooltip>}
+    {onReschedule && <Tooltip title="Reprogramar para manana"><IconButton size="small" onClick={onReschedule}><EventNote fontSize="small" /></IconButton></Tooltip>}
+    {onCancel && <Tooltip title="Cancelar"><IconButton size="small" color="warning" onClick={onCancel}><Close fontSize="small" /></IconButton></Tooltip>}
     {onEdit && <Tooltip title="Editar"><IconButton size="small" onClick={onEdit}><Edit fontSize="small" /></IconButton></Tooltip>}
     {onConvert && <Tooltip title="Convertir a cliente"><IconButton size="small" onClick={onConvert}><SyncAlt fontSize="small" /></IconButton></Tooltip>}
     {onDownload && <Tooltip title="Descargar PDF"><IconButton size="small" onClick={onDownload}><Download fontSize="small" /></IconButton></Tooltip>}
@@ -1276,6 +1326,19 @@ function toInputDateTime(value: string) {
   return new Date(date.getTime() - offset).toISOString().slice(0, 16);
 }
 
+function toActivityPayload(payload: typeof emptyActivity | Activity) {
+  return {
+    ...payload,
+    type: Number(payload.type),
+    status: Number(payload.status),
+    customerId: payload.customerId || null,
+    dealId: payload.dealId || null,
+    assignedUserId: payload.assignedUserId || null,
+    scheduledAt: new Date(payload.scheduledAt).toISOString(),
+    reminderAt: payload.reminderAt ? new Date(payload.reminderAt).toISOString() : null
+  };
+}
+
 function money(value?: number) { return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(value ?? 0); }
 function timelineColor(tone: CustomerTimelineItem['tone']) {
   if (tone === 'success') return '#15803d';
@@ -1299,6 +1362,36 @@ function whatsappUrl(value: string) {
   const digits = value.replace(/\D/g, '');
   const withCountry = digits.startsWith('57') ? digits : `57${digits}`;
   return `https://wa.me/${withCountry}`;
+}
+function activityDueState(activity: Activity) {
+  if (activity.status === 3 || activity.status === 4) return 'done';
+  const scheduled = new Date(activity.scheduledAt);
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 1);
+  if (scheduled < start) return 'overdue';
+  if (scheduled < end) return 'today';
+  return 'upcoming';
+}
+function activityDueLabel(activity: Activity) {
+  const state = activityDueState(activity);
+  if (state === 'overdue') return 'Vencida';
+  if (state === 'today') return 'Para hoy';
+  if (state === 'done') return activity.status === 3 ? 'Completada' : 'Cancelada';
+  return 'Proxima';
+}
+function activityTone(activity: Activity): 'success' | 'warning' | 'error' | 'default' {
+  const state = activityDueState(activity);
+  if (activity.status === 3) return 'success';
+  if (activity.status === 4 || state === 'overdue') return 'error';
+  if (state === 'today' || activity.status === 2) return 'warning';
+  return 'default';
+}
+function addDaysIso(value: string, days: number) {
+  const date = new Date(value);
+  date.setDate(date.getDate() + days);
+  return date.toISOString();
 }
 function statusLabel(value: number) { return ['-', 'Activo', 'Inactivo', 'Suspendido'][value] ?? 'Activo'; }
 function ratingLabel(value: number) { return ['-', 'Frio', 'Tibio', 'Caliente'][value] ?? 'Frio'; }

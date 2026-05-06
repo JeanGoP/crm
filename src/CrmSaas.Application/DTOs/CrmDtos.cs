@@ -14,7 +14,19 @@ public sealed record UpsertDealStageDto(string Name, int Order, decimal DefaultP
 public sealed record DealDto(Guid Id, string Title, Guid? CustomerId, Guid StageId, decimal Value, decimal CloseProbability, DateTime EstimatedCloseDate, EstadoNegocio Status);
 public sealed record UpsertDealDto(string Title, Guid? CustomerId, Guid StageId, decimal Value, decimal CloseProbability, DateTime EstimatedCloseDate, EstadoNegocio Status);
 
-public sealed record ActivityDto(Guid Id, string Title, string? Description, TipoActividad Type, EstadoActividad Status, DateTime ScheduledAt, DateTime? ReminderAt, Guid? CustomerId, Guid? DealId, Guid? AssignedUserId);
+public sealed record ActivityDto(
+    Guid Id,
+    string Title,
+    string? Description,
+    TipoActividad Type,
+    EstadoActividad Status,
+    DateTime ScheduledAt,
+    DateTime? ReminderAt,
+    Guid? CustomerId,
+    Guid? DealId,
+    Guid? AssignedUserId,
+    string? CustomerName,
+    string? DealTitle);
 public sealed record UpsertActivityDto(string Title, string? Description, TipoActividad Type, EstadoActividad Status, DateTime ScheduledAt, DateTime? ReminderAt, Guid? CustomerId, Guid? DealId, Guid? AssignedUserId);
 
 public sealed record ProductDto(Guid Id, string Brand, string Model, string Reference, int? EngineCc, int? Year, string? Color, decimal Price, bool Active);

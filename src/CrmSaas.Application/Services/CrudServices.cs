@@ -186,14 +186,16 @@ public sealed class PipelineService(ICrmDbContext db, IMapper mapper) : IPipelin
 public sealed class ActivityService(ICrmDbContext db, IMapper mapper) : IActivityService
 {
     public async Task<IReadOnlyCollection<ActivityDto>> GetAsync(CancellationToken cancellationToken) =>
-        await db.Actividades.OrderBy(x => x.FechaProgramada).Select(x => new ActivityDto(x.Id, x.Titulo, x.Descripcion, x.Tipo, x.Estado, x.FechaProgramada, x.RecordatorioEn, x.ClienteId, x.NegocioId, x.UsuarioAsignadoId)).ToListAsync(cancellationToken);
+        await ProjectActivities(db.Actividades.OrderBy(x => x.FechaProgramada))
+            .ToListAsync(cancellationToken);
 
     public async Task<ActivityDto> CreateAsync(UpsertActivityDto dto, CancellationToken cancellationToken)
     {
         var entity = mapper.Map<Actividad>(dto);
         db.Actividades.Add(entity);
         await db.SaveChangesAsync(cancellationToken);
-        return CrmDtoMapper.ToDto(entity);
+        return await ProjectActivities(db.Actividades.Where(x => x.Id == entity.Id))
+            .FirstAsync(cancellationToken);
     }
 
     public async Task<ActivityDto> UpdateAsync(Guid id, UpsertActivityDto dto, CancellationToken cancellationToken)
@@ -201,7 +203,8 @@ public sealed class ActivityService(ICrmDbContext db, IMapper mapper) : IActivit
         var entity = await db.Actividades.FindAsync([id], cancellationToken) ?? throw new KeyNotFoundException("Actividad no encontrada.");
         mapper.Map(dto, entity);
         await db.SaveChangesAsync(cancellationToken);
-        return CrmDtoMapper.ToDto(entity);
+        return await ProjectActivities(db.Actividades.Where(x => x.Id == entity.Id))
+            .FirstAsync(cancellationToken);
     }
 
     public async Task DeleteAsync(Guid id, CancellationToken cancellationToken)
@@ -210,6 +213,21 @@ public sealed class ActivityService(ICrmDbContext db, IMapper mapper) : IActivit
         db.Actividades.Remove(entity);
         await db.SaveChangesAsync(cancellationToken);
     }
+
+    private static IQueryable<ActivityDto> ProjectActivities(IQueryable<Actividad> query) =>
+        query.Select(x => new ActivityDto(
+            x.Id,
+            x.Titulo,
+            x.Descripcion,
+            x.Tipo,
+            x.Estado,
+            x.FechaProgramada,
+            x.RecordatorioEn,
+            x.ClienteId,
+            x.NegocioId,
+            x.UsuarioAsignadoId,
+            x.Cliente == null ? null : (x.Cliente.Nombres + " " + x.Cliente.Apellidos).Trim(),
+            x.Negocio == null ? null : x.Negocio.Titulo));
 }
 
 file static class CrmDtoMapper
@@ -218,7 +236,7 @@ file static class CrmDtoMapper
     public static LeadDto ToDto(Prospecto x) => new(x.Id, DisplayName(x.Nombres, x.Apellidos, x.Nombre), x.Nombres, x.Apellidos, x.Email, x.Telefono, x.Fuente, x.Calificacion, x.Convertido, x.ClienteId);
     public static DealStageDto ToDto(EtapaNegocio x) => new(x.Id, x.Nombre, x.Orden, x.ProbabilidadPredeterminada, x.Activa);
     public static DealDto ToDto(Negocio x) => new(x.Id, x.Titulo, x.ClienteId, x.EtapaNegocioId, x.Valor, x.ProbabilidadCierre, x.FechaEstimadaCierre, x.Estado);
-    public static ActivityDto ToDto(Actividad x) => new(x.Id, x.Titulo, x.Descripcion, x.Tipo, x.Estado, x.FechaProgramada, x.RecordatorioEn, x.ClienteId, x.NegocioId, x.UsuarioAsignadoId);
+    public static ActivityDto ToDto(Actividad x) => new(x.Id, x.Titulo, x.Descripcion, x.Tipo, x.Estado, x.FechaProgramada, x.RecordatorioEn, x.ClienteId, x.NegocioId, x.UsuarioAsignadoId, null, null);
     private static string DisplayName(string firstNames, string lastNames, string fallback)
     {
         var value = $"{firstNames} {lastNames}".Trim();
@@ -242,7 +260,7 @@ public sealed class DashboardService(ICrmDbContext db) : IDashboardService
             await openDeals.SumAsync(x => x.Valor * (x.ProbabilidadCierre / 100), cancellationToken),
             await db.Clientes.CountAsync(x => x.Estado == EstadoCliente.Activo, cancellationToken),
             await db.Prospectos.CountAsync(x => !x.Convertido, cancellationToken),
-            await db.Actividades.CountAsync(x => x.Estado == EstadoActividad.Pendiente, cancellationToken),
+            await db.Actividades.CountAsync(x => x.Estado == EstadoActividad.Pendiente || x.Estado == EstadoActividad.EnProceso, cancellationToken),
             recent);
     }
 }
