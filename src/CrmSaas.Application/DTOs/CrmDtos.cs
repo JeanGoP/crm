@@ -136,5 +136,15 @@ public sealed record CustomerTimelineItemDto(
     string Tone,
     Guid? RelatedId);
 
-public sealed record DashboardDto(decimal OpenPipelineValue, decimal WeightedPipelineValue, int ActiveCustomers, int OpenLeads, int PendingActivities, IReadOnlyCollection<RecentActivityDto> RecentActivities);
+public sealed record DashboardDto(
+    decimal OpenPipelineValue,
+    decimal WeightedPipelineValue,
+    int ActiveCustomers,
+    int OpenLeads,
+    int PendingActivities,
+    int OverdueActivities,
+    int TodayActivities,
+    IReadOnlyCollection<RecentActivityDto> RecentActivities,
+    IReadOnlyCollection<CommercialAlertDto> Alerts);
 public sealed record RecentActivityDto(string Title, DateTime ScheduledAt, EstadoActividad Status);
+public sealed record CommercialAlertDto(string Type, string Severity, string Title, string Description, DateTime CreatedAt, string? ActionUrl);

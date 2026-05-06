@@ -254,6 +254,13 @@ public sealed class DashboardService(ICrmDbContext db) : IDashboardService
             .Take(8)
             .Select(x => new RecentActivityDto(x.Titulo, x.FechaProgramada, x.Estado))
             .ToListAsync(cancellationToken);
+        var today = DateTime.UtcNow.Date;
+        var tomorrow = today.AddDays(1);
+        var overdueActivities = await db.Actividades
+            .CountAsync(x => (x.Estado == EstadoActividad.Pendiente || x.Estado == EstadoActividad.EnProceso) && x.FechaProgramada < today, cancellationToken);
+        var todayActivities = await db.Actividades
+            .CountAsync(x => (x.Estado == EstadoActividad.Pendiente || x.Estado == EstadoActividad.EnProceso) && x.FechaProgramada >= today && x.FechaProgramada < tomorrow, cancellationToken);
+        var alerts = await BuildAlertsAsync(today, tomorrow, cancellationToken);
 
         return new DashboardDto(
             await openDeals.SumAsync(x => x.Valor, cancellationToken),
@@ -261,6 +268,87 @@ public sealed class DashboardService(ICrmDbContext db) : IDashboardService
             await db.Clientes.CountAsync(x => x.Estado == EstadoCliente.Activo, cancellationToken),
             await db.Prospectos.CountAsync(x => !x.Convertido, cancellationToken),
             await db.Actividades.CountAsync(x => x.Estado == EstadoActividad.Pendiente || x.Estado == EstadoActividad.EnProceso, cancellationToken),
-            recent);
+            overdueActivities,
+            todayActivities,
+            recent,
+            alerts);
+    }
+
+    private async Task<IReadOnlyCollection<CommercialAlertDto>> BuildAlertsAsync(DateTime today, DateTime tomorrow, CancellationToken cancellationToken)
+    {
+        var alerts = new List<CommercialAlertDto>();
+
+        alerts.AddRange(await db.Actividades
+            .Where(x => (x.Estado == EstadoActividad.Pendiente || x.Estado == EstadoActividad.EnProceso) && x.FechaProgramada < today)
+            .OrderBy(x => x.FechaProgramada)
+            .Take(5)
+            .Select(x => new CommercialAlertDto(
+                "Actividad",
+                "error",
+                "Actividad vencida",
+                x.Titulo,
+                x.FechaProgramada,
+                x.ClienteId == null ? "/actividades" : "/clientes/" + x.ClienteId))
+            .ToListAsync(cancellationToken));
+
+        alerts.AddRange(await db.Actividades
+            .Where(x => (x.Estado == EstadoActividad.Pendiente || x.Estado == EstadoActividad.EnProceso) && x.FechaProgramada >= today && x.FechaProgramada < tomorrow)
+            .OrderBy(x => x.FechaProgramada)
+            .Take(5)
+            .Select(x => new CommercialAlertDto(
+                "Actividad",
+                "warning",
+                "Seguimiento para hoy",
+                x.Titulo,
+                x.FechaProgramada,
+                x.ClienteId == null ? "/actividades" : "/clientes/" + x.ClienteId))
+            .ToListAsync(cancellationToken));
+
+        alerts.AddRange(await db.SolicitudesCredito
+            .Where(x => x.Estado == EstadoSolicitudCredito.DocumentosPendientes || x.Documentos.Any(d => d.Estado == EstadoDocumentoCredito.Pendiente || d.Estado == EstadoDocumentoCredito.Rechazado))
+            .OrderBy(x => x.FechaCreacion)
+            .Take(5)
+            .Select(x => new CommercialAlertDto(
+                "Credito",
+                "warning",
+                "Solicitud con documentos pendientes",
+                x.Numero + " requiere completar o validar documentos.",
+                x.FechaCreacion,
+                "/solicitudes-credito"))
+            .ToListAsync(cancellationToken));
+
+        var quoteLimit = today.AddDays(-3);
+        alerts.AddRange(await db.Cotizaciones
+            .Where(x => x.FechaCotizacion <= quoteLimit && !db.Actividades.Any(a => a.ClienteId == x.ClienteId && a.FechaProgramada >= x.FechaCotizacion))
+            .OrderByDescending(x => x.FechaCotizacion)
+            .Take(5)
+            .Select(x => new CommercialAlertDto(
+                "Cotizacion",
+                "info",
+                "Cotizacion sin seguimiento",
+                x.Numero + " no tiene actividad posterior registrada.",
+                x.FechaCotizacion,
+                "/clientes/" + x.ClienteId))
+            .ToListAsync(cancellationToken));
+
+        var staleDealLimit = today.AddDays(-7);
+        alerts.AddRange(await db.Negocios
+            .Where(x => x.Estado == EstadoNegocio.Abierto && x.FechaCreacion <= staleDealLimit && !db.Actividades.Any(a => a.NegocioId == x.Id && a.FechaProgramada >= staleDealLimit))
+            .OrderByDescending(x => x.Valor)
+            .Take(5)
+            .Select(x => new CommercialAlertDto(
+                "Pipeline",
+                "info",
+                "Negocio sin actividad reciente",
+                x.Titulo + " requiere seguimiento comercial.",
+                x.FechaCreacion,
+                x.ClienteId == null ? "/pipeline" : "/clientes/" + x.ClienteId))
+            .ToListAsync(cancellationToken));
+
+        return alerts
+            .OrderBy(x => x.Severity == "error" ? 0 : x.Severity == "warning" ? 1 : 2)
+            .ThenBy(x => x.CreatedAt)
+            .Take(12)
+            .ToList();
     }
 }

@@ -1,7 +1,7 @@
 # Manual del Sistema CRM SaaS
 
 Ultima actualizacion: 2026-05-06  
-Version del manual: 1.4  
+Version del manual: 1.5  
 Sistema: CRM SaaS para ventas de motos a credito  
 Ambiente documentado: Desarrollo local conectado a SQL Server
 
@@ -80,7 +80,7 @@ En la barra superior se muestra el usuario autenticado, su rol principal y el bo
 
 ### Para que sirve
 
-Resume el estado comercial de la empresa: valor del pipeline, clientes activos, prospectos abiertos, actividades pendientes y actividad reciente.
+Resume el estado comercial de la empresa: valor del pipeline, clientes activos, prospectos abiertos, actividades pendientes, alertas comerciales y actividad reciente.
 
 ### Indicadores
 
@@ -89,7 +89,22 @@ Resume el estado comercial de la empresa: valor del pipeline, clientes activos, 
 - **Clientes activos:** cantidad de clientes activos.
 - **Prospectos abiertos:** cantidad de prospectos sin convertir.
 - **Actividades pendientes:** tareas, llamadas o reuniones aun sin completar.
+- **Vencidas:** actividades pendientes cuya fecha programada ya paso.
+- **Para hoy:** actividades pendientes programadas para el dia actual.
+- **Alertas comerciales:** avisos accionables para priorizar seguimientos.
 - **Actividad reciente:** ultimos movimientos o actividades programadas.
+
+### Alertas comerciales
+
+El panel de alertas ayuda al equipo a saber que debe atender primero. Puede mostrar:
+
+- Actividades vencidas.
+- Seguimientos programados para hoy.
+- Solicitudes de credito con documentos pendientes o rechazados.
+- Cotizaciones que llevan varios dias sin seguimiento.
+- Negocios abiertos sin actividad reciente.
+
+Cada alerta muestra el tipo, el nivel de prioridad, una descripcion y un boton **Abrir** para ir al modulo o cliente relacionado.
 
 ### Paso a paso
 
@@ -251,6 +266,8 @@ El calculo es una estimacion comercial. La aprobacion final y las condiciones de
 ### Relacion con clientes
 
 Cuando se crea una cotizacion, el cliente queda disponible en **Clientes** para completar sus datos si avanza hacia credito o venta.
+
+Adicionalmente, el sistema crea automaticamente una actividad de seguimiento para el dia siguiente. Esta actividad queda relacionada con el cliente y el negocio del pipeline, para que el vendedor recuerde llamar, resolver dudas y avanzar la venta.
 
 ## 10. Solicitudes de credito
 
@@ -569,6 +586,7 @@ Si aparece un error, revise primero los datos ingresados. Si el error persiste, 
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-05-06 | 1.5 | Se agregan alertas comerciales en Dashboard y seguimiento automatico al crear cotizaciones. |
 | 2026-05-06 | 1.4 | Se mejora gestion de actividades con indicadores, filtros por vencimiento, nombres de cliente/negocio, acciones rapidas y creacion de seguimientos desde Cliente 360. |
 | 2026-05-06 | 1.3 | Se agrega historial completo del cliente en Cliente 360 con timeline cronologico de cotizaciones, solicitudes, documentos, decisiones, pipeline, actividades y notas. |
 | 2026-05-06 | 1.2 | Se agrega flujo formal de aprobaciones para solicitudes de credito con fechas, usuario de decision y acciones controladas. |

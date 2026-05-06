@@ -165,18 +165,44 @@ function LoginPage() {
 
 function DashboardPage() {
   const { data, loading, error, reload } = useResource<Dashboard>('/api/dashboard');
+  const navigate = useNavigate();
   const cards: { label: string; value: ReactNode }[] = [
     { label: 'Pipeline abierto', value: money(data?.openPipelineValue) },
     { label: 'Pipeline ponderado', value: money(data?.weightedPipelineValue) },
     { label: 'Clientes activos', value: data?.activeCustomers ?? 0 },
     { label: 'Prospectos abiertos', value: data?.openLeads ?? 0 },
-    { label: 'Actividades pendientes', value: data?.pendingActivities ?? 0 }
+    { label: 'Actividades pendientes', value: data?.pendingActivities ?? 0 },
+    { label: 'Vencidas', value: data?.overdueActivities ?? 0 },
+    { label: 'Para hoy', value: data?.todayActivities ?? 0 }
   ];
   return <Stack spacing={3}>
     <Header title="Dashboard" onRefresh={reload} />
     <StatusBar loading={loading} error={error} />
-    <Grid container spacing={2}>{cards.map((card) => <Grid item xs={12} md={2.4} key={card.label}><Metric label={card.label} value={card.value} /></Grid>)}</Grid>
-    <Card><CardContent><Typography variant="h6">Actividad reciente</Typography>{data?.recentActivities?.length ? data.recentActivities.map((a) => <Row key={`${a.title}${a.scheduledAt}`} primary={a.title} secondary={new Date(a.scheduledAt).toLocaleString()} />) : <EmptyState text="Sin actividad reciente" />}</CardContent></Card>
+    <Grid container spacing={2}>{cards.map((card) => <Grid item xs={12} md={card.label.length > 12 ? 2.4 : 1.7} key={card.label}><Metric label={card.label} value={card.value} /></Grid>)}</Grid>
+    <Grid container spacing={2}>
+      <Grid item xs={12} md={7}>
+        <Card><CardContent>
+          <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+            <Typography variant="h6" fontWeight={900}>Alertas comerciales</Typography>
+            <Chip size="small" label={`${data?.alerts?.length ?? 0} pendientes`} variant="outlined" />
+          </Stack>
+          {data?.alerts?.length ? data.alerts.map((alert) => <Stack key={`${alert.type}${alert.title}${alert.createdAt}`} direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" gap={1.5} sx={{ py: 1.25, borderBottom: '1px solid #edf1f5' }}>
+            <Stack spacing={.5}>
+              <Stack direction="row" gap={1} alignItems="center" flexWrap="wrap">
+                <StatusChip label={alert.type} tone={alertSeverityTone(alert.severity)} />
+                <Typography fontWeight={900}>{alert.title}</Typography>
+              </Stack>
+              <Typography color="text.secondary">{alert.description}</Typography>
+              <Typography variant="caption" color="text.secondary">{new Date(alert.createdAt).toLocaleString()}</Typography>
+            </Stack>
+            {alert.actionUrl && <Button variant="outlined" onClick={() => navigate(alert.actionUrl!)}>Abrir</Button>}
+          </Stack>) : <EmptyState text="Sin alertas comerciales" />}
+        </CardContent></Card>
+      </Grid>
+      <Grid item xs={12} md={5}>
+        <Card><CardContent><Typography variant="h6" fontWeight={900}>Actividad reciente</Typography>{data?.recentActivities?.length ? data.recentActivities.map((a) => <Row key={`${a.title}${a.scheduledAt}`} primary={a.title} secondary={new Date(a.scheduledAt).toLocaleString()} />) : <EmptyState text="Sin actividad reciente" />}</CardContent></Card>
+      </Grid>
+    </Grid>
   </Stack>;
 }
 
@@ -1386,6 +1412,12 @@ function activityTone(activity: Activity): 'success' | 'warning' | 'error' | 'de
   if (activity.status === 3) return 'success';
   if (activity.status === 4 || state === 'overdue') return 'error';
   if (state === 'today' || activity.status === 2) return 'warning';
+  return 'default';
+}
+function alertSeverityTone(severity?: string): 'success' | 'warning' | 'error' | 'default' {
+  if (severity === 'error') return 'error';
+  if (severity === 'warning') return 'warning';
+  if (severity === 'success') return 'success';
   return 'default';
 }
 function addDaysIso(value: string, days: number) {

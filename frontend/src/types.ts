@@ -178,5 +178,17 @@ export interface Dashboard {
   activeCustomers: number;
   openLeads: number;
   pendingActivities: number;
+  overdueActivities: number;
+  todayActivities: number;
   recentActivities: { title: string; scheduledAt: string; status: number }[];
+  alerts: CommercialAlert[];
+}
+
+export interface CommercialAlert {
+  type: string;
+  severity: 'error' | 'warning' | 'info' | 'success' | string;
+  title: string;
+  description: string;
+  createdAt: string;
+  actionUrl?: string;
 }

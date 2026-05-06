@@ -90,9 +90,21 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             FechaEstimadaCierre = DateTime.UtcNow.AddDays(15),
             Estado = EstadoNegocio.Abierto
         };
+        var followUp = new Actividad
+        {
+            Titulo = $"Seguimiento cotizacion {number}",
+            Descripcion = $"Contactar a {fullName} para resolver dudas y avanzar la venta de {productName}.",
+            Tipo = TipoActividad.Llamada,
+            Estado = EstadoActividad.Pendiente,
+            FechaProgramada = DateTime.UtcNow.AddDays(1),
+            RecordatorioEn = DateTime.UtcNow.AddHours(20),
+            ClienteId = customer.Id,
+            NegocioId = deal.Id
+        };
 
         db.Cotizaciones.Add(quote);
         db.Negocios.Add(deal);
+        db.Actividades.Add(followUp);
         await db.SaveChangesAsync(cancellationToken);
         quote.Producto = product;
 
