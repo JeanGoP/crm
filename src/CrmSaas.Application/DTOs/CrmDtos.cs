@@ -64,6 +64,13 @@ public sealed record CreditApplicationDto(
     decimal MotorcycleValue,
     EstadoSolicitudCredito Status,
     string? Notes,
+    DateTime? SubmittedAt,
+    DateTime? ReviewStartedAt,
+    DateTime? ApprovedAt,
+    DateTime? RejectedAt,
+    DateTime? DisbursedAt,
+    string? DecisionUser,
+    string? DecisionNotes,
     IReadOnlyCollection<CreditDocumentDto> Documents);
 
 public sealed record UpsertCreditApplicationDto(
@@ -99,6 +106,7 @@ public sealed record CreditDocumentDto(
     DateTime? UploadedAt);
 public sealed record UpsertCreditDocumentDto(TipoDocumentoCredito Type, string Name, EstadoDocumentoCredito Status, DateTime? ReceivedAt, string? Notes);
 public sealed record ChangeCreditApplicationStatusDto(EstadoSolicitudCredito Status);
+public sealed record CreditApplicationDecisionDto(EstadoSolicitudCredito Status, string? Notes);
 
 public sealed record Customer360Dto(
     CustomerDto Customer,

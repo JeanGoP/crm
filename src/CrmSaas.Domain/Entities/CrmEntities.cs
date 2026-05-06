@@ -145,6 +145,13 @@ public sealed class SolicitudCredito : AuditableTenantEntity
     public decimal ValorMoto { get; set; }
     public EstadoSolicitudCredito Estado { get; set; } = EstadoSolicitudCredito.Borrador;
     public string? Observaciones { get; set; }
+    public DateTime? FechaEnvio { get; set; }
+    public DateTime? FechaInicioEstudio { get; set; }
+    public DateTime? FechaAprobacion { get; set; }
+    public DateTime? FechaRechazo { get; set; }
+    public DateTime? FechaDesembolso { get; set; }
+    public string? UsuarioDecision { get; set; }
+    public string? ObservacionDecision { get; set; }
     public ICollection<DocumentoSolicitudCredito> Documentos { get; set; } = new List<DocumentoSolicitudCredito>();
 }
 

@@ -421,6 +421,16 @@ function CreditApplicationsPage() {
     setNotice({ type: 'success', text: `Solicitud marcada como ${creditStatus(status)}.` });
   };
 
+  const decide = async (application: CreditApplication, status: number, notes?: string) => {
+    try {
+      const { data } = await api.post<CreditApplication>(`/api/credit-applications/${application.id}/decision`, { status, notes: notes ?? null });
+      setData(rows.map((x) => x.id === data.id ? data : x));
+      setNotice({ type: 'success', text: `Solicitud marcada como ${creditStatus(status)}.` });
+    } catch (err) {
+      setNotice({ type: 'error', text: apiError(err) });
+    }
+  };
+
   const updateDocument = async (application: CreditApplication, document: CreditDocument, status: number) => {
     const { data } = await api.put<CreditApplication>(`/api/credit-applications/${application.id}/documents/${document.id}`, {
       type: document.type,
@@ -462,7 +472,7 @@ function CreditApplicationsPage() {
     <Header title="Solicitudes de credito" action="Nueva solicitud" onAction={() => setForm({ open: true })} onRefresh={reload} />
     <StatusBar loading={loading} error={error} />
     <EntityTable
-      headers={['Numero', 'Cliente', 'Moto', 'Estado', 'Ingresos', 'Cuota inicial', 'Plazo', 'Documentos', 'Acciones']}
+      headers={['Numero', 'Cliente', 'Moto', 'Estado', 'Ingresos', 'Cuota inicial', 'Plazo', 'Documentos', 'Aprobacion', 'Acciones']}
       empty="No hay solicitudes de credito"
       rows={rows.map((r) => [
         r.number,
@@ -473,6 +483,7 @@ function CreditApplicationsPage() {
         money(r.downPayment),
         `${r.termMonths} meses`,
         <DocumentSummary application={r} onUpdate={updateDocument} onUpload={uploadDocument} onDownload={downloadDocument} />,
+        <ApprovalSummary application={r} onDecision={decide} />,
         <Stack direction="row" gap={1} alignItems="center">
           <Actions onEdit={() => setForm({ open: true, item: r })} />
           <TextField select size="small" label="Estado" value={r.status} onChange={(e) => changeStatus(r, Number(e.target.value))} sx={{ minWidth: 160 }}>
@@ -483,6 +494,26 @@ function CreditApplicationsPage() {
     />
     <CreditApplicationDialog form={form} customers={customers} products={products.filter((x) => x.active)} quotes={quotes} deals={deals} onClose={() => setForm({ open: false })} onSave={save} />
     <Notice notice={notice} onClose={() => setNotice(undefined)} />
+  </Stack>;
+}
+
+function ApprovalSummary({ application, onDecision }: { application: CreditApplication; onDecision: (application: CreditApplication, status: number, notes?: string) => Promise<void> }) {
+  const actions = [
+    { status: 2, label: 'Enviar', show: application.status === 1 },
+    { status: 4, label: 'Estudio', show: application.status === 3 },
+    { status: 5, label: 'Aprobar', show: application.status === 4 },
+    { status: 6, label: 'Rechazar', show: application.status === 4 || application.status === 5 },
+    { status: 7, label: 'Desembolsar', show: application.status === 5 }
+  ].filter((x) => x.show);
+  const lastDate = application.disbursedAt ?? application.approvedAt ?? application.rejectedAt ?? application.reviewStartedAt ?? application.submittedAt;
+  return <Stack spacing={.75} sx={{ minWidth: 190 }}>
+    <Typography variant="caption" color="text.secondary">
+      {lastDate ? `${application.decisionUser ?? 'Sistema'} · ${new Date(lastDate).toLocaleDateString()}` : 'Sin decision registrada'}
+    </Typography>
+    {application.decisionNotes && <Typography variant="caption" color="text.secondary" noWrap>{application.decisionNotes}</Typography>}
+    <Stack direction="row" gap={.5} flexWrap="wrap">
+      {actions.length ? actions.map((action) => <Button key={action.status} size="small" variant="outlined" onClick={() => onDecision(application, action.status)}>{action.label}</Button>) : <Chip size="small" label="Sin acciones" variant="outlined" />}
+    </Stack>
   </Stack>;
 }
 

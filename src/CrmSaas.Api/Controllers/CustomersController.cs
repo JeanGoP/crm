@@ -138,6 +138,13 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
             x.ValorMoto,
             x.Estado,
             x.Observaciones,
+            x.FechaEnvio,
+            x.FechaInicioEstudio,
+            x.FechaAprobacion,
+            x.FechaRechazo,
+            x.FechaDesembolso,
+            x.UsuarioDecision,
+            x.ObservacionDecision,
             x.Documentos.OrderBy(d => d.Tipo).Select(d => new CreditDocumentDto(
                 d.Id,
                 d.Tipo,

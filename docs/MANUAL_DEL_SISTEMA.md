@@ -1,7 +1,7 @@
 # Manual del Sistema CRM SaaS
 
 Ultima actualizacion: 2026-05-06  
-Version del manual: 1.1  
+Version del manual: 1.2  
 Sistema: CRM SaaS para ventas de motos a credito  
 Ambiente documentado: Desarrollo local conectado a SQL Server
 
@@ -252,6 +252,22 @@ Permite gestionar el tramite de credito de una moto para un cliente.
 - Rechazada
 - Desembolsada
 
+### Flujo de aprobacion
+
+El sistema permite avanzar la solicitud con acciones controladas:
+
+- **Enviar:** pasa de borrador a documentos pendientes y registra la fecha de envio.
+- **Estudio:** pasa a estudio cuando todos los documentos estan recibidos o validados.
+- **Aprobar:** solo se permite desde el estado en estudio.
+- **Rechazar:** marca la solicitud como rechazada y mueve el pipeline a perdido si existe negocio relacionado.
+- **Desembolsar:** solo se permite despues de aprobar y marca el negocio como ganado/entregado si esta relacionado.
+
+Cada decision guarda:
+
+- Fecha de la decision.
+- Usuario que la ejecuto.
+- Observacion de decision cuando se envia desde API o procesos internos.
+
 ### Crear solicitud
 
 1. Abra **Solicitudes credito**.
@@ -304,6 +320,15 @@ Tamano maximo: 10 MB por archivo.
 ### Relacion con pipeline
 
 Cuando la solicitud cambia de estado, el negocio relacionado puede moverse automaticamente a la etapa correspondiente del pipeline.
+
+Reglas principales:
+
+- Documentos pendientes: etapa de preaprobacion.
+- Documentos recibidos: etapa documentos recibidos.
+- En estudio: etapa estudio de credito.
+- Aprobada: etapa aprobado.
+- Rechazada: negocio perdido.
+- Desembolsada: negocio ganado y etapa entregada.
 
 ## 11. Prospectos
 
@@ -504,5 +529,6 @@ Si aparece un error, revise primero los datos ingresados. Si el error persiste, 
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-05-06 | 1.2 | Se agrega flujo formal de aprobaciones para solicitudes de credito con fechas, usuario de decision y acciones controladas. |
 | 2026-05-06 | 1.1 | Se agrega simulador de credito en cotizaciones, cuota estimada en listado y PDF con informacion financiera. |
 | 2026-05-05 | 1.0 | Creacion inicial del manual con capturas reales y documentacion de modulos actuales. |

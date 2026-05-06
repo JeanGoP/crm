@@ -142,6 +142,13 @@ export interface CreditApplication {
   motorcycleValue: number;
   status: number;
   notes?: string;
+  submittedAt?: string;
+  reviewStartedAt?: string;
+  approvedAt?: string;
+  rejectedAt?: string;
+  disbursedAt?: string;
+  decisionUser?: string;
+  decisionNotes?: string;
   documents: CreditDocument[];
 }
 

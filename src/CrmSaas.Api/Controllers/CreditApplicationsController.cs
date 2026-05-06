@@ -1,4 +1,5 @@
 using CrmSaas.Application.DTOs;
+using CrmSaas.Application.Abstractions;
 using CrmSaas.Domain.Entities;
 using CrmSaas.Domain.Enums;
 using CrmSaas.Infrastructure.Persistence;
@@ -12,7 +13,7 @@ namespace CrmSaas.Api.Controllers;
 [ApiController]
 [Authorize]
 [Route("api/credit-applications")]
-public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnvironment env) : ControllerBase
+public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnvironment env, ITenantContext tenantContext) : ControllerBase
 {
     private static readonly HashSet<string> AllowedFileExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -134,6 +135,26 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             ?? throw new KeyNotFoundException("Solicitud de credito no encontrada.");
 
         entity.Estado = dto.Status;
+        ApplyDecision(entity, dto.Status, null);
+        await SyncPipelineAsync(entity, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+        return Ok(ToDto(entity));
+    }
+
+    [HttpPost("{id:guid}/decision")]
+    [Authorize(Roles = "Administrador,Supervisor")]
+    public async Task<ActionResult<CreditApplicationDto>> Decide(Guid id, CreditApplicationDecisionDto dto, CancellationToken cancellationToken)
+    {
+        var entity = await db.SolicitudesCredito
+            .Include(x => x.Cliente)
+            .Include(x => x.Producto)
+            .Include(x => x.Documentos)
+            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
+            ?? throw new KeyNotFoundException("Solicitud de credito no encontrada.");
+
+        ValidateDecision(entity, dto.Status);
+        entity.Estado = dto.Status;
+        ApplyDecision(entity, dto.Status, dto.Notes);
         await SyncPipelineAsync(entity, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         return Ok(ToDto(entity));
@@ -261,6 +282,51 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         }
     }
 
+    private static void ValidateDecision(SolicitudCredito entity, EstadoSolicitudCredito status)
+    {
+        if (status == EstadoSolicitudCredito.EnEstudio && entity.Documentos.Any(x => x.Estado is EstadoDocumentoCredito.Pendiente or EstadoDocumentoCredito.Rechazado))
+        {
+            throw new ValidationException("Para enviar a estudio todos los documentos deben estar recibidos o validados.");
+        }
+
+        if (status == EstadoSolicitudCredito.Aprobada && entity.Estado != EstadoSolicitudCredito.EnEstudio)
+        {
+            throw new ValidationException("Solo se puede aprobar una solicitud que este en estudio.");
+        }
+
+        if (status == EstadoSolicitudCredito.Desembolsada && entity.Estado != EstadoSolicitudCredito.Aprobada)
+        {
+            throw new ValidationException("Solo se puede desembolsar una solicitud aprobada.");
+        }
+    }
+
+    private void ApplyDecision(SolicitudCredito entity, EstadoSolicitudCredito status, string? notes)
+    {
+        var now = DateTime.UtcNow;
+        entity.UsuarioDecision = tenantContext.UsuarioActual;
+        entity.ObservacionDecision = string.IsNullOrWhiteSpace(notes) ? entity.ObservacionDecision : notes.Trim();
+
+        switch (status)
+        {
+            case EstadoSolicitudCredito.DocumentosPendientes:
+                entity.FechaEnvio ??= now;
+                break;
+            case EstadoSolicitudCredito.EnEstudio:
+                entity.FechaInicioEstudio ??= now;
+                break;
+            case EstadoSolicitudCredito.Aprobada:
+                entity.FechaAprobacion ??= now;
+                entity.FechaRechazo = null;
+                break;
+            case EstadoSolicitudCredito.Rechazada:
+                entity.FechaRechazo ??= now;
+                break;
+            case EstadoSolicitudCredito.Desembolsada:
+                entity.FechaDesembolso ??= now;
+                break;
+        }
+    }
+
     private string StorageRoot => Path.Combine(env.ContentRootPath, "App_Data", "uploads");
 
     private bool IsStoredPath(string path)
@@ -340,6 +406,13 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             x.ValorMoto,
             x.Estado,
             x.Observaciones,
+            x.FechaEnvio,
+            x.FechaInicioEstudio,
+            x.FechaAprobacion,
+            x.FechaRechazo,
+            x.FechaDesembolso,
+            x.UsuarioDecision,
+            x.ObservacionDecision,
             x.Documentos.OrderBy(d => d.Tipo).Select(ToDocumentDto).ToList());
     }
 
