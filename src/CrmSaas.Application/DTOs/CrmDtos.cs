@@ -20,8 +20,27 @@ public sealed record UpsertActivityDto(string Title, string? Description, TipoAc
 public sealed record ProductDto(Guid Id, string Brand, string Model, string Reference, int? EngineCc, int? Year, string? Color, decimal Price, bool Active);
 public sealed record UpsertProductDto(string Brand, string Model, string Reference, int? EngineCc, int? Year, string? Color, decimal Price, bool Active);
 
-public sealed record QuoteDto(Guid Id, string Number, TipoIdentificacionColombia IdentificationType, string? IdentificationNumber, string CustomerFirstNames, string CustomerLastNames, Guid CustomerId, Guid ProductId, string ProductName, decimal ProductPrice, DateTime QuoteDate, DateTime ValidUntil, string? Notes);
-public sealed record CreateQuoteDto(TipoIdentificacionColombia IdentificationType, string? IdentificationNumber, string CustomerFirstNames, string CustomerLastNames, Guid ProductId, string? Notes);
+public sealed record QuoteDto(
+    Guid Id,
+    string Number,
+    TipoIdentificacionColombia IdentificationType,
+    string? IdentificationNumber,
+    string CustomerFirstNames,
+    string CustomerLastNames,
+    Guid CustomerId,
+    Guid ProductId,
+    string ProductName,
+    decimal ProductPrice,
+    decimal DownPayment,
+    int TermMonths,
+    decimal MonthlyInterestRate,
+    decimal FinancedAmount,
+    decimal EstimatedMonthlyPayment,
+    decimal EstimatedTotalPayment,
+    DateTime QuoteDate,
+    DateTime ValidUntil,
+    string? Notes);
+public sealed record CreateQuoteDto(TipoIdentificacionColombia IdentificationType, string? IdentificationNumber, string CustomerFirstNames, string CustomerLastNames, Guid ProductId, decimal DownPayment, int TermMonths, decimal MonthlyInterestRate, string? Notes);
 
 public sealed record CreditApplicationDto(
     Guid Id,

@@ -33,6 +33,9 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
         if (string.IsNullOrWhiteSpace(dto.CustomerFirstNames)) throw new ValidationException("Los nombres del cliente son obligatorios.");
         if (string.IsNullOrWhiteSpace(dto.CustomerLastNames)) throw new ValidationException("Los apellidos del cliente son obligatorios.");
         if (dto.ProductId == Guid.Empty) throw new ValidationException("Debe seleccionar una moto para cotizar.");
+        if (dto.DownPayment < 0) throw new ValidationException("La cuota inicial no puede ser negativa.");
+        if (dto.TermMonths <= 0) throw new ValidationException("El plazo debe ser mayor a cero.");
+        if (dto.MonthlyInterestRate < 0) throw new ValidationException("La tasa mensual no puede ser negativa.");
 
         var product = await db.Productos.FirstOrDefaultAsync(x => x.Id == dto.ProductId && x.Activo, cancellationToken)
             ?? throw new KeyNotFoundException("Moto no encontrada o inactiva.");
@@ -44,6 +47,7 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
 
         var fullName = $"{dto.CustomerFirstNames.Trim()} {dto.CustomerLastNames.Trim()}".Trim();
         var productName = $"{product.Marca} {product.Modelo} {product.Referencia}".Trim();
+        var simulation = CalculateSimulation(product.Precio, dto.DownPayment, dto.TermMonths, dto.MonthlyInterestRate);
         var customer = new Cliente
         {
             Nombre = dto.CustomerFirstNames.Trim(),
@@ -66,6 +70,12 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             ClienteId = customer.Id,
             ProductoId = product.Id,
             PrecioProducto = product.Precio,
+            CuotaInicial = simulation.DownPayment,
+            PlazoMeses = dto.TermMonths,
+            TasaInteresMensual = dto.MonthlyInterestRate,
+            ValorFinanciado = simulation.FinancedAmount,
+            CuotaMensualEstimada = simulation.MonthlyPayment,
+            TotalPagarEstimado = simulation.TotalPayment,
             FechaCotizacion = DateTime.UtcNow,
             ValidaHasta = DateTime.UtcNow.AddDays(7),
             Observaciones = dto.Notes
@@ -105,6 +115,45 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
         var productName = x.Producto is null
             ? "Moto"
             : $"{x.Producto.Marca} {x.Producto.Modelo} {x.Producto.Referencia}".Trim();
-        return new QuoteDto(x.Id, x.Numero, x.TipoIdentificacion, x.NumeroIdentificacion, x.NombresCliente, x.ApellidosCliente, x.ClienteId, x.ProductoId, productName, x.PrecioProducto, x.FechaCotizacion, x.ValidaHasta, x.Observaciones);
+        var termMonths = x.PlazoMeses <= 0 ? 24 : x.PlazoMeses;
+        var financedAmount = x.ValorFinanciado <= 0 && x.CuotaMensualEstimada <= 0 ? Math.Max(x.PrecioProducto - x.CuotaInicial, 0) : x.ValorFinanciado;
+        var totalPayment = x.TotalPagarEstimado <= 0 ? x.PrecioProducto : x.TotalPagarEstimado;
+        return new QuoteDto(
+            x.Id,
+            x.Numero,
+            x.TipoIdentificacion,
+            x.NumeroIdentificacion,
+            x.NombresCliente,
+            x.ApellidosCliente,
+            x.ClienteId,
+            x.ProductoId,
+            productName,
+            x.PrecioProducto,
+            x.CuotaInicial,
+            termMonths,
+            x.TasaInteresMensual,
+            financedAmount,
+            x.CuotaMensualEstimada,
+            totalPayment,
+            x.FechaCotizacion,
+            x.ValidaHasta,
+            x.Observaciones);
     }
+
+    private static CreditSimulation CalculateSimulation(decimal productPrice, decimal downPayment, int termMonths, decimal monthlyInterestRate)
+    {
+        var normalizedDownPayment = Math.Min(downPayment, productPrice);
+        var financedAmount = Math.Max(productPrice - normalizedDownPayment, 0);
+        var monthlyRate = monthlyInterestRate / 100;
+        var monthlyPayment = financedAmount == 0
+            ? 0
+            : monthlyRate == 0
+                ? financedAmount / termMonths
+                : financedAmount * monthlyRate / (1 - (decimal)Math.Pow(1 + (double)monthlyRate, -termMonths));
+        monthlyPayment = Math.Round(monthlyPayment, 0, MidpointRounding.AwayFromZero);
+        var totalPayment = normalizedDownPayment + (monthlyPayment * termMonths);
+        return new CreditSimulation(normalizedDownPayment, financedAmount, monthlyPayment, totalPayment);
+    }
+
+    private sealed record CreditSimulation(decimal DownPayment, decimal FinancedAmount, decimal MonthlyPayment, decimal TotalPayment);
 }

@@ -24,6 +24,14 @@ public static class SimplePdfGenerator
             $"Producto: {quote.ProductName}",
             $"Precio: {quote.ProductPrice:C0}",
             "",
+            "SIMULACION DE CREDITO",
+            $"Cuota inicial: {quote.DownPayment:C0}",
+            $"Valor financiado: {quote.FinancedAmount:C0}",
+            $"Plazo: {quote.TermMonths} meses",
+            $"Tasa mensual: {quote.MonthlyInterestRate:N2}%",
+            $"Cuota mensual estimada: {quote.EstimatedMonthlyPayment:C0}",
+            $"Total estimado a pagar: {quote.EstimatedTotalPayment:C0}",
+            "",
             $"Observaciones: {quote.Notes ?? "N/A"}"
         };
 

@@ -70,7 +70,7 @@ const emptyActivity = { title: '', description: '', type: 1, status: 1, schedule
 const emptyCompany = { name: '', subdomain: '', customDomain: '', active: true };
 const emptyUser = { fullName: '', email: '', password: '', companyId: '', roles: ['Vendedor'] };
 const emptyProduct = { brand: '', model: '', reference: '', engineCc: '', year: '', color: '', price: 0, active: true };
-const emptyQuote = { identificationType: 1, identificationNumber: '', customerFirstNames: '', customerLastNames: '', productId: '', notes: '' };
+const emptyQuote = { identificationType: 1, identificationNumber: '', customerFirstNames: '', customerLastNames: '', productId: '', downPayment: 0, termMonths: 24, monthlyInterestRate: 2.2, notes: '' };
 const emptyCreditApplication = { customerId: '', productId: '', quoteId: '', dealId: '', identificationType: 1, identificationNumber: '', birthDate: '', mobile: '', address: '', city: '', occupation: '', monthlyIncome: 0, downPayment: 0, termMonths: 24, motorcycleValue: 0, status: 1, notes: '' };
 
 function Layout() {
@@ -247,7 +247,7 @@ function Customer360Page() {
       <Grid item xs={12} md={6}>
         <Card><CardContent>
           <Typography variant="h6" fontWeight={900}>Cotizaciones</Typography>
-          {data?.quotes.length ? data.quotes.map((q) => <Row key={q.id} primary={`${q.number} - ${q.productName}`} secondary={`${money(q.productPrice)} · ${new Date(q.quoteDate).toLocaleDateString()}`} />) : <EmptyState text="Sin cotizaciones" />}
+          {data?.quotes.length ? data.quotes.map((q) => <Row key={q.id} primary={`${q.number} - ${q.productName}`} secondary={`${money(q.productPrice)} · cuota ${money(q.estimatedMonthlyPayment)} x ${q.termMonths} · ${new Date(q.quoteDate).toLocaleDateString()}`} />) : <EmptyState text="Sin cotizaciones" />}
         </CardContent></Card>
       </Grid>
       <Grid item xs={12} md={6}>
@@ -350,6 +350,9 @@ function QuotesPage() {
       ...payload,
       identificationType: Number(payload.identificationType),
       identificationNumber: payload.identificationNumber || null,
+      downPayment: Number(payload.downPayment),
+      termMonths: Number(payload.termMonths),
+      monthlyInterestRate: Number(payload.monthlyInterestRate),
       notes: payload.notes || null
     };
     const { data } = await api.post<Quote>('/api/quotes', body);
@@ -363,7 +366,7 @@ function QuotesPage() {
     <Header title="Cotizaciones" action="Nueva cotizacion" onAction={() => setForm({ open: true })} onRefresh={reload} />
     <StatusBar loading={loading} error={error} />
     <EntityTable
-      headers={['Numero', 'Cliente', 'Identificacion', 'Moto', 'Valor', 'Valida hasta', 'PDF']}
+      headers={['Numero', 'Cliente', 'Identificacion', 'Moto', 'Valor', 'Cuota estimada', 'Valida hasta', 'PDF']}
       empty="No hay cotizaciones registradas"
       rows={rows.map((r) => [
         r.number,
@@ -371,6 +374,7 @@ function QuotesPage() {
         `${identificationLabel(r.identificationType)} ${r.identificationNumber ?? ''}`.trim(),
         r.productName,
         money(r.productPrice),
+        r.estimatedMonthlyPayment > 0 ? `${money(r.estimatedMonthlyPayment)} x ${r.termMonths}` : 'Sin simulacion',
         new Date(r.validUntil).toLocaleDateString(),
         <Actions onDownload={() => downloadPdf(r)} />
       ])}
@@ -846,18 +850,41 @@ function ProductDialog({ form, onClose, onSave }: DialogProps<Product, typeof em
 function QuoteDialog({ form, products, onClose, onSave }: DialogProps<Quote, typeof emptyQuote> & { products: Product[] }) {
   const initial = { ...emptyQuote, productId: products[0]?.id ?? '' };
   return <FormDialog title="Nueva cotizacion" open={form.open} initial={initial} onClose={onClose} onSave={onSave}>
-    {(v, set) => <>
-      <TextField required select label="Tipo de identificacion" value={v.identificationType} onChange={(e) => set({ identificationType: Number(e.target.value) })}>
-        {identificationOptions.map((option) => <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>)}
-      </TextField>
-      <TextField label="Numero de identificacion" value={v.identificationNumber} onChange={(e) => set({ identificationNumber: e.target.value })} />
-      <TextField required label="Nombres" value={v.customerFirstNames} onChange={(e) => set({ customerFirstNames: e.target.value })} />
-      <TextField required label="Apellidos" value={v.customerLastNames} onChange={(e) => set({ customerLastNames: e.target.value })} />
-      <TextField required select label="Moto" value={v.productId} onChange={(e) => set({ productId: e.target.value })}>
-        {products.length ? products.map((product) => <MenuItem key={product.id} value={product.id}>{product.brand} {product.model} {product.reference} - {money(product.price)}</MenuItem>) : <MenuItem value="">No hay motos activas</MenuItem>}
-      </TextField>
-      <TextField label="Observaciones" value={v.notes} onChange={(e) => set({ notes: e.target.value })} multiline minRows={2} />
-    </>}
+    {(v, set) => {
+      const selectedProduct = products.find((product) => product.id === v.productId);
+      const productPrice = selectedProduct?.price ?? 0;
+      const downPayment = Math.min(Number(v.downPayment) || 0, productPrice);
+      const termMonths = Math.max(Number(v.termMonths) || 1, 1);
+      const monthlyInterestRate = Math.max(Number(v.monthlyInterestRate) || 0, 0);
+      const financedAmount = Math.max(productPrice - downPayment, 0);
+      const monthlyPayment = estimateMonthlyPayment(financedAmount, termMonths, monthlyInterestRate);
+      const totalPayment = downPayment + monthlyPayment * termMonths;
+      return <>
+        <TextField required select label="Tipo de identificacion" value={v.identificationType} onChange={(e) => set({ identificationType: Number(e.target.value) })}>
+          {identificationOptions.map((option) => <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>)}
+        </TextField>
+        <TextField label="Numero de identificacion" value={v.identificationNumber} onChange={(e) => set({ identificationNumber: e.target.value })} />
+        <TextField required label="Nombres" value={v.customerFirstNames} onChange={(e) => set({ customerFirstNames: e.target.value })} />
+        <TextField required label="Apellidos" value={v.customerLastNames} onChange={(e) => set({ customerLastNames: e.target.value })} />
+        <TextField required select label="Moto" value={v.productId} onChange={(e) => set({ productId: e.target.value })}>
+          {products.length ? products.map((product) => <MenuItem key={product.id} value={product.id}>{product.brand} {product.model} {product.reference} - {money(product.price)}</MenuItem>) : <MenuItem value="">No hay motos activas</MenuItem>}
+        </TextField>
+        <Grid container spacing={2}>
+          <Grid item xs={12} sm={4}><TextField fullWidth label="Cuota inicial" type="number" value={v.downPayment} onChange={(e) => set({ downPayment: Number(e.target.value) })} /></Grid>
+          <Grid item xs={12} sm={4}><TextField fullWidth label="Plazo meses" type="number" value={v.termMonths} onChange={(e) => set({ termMonths: Number(e.target.value) })} /></Grid>
+          <Grid item xs={12} sm={4}><TextField fullWidth label="Tasa mensual %" type="number" value={v.monthlyInterestRate} onChange={(e) => set({ monthlyInterestRate: Number(e.target.value) })} /></Grid>
+        </Grid>
+        <Paper variant="outlined" sx={{ p: 2, bgcolor: '#f8fafc' }}>
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={4}><Typography variant="caption" color="text.secondary">Valor moto</Typography><Typography fontWeight={700}>{money(productPrice)}</Typography></Grid>
+            <Grid item xs={12} sm={4}><Typography variant="caption" color="text.secondary">Valor financiado</Typography><Typography fontWeight={700}>{money(financedAmount)}</Typography></Grid>
+            <Grid item xs={12} sm={4}><Typography variant="caption" color="text.secondary">Cuota estimada</Typography><Typography fontWeight={700}>{money(monthlyPayment)}</Typography></Grid>
+            <Grid item xs={12}><Typography variant="caption" color="text.secondary">Total estimado a pagar: {money(totalPayment)}</Typography></Grid>
+          </Grid>
+        </Paper>
+        <TextField label="Observaciones" value={v.notes} onChange={(e) => set({ notes: e.target.value })} multiline minRows={2} />
+      </>;
+    }}
   </FormDialog>;
 }
 
@@ -896,7 +923,9 @@ function CreditApplicationDialog({ form, customers, products, quotes, deals, onC
             productId: selected?.productId ?? v.productId,
             identificationType: selected?.identificationType ?? v.identificationType,
             identificationNumber: selected?.identificationNumber ?? v.identificationNumber,
-            motorcycleValue: selected?.productPrice ?? v.motorcycleValue
+            motorcycleValue: selected?.productPrice ?? v.motorcycleValue,
+            downPayment: selected?.downPayment ?? v.downPayment,
+            termMonths: selected?.termMonths ?? v.termMonths
           });
         }}>
           <MenuItem value="">Sin cotizacion</MenuItem>
@@ -1190,6 +1219,14 @@ function toInputDateTime(value: string) {
 }
 
 function money(value?: number) { return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(value ?? 0); }
+function estimateMonthlyPayment(financedAmount: number, termMonths: number, monthlyInterestRate: number) {
+  if (financedAmount <= 0) return 0;
+  const rate = monthlyInterestRate / 100;
+  const payment = rate === 0
+    ? financedAmount / termMonths
+    : financedAmount * rate / (1 - Math.pow(1 + rate, -termMonths));
+  return Math.round(payment);
+}
 function whatsappUrl(value: string) {
   const digits = value.replace(/\D/g, '');
   const withCountry = digits.startsWith('57') ? digits : `57${digits}`;

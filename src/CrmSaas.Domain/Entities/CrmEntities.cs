@@ -110,6 +110,12 @@ public sealed class Cotizacion : AuditableTenantEntity
     public Guid ProductoId { get; set; }
     public Producto? Producto { get; set; }
     public decimal PrecioProducto { get; set; }
+    public decimal CuotaInicial { get; set; }
+    public int PlazoMeses { get; set; } = 24;
+    public decimal TasaInteresMensual { get; set; }
+    public decimal ValorFinanciado { get; set; }
+    public decimal CuotaMensualEstimada { get; set; }
+    public decimal TotalPagarEstimado { get; set; }
     public DateTime FechaCotizacion { get; set; } = DateTime.UtcNow;
     public DateTime ValidaHasta { get; set; } = DateTime.UtcNow.AddDays(7);
     public string? Observaciones { get; set; }

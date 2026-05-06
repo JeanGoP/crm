@@ -62,6 +62,11 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
         modelBuilder.Entity<Producto>().Property(x => x.Precio).HasPrecision(18, 2);
         modelBuilder.Entity<Producto>().HasIndex(x => new { x.EmpresaId, x.Referencia });
         modelBuilder.Entity<Cotizacion>().Property(x => x.PrecioProducto).HasPrecision(18, 2);
+        modelBuilder.Entity<Cotizacion>().Property(x => x.CuotaInicial).HasPrecision(18, 2);
+        modelBuilder.Entity<Cotizacion>().Property(x => x.TasaInteresMensual).HasPrecision(6, 3);
+        modelBuilder.Entity<Cotizacion>().Property(x => x.ValorFinanciado).HasPrecision(18, 2);
+        modelBuilder.Entity<Cotizacion>().Property(x => x.CuotaMensualEstimada).HasPrecision(18, 2);
+        modelBuilder.Entity<Cotizacion>().Property(x => x.TotalPagarEstimado).HasPrecision(18, 2);
         modelBuilder.Entity<Cotizacion>().HasIndex(x => new { x.EmpresaId, x.Numero }).IsUnique();
         modelBuilder.Entity<SolicitudCredito>().Property(x => x.IngresosMensuales).HasPrecision(18, 2);
         modelBuilder.Entity<SolicitudCredito>().Property(x => x.CuotaInicial).HasPrecision(18, 2);

@@ -86,7 +86,29 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
     private static QuoteDto ToQuoteDto(Cotizacion x)
     {
         var productName = x.Producto is null ? "Moto" : $"{x.Producto.Marca} {x.Producto.Modelo} {x.Producto.Referencia}".Trim();
-        return new QuoteDto(x.Id, x.Numero, x.TipoIdentificacion, x.NumeroIdentificacion, x.NombresCliente, x.ApellidosCliente, x.ClienteId, x.ProductoId, productName, x.PrecioProducto, x.FechaCotizacion, x.ValidaHasta, x.Observaciones);
+        var termMonths = x.PlazoMeses <= 0 ? 24 : x.PlazoMeses;
+        var financedAmount = x.ValorFinanciado <= 0 && x.CuotaMensualEstimada <= 0 ? Math.Max(x.PrecioProducto - x.CuotaInicial, 0) : x.ValorFinanciado;
+        var totalPayment = x.TotalPagarEstimado <= 0 ? x.PrecioProducto : x.TotalPagarEstimado;
+        return new QuoteDto(
+            x.Id,
+            x.Numero,
+            x.TipoIdentificacion,
+            x.NumeroIdentificacion,
+            x.NombresCliente,
+            x.ApellidosCliente,
+            x.ClienteId,
+            x.ProductoId,
+            productName,
+            x.PrecioProducto,
+            x.CuotaInicial,
+            termMonths,
+            x.TasaInteresMensual,
+            financedAmount,
+            x.CuotaMensualEstimada,
+            totalPayment,
+            x.FechaCotizacion,
+            x.ValidaHasta,
+            x.Observaciones);
     }
 
     private static CreditApplicationDto ToCreditApplicationDto(SolicitudCredito x)

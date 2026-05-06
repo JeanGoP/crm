@@ -1,7 +1,7 @@
 # Manual del Sistema CRM SaaS
 
-Ultima actualizacion: 2026-05-05  
-Version del manual: 1.0  
+Ultima actualizacion: 2026-05-06  
+Version del manual: 1.1  
 Sistema: CRM SaaS para ventas de motos a credito  
 Ambiente documentado: Desarrollo local conectado a SQL Server
 
@@ -177,9 +177,13 @@ Los productos activos aparecen disponibles para crear cotizaciones y solicitudes
 
 ![Cotizaciones](./assets/manual/05-cotizaciones.png)
 
+![Simulador de credito en cotizacion](./assets/manual/05-cotizaciones-simulador.png)
+
 ### Para que sirve
 
 Permite generar una cotizacion de moto para un cliente con datos minimos. Al crear una cotizacion, el sistema registra o relaciona el cliente para continuar el proceso comercial.
+
+Tambien permite simular la financiacion de la moto para entregar al cliente una cuota mensual estimada.
 
 ### Datos solicitados
 
@@ -188,6 +192,12 @@ Permite generar una cotizacion de moto para un cliente con datos minimos. Al cre
 - Nombres del cliente
 - Apellidos del cliente
 - Moto seleccionada
+- Cuota inicial
+- Plazo en meses
+- Tasa mensual
+- Valor financiado calculado
+- Cuota mensual estimada
+- Total estimado a pagar
 - Observaciones
 
 ### Crear cotizacion
@@ -197,14 +207,28 @@ Permite generar una cotizacion de moto para un cliente con datos minimos. Al cre
 3. Seleccione el tipo de identificacion.
 4. Escriba numero de identificacion, nombres y apellidos.
 5. Seleccione la moto.
-6. Agregue observaciones si aplica.
-7. Guarde.
+6. Ingrese la cuota inicial.
+7. Defina el plazo en meses.
+8. Defina la tasa mensual.
+9. Revise el resumen del simulador: valor de la moto, valor financiado, cuota estimada y total estimado.
+10. Agregue observaciones si aplica.
+11. Guarde.
+
+### Simulador de credito
+
+El simulador calcula automaticamente:
+
+- **Valor financiado:** precio de la moto menos cuota inicial.
+- **Cuota mensual estimada:** valor aproximado de la cuota segun plazo y tasa mensual.
+- **Total estimado a pagar:** cuota inicial mas la suma de las cuotas mensuales.
+
+El calculo es una estimacion comercial. La aprobacion final y las condiciones definitivas dependen del proceso de credito.
 
 ### Generar PDF
 
 1. Ubique la cotizacion en la tabla.
 2. Presione el icono de descarga en la columna **PDF**.
-3. El sistema descarga el archivo PDF de la cotizacion.
+3. El sistema descarga el archivo PDF de la cotizacion con la simulacion de credito incluida.
 
 ### Relacion con clientes
 
@@ -480,4 +504,5 @@ Si aparece un error, revise primero los datos ingresados. Si el error persiste, 
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-05-06 | 1.1 | Se agrega simulador de credito en cotizaciones, cuota estimada en listado y PDF con informacion financiera. |
 | 2026-05-05 | 1.0 | Creacion inicial del manual con capturas reales y documentacion de modulos actuales. |

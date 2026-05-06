@@ -95,6 +95,12 @@ export interface Quote {
   productId: string;
   productName: string;
   productPrice: number;
+  downPayment: number;
+  termMonths: number;
+  monthlyInterestRate: number;
+  financedAmount: number;
+  estimatedMonthlyPayment: number;
+  estimatedTotalPayment: number;
   quoteDate: string;
   validUntil: string;
   notes?: string;
