@@ -1,7 +1,7 @@
 # Manual del Sistema CRM SaaS
 
 Ultima actualizacion: 2026-05-06  
-Version del manual: 1.2  
+Version del manual: 1.3  
 Sistema: CRM SaaS para ventas de motos a credito  
 Ambiente documentado: Desarrollo local conectado a SQL Server
 
@@ -102,6 +102,8 @@ Resume el estado comercial de la empresa: valor del pipeline, clientes activos, 
 
 ![Clientes](./assets/manual/03-clientes.png)
 
+![Cliente 360](./assets/manual/03-clientes-360.png)
+
 ### Para que sirve
 
 Permite administrar los clientes de la empresa. Un cliente puede venir de una cotizacion, de un prospecto convertido o ser creado manualmente.
@@ -138,7 +140,21 @@ Segun los permisos del usuario, el sistema permite eliminar o marcar registros p
 
 ### Vista 360 del cliente
 
-Desde el cliente se puede acceder a su resumen completo: cotizaciones, solicitudes de credito, negocios del pipeline y actividades relacionadas.
+Desde el cliente se puede acceder a su resumen completo: cotizaciones, solicitudes de credito, negocios del pipeline, actividades relacionadas e historial completo.
+
+### Historial del cliente
+
+La vista 360 incluye una linea de tiempo cronologica con los eventos mas importantes del cliente:
+
+- Cotizaciones generadas.
+- Solicitudes de credito creadas.
+- Documentos cargados, recibidos o validados.
+- Decisiones de credito: enviado, en estudio, aprobado, rechazado o desembolsado.
+- Negocios del pipeline.
+- Actividades programadas.
+- Notas registradas.
+
+Esta linea de tiempo sirve para que un vendedor, supervisor o administrador entienda rapidamente que ha pasado con el cliente sin abrir cada modulo por separado.
 
 ## 8. Productos
 
@@ -529,6 +545,7 @@ Si aparece un error, revise primero los datos ingresados. Si el error persiste, 
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-05-06 | 1.3 | Se agrega historial completo del cliente en Cliente 360 con timeline cronologico de cotizaciones, solicitudes, documentos, decisiones, pipeline, actividades y notas. |
 | 2026-05-06 | 1.2 | Se agrega flujo formal de aprobaciones para solicitudes de credito con fechas, usuario de decision y acciones controladas. |
 | 2026-05-06 | 1.1 | Se agrega simulador de credito en cotizaciones, cuota estimada en listado y PDF con informacion financiera. |
 | 2026-05-05 | 1.0 | Creacion inicial del manual con capturas reales y documentacion de modulos actuales. |

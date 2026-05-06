@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+﻿import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Navigate, NavLink, Route, Routes, useNavigate, useParams } from 'react-router-dom';
 import {
   Alert, AppBar, Box, Button, Card, CardContent, Chip, CssBaseline, Dialog, DialogActions,
@@ -30,7 +30,7 @@ import WhatsApp from '@mui/icons-material/WhatsApp';
 import { AxiosError } from 'axios';
 import { api } from './api';
 import { useAuthStore } from './store';
-import { Activity, Company, CreditApplication, CreditDocument, Customer, Customer360, Dashboard, Deal, DealStage, Lead, Product, Quote, User } from './types';
+import { Activity, Company, CreditApplication, CreditDocument, Customer, Customer360, CustomerTimelineItem, Dashboard, Deal, DealStage, Lead, Product, Quote, User } from './types';
 
 const drawerWidth = 248;
 const today = new Date().toISOString().slice(0, 10);
@@ -243,32 +243,59 @@ function Customer360Page() {
       <Grid item xs={12} md={3}><Metric label="Estado" value={statusLabel(customer.status)} /></Grid>
       <Grid item xs={12} md={3}><Metric label="Etiquetas" value={customer.tags || '-'} /></Grid>
     </Grid>}
+    <Card><CardContent>
+      <Stack direction="row" alignItems="center" justifyContent="space-between" gap={2} sx={{ mb: 2 }}>
+        <Typography variant="h6" fontWeight={900}>Historial del cliente</Typography>
+        <Chip size="small" label={`${data?.timeline.length ?? 0} eventos`} variant="outlined" />
+      </Stack>
+      <CustomerTimeline items={data?.timeline ?? []} />
+    </CardContent></Card>
     <Grid container spacing={2}>
       <Grid item xs={12} md={6}>
         <Card><CardContent>
           <Typography variant="h6" fontWeight={900}>Cotizaciones</Typography>
-          {data?.quotes.length ? data.quotes.map((q) => <Row key={q.id} primary={`${q.number} - ${q.productName}`} secondary={`${money(q.productPrice)} · cuota ${money(q.estimatedMonthlyPayment)} x ${q.termMonths} · ${new Date(q.quoteDate).toLocaleDateString()}`} />) : <EmptyState text="Sin cotizaciones" />}
+          {data?.quotes.length ? data.quotes.map((q) => <Row key={q.id} primary={`${q.number} - ${q.productName}`} secondary={`${money(q.productPrice)} - cuota ${money(q.estimatedMonthlyPayment)} x ${q.termMonths} - ${new Date(q.quoteDate).toLocaleDateString()}`} />) : <EmptyState text="Sin cotizaciones" />}
         </CardContent></Card>
       </Grid>
       <Grid item xs={12} md={6}>
         <Card><CardContent>
           <Typography variant="h6" fontWeight={900}>Solicitudes de credito</Typography>
-          {data?.creditApplications.length ? data.creditApplications.map((s) => <Row key={s.id} primary={`${s.number} - ${s.productName}`} secondary={`${creditStatus(s.status)} · ${money(s.motorcycleValue)}`} />) : <EmptyState text="Sin solicitudes" />}
+          {data?.creditApplications.length ? data.creditApplications.map((s) => <Row key={s.id} primary={`${s.number} - ${s.productName}`} secondary={`${creditStatus(s.status)} - ${money(s.motorcycleValue)}`} />) : <EmptyState text="Sin solicitudes" />}
         </CardContent></Card>
       </Grid>
       <Grid item xs={12} md={6}>
         <Card><CardContent>
           <Typography variant="h6" fontWeight={900}>Pipeline</Typography>
-          {data?.deals.length ? data.deals.map((d) => <Row key={d.id} primary={d.title} secondary={`${dealStatus(d.status)} · ${money(d.value)} · ${d.closeProbability}%`} />) : <EmptyState text="Sin negocios" />}
+          {data?.deals.length ? data.deals.map((d) => <Row key={d.id} primary={d.title} secondary={`${dealStatus(d.status)} - ${money(d.value)} - ${d.closeProbability}%`} />) : <EmptyState text="Sin negocios" />}
         </CardContent></Card>
       </Grid>
       <Grid item xs={12} md={6}>
         <Card><CardContent>
           <Typography variant="h6" fontWeight={900}>Actividades</Typography>
-          {data?.activities.length ? data.activities.map((a) => <Row key={a.id} primary={a.title} secondary={`${activityStatus(a.status)} · ${new Date(a.scheduledAt).toLocaleString()}`} />) : <EmptyState text="Sin actividades" />}
+          {data?.activities.length ? data.activities.map((a) => <Row key={a.id} primary={a.title} secondary={`${activityStatus(a.status)} - ${new Date(a.scheduledAt).toLocaleString()}`} />) : <EmptyState text="Sin actividades" />}
         </CardContent></Card>
       </Grid>
     </Grid>
+  </Stack>;
+}
+
+function CustomerTimeline({ items }: { items: CustomerTimelineItem[] }) {
+  if (!items.length) return <EmptyState text="Sin historial registrado" />;
+  return <Stack spacing={0}>
+    {items.map((item, index) => <Stack key={`${item.type}-${item.relatedId ?? index}-${item.occurredAt}`} direction="row" gap={2} sx={{ position: 'relative', pb: 2 }}>
+      <Box sx={{ width: 16, display: 'flex', justifyContent: 'center', position: 'relative' }}>
+        <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: timelineColor(item.tone), mt: .9, zIndex: 1 }} />
+        {index < items.length - 1 && <Box sx={{ position: 'absolute', top: 20, bottom: 0, width: 2, bgcolor: '#e5eaf0' }} />}
+      </Box>
+      <Box sx={{ flex: 1, minWidth: 0, borderBottom: index < items.length - 1 ? '1px solid #edf1f5' : 'none', pb: 1.5 }}>
+        <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap">
+          <Chip size="small" label={item.type} color={timelineChipColor(item.tone)} variant={item.tone === 'default' || item.tone === 'info' ? 'outlined' : 'filled'} />
+          <Typography fontWeight={800}>{item.title}</Typography>
+          <Typography variant="caption" color="text.secondary">{new Date(item.occurredAt).toLocaleString()}</Typography>
+        </Stack>
+        <Typography color="text.secondary" sx={{ mt: .5 }}>{item.description}</Typography>
+      </Box>
+    </Stack>)}
   </Stack>;
 }
 
@@ -508,7 +535,7 @@ function ApprovalSummary({ application, onDecision }: { application: CreditAppli
   const lastDate = application.disbursedAt ?? application.approvedAt ?? application.rejectedAt ?? application.reviewStartedAt ?? application.submittedAt;
   return <Stack spacing={.75} sx={{ minWidth: 190 }}>
     <Typography variant="caption" color="text.secondary">
-      {lastDate ? `${application.decisionUser ?? 'Sistema'} · ${new Date(lastDate).toLocaleDateString()}` : 'Sin decision registrada'}
+      {lastDate ? `${application.decisionUser ?? 'Sistema'} - ${new Date(lastDate).toLocaleDateString()}` : 'Sin decision registrada'}
     </Typography>
     {application.decisionNotes && <Typography variant="caption" color="text.secondary" noWrap>{application.decisionNotes}</Typography>}
     <Stack direction="row" gap={.5} flexWrap="wrap">
@@ -1250,6 +1277,16 @@ function toInputDateTime(value: string) {
 }
 
 function money(value?: number) { return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(value ?? 0); }
+function timelineColor(tone: CustomerTimelineItem['tone']) {
+  if (tone === 'success') return '#15803d';
+  if (tone === 'warning') return '#b45309';
+  if (tone === 'error') return '#b91c1c';
+  if (tone === 'info') return '#155e75';
+  return '#64748b';
+}
+function timelineChipColor(tone: CustomerTimelineItem['tone']) {
+  return tone === 'success' || tone === 'warning' || tone === 'error' ? tone : undefined;
+}
 function estimateMonthlyPayment(financedAmount: number, termMonths: number, monthlyInterestRate: number) {
   if (financedAmount <= 0) return 0;
   const rate = monthlyInterestRate / 100;
@@ -1284,3 +1321,4 @@ export default function App() {
   const token = useAuthStore((s) => s.accessToken);
   return <ThemeProvider theme={theme}><CssBaseline /><Routes><Route path="/login" element={token ? <Navigate to="/" /> : <LoginPage />} /><Route path="/*" element={token ? <Layout /> : <Navigate to="/login" />} /></Routes></ThemeProvider>;
 }
+

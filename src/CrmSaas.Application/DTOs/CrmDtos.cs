@@ -113,7 +113,16 @@ public sealed record Customer360Dto(
     IReadOnlyCollection<QuoteDto> Quotes,
     IReadOnlyCollection<CreditApplicationDto> CreditApplications,
     IReadOnlyCollection<DealDto> Deals,
-    IReadOnlyCollection<ActivityDto> Activities);
+    IReadOnlyCollection<ActivityDto> Activities,
+    IReadOnlyCollection<CustomerTimelineItemDto> Timeline);
+
+public sealed record CustomerTimelineItemDto(
+    DateTime OccurredAt,
+    string Type,
+    string Title,
+    string Description,
+    string Tone,
+    Guid? RelatedId);
 
 public sealed record DashboardDto(decimal OpenPipelineValue, decimal WeightedPipelineValue, int ActiveCustomers, int OpenLeads, int PendingActivities, IReadOnlyCollection<RecentActivityDto> RecentActivities);
 public sealed record RecentActivityDto(string Title, DateTime ScheduledAt, EstadoActividad Status);

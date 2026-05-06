@@ -158,6 +158,16 @@ export interface Customer360 {
   creditApplications: CreditApplication[];
   deals: Deal[];
   activities: Activity[];
+  timeline: CustomerTimelineItem[];
+}
+
+export interface CustomerTimelineItem {
+  occurredAt: string;
+  type: string;
+  title: string;
+  description: string;
+  tone: 'success' | 'warning' | 'error' | 'info' | 'default';
+  relatedId?: string;
 }
 
 export interface Dashboard {
