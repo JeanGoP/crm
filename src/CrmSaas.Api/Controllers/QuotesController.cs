@@ -32,13 +32,13 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
     {
         if (string.IsNullOrWhiteSpace(dto.CustomerFirstNames)) throw new ValidationException("Los nombres del cliente son obligatorios.");
         if (string.IsNullOrWhiteSpace(dto.CustomerLastNames)) throw new ValidationException("Los apellidos del cliente son obligatorios.");
-        if (dto.ProductId == Guid.Empty) throw new ValidationException("Debe seleccionar una moto para cotizar.");
+        if (dto.ProductId == Guid.Empty) throw new ValidationException("Debe seleccionar un producto para cotizar.");
         if (dto.DownPayment < 0) throw new ValidationException("La cuota inicial no puede ser negativa.");
         if (dto.TermMonths <= 0) throw new ValidationException("El plazo debe ser mayor a cero.");
         if (dto.MonthlyInterestRate < 0) throw new ValidationException("La tasa mensual no puede ser negativa.");
 
         var product = await db.Productos.FirstOrDefaultAsync(x => x.Id == dto.ProductId && x.Activo, cancellationToken)
-            ?? throw new KeyNotFoundException("Moto no encontrada o inactiva.");
+            ?? throw new KeyNotFoundException("Producto no encontrado o inactivo.");
         var initialStage = await db.EtapasNegocio
             .Where(x => x.Activa)
             .OrderBy(x => x.Orden)
@@ -46,7 +46,7 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             ?? throw new InvalidOperationException("No hay etapas activas en el pipeline para crear la oportunidad.");
 
         var fullName = $"{dto.CustomerFirstNames.Trim()} {dto.CustomerLastNames.Trim()}".Trim();
-        var productName = $"{product.Marca} {product.Modelo} {product.Referencia}".Trim();
+        var productName = ProductName(product);
         var simulation = CalculateSimulation(product.Precio, dto.DownPayment, dto.TermMonths, dto.MonthlyInterestRate);
         var customer = new Cliente
         {
@@ -125,8 +125,8 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
     private static QuoteDto ToDto(Cotizacion x)
     {
         var productName = x.Producto is null
-            ? "Moto"
-            : $"{x.Producto.Marca} {x.Producto.Modelo} {x.Producto.Referencia}".Trim();
+            ? "Producto"
+            : ProductName(x.Producto);
         var termMonths = x.PlazoMeses <= 0 ? 24 : x.PlazoMeses;
         var financedAmount = x.ValorFinanciado <= 0 && x.CuotaMensualEstimada <= 0 ? Math.Max(x.PrecioProducto - x.CuotaInicial, 0) : x.ValorFinanciado;
         var totalPayment = x.TotalPagarEstimado <= 0 ? x.PrecioProducto : x.TotalPagarEstimado;
@@ -168,4 +168,10 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
     }
 
     private sealed record CreditSimulation(decimal DownPayment, decimal FinancedAmount, decimal MonthlyPayment, decimal TotalPayment);
+
+    private static string ProductName(Producto product)
+    {
+        if (!string.IsNullOrWhiteSpace(product.Nombre)) return product.Nombre.Trim();
+        return $"{product.Marca} {product.Modelo} {product.Referencia}".Trim();
+    }
 }

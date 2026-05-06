@@ -1,7 +1,7 @@
 # Manual del Sistema CRM SaaS
 
 Ultima actualizacion: 2026-05-06  
-Version del manual: 1.5  
+Version del manual: 1.6  
 Sistema: CRM SaaS para ventas de motos a credito  
 Ambiente documentado: Desarrollo local conectado a SQL Server
 
@@ -179,32 +179,35 @@ Esta linea de tiempo sirve para que un vendedor, supervisor o administrador enti
 
 ### Para que sirve
 
-Permite registrar las motos que se van a cotizar y vender.
+Permite registrar el catalogo comercial de la empresa. Una moto es una categoria de producto, pero tambien se pueden manejar accesorios, seguros, tramites, repuestos, servicios, garantias u otros productos.
 
 ### Datos principales
 
-- Marca
-- Modelo
+- Nombre del producto
+- Categoria
+- Marca opcional
+- Modelo opcional
 - Referencia
 - Cilindraje
 - Ano
 - Color
+- Descripcion
 - Precio
 - Estado activo/inactivo
 
 ### Crear producto
 
 1. Abra **Productos**.
-2. Presione **Nueva moto**.
-3. Complete marca, modelo y referencia.
-4. Agregue cilindraje, ano y color si estan disponibles.
+2. Presione **Nuevo producto**.
+3. Complete el nombre, categoria y referencia.
+4. Agregue marca, modelo, descripcion, cilindraje, ano y color si aplican.
 5. Ingrese el precio.
 6. Marque el producto como activo.
 7. Guarde.
 
 ### Uso comercial
 
-Los productos activos aparecen disponibles para crear cotizaciones y solicitudes de credito.
+Los productos activos aparecen disponibles para crear cotizaciones y solicitudes de credito. Para motos se pueden diligenciar las caracteristicas tecnicas; para accesorios, seguros, tramites o servicios se usan principalmente nombre, categoria, referencia, descripcion y precio.
 
 ## 9. Cotizaciones
 
@@ -214,9 +217,9 @@ Los productos activos aparecen disponibles para crear cotizaciones y solicitudes
 
 ### Para que sirve
 
-Permite generar una cotizacion de moto para un cliente con datos minimos. Al crear una cotizacion, el sistema registra o relaciona el cliente para continuar el proceso comercial.
+Permite generar una cotizacion para un cliente con datos minimos. Al crear una cotizacion, el sistema registra o relaciona el cliente para continuar el proceso comercial.
 
-Tambien permite simular la financiacion de la moto para entregar al cliente una cuota mensual estimada.
+Tambien permite simular la financiacion del producto para entregar al cliente una cuota mensual estimada.
 
 ### Datos solicitados
 
@@ -224,7 +227,7 @@ Tambien permite simular la financiacion de la moto para entregar al cliente una 
 - Numero de identificacion
 - Nombres del cliente
 - Apellidos del cliente
-- Moto seleccionada
+- Producto seleccionado
 - Cuota inicial
 - Plazo en meses
 - Tasa mensual
@@ -239,11 +242,11 @@ Tambien permite simular la financiacion de la moto para entregar al cliente una 
 2. Presione **Nueva cotizacion**.
 3. Seleccione el tipo de identificacion.
 4. Escriba numero de identificacion, nombres y apellidos.
-5. Seleccione la moto.
+5. Seleccione el producto.
 6. Ingrese la cuota inicial.
 7. Defina el plazo en meses.
 8. Defina la tasa mensual.
-9. Revise el resumen del simulador: valor de la moto, valor financiado, cuota estimada y total estimado.
+9. Revise el resumen del simulador: valor del producto, valor financiado, cuota estimada y total estimado.
 10. Agregue observaciones si aplica.
 11. Guarde.
 
@@ -251,7 +254,7 @@ Tambien permite simular la financiacion de la moto para entregar al cliente una 
 
 El simulador calcula automaticamente:
 
-- **Valor financiado:** precio de la moto menos cuota inicial.
+- **Valor financiado:** precio del producto menos cuota inicial.
 - **Cuota mensual estimada:** valor aproximado de la cuota segun plazo y tasa mensual.
 - **Total estimado a pagar:** cuota inicial mas la suma de las cuotas mensuales.
 
@@ -275,7 +278,7 @@ Adicionalmente, el sistema crea automaticamente una actividad de seguimiento par
 
 ### Para que sirve
 
-Permite gestionar el tramite de credito de una moto para un cliente.
+Permite gestionar el tramite de credito de un producto para un cliente.
 
 ### Estados de solicitud
 
@@ -308,10 +311,10 @@ Cada decision guarda:
 1. Abra **Solicitudes credito**.
 2. Presione **Nueva solicitud**.
 3. Seleccione el cliente.
-4. Seleccione la moto.
+4. Seleccione el producto principal.
 5. Relacione una cotizacion o negocio del pipeline si aplica.
 6. Complete identificacion, fecha de nacimiento, celular, direccion, ciudad y ocupacion.
-7. Registre ingresos mensuales, cuota inicial, plazo y valor de la moto.
+7. Registre ingresos mensuales, cuota inicial, plazo y valor del producto.
 8. Seleccione el estado inicial.
 9. Guarde.
 
@@ -410,7 +413,7 @@ Permite registrar personas interesadas que aun no son clientes. Un prospecto rep
 
 ### Para que sirve
 
-Permite visualizar y gestionar los negocios de venta de motos a credito por etapas.
+Permite visualizar y gestionar los negocios de venta a credito por etapas.
 
 ### Etapas sugeridas
 
@@ -586,6 +589,7 @@ Si aparece un error, revise primero los datos ingresados. Si el error persiste, 
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-05-06 | 1.6 | Se generaliza el catalogo de productos para manejar motos, accesorios, seguros, tramites, repuestos, servicios y otros productos. |
 | 2026-05-06 | 1.5 | Se agregan alertas comerciales en Dashboard y seguimiento automatico al crear cotizaciones. |
 | 2026-05-06 | 1.4 | Se mejora gestion de actividades con indicadores, filtros por vencimiento, nombres de cliente/negocio, acciones rapidas y creacion de seguimientos desde Cliente 360. |
 | 2026-05-06 | 1.3 | Se agrega historial completo del cliente en Cliente 360 con timeline cronologico de cotizaciones, solicitudes, documentos, decisiones, pipeline, actividades y notas. |

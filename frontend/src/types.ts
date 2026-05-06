@@ -76,9 +76,12 @@ export interface Activity {
 
 export interface Product {
   id: string;
+  name: string;
+  category: string;
   brand: string;
   model: string;
   reference: string;
+  description?: string;
   engineCc?: number;
   year?: number;
   color?: string;

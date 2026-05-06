@@ -69,7 +69,7 @@ const emptyDeal = { title: '', customerId: '', stageId: '', value: 0, closeProba
 const emptyActivity = { title: '', description: '', type: 1, status: 1, scheduledAt: `${today}T09:00`, reminderAt: '', customerId: '', dealId: '', assignedUserId: '' };
 const emptyCompany = { name: '', subdomain: '', customDomain: '', active: true };
 const emptyUser = { fullName: '', email: '', password: '', companyId: '', roles: ['Vendedor'] };
-const emptyProduct = { brand: '', model: '', reference: '', engineCc: '', year: '', color: '', price: 0, active: true };
+const emptyProduct = { name: '', category: 'Moto', brand: '', model: '', reference: '', description: '', engineCc: '', year: '', color: '', price: 0, active: true };
 const emptyQuote = { identificationType: 1, identificationNumber: '', customerFirstNames: '', customerLastNames: '', productId: '', downPayment: 0, termMonths: 24, monthlyInterestRate: 2.2, notes: '' };
 const emptyCreditApplication = { customerId: '', productId: '', quoteId: '', dealId: '', identificationType: 1, identificationNumber: '', birthDate: '', mobile: '', address: '', city: '', occupation: '', monthlyIncome: 0, downPayment: 0, termMonths: 24, motorcycleValue: 0, status: 1, notes: '' };
 
@@ -352,6 +352,7 @@ function ProductsPage() {
   const save = async (payload: typeof emptyProduct) => {
     const body = {
       ...payload,
+      description: payload.description || null,
       engineCc: payload.engineCc === '' ? null : Number(payload.engineCc),
       year: payload.year === '' ? null : Number(payload.year),
       price: Number(payload.price),
@@ -361,7 +362,7 @@ function ProductsPage() {
       ? await api.put<Product>(`/api/products/${form.item.id}`, body)
       : await api.post<Product>('/api/products', body);
     setData(form.item ? rows.map((x) => x.id === data.id ? data : x) : [data, ...rows]);
-    setNotice({ type: 'success', text: form.item ? 'Moto actualizada.' : 'Moto creada.' });
+    setNotice({ type: 'success', text: form.item ? 'Producto actualizado.' : 'Producto creado.' });
     setForm({ open: false });
   };
 
@@ -369,30 +370,29 @@ function ProductsPage() {
     if (!confirm) return;
     const { data } = await api.delete<Product>(`/api/products/${confirm.id}`);
     setData(rows.map((x) => x.id === data.id ? data : x));
-    setNotice({ type: 'success', text: 'Moto inactivada.' });
+    setNotice({ type: 'success', text: 'Producto inactivado.' });
     setConfirm(undefined);
   };
 
   return <Stack spacing={3}>
-    <Header title="Productos / motos" action={canManage ? 'Nueva moto' : undefined} onAction={() => setForm({ open: true })} onRefresh={reload} />
+    <Header title="Productos" action={canManage ? 'Nuevo producto' : undefined} onAction={() => setForm({ open: true })} onRefresh={reload} />
     <StatusBar loading={loading} error={error} />
     <EntityTable
-      headers={['Marca', 'Modelo', 'Referencia', 'Cilindraje', 'Ano', 'Color', 'Precio', 'Estado', 'Acciones']}
-      empty="No hay motos registradas"
+      headers={['Producto', 'Categoria', 'Marca', 'Referencia', 'Caracteristicas', 'Precio', 'Estado', 'Acciones']}
+      empty="No hay productos registrados"
       rows={rows.map((r) => [
+        productName(r),
+        r.category,
         r.brand,
-        r.model,
         r.reference,
-        r.engineCc ? `${r.engineCc} cc` : undefined,
-        r.year,
-        r.color,
+        [r.model, r.engineCc ? `${r.engineCc} cc` : undefined, r.year, r.color].filter(Boolean).join(' / ') || r.description,
         money(r.price),
         <StatusChip label={r.active ? 'Activa' : 'Inactiva'} tone={r.active ? 'success' : 'default'} />,
         <Actions onEdit={canManage ? () => setForm({ open: true, item: r }) : undefined} onDelete={canManage && r.active ? () => setConfirm(r) : undefined} />
       ])}
     />
     <ProductDialog form={form} onClose={() => setForm({ open: false })} onSave={save} />
-    <ConfirmDialog title="Inactivar moto" text={`Se inactivara ${confirm?.brand} ${confirm?.model}. Las cotizaciones existentes conservaran el historial.`} open={!!confirm} onClose={() => setConfirm(undefined)} onConfirm={remove} confirmLabel="Inactivar" />
+    <ConfirmDialog title="Inactivar producto" text={`Se inactivara ${confirm ? productName(confirm) : ''}. Las cotizaciones existentes conservaran el historial.`} open={!!confirm} onClose={() => setConfirm(undefined)} onConfirm={remove} confirmLabel="Inactivar" />
     <Notice notice={notice} onClose={() => setNotice(undefined)} />
   </Stack>;
 }
@@ -436,7 +436,7 @@ function QuotesPage() {
     <Header title="Cotizaciones" action="Nueva cotizacion" onAction={() => setForm({ open: true })} onRefresh={reload} />
     <StatusBar loading={loading} error={error} />
     <EntityTable
-      headers={['Numero', 'Cliente', 'Identificacion', 'Moto', 'Valor', 'Cuota estimada', 'Valida hasta', 'PDF']}
+      headers={['Numero', 'Cliente', 'Identificacion', 'Producto', 'Valor', 'Cuota estimada', 'Valida hasta', 'PDF']}
       empty="No hay cotizaciones registradas"
       rows={rows.map((r) => [
         r.number,
@@ -542,7 +542,7 @@ function CreditApplicationsPage() {
     <Header title="Solicitudes de credito" action="Nueva solicitud" onAction={() => setForm({ open: true })} onRefresh={reload} />
     <StatusBar loading={loading} error={error} />
     <EntityTable
-      headers={['Numero', 'Cliente', 'Moto', 'Estado', 'Ingresos', 'Cuota inicial', 'Plazo', 'Documentos', 'Aprobacion', 'Acciones']}
+      headers={['Numero', 'Cliente', 'Producto', 'Estado', 'Ingresos', 'Cuota inicial', 'Plazo', 'Documentos', 'Aprobacion', 'Acciones']}
       empty="No hay solicitudes de credito"
       rows={rows.map((r) => [
         r.number,
@@ -697,7 +697,7 @@ function PipelinePage() {
 
   const defaultStageId = stages[0]?.id ?? '';
   return <Stack spacing={3}>
-    <Header title="Pipeline de motos a credito" action="Nueva venta" onAction={() => setForm({ open: true })} onRefresh={() => { reloadStages(); reloadDeals(); }} secondaryAction={canManage ? { label: 'Nueva etapa', onClick: () => setStageForm({ open: true }) } : undefined} />
+    <Header title="Pipeline de ventas a credito" action="Nueva venta" onAction={() => setForm({ open: true })} onRefresh={() => { reloadStages(); reloadDeals(); }} secondaryAction={canManage ? { label: 'Nueva etapa', onClick: () => setStageForm({ open: true }) } : undefined} />
     <StatusBar loading={loadingStages || loadingDeals} error={stagesError || dealsError} />
     <Box className="kanban">{stages.map((stage) => <Paper className="kanbanColumn" key={stage.id}>
       <Stack direction="row" justifyContent="space-between" alignItems="center">
@@ -952,20 +952,28 @@ function CustomerDialog({ form, onClose, onSave }: DialogProps<Customer, typeof 
 
 function ProductDialog({ form, onClose, onSave }: DialogProps<Product, typeof emptyProduct>) {
   const initial = form.item ? {
+    name: form.item.name,
+    category: form.item.category,
     brand: form.item.brand,
     model: form.item.model,
     reference: form.item.reference,
+    description: form.item.description ?? '',
     engineCc: form.item.engineCc?.toString() ?? '',
     year: form.item.year?.toString() ?? '',
     color: form.item.color ?? '',
     price: form.item.price,
     active: form.item.active
   } : emptyProduct;
-  return <FormDialog title={form.item ? 'Editar moto' : 'Nueva moto'} open={form.open} initial={initial} onClose={onClose} onSave={onSave}>
+  return <FormDialog title={form.item ? 'Editar producto' : 'Nuevo producto'} open={form.open} initial={initial} onClose={onClose} onSave={onSave}>
     {(v, set) => <>
-      <TextField required label="Marca" value={v.brand} onChange={(e) => set({ brand: e.target.value })} />
-      <TextField required label="Modelo" value={v.model} onChange={(e) => set({ model: e.target.value })} />
+      <TextField required label="Nombre del producto" value={v.name} onChange={(e) => set({ name: e.target.value })} />
+      <TextField required select label="Categoria" value={v.category} onChange={(e) => set({ category: e.target.value })}>
+        {['Moto', 'Accesorio', 'Seguro', 'Tramite', 'Repuesto', 'Servicio', 'Garantia', 'Otro'].map((category) => <MenuItem key={category} value={category}>{category}</MenuItem>)}
+      </TextField>
+      <TextField label="Marca" value={v.brand} onChange={(e) => set({ brand: e.target.value })} />
+      <TextField label="Modelo" value={v.model} onChange={(e) => set({ model: e.target.value })} />
       <TextField required label="Referencia" value={v.reference} onChange={(e) => set({ reference: e.target.value })} />
+      <TextField label="Descripcion" value={v.description} onChange={(e) => set({ description: e.target.value })} multiline minRows={2} />
       <Grid container spacing={2}>
         <Grid item xs={12} sm={6}><TextField fullWidth label="Cilindraje" type="number" value={v.engineCc} onChange={(e) => set({ engineCc: e.target.value })} /></Grid>
         <Grid item xs={12} sm={6}><TextField fullWidth label="Ano" type="number" value={v.year} onChange={(e) => set({ year: e.target.value })} /></Grid>
@@ -996,8 +1004,8 @@ function QuoteDialog({ form, products, onClose, onSave }: DialogProps<Quote, typ
         <TextField label="Numero de identificacion" value={v.identificationNumber} onChange={(e) => set({ identificationNumber: e.target.value })} />
         <TextField required label="Nombres" value={v.customerFirstNames} onChange={(e) => set({ customerFirstNames: e.target.value })} />
         <TextField required label="Apellidos" value={v.customerLastNames} onChange={(e) => set({ customerLastNames: e.target.value })} />
-        <TextField required select label="Moto" value={v.productId} onChange={(e) => set({ productId: e.target.value })}>
-          {products.length ? products.map((product) => <MenuItem key={product.id} value={product.id}>{product.brand} {product.model} {product.reference} - {money(product.price)}</MenuItem>) : <MenuItem value="">No hay motos activas</MenuItem>}
+        <TextField required select label="Producto" value={v.productId} onChange={(e) => set({ productId: e.target.value })}>
+          {products.length ? products.map((product) => <MenuItem key={product.id} value={product.id}>{productName(product)} ({product.category}) - {money(product.price)}</MenuItem>) : <MenuItem value="">No hay productos activos</MenuItem>}
         </TextField>
         <Grid container spacing={2}>
           <Grid item xs={12} sm={4}><TextField fullWidth label="Cuota inicial" type="number" value={v.downPayment} onChange={(e) => set({ downPayment: Number(e.target.value) })} /></Grid>
@@ -1006,7 +1014,7 @@ function QuoteDialog({ form, products, onClose, onSave }: DialogProps<Quote, typ
         </Grid>
         <Paper variant="outlined" sx={{ p: 2, bgcolor: '#f8fafc' }}>
           <Grid container spacing={2}>
-            <Grid item xs={12} sm={4}><Typography variant="caption" color="text.secondary">Valor moto</Typography><Typography fontWeight={700}>{money(productPrice)}</Typography></Grid>
+            <Grid item xs={12} sm={4}><Typography variant="caption" color="text.secondary">Valor producto</Typography><Typography fontWeight={700}>{money(productPrice)}</Typography></Grid>
             <Grid item xs={12} sm={4}><Typography variant="caption" color="text.secondary">Valor financiado</Typography><Typography fontWeight={700}>{money(financedAmount)}</Typography></Grid>
             <Grid item xs={12} sm={4}><Typography variant="caption" color="text.secondary">Cuota estimada</Typography><Typography fontWeight={700}>{money(monthlyPayment)}</Typography></Grid>
             <Grid item xs={12}><Typography variant="caption" color="text.secondary">Total estimado a pagar: {money(totalPayment)}</Typography></Grid>
@@ -1062,10 +1070,10 @@ function CreditApplicationDialog({ form, customers, products, quotes, deals, onC
           {quotes.map((x) => <MenuItem key={x.id} value={x.id}>{x.number} - {x.customerFirstNames} {x.customerLastNames}</MenuItem>)}
         </TextField>
         <TextField required select label="Cliente" value={v.customerId} onChange={(e) => set({ customerId: e.target.value })}>{customers.map((x) => <MenuItem key={x.id} value={x.id}>{x.firstNames || x.name} {x.lastNames}</MenuItem>)}</TextField>
-        <TextField required select label="Moto" value={v.productId} onChange={(e) => {
+        <TextField required select label="Producto principal" value={v.productId} onChange={(e) => {
           const product = products.find((x) => x.id === e.target.value);
           set({ productId: e.target.value, motorcycleValue: product?.price ?? v.motorcycleValue });
-        }}>{products.map((x) => <MenuItem key={x.id} value={x.id}>{x.brand} {x.model} {x.reference} - {money(x.price)}</MenuItem>)}</TextField>
+        }}>{products.map((x) => <MenuItem key={x.id} value={x.id}>{productName(x)} ({x.category}) - {money(x.price)}</MenuItem>)}</TextField>
         <Grid container spacing={2}>
           <Grid item xs={12} sm={6}><TextField fullWidth required select label="Tipo identificacion" value={v.identificationType} onChange={(e) => set({ identificationType: Number(e.target.value) })}>{identificationOptions.map((option) => <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>)}</TextField></Grid>
           <Grid item xs={12} sm={6}><TextField fullWidth required label="Numero identificacion" value={v.identificationNumber} onChange={(e) => set({ identificationNumber: e.target.value })} /></Grid>
@@ -1085,7 +1093,7 @@ function CreditApplicationDialog({ form, customers, products, quotes, deals, onC
         </Grid>
         <Grid container spacing={2}>
           <Grid item xs={12} sm={6}><TextField fullWidth label="Plazo meses" type="number" value={v.termMonths} onChange={(e) => set({ termMonths: Number(e.target.value) })} /></Grid>
-          <Grid item xs={12} sm={6}><TextField fullWidth label="Valor moto" type="number" value={v.motorcycleValue || selectedQuote?.productPrice || selectedProduct?.price || 0} onChange={(e) => set({ motorcycleValue: Number(e.target.value) })} /></Grid>
+          <Grid item xs={12} sm={6}><TextField fullWidth label="Valor producto" type="number" value={v.motorcycleValue || selectedQuote?.productPrice || selectedProduct?.price || 0} onChange={(e) => set({ motorcycleValue: Number(e.target.value) })} /></Grid>
         </Grid>
         <TextField select label="Negocio pipeline" value={v.dealId} onChange={(e) => set({ dealId: e.target.value })}><MenuItem value="">Sin negocio</MenuItem>{deals.map((x) => <MenuItem key={x.id} value={x.id}>{x.title}</MenuItem>)}</TextField>
         <TextField select label="Estado" value={v.status} onChange={(e) => set({ status: Number(e.target.value) })}>{[1, 2, 3, 4, 5, 6, 7].map((x) => <MenuItem key={x} value={x}>{creditStatus(x)}</MenuItem>)}</TextField>
@@ -1156,12 +1164,12 @@ function DealDialog({ form, stages, customers, defaultStageId, onClose, onSave }
     estimatedCloseDate: form.item.estimatedCloseDate.slice(0, 10),
     status: form.item.status
   } : { ...emptyDeal, stageId: defaultStageId };
-  return <FormDialog title={form.item ? 'Editar venta de moto' : 'Nueva venta de moto'} open={form.open} initial={initial} onClose={onClose} onSave={onSave}>
+  return <FormDialog title={form.item ? 'Editar venta' : 'Nueva venta'} open={form.open} initial={initial} onClose={onClose} onSave={onSave}>
     {(v, set) => <>
-      <TextField required label="Cliente y moto" placeholder="Juan Perez - AKT NKD 125 a credito" value={v.title} onChange={(e) => set({ title: e.target.value })} />
+      <TextField required label="Cliente y producto" placeholder="Juan Perez - AKT NKD 125 a credito" value={v.title} onChange={(e) => set({ title: e.target.value })} />
       <TextField select label="Cliente" value={v.customerId} onChange={(e) => set({ customerId: e.target.value })}><MenuItem value="">Sin cliente</MenuItem>{customers.map((x) => <MenuItem key={x.id} value={x.id}>{x.name}</MenuItem>)}</TextField>
       <TextField required select label="Etapa" value={v.stageId} onChange={(e) => set({ stageId: e.target.value })}>{stages.map((x) => <MenuItem key={x.id} value={x.id}>{x.name}</MenuItem>)}</TextField>
-      <TextField label="Valor de la moto / credito" type="number" value={v.value} onChange={(e) => set({ value: Number(e.target.value) })} />
+      <TextField label="Valor del producto / credito" type="number" value={v.value} onChange={(e) => set({ value: Number(e.target.value) })} />
       <TextField label="Probabilidad" type="number" value={v.closeProbability} onChange={(e) => set({ closeProbability: Number(e.target.value) })} />
       <TextField label="Fecha estimada" type="date" value={v.estimatedCloseDate} onChange={(e) => set({ estimatedCloseDate: e.target.value })} InputLabelProps={{ shrink: true }} />
       <TextField select label="Estado" value={v.status} onChange={(e) => set({ status: Number(e.target.value) })}>{[1, 2, 3].map((x) => <MenuItem key={x} value={x}>{dealStatus(x)}</MenuItem>)}</TextField>
@@ -1419,6 +1427,9 @@ function alertSeverityTone(severity?: string): 'success' | 'warning' | 'error' |
   if (severity === 'warning') return 'warning';
   if (severity === 'success') return 'success';
   return 'default';
+}
+function productName(product: Product) {
+  return product.name?.trim() || [product.brand, product.model, product.reference].filter(Boolean).join(' ').trim() || 'Producto';
 }
 function addDaysIso(value: string, days: number) {
   const date = new Date(value);

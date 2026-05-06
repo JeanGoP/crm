@@ -95,7 +95,7 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
 
     private static QuoteDto ToQuoteDto(Cotizacion x)
     {
-        var productName = x.Producto is null ? "Moto" : $"{x.Producto.Marca} {x.Producto.Modelo} {x.Producto.Referencia}".Trim();
+        var productName = x.Producto is null ? "Producto" : ProductName(x.Producto);
         var termMonths = x.PlazoMeses <= 0 ? 24 : x.PlazoMeses;
         var financedAmount = x.ValorFinanciado <= 0 && x.CuotaMensualEstimada <= 0 ? Math.Max(x.PrecioProducto - x.CuotaInicial, 0) : x.ValorFinanciado;
         var totalPayment = x.TotalPagarEstimado <= 0 ? x.PrecioProducto : x.TotalPagarEstimado;
@@ -125,7 +125,7 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
     {
         var customerName = x.Cliente is null ? "Cliente" : $"{x.Cliente.Nombres} {x.Cliente.Apellidos}".Trim();
         if (string.IsNullOrWhiteSpace(customerName) && x.Cliente is not null) customerName = x.Cliente.Nombre;
-        var productName = x.Producto is null ? "Moto" : $"{x.Producto.Marca} {x.Producto.Modelo} {x.Producto.Referencia}".Trim();
+        var productName = x.Producto is null ? "Producto" : ProductName(x.Producto);
         return new CreditApplicationDto(
             x.Id,
             x.Numero,
@@ -182,7 +182,7 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
             x.FechaCotizacion,
             "Cotizacion",
             $"Cotizacion {x.Numero}",
-            $"{(x.Producto is null ? "Moto" : $"{x.Producto.Marca} {x.Producto.Modelo} {x.Producto.Referencia}".Trim())} por {x.PrecioProducto:C0}.",
+            $"{(x.Producto is null ? "Producto" : ProductName(x.Producto))} por {x.PrecioProducto:C0}.",
             "info",
             x.Id)));
 
@@ -192,7 +192,7 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
                 application.FechaCreacion,
                 "Solicitud",
                 $"Solicitud {application.Numero}",
-                $"{(application.Producto is null ? "Moto" : $"{application.Producto.Marca} {application.Producto.Modelo} {application.Producto.Referencia}".Trim())} - {application.Estado}.",
+                $"{(application.Producto is null ? "Producto" : ProductName(application.Producto))} - {application.Estado}.",
                 application.Estado is EstadoSolicitudCredito.Rechazada ? "error" : application.Estado is EstadoSolicitudCredito.Aprobada or EstadoSolicitudCredito.Desembolsada ? "success" : "warning",
                 application.Id));
 
@@ -250,4 +250,10 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
     }
 
     private sealed record DealTimelineEntry(DealDto Deal, DateTime OccurredAt);
+
+    private static string ProductName(Producto product)
+    {
+        if (!string.IsNullOrWhiteSpace(product.Nombre)) return product.Nombre.Trim();
+        return $"{product.Marca} {product.Modelo} {product.Referencia}".Trim();
+    }
 }

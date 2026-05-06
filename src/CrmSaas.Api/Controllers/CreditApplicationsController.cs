@@ -46,7 +46,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         var customer = await db.Clientes.FirstOrDefaultAsync(x => x.Id == dto.CustomerId, cancellationToken)
             ?? throw new KeyNotFoundException("Cliente no encontrado.");
         var product = await db.Productos.FirstOrDefaultAsync(x => x.Id == dto.ProductId, cancellationToken)
-            ?? throw new KeyNotFoundException("Moto no encontrada.");
+            ?? throw new KeyNotFoundException("Producto no encontrado.");
         if (dto.QuoteId.HasValue && !await db.Cotizaciones.AnyAsync(x => x.Id == dto.QuoteId.Value, cancellationToken)) throw new KeyNotFoundException("Cotizacion no encontrada.");
         if (dto.DealId.HasValue && !await db.Negocios.AnyAsync(x => x.Id == dto.DealId.Value, cancellationToken)) throw new KeyNotFoundException("Negocio no encontrado.");
 
@@ -98,7 +98,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
 
         if (!await db.Clientes.AnyAsync(x => x.Id == dto.CustomerId, cancellationToken)) throw new KeyNotFoundException("Cliente no encontrado.");
         var product = await db.Productos.FirstOrDefaultAsync(x => x.Id == dto.ProductId, cancellationToken)
-            ?? throw new KeyNotFoundException("Moto no encontrada.");
+            ?? throw new KeyNotFoundException("Producto no encontrado.");
 
         entity.ClienteId = dto.CustomerId;
         entity.ProductoId = dto.ProductId;
@@ -258,7 +258,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
     private static void Validate(UpsertCreditApplicationDto dto)
     {
         if (dto.CustomerId == Guid.Empty) throw new ValidationException("Debe seleccionar un cliente.");
-        if (dto.ProductId == Guid.Empty) throw new ValidationException("Debe seleccionar una moto.");
+        if (dto.ProductId == Guid.Empty) throw new ValidationException("Debe seleccionar un producto.");
         if (string.IsNullOrWhiteSpace(dto.IdentificationNumber)) throw new ValidationException("El numero de identificacion es obligatorio.");
         if (string.IsNullOrWhiteSpace(dto.Mobile)) throw new ValidationException("El celular o WhatsApp es obligatorio.");
         if (dto.MonthlyIncome < 0) throw new ValidationException("Los ingresos no pueden ser negativos.");
@@ -383,7 +383,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
     {
         var customerName = x.Cliente is null ? "Cliente" : $"{x.Cliente.Nombres} {x.Cliente.Apellidos}".Trim();
         if (string.IsNullOrWhiteSpace(customerName) && x.Cliente is not null) customerName = x.Cliente.Nombre;
-        var productName = x.Producto is null ? "Moto" : $"{x.Producto.Marca} {x.Producto.Modelo} {x.Producto.Referencia}".Trim();
+        var productName = x.Producto is null ? "Producto" : ProductName(x.Producto);
         return new CreditApplicationDto(
             x.Id,
             x.Numero,
@@ -429,4 +429,10 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             d.ContentType,
             d.TamanoBytes,
             d.FechaCarga);
+
+    private static string ProductName(Producto product)
+    {
+        if (!string.IsNullOrWhiteSpace(product.Nombre)) return product.Nombre.Trim();
+        return $"{product.Marca} {product.Modelo} {product.Referencia}".Trim();
+    }
 }

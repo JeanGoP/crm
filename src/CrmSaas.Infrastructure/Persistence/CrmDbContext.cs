@@ -59,7 +59,10 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
         modelBuilder.Entity<Negocio>().Property(x => x.Valor).HasPrecision(18, 2);
         modelBuilder.Entity<Negocio>().Property(x => x.ProbabilidadCierre).HasPrecision(5, 2);
         modelBuilder.Entity<EtapaNegocio>().Property(x => x.ProbabilidadPredeterminada).HasPrecision(5, 2);
+        modelBuilder.Entity<Producto>().Property(x => x.Nombre).HasMaxLength(180);
+        modelBuilder.Entity<Producto>().Property(x => x.Categoria).HasMaxLength(80);
         modelBuilder.Entity<Producto>().Property(x => x.Precio).HasPrecision(18, 2);
+        modelBuilder.Entity<Producto>().HasIndex(x => new { x.EmpresaId, x.Categoria });
         modelBuilder.Entity<Producto>().HasIndex(x => new { x.EmpresaId, x.Referencia });
         modelBuilder.Entity<Cotizacion>().Property(x => x.PrecioProducto).HasPrecision(18, 2);
         modelBuilder.Entity<Cotizacion>().Property(x => x.CuotaInicial).HasPrecision(18, 2);

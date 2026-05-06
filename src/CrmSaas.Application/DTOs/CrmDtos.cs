@@ -29,8 +29,8 @@ public sealed record ActivityDto(
     string? DealTitle);
 public sealed record UpsertActivityDto(string Title, string? Description, TipoActividad Type, EstadoActividad Status, DateTime ScheduledAt, DateTime? ReminderAt, Guid? CustomerId, Guid? DealId, Guid? AssignedUserId);
 
-public sealed record ProductDto(Guid Id, string Brand, string Model, string Reference, int? EngineCc, int? Year, string? Color, decimal Price, bool Active);
-public sealed record UpsertProductDto(string Brand, string Model, string Reference, int? EngineCc, int? Year, string? Color, decimal Price, bool Active);
+public sealed record ProductDto(Guid Id, string Name, string Category, string Brand, string Model, string Reference, string? Description, int? EngineCc, int? Year, string? Color, decimal Price, bool Active);
+public sealed record UpsertProductDto(string Name, string Category, string Brand, string Model, string Reference, string? Description, int? EngineCc, int? Year, string? Color, decimal Price, bool Active);
 
 public sealed record QuoteDto(
     Guid Id,

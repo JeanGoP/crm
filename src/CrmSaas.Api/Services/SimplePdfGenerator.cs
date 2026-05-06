@@ -9,7 +9,7 @@ public static class SimplePdfGenerator
     {
         var lines = new[]
         {
-            "COTIZACION DE MOTO",
+            "COTIZACION",
             $"Numero: {quote.Number}",
             $"Empresa: {companyName}",
             $"Fecha: {quote.QuoteDate:yyyy-MM-dd}",
@@ -20,7 +20,7 @@ public static class SimplePdfGenerator
             $"Identificacion: {quote.IdentificationNumber ?? "Pendiente"}",
             $"Nombre: {quote.CustomerFirstNames} {quote.CustomerLastNames}",
             "",
-            "MOTO",
+            "PRODUCTO",
             $"Producto: {quote.ProductName}",
             $"Precio: {quote.ProductPrice:C0}",
             "",

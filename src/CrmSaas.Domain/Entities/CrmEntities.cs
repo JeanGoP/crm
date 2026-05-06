@@ -88,9 +88,12 @@ public sealed class Archivo : AuditableTenantEntity
 
 public sealed class Producto : AuditableTenantEntity
 {
+    public string Nombre { get; set; } = string.Empty;
+    public string Categoria { get; set; } = "Moto";
     public string Marca { get; set; } = string.Empty;
     public string Modelo { get; set; } = string.Empty;
     public string Referencia { get; set; } = string.Empty;
+    public string? Descripcion { get; set; }
     public int? Cilindraje { get; set; }
     public int? Anio { get; set; }
     public string? Color { get; set; }
