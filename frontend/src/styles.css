@@ -1,6 +1,11 @@
 html, body, #root {
   min-height: 100%;
   margin: 0;
+  overflow-x: hidden;
+}
+
+* {
+  box-sizing: border-box;
 }
 
 a {
@@ -21,7 +26,7 @@ a {
 
 .loginPanel {
   width: min(420px, calc(100vw - 32px));
-  padding: 32px;
+  padding: clamp(20px, 6vw, 32px);
 }
 
 .kanban {
@@ -35,4 +40,15 @@ a {
   min-height: 520px;
   padding: 16px;
   background: #eef4f7;
+}
+
+@media (max-width: 700px) {
+  .kanban {
+    grid-template-columns: 1fr;
+  }
+
+  .kanbanColumn {
+    min-height: 260px;
+    padding: 12px;
+  }
 }

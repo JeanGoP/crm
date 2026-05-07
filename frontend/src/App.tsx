@@ -3,8 +3,8 @@ import { Navigate, NavLink, Route, Routes, useNavigate, useParams } from 'react-
 import {
   Alert, AppBar, Box, Button, Card, CardContent, Chip, CssBaseline, Dialog, DialogActions,
   DialogContent, DialogTitle, Divider, Drawer, Grid, IconButton, LinearProgress, MenuItem,
-  Paper, Snackbar, Stack, Table, TableBody, TableCell, TableHead, TableRow, TextField,
-  ThemeProvider, Toolbar, Tooltip, Typography, createTheme
+  Paper, Snackbar, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField,
+  ThemeProvider, Toolbar, Tooltip, Typography, createTheme, useMediaQuery, useTheme
 } from '@mui/material';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import Groups from '@mui/icons-material/Groups';
@@ -13,6 +13,7 @@ import ViewKanban from '@mui/icons-material/ViewKanban';
 import EventNote from '@mui/icons-material/EventNote';
 import Settings from '@mui/icons-material/Settings';
 import Logout from '@mui/icons-material/Logout';
+import Menu from '@mui/icons-material/Menu';
 import Add from '@mui/icons-material/Add';
 import CheckCircle from '@mui/icons-material/CheckCircle';
 import Edit from '@mui/icons-material/Edit';
@@ -76,34 +77,50 @@ const emptyCreditApplication = { customerId: '', productId: '', quoteId: '', dea
 function Layout() {
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
+  const muiTheme = useTheme();
+  const isDesktop = useMediaQuery(muiTheme.breakpoints.up('md'));
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const closeMobileNav = () => setMobileOpen(false);
+  const drawerContent = <>
+    <Toolbar sx={{ px: 3 }}>
+      <Typography variant="h6" fontWeight={800}>CRM SaaS</Typography>
+    </Toolbar>
+    <Divider />
+    <Stack sx={{ p: 1 }}>
+      {nav.map((item) => (
+        <Button key={item.to} component={NavLink} to={item.to} startIcon={item.icon} onClick={closeMobileNav} sx={{ justifyContent: 'flex-start', my: .25 }}>
+          {item.label}
+        </Button>
+      ))}
+    </Stack>
+  </>;
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh' }}>
-      <Drawer variant="permanent" PaperProps={{ sx: { width: drawerWidth, borderRight: '1px solid #dde5ee' } }}>
-        <Toolbar sx={{ px: 3 }}>
-          <Typography variant="h6" fontWeight={800}>CRM SaaS</Typography>
-        </Toolbar>
-        <Divider />
-        <Stack sx={{ p: 1 }}>
-          {nav.map((item) => (
-            <Button key={item.to} component={NavLink} to={item.to} startIcon={item.icon} sx={{ justifyContent: 'flex-start', my: .25 }}>
-              {item.label}
-            </Button>
-          ))}
-        </Stack>
+    <Box sx={{ display: 'flex', minHeight: '100vh', width: '100%', overflowX: 'hidden' }}>
+      <Drawer
+        variant={isDesktop ? 'permanent' : 'temporary'}
+        open={isDesktop || mobileOpen}
+        onClose={closeMobileNav}
+        ModalProps={{ keepMounted: true }}
+        PaperProps={{ sx: { width: drawerWidth, borderRight: '1px solid #dde5ee' } }}
+      >
+        {drawerContent}
       </Drawer>
-      <Box sx={{ flex: 1, ml: `${drawerWidth}px` }}>
+      <Box sx={{ flex: 1, minWidth: 0, ml: { xs: 0, md: `${drawerWidth}px` } }}>
         <AppBar position="sticky" color="inherit" elevation={0} sx={{ borderBottom: '1px solid #dde5ee' }}>
-          <Toolbar sx={{ justifyContent: 'space-between' }}>
-            <Stack>
-              <Typography fontWeight={800}>{user?.fullName ?? 'Equipo comercial'}</Typography>
-              <Typography color="text.secondary" fontSize={13}>{user?.roles.join(', ')}</Typography>
+          <Toolbar sx={{ justifyContent: 'space-between', gap: 1 }}>
+            <Stack direction="row" alignItems="center" gap={1.25} sx={{ minWidth: 0 }}>
+              {!isDesktop && <IconButton aria-label="Abrir menu" edge="start" onClick={() => setMobileOpen(true)}><Menu /></IconButton>}
+              <Box sx={{ minWidth: 0 }}>
+                <Typography fontWeight={800} noWrap>{user?.fullName ?? 'Equipo comercial'}</Typography>
+                <Typography color="text.secondary" fontSize={13} noWrap>{user?.roles.join(', ')}</Typography>
+              </Box>
             </Stack>
             <Tooltip title="Salir">
               <IconButton aria-label="Salir" onClick={() => { logout(); navigate('/login'); }}><Logout /></IconButton>
             </Tooltip>
           </Toolbar>
         </AppBar>
-        <Box component="main" sx={{ p: 3 }}>
+        <Box component="main" sx={{ p: { xs: 1.5, sm: 2, md: 3 }, width: '100%', maxWidth: '100vw', boxSizing: 'border-box' }}>
           <Routes>
             <Route path="/" element={<DashboardPage />} />
             <Route path="/clientes" element={<CustomersPage />} />
@@ -1218,6 +1235,8 @@ function ActivityDialog({ form, customers, deals, onClose, onSave }: DialogProps
 type DialogProps<TItem, TPayload> = { form: FormMode<TItem>; onClose: () => void; onSave: (payload: TPayload) => Promise<void> };
 
 function FormDialog<T extends Record<string, unknown>>({ title, open, initial, children, onClose, onSave }: { title: string; open: boolean; initial: T; children: (value: T, set: (patch: Partial<T>) => void) => ReactNode; onClose: () => void; onSave: (payload: T) => Promise<void> }) {
+  const muiTheme = useTheme();
+  const fullScreen = useMediaQuery(muiTheme.breakpoints.down('sm'));
   const [value, setValue] = useState(initial);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -1241,14 +1260,16 @@ function FormDialog<T extends Record<string, unknown>>({ title, open, initial, c
     }
   };
 
-  return <Dialog open={open} onClose={saving ? undefined : onClose} fullWidth maxWidth="sm">
-    <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>{title}<IconButton onClick={onClose}><Close /></IconButton></DialogTitle>
-    <DialogContent><Stack spacing={2} sx={{ pt: 1 }}>{error && <Alert severity="error">{error}</Alert>}{children(value, (patch) => setValue((prev) => ({ ...prev, ...patch })))}</Stack></DialogContent>
-    <DialogActions><Button onClick={onClose} disabled={saving}>Cancelar</Button><Button variant="contained" onClick={save} disabled={saving}>{saving ? 'Guardando...' : 'Guardar'}</Button></DialogActions>
+  return <Dialog open={open} onClose={saving ? undefined : onClose} fullWidth maxWidth="sm" fullScreen={fullScreen}>
+    <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1 }}>{title}<IconButton onClick={onClose}><Close /></IconButton></DialogTitle>
+    <DialogContent sx={{ px: { xs: 2, sm: 3 } }}><Stack spacing={2} sx={{ pt: 1 }}>{error && <Alert severity="error">{error}</Alert>}{children(value, (patch) => setValue((prev) => ({ ...prev, ...patch })))}</Stack></DialogContent>
+    <DialogActions sx={{ px: { xs: 2, sm: 3 }, pb: { xs: 2, sm: 1 }, flexWrap: 'wrap' }}><Button onClick={onClose} disabled={saving}>Cancelar</Button><Button variant="contained" onClick={save} disabled={saving}>{saving ? 'Guardando...' : 'Guardar'}</Button></DialogActions>
   </Dialog>;
 }
 
 function ConfirmDialog({ open, title, text, onClose, onConfirm, confirmLabel = 'Eliminar' }: { open: boolean; title: string; text: string; onClose: () => void; onConfirm: () => Promise<void>; confirmLabel?: string }) {
+  const muiTheme = useTheme();
+  const fullScreen = useMediaQuery(muiTheme.breakpoints.down('sm'));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const confirm = async () => {
@@ -1262,26 +1283,37 @@ function ConfirmDialog({ open, title, text, onClose, onConfirm, confirmLabel = '
       setLoading(false);
     }
   };
-  return <Dialog open={open} onClose={loading ? undefined : onClose} fullWidth maxWidth="xs">
+  return <Dialog open={open} onClose={loading ? undefined : onClose} fullWidth maxWidth="xs" fullScreen={fullScreen}>
     <DialogTitle>{title}</DialogTitle>
     <DialogContent><Stack spacing={2}>{error && <Alert severity="error">{error}</Alert>}<Typography>{text}</Typography></Stack></DialogContent>
-    <DialogActions><Button onClick={onClose} disabled={loading}>Cancelar</Button><Button color="error" variant="contained" onClick={confirm} disabled={loading}>{confirmLabel}</Button></DialogActions>
+    <DialogActions sx={{ flexWrap: 'wrap' }}><Button onClick={onClose} disabled={loading}>Cancelar</Button><Button color="error" variant="contained" onClick={confirm} disabled={loading}>{confirmLabel}</Button></DialogActions>
   </Dialog>;
 }
 
 function Header({ title, action, onAction, onRefresh, secondaryAction }: { title: string; action?: string; onAction?: () => void; onRefresh?: () => void; secondaryAction?: { label: string; onClick: () => void } }) {
-  return <Stack direction="row" alignItems="center" justifyContent="space-between" gap={2}>
-    <Typography variant="h4" fontWeight={900}>{title}</Typography>
-    <Stack direction="row" gap={1}>{onRefresh && <Button onClick={onRefresh}>Actualizar</Button>}{secondaryAction && <Button variant="outlined" onClick={secondaryAction.onClick}>{secondaryAction.label}</Button>}{action && <Button variant="contained" startIcon={<Add />} onClick={onAction}>{action}</Button>}</Stack>
+  return <Stack direction={{ xs: 'column', sm: 'row' }} alignItems={{ xs: 'stretch', sm: 'center' }} justifyContent="space-between" gap={1.5}>
+    <Typography variant="h4" fontWeight={900} sx={{ fontSize: { xs: 26, sm: 34 }, lineHeight: 1.15 }}>{title}</Typography>
+    <Stack direction={{ xs: 'column', sm: 'row' }} gap={1} sx={{ width: { xs: '100%', sm: 'auto' } }}>
+      {onRefresh && <Button fullWidth={false} onClick={onRefresh}>Actualizar</Button>}
+      {secondaryAction && <Button variant="outlined" onClick={secondaryAction.onClick}>{secondaryAction.label}</Button>}
+      {action && <Button variant="contained" startIcon={<Add />} onClick={onAction}>{action}</Button>}
+    </Stack>
   </Stack>;
 }
 
 function EntityTable({ headers, rows, empty }: { headers: string[]; rows: ReactNode[][]; empty: string }) {
-  return <Card><Table><TableHead><TableRow>{headers.map((h) => <TableCell key={h}>{h}</TableCell>)}</TableRow></TableHead><TableBody>{rows.length ? rows.map((row, i) => <TableRow key={i}>{row.map((c, j) => <TableCell key={j}>{c ?? '-'}</TableCell>)}</TableRow>) : <TableRow><TableCell colSpan={headers.length}><EmptyState text={empty} /></TableCell></TableRow>}</TableBody></Table></Card>;
+  return <Card sx={{ width: '100%', overflow: 'hidden' }}>
+    <TableContainer sx={{ width: '100%', overflowX: 'auto' }}>
+      <Table size="small" sx={{ minWidth: 760 }}>
+        <TableHead><TableRow>{headers.map((h) => <TableCell key={h} sx={{ whiteSpace: 'nowrap', fontWeight: 800 }}>{h}</TableCell>)}</TableRow></TableHead>
+        <TableBody>{rows.length ? rows.map((row, i) => <TableRow key={i}>{row.map((c, j) => <TableCell key={j} sx={{ verticalAlign: 'top', maxWidth: 260 }}>{c ?? '-'}</TableCell>)}</TableRow>) : <TableRow><TableCell colSpan={headers.length}><EmptyState text={empty} /></TableCell></TableRow>}</TableBody>
+      </Table>
+    </TableContainer>
+  </Card>;
 }
 
 function Actions({ onView, onEdit, onDelete, onConvert, onDownload, onActivity, onWhatsapp, onStart, onComplete, onReschedule, onCancel, compact }: { onView?: () => void; onEdit?: () => void; onDelete?: () => void; onConvert?: () => void; onDownload?: () => void; onActivity?: () => void; onWhatsapp?: () => void; onStart?: () => void; onComplete?: () => void; onReschedule?: () => void; onCancel?: () => void; compact?: boolean }) {
-  return <Stack direction="row" gap={compact ? .5 : 1} sx={{ mt: compact ? 1 : 0 }}>
+  return <Stack direction="row" gap={compact ? .5 : 1} sx={{ mt: compact ? 1 : 0, flexWrap: 'wrap' }}>
     {onView && <Tooltip title="Ver cliente 360"><IconButton size="small" onClick={onView}><Visibility fontSize="small" /></IconButton></Tooltip>}
     {onWhatsapp && <Tooltip title="Abrir WhatsApp"><IconButton size="small" onClick={onWhatsapp}><WhatsApp fontSize="small" /></IconButton></Tooltip>}
     {onActivity && <Tooltip title="Registrar actividad"><IconButton size="small" onClick={onActivity}><AddTask fontSize="small" /></IconButton></Tooltip>}
@@ -1297,11 +1329,11 @@ function Actions({ onView, onEdit, onDelete, onConvert, onDownload, onActivity, 
 }
 
 function Metric({ label, value }: { label: string; value: ReactNode }) {
-  return <Card><CardContent><Typography color="text.secondary" fontSize={13}>{label}</Typography><Typography variant="h5" fontWeight={900}>{value}</Typography></CardContent></Card>;
+  return <Card sx={{ height: '100%' }}><CardContent><Typography color="text.secondary" fontSize={13}>{label}</Typography><Typography variant="h5" fontWeight={900} sx={{ overflowWrap: 'anywhere' }}>{value}</Typography></CardContent></Card>;
 }
 
 function Row({ primary, secondary }: { primary: string; secondary: string }) {
-  return <Stack direction="row" justifyContent="space-between" sx={{ py: 1, borderBottom: '1px solid #edf1f5' }}><Typography>{primary}</Typography><Typography color="text.secondary">{secondary}</Typography></Stack>;
+  return <Stack direction={{ xs: 'column', sm: 'row' }} gap={.5} justifyContent="space-between" sx={{ py: 1, borderBottom: '1px solid #edf1f5' }}><Typography sx={{ overflowWrap: 'anywhere' }}>{primary}</Typography><Typography color="text.secondary" sx={{ flexShrink: 0 }}>{secondary}</Typography></Stack>;
 }
 
 function EmptyState({ text }: { text: string }) {
