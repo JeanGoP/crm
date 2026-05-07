@@ -991,10 +991,10 @@ function ProductDialog({ form, onClose, onSave }: DialogProps<Product, typeof em
       <TextField label="Modelo" value={v.model} onChange={(e) => set({ model: e.target.value })} />
       <TextField required label="Referencia" value={v.reference} onChange={(e) => set({ reference: e.target.value })} />
       <TextField label="Descripcion" value={v.description} onChange={(e) => set({ description: e.target.value })} multiline minRows={2} />
-      <Grid container spacing={2}>
-        <Grid item xs={12} sm={6}><TextField fullWidth label="Cilindraje" type="number" value={v.engineCc} onChange={(e) => set({ engineCc: e.target.value })} /></Grid>
-        <Grid item xs={12} sm={6}><TextField fullWidth label="Ano" type="number" value={v.year} onChange={(e) => set({ year: e.target.value })} /></Grid>
-      </Grid>
+      <FieldGrid>
+        <TextField fullWidth label="Cilindraje" type="number" value={v.engineCc} onChange={(e) => set({ engineCc: e.target.value })} />
+        <TextField fullWidth label="Ano" type="number" value={v.year} onChange={(e) => set({ year: e.target.value })} />
+      </FieldGrid>
       <TextField label="Color" value={v.color} onChange={(e) => set({ color: e.target.value })} />
       <TextField required label="Precio" type="number" value={v.price} onChange={(e) => set({ price: Number(e.target.value) })} />
       <TextField select label="Estado" value={String(v.active)} onChange={(e) => set({ active: e.target.value === 'true' })}><MenuItem value="true">Activa</MenuItem><MenuItem value="false">Inactiva</MenuItem></TextField>
@@ -1024,18 +1024,18 @@ function QuoteDialog({ form, products, onClose, onSave }: DialogProps<Quote, typ
         <TextField required select label="Producto" value={v.productId} onChange={(e) => set({ productId: e.target.value })}>
           {products.length ? products.map((product) => <MenuItem key={product.id} value={product.id}>{productName(product)} ({product.category}) - {money(product.price)}</MenuItem>) : <MenuItem value="">No hay productos activos</MenuItem>}
         </TextField>
-        <Grid container spacing={2}>
-          <Grid item xs={12} sm={4}><TextField fullWidth label="Cuota inicial" type="number" value={v.downPayment} onChange={(e) => set({ downPayment: Number(e.target.value) })} /></Grid>
-          <Grid item xs={12} sm={4}><TextField fullWidth label="Plazo meses" type="number" value={v.termMonths} onChange={(e) => set({ termMonths: Number(e.target.value) })} /></Grid>
-          <Grid item xs={12} sm={4}><TextField fullWidth label="Tasa mensual %" type="number" value={v.monthlyInterestRate} onChange={(e) => set({ monthlyInterestRate: Number(e.target.value) })} /></Grid>
-        </Grid>
+        <FieldGrid columns={3}>
+          <TextField fullWidth label="Cuota inicial" type="number" value={v.downPayment} onChange={(e) => set({ downPayment: Number(e.target.value) })} />
+          <TextField fullWidth label="Plazo meses" type="number" value={v.termMonths} onChange={(e) => set({ termMonths: Number(e.target.value) })} />
+          <TextField fullWidth label="Tasa mensual %" type="number" value={v.monthlyInterestRate} onChange={(e) => set({ monthlyInterestRate: Number(e.target.value) })} />
+        </FieldGrid>
         <Paper variant="outlined" sx={{ p: 2, bgcolor: '#f8fafc' }}>
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={4}><Typography variant="caption" color="text.secondary">Valor producto</Typography><Typography fontWeight={700}>{money(productPrice)}</Typography></Grid>
-            <Grid item xs={12} sm={4}><Typography variant="caption" color="text.secondary">Valor financiado</Typography><Typography fontWeight={700}>{money(financedAmount)}</Typography></Grid>
-            <Grid item xs={12} sm={4}><Typography variant="caption" color="text.secondary">Cuota estimada</Typography><Typography fontWeight={700}>{money(monthlyPayment)}</Typography></Grid>
-            <Grid item xs={12}><Typography variant="caption" color="text.secondary">Total estimado a pagar: {money(totalPayment)}</Typography></Grid>
-          </Grid>
+          <FieldGrid columns={3}>
+            <Box><Typography variant="caption" color="text.secondary">Valor producto</Typography><Typography fontWeight={700}>{money(productPrice)}</Typography></Box>
+            <Box><Typography variant="caption" color="text.secondary">Valor financiado</Typography><Typography fontWeight={700}>{money(financedAmount)}</Typography></Box>
+            <Box><Typography variant="caption" color="text.secondary">Cuota estimada</Typography><Typography fontWeight={700}>{money(monthlyPayment)}</Typography></Box>
+          </FieldGrid>
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1.5 }}>Total estimado a pagar: {money(totalPayment)}</Typography>
         </Paper>
         <TextField label="Observaciones" value={v.notes} onChange={(e) => set({ notes: e.target.value })} multiline minRows={2} />
       </>;
@@ -1091,27 +1091,27 @@ function CreditApplicationDialog({ form, customers, products, quotes, deals, onC
           const product = products.find((x) => x.id === e.target.value);
           set({ productId: e.target.value, motorcycleValue: product?.price ?? v.motorcycleValue });
         }}>{products.map((x) => <MenuItem key={x.id} value={x.id}>{productName(x)} ({x.category}) - {money(x.price)}</MenuItem>)}</TextField>
-        <Grid container spacing={2}>
-          <Grid item xs={12} sm={6}><TextField fullWidth required select label="Tipo identificacion" value={v.identificationType} onChange={(e) => set({ identificationType: Number(e.target.value) })}>{identificationOptions.map((option) => <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>)}</TextField></Grid>
-          <Grid item xs={12} sm={6}><TextField fullWidth required label="Numero identificacion" value={v.identificationNumber} onChange={(e) => set({ identificationNumber: e.target.value })} /></Grid>
-        </Grid>
-        <Grid container spacing={2}>
-          <Grid item xs={12} sm={6}><TextField fullWidth label="Fecha nacimiento" type="date" value={v.birthDate} onChange={(e) => set({ birthDate: e.target.value })} InputLabelProps={{ shrink: true }} /></Grid>
-          <Grid item xs={12} sm={6}><TextField fullWidth required label="Celular / WhatsApp" value={v.mobile} onChange={(e) => set({ mobile: e.target.value })} /></Grid>
-        </Grid>
-        <Grid container spacing={2}>
-          <Grid item xs={12} sm={7}><TextField fullWidth label="Direccion" value={v.address} onChange={(e) => set({ address: e.target.value })} /></Grid>
-          <Grid item xs={12} sm={5}><TextField fullWidth label="Ciudad" value={v.city} onChange={(e) => set({ city: e.target.value })} /></Grid>
-        </Grid>
+        <FieldGrid>
+          <TextField fullWidth required select label="Tipo identificacion" value={v.identificationType} onChange={(e) => set({ identificationType: Number(e.target.value) })}>{identificationOptions.map((option) => <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>)}</TextField>
+          <TextField fullWidth required label="Numero identificacion" value={v.identificationNumber} onChange={(e) => set({ identificationNumber: e.target.value })} />
+        </FieldGrid>
+        <FieldGrid>
+          <TextField fullWidth label="Fecha nacimiento" type="date" value={v.birthDate} onChange={(e) => set({ birthDate: e.target.value })} InputLabelProps={{ shrink: true }} />
+          <TextField fullWidth required label="Celular / WhatsApp" value={v.mobile} onChange={(e) => set({ mobile: e.target.value })} />
+        </FieldGrid>
+        <FieldGrid>
+          <TextField fullWidth label="Direccion" value={v.address} onChange={(e) => set({ address: e.target.value })} />
+          <TextField fullWidth label="Ciudad" value={v.city} onChange={(e) => set({ city: e.target.value })} />
+        </FieldGrid>
         <TextField label="Ocupacion" value={v.occupation} onChange={(e) => set({ occupation: e.target.value })} />
-        <Grid container spacing={2}>
-          <Grid item xs={12} sm={6}><TextField fullWidth label="Ingresos mensuales" type="number" value={v.monthlyIncome} onChange={(e) => set({ monthlyIncome: Number(e.target.value) })} /></Grid>
-          <Grid item xs={12} sm={6}><TextField fullWidth label="Cuota inicial" type="number" value={v.downPayment} onChange={(e) => set({ downPayment: Number(e.target.value) })} /></Grid>
-        </Grid>
-        <Grid container spacing={2}>
-          <Grid item xs={12} sm={6}><TextField fullWidth label="Plazo meses" type="number" value={v.termMonths} onChange={(e) => set({ termMonths: Number(e.target.value) })} /></Grid>
-          <Grid item xs={12} sm={6}><TextField fullWidth label="Valor producto" type="number" value={v.motorcycleValue || selectedQuote?.productPrice || selectedProduct?.price || 0} onChange={(e) => set({ motorcycleValue: Number(e.target.value) })} /></Grid>
-        </Grid>
+        <FieldGrid>
+          <TextField fullWidth label="Ingresos mensuales" type="number" value={v.monthlyIncome} onChange={(e) => set({ monthlyIncome: Number(e.target.value) })} />
+          <TextField fullWidth label="Cuota inicial" type="number" value={v.downPayment} onChange={(e) => set({ downPayment: Number(e.target.value) })} />
+        </FieldGrid>
+        <FieldGrid>
+          <TextField fullWidth label="Plazo meses" type="number" value={v.termMonths} onChange={(e) => set({ termMonths: Number(e.target.value) })} />
+          <TextField fullWidth label="Valor producto" type="number" value={v.motorcycleValue || selectedQuote?.productPrice || selectedProduct?.price || 0} onChange={(e) => set({ motorcycleValue: Number(e.target.value) })} />
+        </FieldGrid>
         <TextField select label="Negocio pipeline" value={v.dealId} onChange={(e) => set({ dealId: e.target.value })}><MenuItem value="">Sin negocio</MenuItem>{deals.map((x) => <MenuItem key={x.id} value={x.id}>{x.title}</MenuItem>)}</TextField>
         <TextField select label="Estado" value={v.status} onChange={(e) => set({ status: Number(e.target.value) })}>{[1, 2, 3, 4, 5, 6, 7].map((x) => <MenuItem key={x} value={x}>{creditStatus(x)}</MenuItem>)}</TextField>
         <TextField label="Observaciones" value={v.notes} onChange={(e) => set({ notes: e.target.value })} multiline minRows={2} />
@@ -1233,6 +1233,15 @@ function ActivityDialog({ form, customers, deals, onClose, onSave }: DialogProps
 }
 
 type DialogProps<TItem, TPayload> = { form: FormMode<TItem>; onClose: () => void; onSave: (payload: TPayload) => Promise<void> };
+
+function FieldGrid({ children, columns = 2 }: { children: ReactNode; columns?: 2 | 3 }) {
+  return <Box sx={{
+    display: 'grid',
+    gridTemplateColumns: { xs: '1fr', sm: `repeat(${columns}, minmax(0, 1fr))` },
+    gap: 2,
+    width: '100%'
+  }}>{children}</Box>;
+}
 
 function FormDialog<T extends Record<string, unknown>>({ title, open, initial, children, onClose, onSave }: { title: string; open: boolean; initial: T; children: (value: T, set: (patch: Partial<T>) => void) => ReactNode; onClose: () => void; onSave: (payload: T) => Promise<void> }) {
   const muiTheme = useTheme();
