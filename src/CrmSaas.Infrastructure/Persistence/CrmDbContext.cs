@@ -74,6 +74,7 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
         modelBuilder.Entity<SolicitudCredito>().Property(x => x.IngresosMensuales).HasPrecision(18, 2);
         modelBuilder.Entity<SolicitudCredito>().Property(x => x.CuotaInicial).HasPrecision(18, 2);
         modelBuilder.Entity<SolicitudCredito>().Property(x => x.ValorMoto).HasPrecision(18, 2);
+        modelBuilder.Entity<SolicitudCredito>().Property(x => x.CodeudorIngresosMensuales).HasPrecision(18, 2);
         modelBuilder.Entity<SolicitudCredito>().Property(x => x.UsuarioDecision).HasMaxLength(180);
         modelBuilder.Entity<SolicitudCredito>().HasIndex(x => new { x.EmpresaId, x.Numero }).IsUnique();
         modelBuilder.Entity<DocumentoSolicitudCredito>().HasIndex(x => new { x.EmpresaId, x.SolicitudCreditoId, x.Tipo });

@@ -72,7 +72,13 @@ const emptyCompany = { name: '', subdomain: '', customDomain: '', active: true }
 const emptyUser = { fullName: '', email: '', password: '', companyId: '', roles: ['Vendedor'] };
 const emptyProduct = { name: '', category: 'Moto', brand: '', model: '', reference: '', description: '', engineCc: '', year: '', color: '', price: 0, active: true };
 const emptyQuote = { identificationType: 1, identificationNumber: '', customerFirstNames: '', customerLastNames: '', productId: '', downPayment: 0, termMonths: 24, monthlyInterestRate: 2.2, notes: '' };
-const emptyCreditApplication = { customerId: '', productId: '', quoteId: '', dealId: '', identificationType: 1, identificationNumber: '', birthDate: '', mobile: '', address: '', city: '', occupation: '', monthlyIncome: 0, downPayment: 0, termMonths: 24, motorcycleValue: 0, status: 1, notes: '' };
+const emptyCreditApplication = {
+  customerId: '', productId: '', quoteId: '', dealId: '', identificationType: 1, identificationNumber: '', birthDate: '', mobile: '', address: '', city: '', occupation: '',
+  monthlyIncome: 0, downPayment: 0, termMonths: 24, motorcycleValue: 0,
+  coDebtorName: '', coDebtorIdentification: '', coDebtorMobile: '', coDebtorRelationship: '', coDebtorMonthlyIncome: 0,
+  reference1Name: '', reference1Mobile: '', reference1Relationship: '', reference2Name: '', reference2Mobile: '', reference2Relationship: '',
+  status: 1, notes: ''
+};
 
 function Layout() {
   const { user, logout } = useAuthStore();
@@ -491,6 +497,17 @@ function CreditApplicationsPage() {
       downPayment: Number(payload.downPayment),
       termMonths: Number(payload.termMonths),
       motorcycleValue: Number(payload.motorcycleValue),
+      coDebtorName: payload.coDebtorName || null,
+      coDebtorIdentification: payload.coDebtorIdentification || null,
+      coDebtorMobile: payload.coDebtorMobile || null,
+      coDebtorRelationship: payload.coDebtorRelationship || null,
+      coDebtorMonthlyIncome: Number(payload.coDebtorMonthlyIncome) > 0 ? Number(payload.coDebtorMonthlyIncome) : null,
+      reference1Name: payload.reference1Name || null,
+      reference1Mobile: payload.reference1Mobile || null,
+      reference1Relationship: payload.reference1Relationship || null,
+      reference2Name: payload.reference2Name || null,
+      reference2Mobile: payload.reference2Mobile || null,
+      reference2Relationship: payload.reference2Relationship || null,
       status: Number(payload.status),
       notes: payload.notes || null
     };
@@ -559,7 +576,7 @@ function CreditApplicationsPage() {
     <Header title="Solicitudes de credito" action="Nueva solicitud" onAction={() => setForm({ open: true })} onRefresh={reload} />
     <StatusBar loading={loading} error={error} />
     <EntityTable
-      headers={['Numero', 'Cliente', 'Producto', 'Estado', 'Ingresos', 'Cuota inicial', 'Plazo', 'Documentos', 'Aprobacion', 'Acciones']}
+      headers={['Numero', 'Cliente', 'Producto', 'Estado', 'Ingresos', 'Codeudor', 'Referencias', 'Documentos', 'Aprobacion', 'Acciones']}
       empty="No hay solicitudes de credito"
       rows={rows.map((r) => [
         r.number,
@@ -567,8 +584,11 @@ function CreditApplicationsPage() {
         r.productName,
         <StatusChip label={creditStatus(r.status)} tone={r.status === 5 || r.status === 7 ? 'success' : r.status === 6 ? 'error' : r.status === 4 ? 'warning' : 'default'} />,
         money(r.monthlyIncome),
-        money(r.downPayment),
-        `${r.termMonths} meses`,
+        r.coDebtorName ? <Row primary={r.coDebtorName} secondary={r.coDebtorMobile ?? 'Sin celular'} /> : '-',
+        [r.reference1Name, r.reference2Name].filter(Boolean).length ? <Stack spacing={.5}>
+          {r.reference1Name && <Typography variant="body2">{r.reference1Name} - {r.reference1Mobile ?? 'Sin celular'}</Typography>}
+          {r.reference2Name && <Typography variant="body2">{r.reference2Name} - {r.reference2Mobile ?? 'Sin celular'}</Typography>}
+        </Stack> : '-',
         <DocumentSummary application={r} onUpdate={updateDocument} onUpload={uploadDocument} onDownload={downloadDocument} />,
         <ApprovalSummary application={r} onDecision={decide} />,
         <Stack direction="row" gap={1} alignItems="center">
@@ -1061,6 +1081,17 @@ function CreditApplicationDialog({ form, customers, products, quotes, deals, onC
     downPayment: form.item.downPayment,
     termMonths: form.item.termMonths,
     motorcycleValue: form.item.motorcycleValue,
+    coDebtorName: form.item.coDebtorName ?? '',
+    coDebtorIdentification: form.item.coDebtorIdentification ?? '',
+    coDebtorMobile: form.item.coDebtorMobile ?? '',
+    coDebtorRelationship: form.item.coDebtorRelationship ?? '',
+    coDebtorMonthlyIncome: form.item.coDebtorMonthlyIncome ?? 0,
+    reference1Name: form.item.reference1Name ?? '',
+    reference1Mobile: form.item.reference1Mobile ?? '',
+    reference1Relationship: form.item.reference1Relationship ?? '',
+    reference2Name: form.item.reference2Name ?? '',
+    reference2Mobile: form.item.reference2Mobile ?? '',
+    reference2Relationship: form.item.reference2Relationship ?? '',
     status: form.item.status,
     notes: form.item.notes ?? ''
   } : { ...emptyCreditApplication, customerId: customers[0]?.id ?? '', productId: products[0]?.id ?? '', motorcycleValue: products[0]?.price ?? 0 };
@@ -1111,6 +1142,27 @@ function CreditApplicationDialog({ form, customers, products, quotes, deals, onC
         <FieldGrid>
           <TextField fullWidth label="Plazo meses" type="number" value={v.termMonths} onChange={(e) => set({ termMonths: Number(e.target.value) })} />
           <TextField fullWidth label="Valor producto" type="number" value={v.motorcycleValue || selectedQuote?.productPrice || selectedProduct?.price || 0} onChange={(e) => set({ motorcycleValue: Number(e.target.value) })} />
+        </FieldGrid>
+        <SectionTitle title="Codeudor" />
+        <FieldGrid>
+          <TextField fullWidth label="Nombre codeudor" value={v.coDebtorName} onChange={(e) => set({ coDebtorName: e.target.value })} />
+          <TextField fullWidth label="Identificacion codeudor" value={v.coDebtorIdentification} onChange={(e) => set({ coDebtorIdentification: e.target.value })} />
+        </FieldGrid>
+        <FieldGrid>
+          <TextField fullWidth label="Celular codeudor" value={v.coDebtorMobile} onChange={(e) => set({ coDebtorMobile: e.target.value })} />
+          <TextField fullWidth label="Parentesco / relacion" value={v.coDebtorRelationship} onChange={(e) => set({ coDebtorRelationship: e.target.value })} />
+        </FieldGrid>
+        <TextField label="Ingresos mensuales codeudor" type="number" value={v.coDebtorMonthlyIncome} onChange={(e) => set({ coDebtorMonthlyIncome: Number(e.target.value) })} />
+        <SectionTitle title="Referencias personales" />
+        <FieldGrid columns={3}>
+          <TextField fullWidth label="Referencia 1" value={v.reference1Name} onChange={(e) => set({ reference1Name: e.target.value })} />
+          <TextField fullWidth label="Celular referencia 1" value={v.reference1Mobile} onChange={(e) => set({ reference1Mobile: e.target.value })} />
+          <TextField fullWidth label="Relacion referencia 1" value={v.reference1Relationship} onChange={(e) => set({ reference1Relationship: e.target.value })} />
+        </FieldGrid>
+        <FieldGrid columns={3}>
+          <TextField fullWidth label="Referencia 2" value={v.reference2Name} onChange={(e) => set({ reference2Name: e.target.value })} />
+          <TextField fullWidth label="Celular referencia 2" value={v.reference2Mobile} onChange={(e) => set({ reference2Mobile: e.target.value })} />
+          <TextField fullWidth label="Relacion referencia 2" value={v.reference2Relationship} onChange={(e) => set({ reference2Relationship: e.target.value })} />
         </FieldGrid>
         <TextField select label="Negocio pipeline" value={v.dealId} onChange={(e) => set({ dealId: e.target.value })}><MenuItem value="">Sin negocio</MenuItem>{deals.map((x) => <MenuItem key={x.id} value={x.id}>{x.title}</MenuItem>)}</TextField>
         <TextField select label="Estado" value={v.status} onChange={(e) => set({ status: Number(e.target.value) })}>{[1, 2, 3, 4, 5, 6, 7].map((x) => <MenuItem key={x} value={x}>{creditStatus(x)}</MenuItem>)}</TextField>
@@ -1241,6 +1293,10 @@ function FieldGrid({ children, columns = 2 }: { children: ReactNode; columns?: 2
     gap: 2,
     width: '100%'
   }}>{children}</Box>;
+}
+
+function SectionTitle({ title }: { title: string }) {
+  return <Typography variant="subtitle2" fontWeight={900} color="primary" sx={{ mt: 1 }}>{title}</Typography>;
 }
 
 function FormDialog<T extends Record<string, unknown>>({ title, open, initial, children, onClose, onSave }: { title: string; open: boolean; initial: T; children: (value: T, set: (patch: Partial<T>) => void) => ReactNode; onClose: () => void; onSave: (payload: T) => Promise<void> }) {

@@ -68,6 +68,17 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             CuotaInicial = dto.DownPayment,
             PlazoMeses = dto.TermMonths,
             ValorMoto = dto.MotorcycleValue > 0 ? dto.MotorcycleValue : product.Precio,
+            CodeudorNombre = Normalize(dto.CoDebtorName),
+            CodeudorIdentificacion = Normalize(dto.CoDebtorIdentification),
+            CodeudorCelular = Normalize(dto.CoDebtorMobile),
+            CodeudorParentesco = Normalize(dto.CoDebtorRelationship),
+            CodeudorIngresosMensuales = dto.CoDebtorMonthlyIncome,
+            Referencia1Nombre = Normalize(dto.Reference1Name),
+            Referencia1Celular = Normalize(dto.Reference1Mobile),
+            Referencia1Relacion = Normalize(dto.Reference1Relationship),
+            Referencia2Nombre = Normalize(dto.Reference2Name),
+            Referencia2Celular = Normalize(dto.Reference2Mobile),
+            Referencia2Relacion = Normalize(dto.Reference2Relationship),
             Estado = dto.Status,
             Observaciones = dto.Notes
         };
@@ -115,6 +126,17 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         entity.CuotaInicial = dto.DownPayment;
         entity.PlazoMeses = dto.TermMonths;
         entity.ValorMoto = dto.MotorcycleValue > 0 ? dto.MotorcycleValue : product.Precio;
+        entity.CodeudorNombre = Normalize(dto.CoDebtorName);
+        entity.CodeudorIdentificacion = Normalize(dto.CoDebtorIdentification);
+        entity.CodeudorCelular = Normalize(dto.CoDebtorMobile);
+        entity.CodeudorParentesco = Normalize(dto.CoDebtorRelationship);
+        entity.CodeudorIngresosMensuales = dto.CoDebtorMonthlyIncome;
+        entity.Referencia1Nombre = Normalize(dto.Reference1Name);
+        entity.Referencia1Celular = Normalize(dto.Reference1Mobile);
+        entity.Referencia1Relacion = Normalize(dto.Reference1Relationship);
+        entity.Referencia2Nombre = Normalize(dto.Reference2Name);
+        entity.Referencia2Celular = Normalize(dto.Reference2Mobile);
+        entity.Referencia2Relacion = Normalize(dto.Reference2Relationship);
         entity.Estado = dto.Status;
         entity.Observaciones = dto.Notes;
 
@@ -264,6 +286,8 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         if (dto.MonthlyIncome < 0) throw new ValidationException("Los ingresos no pueden ser negativos.");
         if (dto.DownPayment < 0) throw new ValidationException("La cuota inicial no puede ser negativa.");
         if (dto.TermMonths <= 0) throw new ValidationException("El plazo debe ser mayor a cero.");
+        if (dto.CoDebtorMonthlyIncome.HasValue && dto.CoDebtorMonthlyIncome < 0) throw new ValidationException("Los ingresos del codeudor no pueden ser negativos.");
+        if (!string.IsNullOrWhiteSpace(dto.CoDebtorName) && string.IsNullOrWhiteSpace(dto.CoDebtorMobile)) throw new ValidationException("Si registra codeudor, el celular del codeudor es obligatorio.");
     }
 
     private static IReadOnlyCollection<DocumentoSolicitudCredito> DefaultDocuments() =>
@@ -342,6 +366,8 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         System.IO.File.Delete(path);
     }
 
+    private static string? Normalize(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
     private async Task SyncPipelineAsync(SolicitudCredito application, CancellationToken cancellationToken)
     {
         if (!application.NegocioId.HasValue) return;
@@ -404,6 +430,17 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             x.CuotaInicial,
             x.PlazoMeses,
             x.ValorMoto,
+            x.CodeudorNombre,
+            x.CodeudorIdentificacion,
+            x.CodeudorCelular,
+            x.CodeudorParentesco,
+            x.CodeudorIngresosMensuales,
+            x.Referencia1Nombre,
+            x.Referencia1Celular,
+            x.Referencia1Relacion,
+            x.Referencia2Nombre,
+            x.Referencia2Celular,
+            x.Referencia2Relacion,
             x.Estado,
             x.Observaciones,
             x.FechaEnvio,

@@ -145,6 +145,17 @@ export interface CreditApplication {
   downPayment: number;
   termMonths: number;
   motorcycleValue: number;
+  coDebtorName?: string;
+  coDebtorIdentification?: string;
+  coDebtorMobile?: string;
+  coDebtorRelationship?: string;
+  coDebtorMonthlyIncome?: number;
+  reference1Name?: string;
+  reference1Mobile?: string;
+  reference1Relationship?: string;
+  reference2Name?: string;
+  reference2Mobile?: string;
+  reference2Relationship?: string;
   status: number;
   notes?: string;
   submittedAt?: string;

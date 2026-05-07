@@ -146,6 +146,17 @@ public sealed class SolicitudCredito : AuditableTenantEntity
     public decimal CuotaInicial { get; set; }
     public int PlazoMeses { get; set; } = 24;
     public decimal ValorMoto { get; set; }
+    public string? CodeudorNombre { get; set; }
+    public string? CodeudorIdentificacion { get; set; }
+    public string? CodeudorCelular { get; set; }
+    public string? CodeudorParentesco { get; set; }
+    public decimal? CodeudorIngresosMensuales { get; set; }
+    public string? Referencia1Nombre { get; set; }
+    public string? Referencia1Celular { get; set; }
+    public string? Referencia1Relacion { get; set; }
+    public string? Referencia2Nombre { get; set; }
+    public string? Referencia2Celular { get; set; }
+    public string? Referencia2Relacion { get; set; }
     public EstadoSolicitudCredito Estado { get; set; } = EstadoSolicitudCredito.Borrador;
     public string? Observaciones { get; set; }
     public DateTime? FechaEnvio { get; set; }

@@ -1,7 +1,7 @@
 # Manual del Sistema CRM SaaS
 
 Ultima actualizacion: 2026-05-06  
-Version del manual: 1.6  
+Version del manual: 1.7  
 Sistema: CRM SaaS para ventas de motos a credito  
 Ambiente documentado: Desarrollo local conectado a SQL Server
 
@@ -315,8 +315,20 @@ Cada decision guarda:
 5. Relacione una cotizacion o negocio del pipeline si aplica.
 6. Complete identificacion, fecha de nacimiento, celular, direccion, ciudad y ocupacion.
 7. Registre ingresos mensuales, cuota inicial, plazo y valor del producto.
-8. Seleccione el estado inicial.
-9. Guarde.
+8. Si el credito lo requiere, registre la informacion del codeudor.
+9. Registre hasta dos referencias personales.
+10. Seleccione el estado inicial.
+11. Guarde.
+
+### Codeudor y referencias
+
+El formulario permite registrar informacion clave para estudio de credito:
+
+- Codeudor: nombre, identificacion, celular, parentesco o relacion e ingresos mensuales.
+- Referencia 1: nombre, celular y relacion.
+- Referencia 2: nombre, celular y relacion.
+
+Si se registra nombre de codeudor, el celular del codeudor es obligatorio. Esto ayuda a evitar solicitudes incompletas antes de pasar a estudio.
 
 ### Documentos requeridos
 
@@ -589,6 +601,7 @@ Si aparece un error, revise primero los datos ingresados. Si el error persiste, 
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-05-07 | 1.7 | Se agregan datos de codeudor y referencias personales en solicitudes de credito. |
 | 2026-05-06 | 1.6 | Se generaliza el catalogo de productos para manejar motos, accesorios, seguros, tramites, repuestos, servicios y otros productos. |
 | 2026-05-06 | 1.5 | Se agregan alertas comerciales en Dashboard y seguimiento automatico al crear cotizaciones. |
 | 2026-05-06 | 1.4 | Se mejora gestion de actividades con indicadores, filtros por vencimiento, nombres de cliente/negocio, acciones rapidas y creacion de seguimientos desde Cliente 360. |
