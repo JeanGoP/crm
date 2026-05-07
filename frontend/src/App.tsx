@@ -628,11 +628,11 @@ function ApprovalSummary({ application, onDecision }: { application: CreditAppli
     { status: 7, label: 'Desembolsar', show: application.status === 5 }
   ].filter((x) => x.show);
   const lastDate = application.disbursedAt ?? application.approvedAt ?? application.rejectedAt ?? application.reviewStartedAt ?? application.submittedAt;
-  return <Stack spacing={.75} sx={{ minWidth: 190 }}>
-    <Typography variant="caption" color="text.secondary">
+  return <Stack spacing={.75} sx={{ minWidth: 180, maxWidth: 210 }}>
+    <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.25 }}>
       {lastDate ? `${application.decisionUser ?? 'Sistema'} - ${new Date(lastDate).toLocaleDateString()}` : 'Sin decision registrada'}
     </Typography>
-    {application.decisionNotes && <Typography variant="caption" color="text.secondary" noWrap>{application.decisionNotes}</Typography>}
+    {application.decisionNotes && <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.25 }}>{application.decisionNotes}</Typography>}
     <Stack direction="row" gap={.5} flexWrap="wrap">
       {actions.length ? actions.map((action) => <Button key={action.status} size="small" variant="outlined" onClick={() => onDecision(application, action.status)}>{action.label}</Button>) : <Chip size="small" label="Sin acciones" variant="outlined" />}
     </Stack>
@@ -649,20 +649,20 @@ const creditTemplates: CreditTemplate[] = [
 ];
 
 function CreditTemplateDownloads({ application, onDownload }: { application: CreditApplication; onDownload: (application: CreditApplication, template: CreditTemplate) => Promise<void> }) {
-  return <Stack direction="row" gap={.5} flexWrap="wrap" sx={{ minWidth: 230 }}>
+  return <Stack direction="row" gap={.5} flexWrap="wrap" sx={{ minWidth: 142, maxWidth: 150 }}>
     {creditTemplates.map((template) => {
       const disabled = template.disabled?.(application) ?? false;
       return <Tooltip key={template.id} title={disabled ? template.reason ?? '' : `Descargar ${template.label}`}>
         <span>
-          <Button
+          <IconButton
             size="small"
-            variant="outlined"
-            startIcon={<Download fontSize="small" />}
+            color="primary"
             disabled={disabled}
             onClick={() => onDownload(application, template)}
+            aria-label={`Descargar ${template.label}`}
           >
-            {template.label}
-          </Button>
+            <Download fontSize="small" />
+          </IconButton>
         </span>
       </Tooltip>;
     })}
@@ -1224,13 +1224,13 @@ function DocumentSummary({ application, onUpdate, onUpload, onDownload }: {
   onUpload: (application: CreditApplication, document: CreditDocument, file: File) => Promise<void>;
   onDownload: (application: CreditApplication, document: CreditDocument) => Promise<void>;
 }) {
-  return <Stack spacing={.75}>
-    {application.documents.map((document) => <Stack key={document.id} direction="row" alignItems="center" justifyContent="space-between" gap={1}>
-      <Stack spacing={.25} sx={{ minWidth: 180 }}>
+  return <Stack spacing={.75} sx={{ minWidth: 360, maxWidth: 390 }}>
+    {application.documents.map((document) => <Stack key={document.id} direction="row" alignItems="center" justifyContent="space-between" gap={1} sx={{ width: '100%' }}>
+      <Stack spacing={.25} sx={{ minWidth: 170, maxWidth: 190 }}>
         <Chip size="small" label={`${document.name}: ${documentStatus(document.status)}`} color={document.status === 3 ? 'success' : document.status === 4 ? 'error' : undefined} variant={document.status === 1 ? 'outlined' : 'filled'} />
         {document.hasFile && <Typography variant="caption" color="text.secondary" noWrap>{document.fileName}</Typography>}
       </Stack>
-      <Stack direction="row" alignItems="center" gap={.5}>
+      <Stack direction="row" alignItems="center" gap={.5} sx={{ flexShrink: 0 }}>
         <Tooltip title="Subir documento">
           <IconButton component="label" size="small" color={document.hasFile ? 'success' : 'primary'}>
             <UploadFile fontSize="small" />
@@ -1246,7 +1246,7 @@ function DocumentSummary({ application, onUpdate, onUpload, onDownload }: {
             <Download fontSize="small" />
           </IconButton>
         </Tooltip>}
-        <TextField select size="small" value={document.status} onChange={(e) => onUpdate(application, document, Number(e.target.value))} sx={{ width: 122 }}>
+        <TextField select size="small" value={document.status} onChange={(e) => onUpdate(application, document, Number(e.target.value))} sx={{ width: 126 }}>
           {[1, 2, 3, 4].map((status) => <MenuItem key={status} value={status}>{documentStatus(status)}</MenuItem>)}
         </TextField>
       </Stack>
@@ -1414,12 +1414,39 @@ function Header({ title, action, onAction, onRefresh, secondaryAction }: { title
 function EntityTable({ headers, rows, empty }: { headers: string[]; rows: ReactNode[][]; empty: string }) {
   return <Card sx={{ width: '100%', overflow: 'hidden' }}>
     <TableContainer sx={{ width: '100%', overflowX: 'auto' }}>
-      <Table size="small" sx={{ minWidth: 760 }}>
-        <TableHead><TableRow>{headers.map((h) => <TableCell key={h} sx={{ whiteSpace: 'nowrap', fontWeight: 800 }}>{h}</TableCell>)}</TableRow></TableHead>
-        <TableBody>{rows.length ? rows.map((row, i) => <TableRow key={i}>{row.map((c, j) => <TableCell key={j} sx={{ verticalAlign: 'top', maxWidth: 260 }}>{c ?? '-'}</TableCell>)}</TableRow>) : <TableRow><TableCell colSpan={headers.length}><EmptyState text={empty} /></TableCell></TableRow>}</TableBody>
+      <Table size="small" sx={{ minWidth: tableMinWidth(headers), tableLayout: 'fixed' }}>
+        <TableHead><TableRow>{headers.map((h) => <TableCell key={h} sx={{ ...tableColumnSx(h), whiteSpace: 'nowrap', fontWeight: 800 }}>{h}</TableCell>)}</TableRow></TableHead>
+        <TableBody>{rows.length ? rows.map((row, i) => <TableRow key={i}>{row.map((c, j) => <TableCell key={j} sx={{ ...tableColumnSx(headers[j]), verticalAlign: 'top' }}>{c ?? '-'}</TableCell>)}</TableRow>) : <TableRow><TableCell colSpan={headers.length}><EmptyState text={empty} /></TableCell></TableRow>}</TableBody>
       </Table>
     </TableContainer>
   </Card>;
+}
+
+function tableMinWidth(headers: string[]) {
+  return headers.includes('Plantillas') ? 1760 : 760;
+}
+
+function tableColumnSx(header: string) {
+  const widths: Record<string, number> = {
+    Numero: 150,
+    Cliente: 170,
+    Producto: 220,
+    Estado: 150,
+    Ingresos: 130,
+    Codeudor: 170,
+    Referencias: 210,
+    Documentos: 410,
+    Aprobacion: 220,
+    Plantillas: 170,
+    Acciones: 230
+  };
+  return {
+    width: widths[header] ?? 180,
+    minWidth: widths[header] ?? 180,
+    maxWidth: widths[header] ?? 260,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis'
+  };
 }
 
 function Actions({ onView, onEdit, onDelete, onConvert, onDownload, onActivity, onWhatsapp, onStart, onComplete, onReschedule, onCancel, compact }: { onView?: () => void; onEdit?: () => void; onDelete?: () => void; onConvert?: () => void; onDownload?: () => void; onActivity?: () => void; onWhatsapp?: () => void; onStart?: () => void; onComplete?: () => void; onReschedule?: () => void; onCancel?: () => void; compact?: boolean }) {
