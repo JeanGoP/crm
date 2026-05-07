@@ -572,11 +572,25 @@ function CreditApplicationsPage() {
     }
   };
 
+  const downloadTemplate = async (application: CreditApplication, template: CreditTemplate) => {
+    try {
+      const response = await api.get<Blob>(`/api/credit-applications/${application.id}/pdf/${template.id}`, { responseType: 'blob' });
+      const url = URL.createObjectURL(response.data);
+      const anchor = window.document.createElement('a');
+      anchor.href = url;
+      anchor.download = `${application.number}-${template.id}.pdf`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setNotice({ type: 'error', text: apiError(err) });
+    }
+  };
+
   return <Stack spacing={3}>
     <Header title="Solicitudes de credito" action="Nueva solicitud" onAction={() => setForm({ open: true })} onRefresh={reload} />
     <StatusBar loading={loading} error={error} />
     <EntityTable
-      headers={['Numero', 'Cliente', 'Producto', 'Estado', 'Ingresos', 'Codeudor', 'Referencias', 'Documentos', 'Aprobacion', 'Acciones']}
+      headers={['Numero', 'Cliente', 'Producto', 'Estado', 'Ingresos', 'Codeudor', 'Referencias', 'Documentos', 'Aprobacion', 'Plantillas', 'Acciones']}
       empty="No hay solicitudes de credito"
       rows={rows.map((r) => [
         r.number,
@@ -591,6 +605,7 @@ function CreditApplicationsPage() {
         </Stack> : '-',
         <DocumentSummary application={r} onUpdate={updateDocument} onUpload={uploadDocument} onDownload={downloadDocument} />,
         <ApprovalSummary application={r} onDecision={decide} />,
+        <CreditTemplateDownloads application={r} onDownload={downloadTemplate} />,
         <Stack direction="row" gap={1} alignItems="center">
           <Actions onEdit={() => setForm({ open: true, item: r })} />
           <TextField select size="small" label="Estado" value={r.status} onChange={(e) => changeStatus(r, Number(e.target.value))} sx={{ minWidth: 160 }}>
@@ -621,6 +636,36 @@ function ApprovalSummary({ application, onDecision }: { application: CreditAppli
     <Stack direction="row" gap={.5} flexWrap="wrap">
       {actions.length ? actions.map((action) => <Button key={action.status} size="small" variant="outlined" onClick={() => onDecision(application, action.status)}>{action.label}</Button>) : <Chip size="small" label="Sin acciones" variant="outlined" />}
     </Stack>
+  </Stack>;
+}
+
+type CreditTemplate = { id: 'solicitud-credito' | 'autorizacion-datos' | 'carta-aprobacion' | 'orden-entrega'; label: string; disabled?: (application: CreditApplication) => boolean; reason?: string };
+
+const creditTemplates: CreditTemplate[] = [
+  { id: 'solicitud-credito', label: 'Solicitud' },
+  { id: 'autorizacion-datos', label: 'Datos' },
+  { id: 'carta-aprobacion', label: 'Aprobacion', disabled: (x) => x.status !== 5 && x.status !== 7, reason: 'Disponible cuando la solicitud este aprobada.' },
+  { id: 'orden-entrega', label: 'Entrega', disabled: (x) => x.status !== 5 && x.status !== 7, reason: 'Disponible cuando la solicitud este aprobada.' }
+];
+
+function CreditTemplateDownloads({ application, onDownload }: { application: CreditApplication; onDownload: (application: CreditApplication, template: CreditTemplate) => Promise<void> }) {
+  return <Stack direction="row" gap={.5} flexWrap="wrap" sx={{ minWidth: 230 }}>
+    {creditTemplates.map((template) => {
+      const disabled = template.disabled?.(application) ?? false;
+      return <Tooltip key={template.id} title={disabled ? template.reason ?? '' : `Descargar ${template.label}`}>
+        <span>
+          <Button
+            size="small"
+            variant="outlined"
+            startIcon={<Download fontSize="small" />}
+            disabled={disabled}
+            onClick={() => onDownload(application, template)}
+          >
+            {template.label}
+          </Button>
+        </span>
+      </Tooltip>;
+    })}
   </Stack>;
 }
 

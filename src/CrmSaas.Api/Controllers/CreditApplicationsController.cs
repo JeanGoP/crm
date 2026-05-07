@@ -1,5 +1,6 @@
 using CrmSaas.Application.DTOs;
 using CrmSaas.Application.Abstractions;
+using CrmSaas.Api.Services;
 using CrmSaas.Domain.Entities;
 using CrmSaas.Domain.Enums;
 using CrmSaas.Infrastructure.Persistence;
@@ -275,6 +276,33 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             document.RutaArchivo,
             string.IsNullOrWhiteSpace(document.ContentType) ? "application/octet-stream" : document.ContentType,
             string.IsNullOrWhiteSpace(document.NombreArchivo) ? document.Nombre : document.NombreArchivo);
+    }
+
+    [HttpGet("{id:guid}/pdf/{template}")]
+    public async Task<IActionResult> DownloadTemplate(Guid id, string template, CancellationToken cancellationToken)
+    {
+        var entity = await db.SolicitudesCredito
+            .Include(x => x.Cliente)
+            .Include(x => x.Producto)
+            .Include(x => x.Documentos)
+            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
+            ?? throw new KeyNotFoundException("Solicitud de credito no encontrada.");
+
+        var normalized = template.Trim().ToLowerInvariant();
+        if (normalized == "carta-aprobacion" && entity.Estado is not (EstadoSolicitudCredito.Aprobada or EstadoSolicitudCredito.Desembolsada))
+        {
+            throw new ValidationException("La carta de aprobacion solo se puede generar para solicitudes aprobadas o desembolsadas.");
+        }
+
+        if (normalized == "orden-entrega" && entity.Estado is not (EstadoSolicitudCredito.Aprobada or EstadoSolicitudCredito.Desembolsada))
+        {
+            throw new ValidationException("La orden de entrega solo se puede generar para solicitudes aprobadas o desembolsadas.");
+        }
+
+        var company = await db.Empresas.IgnoreQueryFilters().FirstOrDefaultAsync(x => x.Id == tenantContext.EmpresaId, cancellationToken);
+        var dto = ToDto(entity);
+        var bytes = SimplePdfGenerator.CreditApplication(dto, company?.Nombre ?? "Empresa", normalized);
+        return File(bytes, "application/pdf", SimplePdfGenerator.CreditTemplateFileName(dto, normalized));
     }
 
     private static void Validate(UpsertCreditApplicationDto dto)

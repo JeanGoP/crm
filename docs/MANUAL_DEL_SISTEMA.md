@@ -1,7 +1,7 @@
 # Manual del Sistema CRM SaaS
 
 Ultima actualizacion: 2026-05-06  
-Version del manual: 1.7  
+Version del manual: 1.8  
 Sistema: CRM SaaS para ventas de motos a credito  
 Ambiente documentado: Desarrollo local conectado a SQL Server
 
@@ -264,7 +264,7 @@ El calculo es una estimacion comercial. La aprobacion final y las condiciones de
 
 1. Ubique la cotizacion en la tabla.
 2. Presione el icono de descarga en la columna **PDF**.
-3. El sistema descarga el archivo PDF de la cotizacion con la simulacion de credito incluida.
+3. El sistema descarga el archivo PDF de la cotizacion con datos del cliente, producto, simulacion de credito, condiciones comerciales y espacios de firma.
 
 ### Relacion con clientes
 
@@ -361,6 +361,17 @@ Tamano maximo: 10 MB por archivo.
 1. Ubique el documento cargado.
 2. Presione el icono de descarga.
 3. El sistema descarga el archivo original.
+
+### Plantillas PDF
+
+En la columna **Plantillas** se pueden generar documentos operativos de la solicitud:
+
+- **Solicitud:** formulario completo de solicitud de credito con cliente, producto, condiciones, codeudor, referencias y checklist documental.
+- **Datos:** autorizacion de tratamiento de datos personales para firma del titular.
+- **Aprobacion:** carta de aprobacion con condiciones del credito. Solo esta disponible cuando la solicitud esta aprobada o desembolsada.
+- **Entrega:** orden de entrega del producto con checklist y firmas. Solo esta disponible cuando la solicitud esta aprobada o desembolsada.
+
+Estas plantillas se generan desde el backend para conservar el mismo formato y reglas sin depender del navegador del usuario.
 
 ### Validar o rechazar documentos
 
@@ -601,6 +612,7 @@ Si aparece un error, revise primero los datos ingresados. Si el error persiste, 
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-05-07 | 1.8 | Se agregan plantillas PDF para cotizacion completa, solicitud de credito, autorizacion de datos, carta de aprobacion y orden de entrega. |
 | 2026-05-07 | 1.7 | Se agregan datos de codeudor y referencias personales en solicitudes de credito. |
 | 2026-05-06 | 1.6 | Se generaliza el catalogo de productos para manejar motos, accesorios, seguros, tramites, repuestos, servicios y otros productos. |
 | 2026-05-06 | 1.5 | Se agregan alertas comerciales en Dashboard y seguimiento automatico al crear cotizaciones. |
