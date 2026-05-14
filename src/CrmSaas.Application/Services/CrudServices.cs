@@ -1,6 +1,7 @@
 using AutoMapper;
 using CrmSaas.Application.Abstractions;
 using CrmSaas.Application.DTOs;
+using CrmSaas.Domain.Common;
 using CrmSaas.Domain.Entities;
 using CrmSaas.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
@@ -48,12 +49,34 @@ public interface IDashboardService
     Task<DashboardDto> GetAsync(CancellationToken cancellationToken);
 }
 
+public interface ICommercialReportService
+{
+    Task<CommercialReportsDto> GetAsync(DateTime? from, DateTime? to, CancellationToken cancellationToken);
+}
+
 public sealed class CustomerService(ICrmDbContext db, IMapper mapper) : ICustomerService
 {
     public async Task<IReadOnlyCollection<CustomerDto>> GetAsync(CancellationToken cancellationToken) =>
         await db.Clientes
             .OrderBy(x => x.Nombre)
-            .Select(x => new CustomerDto(x.Id, (x.Nombres + " " + x.Apellidos).Trim() == string.Empty ? x.Nombre : (x.Nombres + " " + x.Apellidos).Trim(), x.Nombres, x.Apellidos, x.EmpresaCliente, x.Email, x.Telefono, x.Estado, x.Etiquetas))
+            .Select(x => new CustomerDto(
+                x.Id,
+                (x.Nombres + " " + x.Apellidos).Trim() == string.Empty ? x.Nombre : (x.Nombres + " " + x.Apellidos).Trim(),
+                x.Nombres,
+                x.Apellidos,
+                x.TipoIdentificacion,
+                x.NumeroIdentificacion,
+                x.EmpresaCliente,
+                x.Email,
+                x.IndicativoTelefono,
+                x.Telefono,
+                x.Direccion,
+                x.Ciudad,
+                x.FechaNacimiento,
+                x.Ocupacion,
+                x.Estado,
+                x.Etiquetas,
+                x.Observaciones))
             .ToListAsync(cancellationToken);
 
     public async Task<CustomerDto> CreateAsync(UpsertCustomerDto dto, CancellationToken cancellationToken)
@@ -232,7 +255,24 @@ public sealed class ActivityService(ICrmDbContext db, IMapper mapper) : IActivit
 
 file static class CrmDtoMapper
 {
-    public static CustomerDto ToDto(Cliente x) => new(x.Id, DisplayName(x.Nombres, x.Apellidos, x.Nombre), x.Nombres, x.Apellidos, x.EmpresaCliente, x.Email, x.Telefono, x.Estado, x.Etiquetas);
+    public static CustomerDto ToDto(Cliente x) => new(
+        x.Id,
+        DisplayName(x.Nombres, x.Apellidos, x.Nombre),
+        x.Nombres,
+        x.Apellidos,
+        x.TipoIdentificacion,
+        x.NumeroIdentificacion,
+        x.EmpresaCliente,
+        x.Email,
+        x.IndicativoTelefono,
+        x.Telefono,
+        x.Direccion,
+        x.Ciudad,
+        x.FechaNacimiento,
+        x.Ocupacion,
+        x.Estado,
+        x.Etiquetas,
+        x.Observaciones);
     public static LeadDto ToDto(Prospecto x) => new(x.Id, DisplayName(x.Nombres, x.Apellidos, x.Nombre), x.Nombres, x.Apellidos, x.Email, x.Telefono, x.Fuente, x.Calificacion, x.Convertido, x.ClienteId);
     public static DealStageDto ToDto(EtapaNegocio x) => new(x.Id, x.Nombre, x.Orden, x.ProbabilidadPredeterminada, x.Activa);
     public static DealDto ToDto(Negocio x) => new(x.Id, x.Titulo, x.ClienteId, x.EtapaNegocioId, x.Valor, x.ProbabilidadCierre, x.FechaEstimadaCierre, x.Estado);
@@ -254,7 +294,7 @@ public sealed class DashboardService(ICrmDbContext db) : IDashboardService
             .Take(8)
             .Select(x => new RecentActivityDto(x.Titulo, x.FechaProgramada, x.Estado))
             .ToListAsync(cancellationToken);
-        var today = DateTime.UtcNow.Date;
+        var today = ColombiaTime.Today;
         var tomorrow = today.AddDays(1);
         var overdueActivities = await db.Actividades
             .CountAsync(x => (x.Estado == EstadoActividad.Pendiente || x.Estado == EstadoActividad.EnProceso) && x.FechaProgramada < today, cancellationToken);
@@ -286,7 +326,7 @@ public sealed class DashboardService(ICrmDbContext db) : IDashboardService
                 "Actividad",
                 "error",
                 "Actividad vencida",
-                x.Titulo,
+                x.Titulo + " esta vencida y requiere seguimiento interno.",
                 x.FechaProgramada,
                 x.ClienteId == null ? "/actividades" : "/clientes/" + x.ClienteId))
             .ToListAsync(cancellationToken));
@@ -304,18 +344,60 @@ public sealed class DashboardService(ICrmDbContext db) : IDashboardService
                 x.ClienteId == null ? "/actividades" : "/clientes/" + x.ClienteId))
             .ToListAsync(cancellationToken));
 
-        alerts.AddRange(await db.SolicitudesCredito
+        var pendingDocumentRequests = await db.SolicitudesCredito
             .Where(x => x.Estado == EstadoSolicitudCredito.DocumentosPendientes || x.Documentos.Any(d => d.Estado == EstadoDocumentoCredito.Pendiente || d.Estado == EstadoDocumentoCredito.Rechazado))
             .OrderBy(x => x.FechaCreacion)
             .Take(5)
-            .Select(x => new CommercialAlertDto(
+            .Select(x => new
+            {
+                x.Numero,
+                x.FechaCreacion,
+                PendingDocuments = x.Documentos.Count(d => d.Estado == EstadoDocumentoCredito.Pendiente),
+                RejectedDocuments = x.Documentos.Count(d => d.Estado == EstadoDocumentoCredito.Rechazado)
+            })
+            .ToListAsync(cancellationToken);
+
+        alerts.AddRange(pendingDocumentRequests.Select(x =>
+        {
+            var documentSummary = x.PendingDocuments + x.RejectedDocuments == 0
+                ? x.Numero + " requiere completar o validar documentos."
+                : x.Numero + " tiene " + x.PendingDocuments + " documento(s) pendiente(s) y " + x.RejectedDocuments + " rechazado(s).";
+
+            return new CommercialAlertDto(
                 "Credito",
                 "warning",
-                "Solicitud con documentos pendientes",
-                x.Numero + " requiere completar o validar documentos.",
+                "Documentos pendientes",
+                documentSummary,
                 x.FechaCreacion,
-                "/solicitudes-credito"))
-            .ToListAsync(cancellationToken));
+                "/solicitudes-credito");
+        }));
+
+        var studyLimit = today.AddDays(-2);
+        var creditApplicationsInStudy = await db.SolicitudesCredito
+            .Where(x => x.Estado == EstadoSolicitudCredito.EnEstudio && (x.FechaInicioEstudio ?? x.FechaActualizacion ?? x.FechaCreacion) <= studyLimit)
+            .OrderBy(x => x.FechaInicioEstudio ?? x.FechaActualizacion ?? x.FechaCreacion)
+            .Take(5)
+            .Select(x => new
+            {
+                x.Numero,
+                x.FechaInicioEstudio,
+                x.FechaActualizacion,
+                x.FechaCreacion
+            })
+            .ToListAsync(cancellationToken);
+
+        alerts.AddRange(creditApplicationsInStudy.Select(x =>
+        {
+            var studyDate = (x.FechaInicioEstudio ?? x.FechaActualizacion ?? x.FechaCreacion).Date;
+            var daysInStudy = Math.Max(1, (today - studyDate).Days);
+            return new CommercialAlertDto(
+                "Credito",
+                "warning",
+                "Credito en estudio",
+                x.Numero + " lleva " + daysInStudy + " dia(s) en estudio. Revisar decision o solicitar informacion.",
+                studyDate,
+                "/solicitudes-credito");
+        }));
 
         var quoteLimit = today.AddDays(-3);
         alerts.AddRange(await db.Cotizaciones
@@ -332,6 +414,40 @@ public sealed class DashboardService(ICrmDbContext db) : IDashboardService
             .ToListAsync(cancellationToken));
 
         var staleDealLimit = today.AddDays(-7);
+        var customerFollowUpLimit = today.AddDays(-7);
+        var customersWithoutFollowUp = await db.Clientes
+            .Where(x => x.Estado == EstadoCliente.Activo
+                && x.FechaCreacion <= customerFollowUpLimit
+                && !db.Actividades.Any(a => a.ClienteId == x.Id && a.Estado != EstadoActividad.Cancelada && a.FechaProgramada >= customerFollowUpLimit))
+            .OrderBy(x => x.FechaCreacion)
+            .Take(5)
+            .Select(x => new
+            {
+                x.Id,
+                x.Nombre,
+                x.Nombres,
+                x.Apellidos,
+                x.FechaCreacion
+            })
+            .ToListAsync(cancellationToken);
+
+        alerts.AddRange(customersWithoutFollowUp.Select(x =>
+        {
+            var customerName = string.Join(" ", new[] { x.Nombres, x.Apellidos }.Where(value => !string.IsNullOrWhiteSpace(value))).Trim();
+            if (string.IsNullOrWhiteSpace(customerName))
+            {
+                customerName = x.Nombre;
+            }
+
+            return new CommercialAlertDto(
+                "Cliente",
+                "info",
+                "Cliente sin seguimiento",
+                customerName + " no tiene actividades recientes o futuras registradas.",
+                x.FechaCreacion,
+                "/clientes/" + x.Id);
+        }));
+
         alerts.AddRange(await db.Negocios
             .Where(x => x.Estado == EstadoNegocio.Abierto && x.FechaCreacion <= staleDealLimit && !db.Actividades.Any(a => a.NegocioId == x.Id && a.FechaProgramada >= staleDealLimit))
             .OrderByDescending(x => x.Valor)
@@ -351,4 +467,135 @@ public sealed class DashboardService(ICrmDbContext db) : IDashboardService
             .Take(12)
             .ToList();
     }
+}
+
+public sealed class CommercialReportService(ICrmDbContext db) : ICommercialReportService
+{
+    public async Task<CommercialReportsDto> GetAsync(DateTime? from, DateTime? to, CancellationToken cancellationToken)
+    {
+        var today = ColombiaTime.Today;
+        var fromDate = (from ?? new DateTime(today.Year, today.Month, 1)).Date;
+        var toDateExclusive = (to ?? today).Date.AddDays(1);
+
+        if (toDateExclusive <= fromDate)
+        {
+            throw new ArgumentException("La fecha final debe ser mayor o igual a la fecha inicial.");
+        }
+
+        var quotes = db.Cotizaciones.Where(x => x.FechaCotizacion >= fromDate && x.FechaCotizacion < toDateExclusive);
+        var creditApplications = db.SolicitudesCredito.Where(x => x.FechaCreacion >= fromDate && x.FechaCreacion < toDateExclusive);
+
+        var totalQuotes = await quotes.CountAsync(cancellationToken);
+        var quotesConvertedToCredit = await quotes.CountAsync(x => db.SolicitudesCredito.Any(s => s.CotizacionId == x.Id), cancellationToken);
+        var approvedCredits = await creditApplications.CountAsync(x => x.Estado == EstadoSolicitudCredito.Aprobada || x.Estado == EstadoSolicitudCredito.Desembolsada, cancellationToken);
+        var rejectedCredits = await creditApplications.CountAsync(x => x.Estado == EstadoSolicitudCredito.Rechazada, cancellationToken);
+        var decidedCredits = approvedCredits + rejectedCredits;
+        var approvedCreditAmount = await creditApplications
+            .Where(x => x.Estado == EstadoSolicitudCredito.Aprobada || x.Estado == EstadoSolicitudCredito.Desembolsada)
+            .SumAsync(x => x.ValorMoto, cancellationToken);
+
+        var salesRows = await creditApplications
+            .Where(x => x.Estado == EstadoSolicitudCredito.Aprobada || x.Estado == EstadoSolicitudCredito.Desembolsada)
+            .GroupBy(x => x.UsuarioCreacion)
+            .Select(x => new
+            {
+                SellerEmail = x.Key,
+                ApprovedCredits = x.Count(),
+                ApprovedAmount = x.Sum(s => s.ValorMoto)
+            })
+            .OrderByDescending(x => x.ApprovedAmount)
+            .ToListAsync(cancellationToken);
+        var sellerEmails = salesRows.Select(x => x.SellerEmail).ToArray();
+        var sellerNames = await db.Usuarios
+            .Where(x => sellerEmails.Contains(x.Email))
+            .Select(x => new { x.Email, x.NombreCompleto })
+            .ToDictionaryAsync(x => x.Email, x => x.NombreCompleto, cancellationToken);
+        var quoteCountsBySeller = await quotes
+            .GroupBy(x => x.UsuarioCreacion)
+            .Select(x => new { SellerEmail = x.Key, Quotes = x.Count() })
+            .ToDictionaryAsync(x => x.SellerEmail, x => x.Quotes, cancellationToken);
+        var salesBySeller = salesRows
+            .Select(x => new SalesBySellerDto(
+                sellerNames.TryGetValue(x.SellerEmail, out var sellerName) ? sellerName : x.SellerEmail,
+                quoteCountsBySeller.TryGetValue(x.SellerEmail, out var sellerQuotes) ? sellerQuotes : 0,
+                x.ApprovedCredits,
+                x.ApprovedAmount))
+            .ToList();
+
+        var convertedQuoteIds = await db.SolicitudesCredito
+            .Where(x => x.CotizacionId.HasValue)
+            .Select(x => x.CotizacionId!.Value)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+        var quoteRows = await quotes
+            .Select(x => new
+            {
+                x.Id,
+                x.ValidaHasta,
+                Amount = x.PrecioProducto
+            })
+            .ToListAsync(cancellationToken);
+        var convertedQuoteSet = convertedQuoteIds.ToHashSet();
+        var quotesByStatus = quoteRows
+            .GroupBy(x => convertedQuoteSet.Contains(x.Id) ? "Convertida a credito" : x.ValidaHasta.Date < today ? "Vencida" : "Vigente")
+            .Select(x => new QuotesByStatusDto(x.Key, x.Count(), x.Sum(q => q.Amount)))
+            .OrderByDescending(x => x.Count)
+            .ToList();
+
+        var creditGroups = await creditApplications
+            .GroupBy(x => x.Estado)
+            .Select(x => new
+            {
+                Status = x.Key,
+                Count = x.Count(),
+                Amount = x.Sum(s => s.ValorMoto)
+            })
+            .OrderByDescending(x => x.Count)
+            .ToListAsync(cancellationToken);
+        var creditRows = creditGroups
+            .Select(x => new CreditsByStatusDto(CreditStatusLabel(x.Status), x.Count, x.Amount))
+            .ToList();
+
+        var topQuotedProductGroups = await quotes
+            .GroupBy(x => new { x.ProductoId, x.Producto!.Nombre, x.Producto.Marca, x.Producto.Modelo })
+            .Select(x => new
+            {
+                x.Key.ProductoId,
+                x.Key.Nombre,
+                x.Key.Marca,
+                x.Key.Modelo,
+                QuoteCount = x.Count(),
+                QuotedAmount = x.Sum(q => q.PrecioProducto)
+            })
+            .OrderByDescending(x => x.QuoteCount)
+            .ThenByDescending(x => x.QuotedAmount)
+            .Take(10)
+            .ToListAsync(cancellationToken);
+        var topQuotedProducts = topQuotedProductGroups
+            .Select(x => new TopQuotedProductDto(x.ProductoId, x.Nombre, x.Marca, x.Modelo, x.QuoteCount, x.QuotedAmount))
+            .ToList();
+
+        var summary = new CommercialReportSummaryDto(
+            totalQuotes,
+            quotesConvertedToCredit,
+            totalQuotes == 0 ? 0 : Math.Round((decimal)quotesConvertedToCredit / totalQuotes * 100, 2),
+            approvedCredits,
+            rejectedCredits,
+            decidedCredits == 0 ? 0 : Math.Round((decimal)approvedCredits / decidedCredits * 100, 2),
+            approvedCreditAmount);
+
+        return new CommercialReportsDto(summary, salesBySeller, quotesByStatus, creditRows, topQuotedProducts);
+    }
+
+    private static string CreditStatusLabel(EstadoSolicitudCredito status) => status switch
+    {
+        EstadoSolicitudCredito.Borrador => "Borrador",
+        EstadoSolicitudCredito.DocumentosPendientes => "Documentos pendientes",
+        EstadoSolicitudCredito.DocumentosRecibidos => "Documentos recibidos",
+        EstadoSolicitudCredito.EnEstudio => "En estudio",
+        EstadoSolicitudCredito.Aprobada => "Aprobada",
+        EstadoSolicitudCredito.Rechazada => "Rechazada",
+        EstadoSolicitudCredito.Desembolsada => "Desembolsada",
+        _ => "Sin estado"
+    };
 }

@@ -1,6 +1,7 @@
 using CrmSaas.Application.DTOs;
 using CrmSaas.Application.Abstractions;
 using CrmSaas.Api.Services;
+using CrmSaas.Domain.Common;
 using CrmSaas.Domain.Entities;
 using CrmSaas.Domain.Enums;
 using CrmSaas.Infrastructure.Persistence;
@@ -53,7 +54,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
 
         var entity = new SolicitudCredito
         {
-            Numero = $"SOL-{DateTime.UtcNow:yyyyMMddHHmmss}",
+            Numero = $"SOL-{ColombiaTime.Now:yyyyMMddHHmmss}",
             ClienteId = customer.Id,
             ProductoId = product.Id,
             CotizacionId = dto.QuoteId,
@@ -199,7 +200,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         document.Nombre = string.IsNullOrWhiteSpace(dto.Name) ? document.Nombre : dto.Name.Trim();
         document.Estado = dto.Status;
         document.FechaRecepcion = dto.Status is EstadoDocumentoCredito.Recibido or EstadoDocumentoCredito.Validado
-            ? dto.ReceivedAt ?? DateTime.UtcNow
+            ? dto.ReceivedAt ?? ColombiaTime.Now
             : dto.ReceivedAt;
         document.Observaciones = dto.Notes;
 
@@ -249,9 +250,9 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         document.RutaArchivo = path;
         document.ContentType = string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType;
         document.TamanoBytes = file.Length;
-        document.FechaCarga = DateTime.UtcNow;
+        document.FechaCarga = ColombiaTime.Now;
         document.Estado = EstadoDocumentoCredito.Recibido;
-        document.FechaRecepcion = DateTime.UtcNow;
+        document.FechaRecepcion = ColombiaTime.Now;
 
         MarkReadyIfDocumentsComplete(entity);
         await SyncPipelineAsync(entity, cancellationToken);
@@ -354,7 +355,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
 
     private void ApplyDecision(SolicitudCredito entity, EstadoSolicitudCredito status, string? notes)
     {
-        var now = DateTime.UtcNow;
+        var now = ColombiaTime.Now;
         entity.UsuarioDecision = tenantContext.UsuarioActual;
         entity.ObservacionDecision = string.IsNullOrWhiteSpace(notes) ? entity.ObservacionDecision : notes.Trim();
 

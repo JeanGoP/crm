@@ -1,5 +1,6 @@
 using CrmSaas.Application.DTOs;
 using CrmSaas.Application.Services;
+using CrmSaas.Domain.Common;
 using CrmSaas.Domain.Entities;
 using CrmSaas.Domain.Enums;
 using CrmSaas.Infrastructure.Persistence;
@@ -64,6 +65,35 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
             timeline));
     }
 
+    [HttpGet("{id:guid}/ai-analysis")]
+    public async Task<ActionResult<CustomerAiAnalysisDto>> AiAnalysis(Guid id, CancellationToken cancellationToken)
+    {
+        var customer = await db.Clientes.FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
+            ?? throw new KeyNotFoundException("Cliente no encontrado.");
+
+        var quotes = await db.Cotizaciones
+            .Include(x => x.Producto)
+            .Where(x => x.ClienteId == id)
+            .OrderByDescending(x => x.FechaCotizacion)
+            .ToListAsync(cancellationToken);
+        var creditApplications = await db.SolicitudesCredito
+            .Include(x => x.Producto)
+            .Include(x => x.Documentos)
+            .Where(x => x.ClienteId == id)
+            .OrderByDescending(x => x.FechaCreacion)
+            .ToListAsync(cancellationToken);
+        var deals = await db.Negocios
+            .Where(x => x.ClienteId == id)
+            .OrderByDescending(x => x.FechaActualizacion ?? x.FechaCreacion)
+            .ToListAsync(cancellationToken);
+        var activities = await db.Actividades
+            .Where(x => x.ClienteId == id)
+            .OrderByDescending(x => x.FechaProgramada)
+            .ToListAsync(cancellationToken);
+
+        return Ok(BuildAiAnalysis(customer, quotes, creditApplications, deals, activities));
+    }
+
     [HttpPost]
     public async Task<ActionResult<CustomerDto>> Create(UpsertCustomerDto dto, CancellationToken cancellationToken)
     {
@@ -90,7 +120,24 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
     private static CustomerDto ToCustomerDto(Cliente x)
     {
         var displayName = $"{x.Nombres} {x.Apellidos}".Trim();
-        return new CustomerDto(x.Id, string.IsNullOrWhiteSpace(displayName) ? x.Nombre : displayName, x.Nombres, x.Apellidos, x.EmpresaCliente, x.Email, x.Telefono, x.Estado, x.Etiquetas);
+        return new CustomerDto(
+            x.Id,
+            string.IsNullOrWhiteSpace(displayName) ? x.Nombre : displayName,
+            x.Nombres,
+            x.Apellidos,
+            x.TipoIdentificacion,
+            x.NumeroIdentificacion,
+            x.EmpresaCliente,
+            x.Email,
+            x.IndicativoTelefono,
+            x.Telefono,
+            x.Direccion,
+            x.Ciudad,
+            x.FechaNacimiento,
+            x.Ocupacion,
+            x.Estado,
+            x.Etiquetas,
+            x.Observaciones);
     }
 
     private static QuoteDto ToQuoteDto(Cotizacion x)
@@ -259,6 +306,126 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
         if (!date.HasValue) return;
         items.Add(new CustomerTimelineItemDto(date.Value, "Decision", title, description, tone, relatedId));
     }
+
+    private static CustomerAiAnalysisDto BuildAiAnalysis(
+        Cliente customer,
+        IReadOnlyCollection<Cotizacion> quotes,
+        IReadOnlyCollection<SolicitudCredito> creditApplications,
+        IReadOnlyCollection<Negocio> deals,
+        IReadOnlyCollection<Actividad> activities)
+    {
+        var customerName = $"{customer.Nombres} {customer.Apellidos}".Trim();
+        if (string.IsNullOrWhiteSpace(customerName)) customerName = customer.Nombre;
+
+        var latestQuote = quotes.OrderByDescending(x => x.FechaCotizacion).FirstOrDefault();
+        var latestApplication = creditApplications.OrderByDescending(x => x.FechaCreacion).FirstOrDefault();
+        var openDeal = deals.FirstOrDefault(x => x.Estado == EstadoNegocio.Abierto);
+        var today = ColombiaTime.Today;
+        var pendingActivities = activities.Where(x => x.Estado is EstadoActividad.Pendiente or EstadoActividad.EnProceso).ToList();
+        var overdueActivities = pendingActivities.Where(x => x.FechaProgramada.Date < today).ToList();
+        var futureActivities = pendingActivities.Where(x => x.FechaProgramada.Date >= today).ToList();
+        var lastContactDate = new[] {
+                latestQuote?.FechaCotizacion,
+                latestApplication?.FechaCreacion,
+                activities.FirstOrDefault()?.FechaProgramada
+            }
+            .Where(x => x.HasValue)
+            .Select(x => x!.Value.Date)
+            .DefaultIfEmpty(customer.FechaCreacion.Date)
+            .Max();
+        var daysWithoutFollowUp = Math.Max(0, (today - lastContactDate).Days);
+
+        var pending = new List<string>();
+        var signals = new List<string>();
+
+        if (latestQuote is null) pending.Add("No tiene cotizaciones registradas.");
+        else signals.Add($"Ultima cotizacion: {latestQuote.Numero} para {ProductName(latestQuote.Producto!)} por {Money(latestQuote.PrecioProducto)}.");
+
+        if (latestApplication is not null)
+        {
+            signals.Add($"Solicitud de credito {latestApplication.Numero} en estado {latestApplication.Estado}.");
+            var pendingDocs = latestApplication.Documentos
+                .Where(x => x.Estado is EstadoDocumentoCredito.Pendiente or EstadoDocumentoCredito.Rechazado)
+                .Select(x => $"{x.Nombre}: {x.Estado}")
+                .ToList();
+            pending.AddRange(pendingDocs.Select(x => $"Documento pendiente o por corregir: {x}."));
+            if (string.IsNullOrWhiteSpace(latestApplication.CodeudorNombre) && latestApplication.IngresosMensuales <= 0)
+                pending.Add("Revisar ingresos y posible codeudor antes de avanzar el credito.");
+        }
+        else if (latestQuote is not null)
+        {
+            pending.Add("Aun no tiene solicitud de credito asociada a la cotizacion.");
+        }
+
+        if (openDeal is not null) signals.Add($"Negocio abierto: {openDeal.Titulo} con probabilidad {openDeal.ProbabilidadCierre:N0}%.");
+        if (overdueActivities.Count > 0) pending.Add($"Tiene {overdueActivities.Count} actividad(es) vencida(s).");
+        if (futureActivities.Count == 0) pending.Add("No tiene una actividad futura programada.");
+        if (daysWithoutFollowUp >= 5) pending.Add($"No registra seguimiento reciente hace {daysWithoutFollowUp} dias.");
+
+        if (pending.Count == 0) pending.Add("No se detectan pendientes criticos en este momento.");
+
+        var riskLevel = "Bajo";
+        var priority = "Media";
+        if (latestApplication?.Estado is EstadoSolicitudCredito.Rechazada || overdueActivities.Count > 0 || latestApplication?.Documentos.Any(x => x.Estado == EstadoDocumentoCredito.Rechazado) == true)
+        {
+            riskLevel = "Alto";
+            priority = "Alta";
+        }
+        else if (latestApplication?.Documentos.Any(x => x.Estado == EstadoDocumentoCredito.Pendiente) == true || latestApplication?.Estado is EstadoSolicitudCredito.DocumentosPendientes or EstadoSolicitudCredito.EnEstudio || daysWithoutFollowUp >= 5)
+        {
+            riskLevel = "Medio";
+            priority = "Alta";
+        }
+        else if (latestQuote is not null && latestApplication is null)
+        {
+            riskLevel = "Medio";
+            priority = "Media";
+        }
+
+        var productName = latestApplication?.Producto is not null
+            ? ProductName(latestApplication.Producto)
+            : latestQuote?.Producto is not null
+                ? ProductName(latestQuote.Producto)
+                : "el producto de interes";
+
+        var nextAction = latestApplication?.Documentos.Any(x => x.Estado is EstadoDocumentoCredito.Pendiente or EstadoDocumentoCredito.Rechazado) == true
+            ? "Contactar al cliente para solicitar o corregir los documentos pendientes."
+            : overdueActivities.Count > 0
+                ? "Resolver la actividad vencida y registrar el resultado del seguimiento."
+                : latestApplication?.Estado == EstadoSolicitudCredito.EnEstudio
+                    ? "Hacer seguimiento al estudio de credito y confirmar si requiere informacion adicional."
+                    : latestQuote is not null && latestApplication is null
+                        ? "Contactar al cliente para confirmar interes y avanzar hacia solicitud de credito."
+                        : "Programar una llamada de seguimiento comercial.";
+
+        var firstName = string.IsNullOrWhiteSpace(customer.Nombres) ? customerName.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "cliente" : customer.Nombres.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "cliente";
+        var whatsappMessage = $"Hola {firstName}, te escribo para hacer seguimiento a tu proceso con {productName}. {WhatsappCallToAction(nextAction)}";
+        var summary = BuildSummary(customerName, latestQuote, latestApplication, openDeal, daysWithoutFollowUp);
+
+        if (signals.Count == 0) signals.Add("Cliente registrado sin proceso comercial avanzado.");
+
+        return new CustomerAiAnalysisDto(summary, pending, riskLevel, priority, nextAction, whatsappMessage, signals);
+    }
+
+    private static string BuildSummary(string customerName, Cotizacion? quote, SolicitudCredito? application, Negocio? deal, int daysWithoutFollowUp)
+    {
+        var parts = new List<string> { $"{customerName} tiene un proceso comercial en seguimiento." };
+        if (quote is not null) parts.Add($"Su ultima cotizacion es {quote.Numero} por {ProductName(quote.Producto!)}.");
+        if (application is not null) parts.Add($"La solicitud de credito {application.Numero} esta en estado {application.Estado}.");
+        if (deal is not null) parts.Add($"Tiene un negocio abierto con probabilidad {deal.ProbabilidadCierre:N0}%.");
+        if (daysWithoutFollowUp > 0) parts.Add($"El ultimo movimiento detectado fue hace {daysWithoutFollowUp} dia(s).");
+        return string.Join(" ", parts);
+    }
+
+    private static string WhatsappCallToAction(string nextAction)
+    {
+        if (nextAction.Contains("documentos", StringComparison.OrdinalIgnoreCase)) return "Nos falta completar algunos documentos para continuar. Me los puedes enviar por este medio?";
+        if (nextAction.Contains("credito", StringComparison.OrdinalIgnoreCase)) return "Quiero confirmar contigo la informacion para avanzar con el credito. Me confirmas si seguimos adelante?";
+        if (nextAction.Contains("cotizacion", StringComparison.OrdinalIgnoreCase)) return "Quiero saber si pudiste revisar la cotizacion y si deseas que avancemos con la solicitud.";
+        return "Quedo atento para ayudarte a continuar con el proceso.";
+    }
+
+    private static string Money(decimal value) => "$" + value.ToString("N0");
 
     private sealed record DealTimelineEntry(DealDto Deal, DateTime OccurredAt);
 

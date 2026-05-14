@@ -8,11 +8,19 @@ public sealed class Cliente : AuditableTenantEntity
     public string Nombre { get; set; } = string.Empty;
     public string Nombres { get; set; } = string.Empty;
     public string Apellidos { get; set; } = string.Empty;
+    public TipoIdentificacionColombia? TipoIdentificacion { get; set; }
+    public string? NumeroIdentificacion { get; set; }
     public string? EmpresaCliente { get; set; }
     public string Email { get; set; } = string.Empty;
+    public string? IndicativoTelefono { get; set; }
     public string? Telefono { get; set; }
+    public string? Direccion { get; set; }
+    public string? Ciudad { get; set; }
+    public DateTime? FechaNacimiento { get; set; }
+    public string? Ocupacion { get; set; }
     public EstadoCliente Estado { get; set; } = EstadoCliente.Activo;
     public string? Etiquetas { get; set; }
+    public string? Observaciones { get; set; }
     public ICollection<Nota> Notas { get; set; } = new List<Nota>();
     public ICollection<Actividad> Actividades { get; set; } = new List<Actividad>();
 }
@@ -119,8 +127,8 @@ public sealed class Cotizacion : AuditableTenantEntity
     public decimal ValorFinanciado { get; set; }
     public decimal CuotaMensualEstimada { get; set; }
     public decimal TotalPagarEstimado { get; set; }
-    public DateTime FechaCotizacion { get; set; } = DateTime.UtcNow;
-    public DateTime ValidaHasta { get; set; } = DateTime.UtcNow.AddDays(7);
+    public DateTime FechaCotizacion { get; set; } = ColombiaTime.Now;
+    public DateTime ValidaHasta { get; set; } = ColombiaTime.Now.AddDays(7);
     public string? Observaciones { get; set; }
 }
 

@@ -2,8 +2,41 @@ using CrmSaas.Domain.Enums;
 
 namespace CrmSaas.Application.DTOs;
 
-public sealed record CustomerDto(Guid Id, string Name, string FirstNames, string LastNames, string? CompanyName, string Email, string? Phone, EstadoCliente Status, string? Tags);
-public sealed record UpsertCustomerDto(string? Name, string FirstNames, string LastNames, string? CompanyName, string Email, string? Phone, EstadoCliente Status, string? Tags);
+public sealed record CustomerDto(
+    Guid Id,
+    string Name,
+    string FirstNames,
+    string LastNames,
+    TipoIdentificacionColombia? IdentificationType,
+    string? IdentificationNumber,
+    string? CompanyName,
+    string Email,
+    string? PhoneCountryCode,
+    string? Phone,
+    string? Address,
+    string? City,
+    DateTime? BirthDate,
+    string? Occupation,
+    EstadoCliente Status,
+    string? Tags,
+    string? Notes);
+public sealed record UpsertCustomerDto(
+    string? Name,
+    string FirstNames,
+    string LastNames,
+    TipoIdentificacionColombia? IdentificationType,
+    string? IdentificationNumber,
+    string? CompanyName,
+    string? Email,
+    string? PhoneCountryCode,
+    string? Phone,
+    string? Address,
+    string? City,
+    DateTime? BirthDate,
+    string? Occupation,
+    EstadoCliente Status,
+    string? Tags,
+    string? Notes);
 
 public sealed record LeadDto(Guid Id, string Name, string FirstNames, string LastNames, string Email, string? Phone, string Source, CalificacionProspecto Rating, bool Converted, Guid? CustomerId);
 public sealed record UpsertLeadDto(string? Name, string FirstNames, string LastNames, string Email, string? Phone, string Source, CalificacionProspecto Rating);
@@ -52,7 +85,18 @@ public sealed record QuoteDto(
     DateTime QuoteDate,
     DateTime ValidUntil,
     string? Notes);
-public sealed record CreateQuoteDto(TipoIdentificacionColombia IdentificationType, string? IdentificationNumber, string CustomerFirstNames, string CustomerLastNames, Guid ProductId, decimal DownPayment, int TermMonths, decimal MonthlyInterestRate, string? Notes);
+public sealed record CreateQuoteDto(
+    TipoIdentificacionColombia IdentificationType,
+    string? IdentificationNumber,
+    string CustomerFirstNames,
+    string CustomerLastNames,
+    string? PhoneCountryCode,
+    string? PhoneNumber,
+    Guid ProductId,
+    decimal DownPayment,
+    int TermMonths,
+    decimal MonthlyInterestRate,
+    string? Notes);
 
 public sealed record CreditApplicationDto(
     Guid Id,
@@ -158,6 +202,15 @@ public sealed record CustomerTimelineItemDto(
     string Tone,
     Guid? RelatedId);
 
+public sealed record CustomerAiAnalysisDto(
+    string Summary,
+    IReadOnlyCollection<string> PendingItems,
+    string RiskLevel,
+    string Priority,
+    string NextBestAction,
+    string WhatsappMessage,
+    IReadOnlyCollection<string> Signals);
+
 public sealed record DashboardDto(
     decimal OpenPipelineValue,
     decimal WeightedPipelineValue,
@@ -170,3 +223,24 @@ public sealed record DashboardDto(
     IReadOnlyCollection<CommercialAlertDto> Alerts);
 public sealed record RecentActivityDto(string Title, DateTime ScheduledAt, EstadoActividad Status);
 public sealed record CommercialAlertDto(string Type, string Severity, string Title, string Description, DateTime CreatedAt, string? ActionUrl);
+
+public sealed record CommercialReportsDto(
+    CommercialReportSummaryDto Summary,
+    IReadOnlyCollection<SalesBySellerDto> SalesBySeller,
+    IReadOnlyCollection<QuotesByStatusDto> QuotesByStatus,
+    IReadOnlyCollection<CreditsByStatusDto> CreditsByStatus,
+    IReadOnlyCollection<TopQuotedProductDto> TopQuotedProducts);
+
+public sealed record CommercialReportSummaryDto(
+    int TotalQuotes,
+    int QuotesConvertedToCredit,
+    decimal QuoteToCreditConversionRate,
+    int ApprovedCredits,
+    int RejectedCredits,
+    decimal CreditApprovalRate,
+    decimal ApprovedCreditAmount);
+
+public sealed record SalesBySellerDto(string Seller, int Quotes, int ApprovedCredits, decimal ApprovedAmount);
+public sealed record QuotesByStatusDto(string Status, int Count, decimal Amount);
+public sealed record CreditsByStatusDto(string Status, int Count, decimal Amount);
+public sealed record TopQuotedProductDto(Guid ProductId, string ProductName, string Brand, string Model, int QuoteCount, decimal QuotedAmount);

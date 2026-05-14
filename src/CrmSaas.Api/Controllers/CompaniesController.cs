@@ -12,12 +12,20 @@ namespace CrmSaas.Api.Controllers;
 [Route("api/companies")]
 public sealed class CompaniesController(CrmDbContext db) : ControllerBase
 {
+    private const int MaxLogoDataUrlLength = 300000;
+    private static readonly string[] AllowedLogoPrefixes =
+    [
+        "data:image/png;base64,",
+        "data:image/jpeg;base64,",
+        "data:image/webp;base64,"
+    ];
+
     [HttpGet]
     public async Task<ActionResult<IReadOnlyCollection<CompanyDto>>> Get(CancellationToken cancellationToken)
     {
         var companies = await db.Empresas.IgnoreQueryFilters()
             .OrderBy(x => x.Nombre)
-            .Select(x => new CompanyDto(x.Id, x.Nombre, x.Subdominio, x.DominioPersonalizado, x.Activa))
+            .Select(x => new CompanyDto(x.Id, x.Nombre, x.Subdominio, x.DominioPersonalizado, x.LogoDataUrl, x.Activa))
             .ToListAsync(cancellationToken);
         return Ok(companies);
     }
@@ -39,6 +47,7 @@ public sealed class CompaniesController(CrmDbContext db) : ControllerBase
             Nombre = dto.Name.Trim(),
             Subdominio = subdomain,
             DominioPersonalizado = string.IsNullOrWhiteSpace(dto.CustomDomain) ? null : dto.CustomDomain.Trim(),
+            LogoDataUrl = NormalizeLogo(dto.LogoDataUrl),
             Activa = dto.Active
         };
 
@@ -46,7 +55,7 @@ public sealed class CompaniesController(CrmDbContext db) : ControllerBase
         await db.SaveChangesAsync(cancellationToken);
         await DatabaseSeeder.SeedCompanyDefaultsAsync(db, company.Id, cancellationToken);
 
-        return Ok(new CompanyDto(company.Id, company.Nombre, company.Subdominio, company.DominioPersonalizado, company.Activa));
+        return Ok(ToDto(company));
     }
 
     [HttpPut("{id:guid}")]
@@ -63,9 +72,34 @@ public sealed class CompaniesController(CrmDbContext db) : ControllerBase
         company.Nombre = dto.Name.Trim();
         company.Subdominio = subdomain;
         company.DominioPersonalizado = string.IsNullOrWhiteSpace(dto.CustomDomain) ? null : dto.CustomDomain.Trim();
+        company.LogoDataUrl = NormalizeLogo(dto.LogoDataUrl);
         company.Activa = dto.Active;
         await db.SaveChangesAsync(cancellationToken);
 
-        return Ok(new CompanyDto(company.Id, company.Nombre, company.Subdominio, company.DominioPersonalizado, company.Activa));
+        return Ok(ToDto(company));
+    }
+
+    private static CompanyDto ToDto(Empresa company) =>
+        new(company.Id, company.Nombre, company.Subdominio, company.DominioPersonalizado, company.LogoDataUrl, company.Activa);
+
+    private static string? NormalizeLogo(string? logoDataUrl)
+    {
+        if (string.IsNullOrWhiteSpace(logoDataUrl))
+        {
+            return null;
+        }
+
+        var logo = logoDataUrl.Trim();
+        if (logo.Length > MaxLogoDataUrlLength)
+        {
+            throw new InvalidOperationException("El logo es demasiado grande. Usa una imagen menor a 300 KB.");
+        }
+
+        if (!AllowedLogoPrefixes.Any(prefix => logo.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new InvalidOperationException("El logo debe ser una imagen PNG, JPG o WebP.");
+        }
+
+        return logo;
     }
 }

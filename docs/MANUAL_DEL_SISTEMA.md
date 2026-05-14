@@ -1,15 +1,18 @@
 # Manual del Sistema CRM SaaS
 
-Ultima actualizacion: 2026-05-06  
-Version del manual: 1.8  
+Ultima actualizacion: 2026-05-13  
+Version del manual: 2.9  
 Sistema: CRM SaaS para ventas de motos a credito  
 Ambiente documentado: Desarrollo local conectado a SQL Server
+Zona horaria operativa: Colombia UTC-5
 
 ## 1. Objetivo del sistema
 
-El CRM permite gestionar el proceso comercial completo de una empresa de venta de motos a credito: clientes, productos, cotizaciones, solicitudes de credito, documentos, prospectos, pipeline, actividades, usuarios, roles y empresas.
+El CRM permite gestionar el proceso comercial completo de una empresa de venta de motos a credito: clientes, productos, cotizaciones, solicitudes de credito, documentos, prospectos, pipeline, actividades, reportes comerciales, usuarios, roles y empresas.
 
 El sistema esta pensado para operar como SaaS multiempresa. Cada usuario pertenece a una empresa y los datos que registra quedan asociados automaticamente a esa empresa.
+
+Las fechas operativas del CRM se registran con fecha y hora de Colombia, UTC-5. Esto aplica para auditoria, cotizaciones, actividades, solicitudes de credito, documentos y decisiones comerciales.
 
 ## 2. Politica de actualizacion del manual
 
@@ -74,13 +77,25 @@ El menu lateral permite moverse entre:
 
 En la barra superior se muestra el usuario autenticado, su rol principal y el boton **Salir**.
 
+### Modo demostracion inicial
+
+Para presentar primero el flujo basico al cliente, algunos modulos pueden aparecer opacos y bloqueados en el menu lateral. En esta etapa se muestran principalmente:
+
+- Dashboard
+- Clientes
+- Productos
+- Cotizaciones
+- Configuracion
+
+Los modulos bloqueados quedan visibles como capacidades futuras, pero no permiten ingreso hasta habilitarlos en una siguiente fase.
+
 ## 6. Dashboard
 
 ![Dashboard](./assets/manual/02-dashboard.png)
 
 ### Para que sirve
 
-Resume el estado comercial de la empresa: valor del pipeline, clientes activos, prospectos abiertos, actividades pendientes, alertas comerciales y actividad reciente.
+Resume el estado comercial de la empresa: valor del pipeline, clientes activos, prospectos abiertos, actividades pendientes, notificaciones internas y actividad reciente.
 
 ### Indicadores
 
@@ -91,20 +106,22 @@ Resume el estado comercial de la empresa: valor del pipeline, clientes activos, 
 - **Actividades pendientes:** tareas, llamadas o reuniones aun sin completar.
 - **Vencidas:** actividades pendientes cuya fecha programada ya paso.
 - **Para hoy:** actividades pendientes programadas para el dia actual.
-- **Alertas comerciales:** avisos accionables para priorizar seguimientos.
+- **Notificaciones internas:** recordatorios accionables para priorizar documentos, creditos, actividades y clientes sin seguimiento.
 - **Actividad reciente:** ultimos movimientos o actividades programadas.
 
-### Alertas comerciales
+### Notificaciones internas
 
-El panel de alertas ayuda al equipo a saber que debe atender primero. Puede mostrar:
+El panel de notificaciones internas ayuda al equipo a saber que debe atender primero. Puede mostrar:
 
-- Actividades vencidas.
+- Actividades vencidas que siguen pendientes o en proceso.
 - Seguimientos programados para hoy.
-- Solicitudes de credito con documentos pendientes o rechazados.
+- Solicitudes de credito con documentos pendientes o rechazados, indicando cantidad.
+- Solicitudes de credito en estudio por varios dias.
+- Clientes activos sin actividades recientes o futuras.
 - Cotizaciones que llevan varios dias sin seguimiento.
 - Negocios abiertos sin actividad reciente.
 
-Cada alerta muestra el tipo, el nivel de prioridad, una descripcion y un boton **Abrir** para ir al modulo o cliente relacionado.
+Cada notificacion muestra el tipo, el nivel de prioridad, una descripcion y un boton **Abrir** para ir al modulo o cliente relacionado.
 
 ### Paso a paso
 
@@ -127,20 +144,30 @@ Permite administrar los clientes de la empresa. Un cliente puede venir de una co
 
 - Nombres
 - Apellidos
+- Tipo de identificacion
+- Numero de identificacion
 - Empresa o razon comercial opcional
 - Email
+- Indicativo telefonico
 - Telefono
+- Direccion
+- Ciudad
+- Fecha de nacimiento
+- Ocupacion
 - Estado
 - Etiquetas
+- Observaciones
 
 ### Crear cliente
 
 1. Abra **Clientes**.
 2. Presione **Nuevo cliente**.
-3. Complete nombres y apellidos.
-4. Registre email, telefono y etiquetas si aplican.
-5. Seleccione el estado.
-6. Guarde el registro.
+3. Complete tipo y numero de identificacion si ya los tiene.
+4. Complete nombres y apellidos.
+5. Registre fecha de nacimiento y ocupacion si aplican.
+6. Registre indicativo, telefono o WhatsApp, email, direccion y ciudad.
+7. Complete datos comerciales como empresa, estado, etiquetas y observaciones.
+8. Guarde el registro.
 
 ### Editar cliente
 
@@ -172,6 +199,21 @@ La vista 360 incluye una linea de tiempo cronologica con los eventos mas importa
 - Notas registradas.
 
 Esta linea de tiempo sirve para que un vendedor, supervisor o administrador entienda rapidamente que ha pasado con el cliente sin abrir cada modulo por separado.
+
+### Analizar con IA
+
+La ficha 360 incluye el boton **Analizar con IA** en el bloque **Asistente comercial del cliente**.
+
+Al presionarlo, el sistema analiza la informacion real del cliente y muestra:
+
+- Resumen del caso.
+- Pendientes.
+- Riesgo o prioridad.
+- Siguiente mejor accion.
+- Mensaje sugerido para WhatsApp.
+- Senales usadas para generar el analisis.
+
+Esta primera version funciona como asistente inteligente interno basado en reglas comerciales del CRM. No depende todavia de un proveedor externo de IA, por lo que puede usarse desde el MVP y evolucionar despues hacia modelos generativos.
 
 ## 8. Productos
 
@@ -227,6 +269,8 @@ Tambien permite simular la financiacion del producto para entregar al cliente un
 - Numero de identificacion
 - Nombres del cliente
 - Apellidos del cliente
+- Indicativo telefonico, por defecto **+57** para Colombia
+- Telefono / WhatsApp
 - Producto seleccionado
 - Cuota inicial
 - Plazo en meses
@@ -236,19 +280,27 @@ Tambien permite simular la financiacion del producto para entregar al cliente un
 - Total estimado a pagar
 - Observaciones
 
+### Consultas externas SIMIT y RUNT
+
+El campo **Numero de identificacion** incluye los botones **Simit** y **Runt**. Al presionar cualquiera, el sistema abre la pagina oficial correspondiente y copia el numero de identificacion al portapapeles para pegarlo en la consulta.
+
+Estas paginas externas no exponen un enlace publico estable para consultar automaticamente con el numero ya diligenciado, por eso el CRM abre el sitio oficial y deja listo el numero para pegar.
+
 ### Crear cotizacion
 
 1. Abra **Cotizaciones**.
 2. Presione **Nueva cotizacion**.
 3. Seleccione el tipo de identificacion.
 4. Escriba numero de identificacion, nombres y apellidos.
-5. Seleccione el producto.
-6. Ingrese la cuota inicial.
-7. Defina el plazo en meses.
-8. Defina la tasa mensual.
-9. Revise el resumen del simulador: valor del producto, valor financiado, cuota estimada y total estimado.
-10. Agregue observaciones si aplica.
-11. Guarde.
+5. Confirme el indicativo telefonico. Por defecto el sistema propone **+57**.
+6. Escriba el telefono o WhatsApp del cliente.
+7. Seleccione el producto.
+8. Ingrese la cuota inicial.
+9. Defina el plazo en meses.
+10. Defina la tasa mensual.
+11. Revise el resumen del simulador: valor del producto, valor financiado, cuota estimada y total estimado.
+12. Agregue observaciones si aplica.
+13. Guarde.
 
 ### Simulador de credito
 
@@ -265,6 +317,10 @@ El calculo es una estimacion comercial. La aprobacion final y las condiciones de
 1. Ubique la cotizacion en la tabla.
 2. Presione el icono de descarga en la columna **PDF**.
 3. El sistema descarga el archivo PDF de la cotizacion con datos del cliente, producto, simulacion de credito, condiciones comerciales y espacios de firma.
+
+### Analizar cliente desde cotizaciones
+
+En la tabla de cotizaciones, el icono de **IA** permite analizar el cliente asociado a la cotizacion sin entrar primero a la ficha 360. El resultado incluye resumen, pendientes, prioridad, siguiente accion y mensaje sugerido para WhatsApp.
 
 ### Relacion con clientes
 
@@ -320,6 +376,8 @@ Cada decision guarda:
 10. Seleccione el estado inicial.
 11. Guarde.
 
+El campo **Numero identificacion** tambien incluye los botones **Simit** y **Runt** para abrir la consulta oficial correspondiente y copiar la cedula registrada en la solicitud.
+
 ### Codeudor y referencias
 
 El formulario permite registrar informacion clave para estudio de credito:
@@ -372,6 +430,10 @@ En la columna **Plantillas** se pueden generar documentos operativos de la solic
 - **Entrega:** orden de entrega del producto con checklist y firmas. Solo esta disponible cuando la solicitud esta aprobada o desembolsada.
 
 Estas plantillas se generan desde el backend para conservar el mismo formato y reglas sin depender del navegador del usuario.
+
+### Analizar cliente desde solicitudes
+
+En la columna **Acciones**, el icono de **IA** permite analizar el cliente asociado a la solicitud de credito. Es util para revisar rapidamente documentos pendientes, estado del credito, riesgo comercial y el proximo seguimiento recomendado.
 
 ### Validar o rechazar documentos
 
@@ -532,7 +594,49 @@ Desde la tabla de actividades se puede:
 - Relacionar la actividad al cliente o negocio correcto.
 - Marcar como completada cuando se realice.
 
-## 14. Configuracion
+## 14. Reportes comerciales
+
+![Reportes comerciales](./assets/manual/11-reportes.png)
+
+### Para que sirve
+
+Permite analizar el rendimiento comercial de la empresa por periodo. El modulo esta pensado para gerencia, administradores y supervisores que necesitan revisar ventas, conversion y productos mas demandados.
+
+### Filtros
+
+La pantalla permite seleccionar:
+
+- **Desde:** fecha inicial del periodo.
+- **Hasta:** fecha final del periodo.
+
+Por defecto el sistema muestra el mes actual.
+
+### Indicadores principales
+
+- **Cotizaciones:** total de cotizaciones creadas en el periodo.
+- **Convertidas a credito:** cotizaciones que ya tienen una solicitud de credito asociada.
+- **Conversion cotizacion:** porcentaje de cotizaciones convertidas a credito.
+- **Creditos aprobados:** solicitudes aprobadas o desembolsadas.
+- **Creditos rechazados:** solicitudes rechazadas.
+- **Tasa aprobacion:** porcentaje de creditos aprobados sobre creditos decididos.
+- **Valor aprobado:** suma del valor de los creditos aprobados o desembolsados.
+
+### Tablas del reporte
+
+- **Ventas por vendedor:** muestra cotizaciones, creditos aprobados y valor aprobado por vendedor.
+- **Cotizaciones por estado:** agrupa cotizaciones vigentes, vencidas y convertidas a credito.
+- **Creditos aprobados/rechazados:** agrupa solicitudes por estado y valor.
+- **Motos mas cotizadas:** ranking de productos mas cotizados, cantidad y valor cotizado.
+
+### Paso a paso
+
+1. Abra **Reportes** desde el menu lateral.
+2. Seleccione el rango de fechas.
+3. Presione **Aplicar** o **Actualizar**.
+4. Revise indicadores y tablas.
+5. Use los resultados para priorizar vendedores, productos y seguimiento comercial.
+
+## 15. Configuracion
 
 ![Configuracion](./assets/manual/10-configuracion.png)
 
@@ -546,19 +650,23 @@ El usuario administrador puede crear empresas. Cada empresa funciona como tenant
 
 Datos principales:
 
+- Logo
 - Nombre
 - Subdominio
 - Dominio personalizado
 - Estado activo/inactivo
 
+El logo se carga en formato PNG, JPG o WebP. El sistema lo ajusta automaticamente a una medida estandar de **320 x 160 px** y lo muestra en un espacio fijo para evitar que quede demasiado grande, pequeno o deformado.
+
 ### Crear empresa
 
 1. Abra **Configuracion**.
 2. En la seccion de empresas, presione **Nueva empresa**.
-3. Complete nombre y subdominio.
-4. Agregue dominio personalizado si aplica.
-5. Marque la empresa como activa.
-6. Guarde.
+3. Cargue el logo de la empresa si esta disponible.
+4. Complete nombre y subdominio.
+5. Agregue dominio personalizado si aplica.
+6. Marque la empresa como activa.
+7. Guarde.
 
 ### Usuarios
 
@@ -581,7 +689,7 @@ Datos principales:
 5. Asigne uno o varios roles.
 6. Guarde.
 
-## 15. Manejo de errores
+## 16. Manejo de errores
 
 El sistema muestra mensajes cuando una accion no se puede completar.
 
@@ -598,7 +706,7 @@ Recomendacion:
 
 Si aparece un error, revise primero los datos ingresados. Si el error persiste, contacte al administrador tecnico con la fecha, usuario y pantalla donde ocurrio.
 
-## 16. Recomendaciones operativas
+## 17. Recomendaciones operativas
 
 - Mantener productos actualizados antes de cotizar.
 - Crear cotizacion antes de iniciar credito cuando el cliente aun esta decidiendo.
@@ -608,10 +716,19 @@ Si aparece un error, revise primero los datos ingresados. Si el error persiste, 
 - Mantener el pipeline actualizado para que el dashboard refleje la realidad comercial.
 - Registrar actividades despues de cada interaccion importante.
 
-## 17. Historial del manual
+## 18. Historial del manual
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-05-14 | 2.9 | Se agrega logo al crear o editar empresas, con normalizacion automatica a 320 x 160 px y vista previa en configuracion. |
+| 2026-05-13 | 2.8 | Se ajusta el registro de fechas operativas del CRM para usar hora de Colombia UTC-5 en lugar de UTC. |
+| 2026-05-13 | 2.7 | Se amplia el maestro de clientes con identificacion, indicativo, telefono, direccion, ciudad, fecha de nacimiento, ocupacion y observaciones. |
+| 2026-05-13 | 2.6 | Se agrega indicativo telefonico y telefono/WhatsApp obligatorio en la creacion de cotizaciones, guardandolo en el cliente creado. |
+| 2026-05-13 | 2.5 | Se bloquean visualmente los modulos desde solicitudes de credito hasta reportes para una demostracion inicial enfocada en opciones principales. |
+| 2026-05-13 | 2.4 | Se agrega el Asistente comercial del cliente con Analizar con IA desde Cliente 360, cotizaciones y solicitudes de credito. |
+| 2026-05-11 | 2.1 | Se actualizan las capturas del manual con una pantalla mas amplia y se agrega captura del modulo de reportes comerciales. |
+| 2026-05-08 | 2.0 | Se agrega modulo de reportes comerciales con ventas por vendedor, cotizaciones por estado, tasa de conversion, creditos aprobados/rechazados y motos mas cotizadas. |
+| 2026-05-07 | 1.9 | Se agregan notificaciones internas para documentos pendientes, credito en estudio, actividades vencidas y clientes sin seguimiento. |
 | 2026-05-07 | 1.8 | Se agregan plantillas PDF para cotizacion completa, solicitud de credito, autorizacion de datos, carta de aprobacion y orden de entrega. |
 | 2026-05-07 | 1.7 | Se agregan datos de codeudor y referencias personales en solicitudes de credito. |
 | 2026-05-06 | 1.6 | Se generaliza el catalogo de productos para manejar motos, accesorios, seguros, tramites, repuestos, servicios y otros productos. |

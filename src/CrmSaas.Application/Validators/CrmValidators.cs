@@ -18,7 +18,9 @@ public sealed class UpsertCustomerValidator : AbstractValidator<UpsertCustomerDt
     {
         RuleFor(x => x.FirstNames).NotEmpty().MaximumLength(120);
         RuleFor(x => x.LastNames).NotEmpty().MaximumLength(120);
-        RuleFor(x => x.Email).NotEmpty().EmailAddress().MaximumLength(180);
+        RuleFor(x => x.Email).EmailAddress().MaximumLength(180).When(x => !string.IsNullOrWhiteSpace(x.Email));
+        RuleFor(x => x.IdentificationNumber).MaximumLength(40);
+        RuleFor(x => x.Phone).MaximumLength(60);
     }
 }
 

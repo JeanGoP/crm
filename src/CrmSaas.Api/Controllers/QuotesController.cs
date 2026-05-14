@@ -1,6 +1,7 @@
 using CrmSaas.Api.Services;
 using CrmSaas.Application.Abstractions;
 using CrmSaas.Application.DTOs;
+using CrmSaas.Domain.Common;
 using CrmSaas.Domain.Entities;
 using CrmSaas.Domain.Enums;
 using CrmSaas.Infrastructure.Persistence;
@@ -32,6 +33,7 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
     {
         if (string.IsNullOrWhiteSpace(dto.CustomerFirstNames)) throw new ValidationException("Los nombres del cliente son obligatorios.");
         if (string.IsNullOrWhiteSpace(dto.CustomerLastNames)) throw new ValidationException("Los apellidos del cliente son obligatorios.");
+        if (string.IsNullOrWhiteSpace(dto.PhoneNumber)) throw new ValidationException("El telefono del cliente es obligatorio.");
         if (dto.ProductId == Guid.Empty) throw new ValidationException("Debe seleccionar un producto para cotizar.");
         if (dto.DownPayment < 0) throw new ValidationException("La cuota inicial no puede ser negativa.");
         if (dto.TermMonths <= 0) throw new ValidationException("El plazo debe ser mayor a cero.");
@@ -46,6 +48,7 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             ?? throw new InvalidOperationException("No hay etapas activas en el pipeline para crear la oportunidad.");
 
         var fullName = $"{dto.CustomerFirstNames.Trim()} {dto.CustomerLastNames.Trim()}".Trim();
+        var phone = FormatPhone(dto.PhoneCountryCode, dto.PhoneNumber);
         var productName = ProductName(product);
         var simulation = CalculateSimulation(product.Precio, dto.DownPayment, dto.TermMonths, dto.MonthlyInterestRate);
         var customer = new Cliente
@@ -53,13 +56,18 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             Nombre = dto.CustomerFirstNames.Trim(),
             Nombres = dto.CustomerFirstNames.Trim(),
             Apellidos = dto.CustomerLastNames.Trim(),
+            TipoIdentificacion = dto.IdentificationType,
+            NumeroIdentificacion = dto.IdentificationNumber,
             Email = string.Empty,
+            IndicativoTelefono = string.IsNullOrWhiteSpace(dto.PhoneCountryCode) ? "+57" : dto.PhoneCountryCode.Trim(),
+            Telefono = phone,
             Estado = EstadoCliente.Activo,
             Etiquetas = "cotizacion"
         };
         db.Clientes.Add(customer);
 
-        var number = $"COT-{DateTime.UtcNow:yyyyMMddHHmmss}";
+        var now = ColombiaTime.Now;
+        var number = $"COT-{now:yyyyMMddHHmmss}";
         var quote = new Cotizacion
         {
             Numero = number,
@@ -76,8 +84,8 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             ValorFinanciado = simulation.FinancedAmount,
             CuotaMensualEstimada = simulation.MonthlyPayment,
             TotalPagarEstimado = simulation.TotalPayment,
-            FechaCotizacion = DateTime.UtcNow,
-            ValidaHasta = DateTime.UtcNow.AddDays(7),
+            FechaCotizacion = now,
+            ValidaHasta = now.AddDays(7),
             Observaciones = dto.Notes
         };
         var deal = new Negocio
@@ -87,7 +95,7 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             EtapaNegocioId = initialStage.Id,
             Valor = product.Precio,
             ProbabilidadCierre = initialStage.ProbabilidadPredeterminada,
-            FechaEstimadaCierre = DateTime.UtcNow.AddDays(15),
+            FechaEstimadaCierre = now.AddDays(15),
             Estado = EstadoNegocio.Abierto
         };
         var followUp = new Actividad
@@ -96,8 +104,8 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             Descripcion = $"Contactar a {fullName} para resolver dudas y avanzar la venta de {productName}.",
             Tipo = TipoActividad.Llamada,
             Estado = EstadoActividad.Pendiente,
-            FechaProgramada = DateTime.UtcNow.AddDays(1),
-            RecordatorioEn = DateTime.UtcNow.AddHours(20),
+            FechaProgramada = now.AddDays(1),
+            RecordatorioEn = now.AddHours(20),
             ClienteId = customer.Id,
             NegocioId = deal.Id
         };
@@ -173,5 +181,13 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
     {
         if (!string.IsNullOrWhiteSpace(product.Nombre)) return product.Nombre.Trim();
         return $"{product.Marca} {product.Modelo} {product.Referencia}".Trim();
+    }
+
+    private static string FormatPhone(string? countryCode, string? phoneNumber)
+    {
+        var normalizedCode = string.IsNullOrWhiteSpace(countryCode) ? "+57" : countryCode.Trim();
+        if (!normalizedCode.StartsWith("+")) normalizedCode = "+" + normalizedCode;
+        var normalizedNumber = new string((phoneNumber ?? string.Empty).Where(char.IsDigit).ToArray());
+        return $"{normalizedCode} {normalizedNumber}".Trim();
     }
 }

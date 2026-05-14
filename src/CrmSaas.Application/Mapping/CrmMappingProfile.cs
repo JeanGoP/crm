@@ -12,10 +12,19 @@ public sealed class CrmMappingProfile : Profile
             .ForMember(dest => dest.Nombre, opt => opt.MapFrom(src => src.FirstNames.Trim()))
             .ForMember(dest => dest.Nombres, opt => opt.MapFrom(src => src.FirstNames.Trim()))
             .ForMember(dest => dest.Apellidos, opt => opt.MapFrom(src => src.LastNames.Trim()))
+            .ForMember(dest => dest.TipoIdentificacion, opt => opt.MapFrom(src => src.IdentificationType))
+            .ForMember(dest => dest.NumeroIdentificacion, opt => opt.MapFrom(src => src.IdentificationNumber))
             .ForMember(dest => dest.EmpresaCliente, opt => opt.MapFrom(src => src.CompanyName))
+            .ForMember(dest => dest.Email, opt => opt.MapFrom(src => src.Email ?? string.Empty))
+            .ForMember(dest => dest.IndicativoTelefono, opt => opt.MapFrom(src => string.IsNullOrWhiteSpace(src.PhoneCountryCode) ? "+57" : src.PhoneCountryCode))
             .ForMember(dest => dest.Telefono, opt => opt.MapFrom(src => src.Phone))
+            .ForMember(dest => dest.Direccion, opt => opt.MapFrom(src => src.Address))
+            .ForMember(dest => dest.Ciudad, opt => opt.MapFrom(src => src.City))
+            .ForMember(dest => dest.FechaNacimiento, opt => opt.MapFrom(src => src.BirthDate))
+            .ForMember(dest => dest.Ocupacion, opt => opt.MapFrom(src => src.Occupation))
             .ForMember(dest => dest.Estado, opt => opt.MapFrom(src => src.Status))
-            .ForMember(dest => dest.Etiquetas, opt => opt.MapFrom(src => src.Tags));
+            .ForMember(dest => dest.Etiquetas, opt => opt.MapFrom(src => src.Tags))
+            .ForMember(dest => dest.Observaciones, opt => opt.MapFrom(src => src.Notes));
 
         CreateMap<UpsertLeadDto, Prospecto>()
             .ForMember(dest => dest.Nombre, opt => opt.MapFrom(src => src.FirstNames.Trim()))

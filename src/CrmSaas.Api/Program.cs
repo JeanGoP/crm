@@ -32,6 +32,7 @@ builder.Services.AddScoped<ILeadService, LeadService>();
 builder.Services.AddScoped<IPipelineService, PipelineService>();
 builder.Services.AddScoped<IActivityService, ActivityService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
+builder.Services.AddScoped<ICommercialReportService, CommercialReportService>();
 builder.Services.AddSingleton<IMapper>(_ =>
 {
     var config = new MapperConfiguration(cfg => cfg.AddProfile<CrmMappingProfile>(), NullLoggerFactory.Instance);

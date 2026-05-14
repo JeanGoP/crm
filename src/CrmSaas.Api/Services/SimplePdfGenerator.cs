@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using CrmSaas.Domain.Common;
 using CrmSaas.Application.DTOs;
 using CrmSaas.Domain.Enums;
 
@@ -82,7 +83,7 @@ public static class SimplePdfGenerator
         "SOLICITUD DE CREDITO",
         $"Numero solicitud: {app.Number}",
         $"Empresa: {companyName}",
-        $"Fecha generacion: {Date(DateTime.UtcNow)}",
+        $"Fecha generacion: {Date(ColombiaTime.Now)}",
         $"Estado actual: {CreditStatus(app.Status)}",
         "",
         "DATOS DEL SOLICITANTE",
@@ -131,7 +132,7 @@ public static class SimplePdfGenerator
         "AUTORIZACION DE TRATAMIENTO DE DATOS PERSONALES",
         $"Empresa responsable: {companyName}",
         $"Solicitud: {app.Number}",
-        $"Fecha: {Date(DateTime.UtcNow)}",
+        $"Fecha: {Date(ColombiaTime.Now)}",
         "",
         "TITULAR",
         $"Nombre: {app.CustomerName}",
@@ -160,7 +161,7 @@ public static class SimplePdfGenerator
         "CARTA DE APROBACION DE CREDITO",
         $"Empresa: {companyName}",
         $"Solicitud: {app.Number}",
-        $"Fecha aprobacion: {Date(app.ApprovedAt ?? DateTime.UtcNow)}",
+        $"Fecha aprobacion: {Date(app.ApprovedAt ?? ColombiaTime.Now)}",
         "",
         "CLIENTE",
         $"Nombre: {app.CustomerName}",
@@ -193,7 +194,7 @@ public static class SimplePdfGenerator
         "ORDEN DE ENTREGA",
         $"Empresa: {companyName}",
         $"Solicitud: {app.Number}",
-        $"Fecha orden: {Date(DateTime.UtcNow)}",
+        $"Fecha orden: {Date(ColombiaTime.Now)}",
         "",
         "CLIENTE",
         $"Nombre: {app.CustomerName}",

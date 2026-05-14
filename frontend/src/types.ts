@@ -13,6 +13,7 @@ export interface Company {
   name: string;
   subdomain: string;
   customDomain?: string;
+  logoDataUrl?: string;
   active: boolean;
 }
 
@@ -21,11 +22,19 @@ export interface Customer {
   name: string;
   firstNames: string;
   lastNames: string;
+  identificationType?: number;
+  identificationNumber?: string;
   companyName?: string;
   email: string;
+  phoneCountryCode?: string;
   phone?: string;
+  address?: string;
+  city?: string;
+  birthDate?: string;
+  occupation?: string;
   status: number;
   tags?: string;
+  notes?: string;
 }
 
 export interface Lead {
@@ -177,6 +186,16 @@ export interface Customer360 {
   timeline: CustomerTimelineItem[];
 }
 
+export interface CustomerAiAnalysis {
+  summary: string;
+  pendingItems: string[];
+  riskLevel: string;
+  priority: string;
+  nextBestAction: string;
+  whatsappMessage: string;
+  signals: string[];
+}
+
 export interface CustomerTimelineItem {
   occurredAt: string;
   type: string;
@@ -205,4 +224,50 @@ export interface CommercialAlert {
   description: string;
   createdAt: string;
   actionUrl?: string;
+}
+
+export interface CommercialReports {
+  summary: CommercialReportSummary;
+  salesBySeller: SalesBySeller[];
+  quotesByStatus: QuotesByStatus[];
+  creditsByStatus: CreditsByStatus[];
+  topQuotedProducts: TopQuotedProduct[];
+}
+
+export interface CommercialReportSummary {
+  totalQuotes: number;
+  quotesConvertedToCredit: number;
+  quoteToCreditConversionRate: number;
+  approvedCredits: number;
+  rejectedCredits: number;
+  creditApprovalRate: number;
+  approvedCreditAmount: number;
+}
+
+export interface SalesBySeller {
+  seller: string;
+  quotes: number;
+  approvedCredits: number;
+  approvedAmount: number;
+}
+
+export interface QuotesByStatus {
+  status: string;
+  count: number;
+  amount: number;
+}
+
+export interface CreditsByStatus {
+  status: string;
+  count: number;
+  amount: number;
+}
+
+export interface TopQuotedProduct {
+  productId: string;
+  productName: string;
+  brand: string;
+  model: string;
+  quoteCount: number;
+  quotedAmount: number;
 }

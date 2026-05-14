@@ -3,7 +3,7 @@ import { Navigate, NavLink, Route, Routes, useNavigate, useParams } from 'react-
 import {
   Alert, AppBar, Box, Button, Card, CardContent, Chip, CssBaseline, Dialog, DialogActions,
   DialogContent, DialogTitle, Divider, Drawer, Grid, IconButton, LinearProgress, MenuItem,
-  Paper, Snackbar, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField,
+  Paper, Snackbar, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, InputAdornment,
   ThemeProvider, Toolbar, Tooltip, Typography, createTheme, useMediaQuery, useTheme
 } from '@mui/material';
 import DashboardIcon from '@mui/icons-material/Dashboard';
@@ -28,13 +28,21 @@ import Assignment from '@mui/icons-material/Assignment';
 import Visibility from '@mui/icons-material/Visibility';
 import AddTask from '@mui/icons-material/AddTask';
 import WhatsApp from '@mui/icons-material/WhatsApp';
+import Assessment from '@mui/icons-material/Assessment';
+import AutoAwesome from '@mui/icons-material/AutoAwesome';
 import { AxiosError } from 'axios';
 import { api } from './api';
 import { useAuthStore } from './store';
-import { Activity, Company, CreditApplication, CreditDocument, Customer, Customer360, CustomerTimelineItem, Dashboard, Deal, DealStage, Lead, Product, Quote, User } from './types';
+import { Activity, CommercialReports, Company, CreditApplication, CreditDocument, Customer, Customer360, CustomerAiAnalysis, CustomerTimelineItem, Dashboard, Deal, DealStage, Lead, Product, Quote, User } from './types';
 
 const drawerWidth = 248;
 const today = new Date().toISOString().slice(0, 10);
+const currentMonthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
+const simitUrl = 'https://www.fcm.org.co/simit/#/home-public';
+const runtUrl = 'https://portalpublico.runt.gov.co/#/consulta-ciudadano-documento/consulta/consulta-ciudadano-documento';
+const companyLogoWidth = 320;
+const companyLogoHeight = 160;
+const companyLogoMaxBytes = 1_000_000;
 
 const theme = createTheme({
   palette: {
@@ -54,24 +62,41 @@ const nav = [
   { to: '/clientes', label: 'Clientes', icon: <Groups /> },
   { to: '/productos', label: 'Productos', icon: <Inventory2 /> },
   { to: '/cotizaciones', label: 'Cotizaciones', icon: <ReceiptLong /> },
-  { to: '/solicitudes-credito', label: 'Solicitudes credito', icon: <Assignment /> },
-  { to: '/prospectos', label: 'Prospectos', icon: <Handshake /> },
-  { to: '/pipeline', label: 'Pipeline', icon: <ViewKanban /> },
-  { to: '/actividades', label: 'Actividades', icon: <EventNote /> },
+  { to: '/solicitudes-credito', label: 'Solicitudes credito', icon: <Assignment />, locked: true },
+  { to: '/prospectos', label: 'Prospectos', icon: <Handshake />, locked: true },
+  { to: '/pipeline', label: 'Pipeline', icon: <ViewKanban />, locked: true },
+  { to: '/actividades', label: 'Actividades', icon: <EventNote />, locked: true },
+  { to: '/reportes', label: 'Reportes', icon: <Assessment />, locked: true },
   { to: '/configuracion', label: 'Configuracion', icon: <Settings /> }
 ];
 
 type Notice = { type: 'success' | 'error' | 'info'; text: string };
 type FormMode<T> = { open: boolean; item?: T };
 
-const emptyCustomer = { firstNames: '', lastNames: '', companyName: '', email: '', phone: '', status: 1, tags: '' };
+const emptyCustomer = {
+  identificationType: 1,
+  identificationNumber: '',
+  firstNames: '',
+  lastNames: '',
+  companyName: '',
+  email: '',
+  phoneCountryCode: '+57',
+  phone: '',
+  address: '',
+  city: '',
+  birthDate: '',
+  occupation: '',
+  status: 1,
+  tags: '',
+  notes: ''
+};
 const emptyLead = { firstNames: '', lastNames: '', email: '', phone: '', source: 'Web', rating: 1 };
 const emptyDeal = { title: '', customerId: '', stageId: '', value: 0, closeProbability: 10, estimatedCloseDate: today, status: 1 };
 const emptyActivity = { title: '', description: '', type: 1, status: 1, scheduledAt: `${today}T09:00`, reminderAt: '', customerId: '', dealId: '', assignedUserId: '' };
-const emptyCompany = { name: '', subdomain: '', customDomain: '', active: true };
+const emptyCompany = { name: '', subdomain: '', customDomain: '', logoDataUrl: '', active: true };
 const emptyUser = { fullName: '', email: '', password: '', companyId: '', roles: ['Vendedor'] };
 const emptyProduct = { name: '', category: 'Moto', brand: '', model: '', reference: '', description: '', engineCc: '', year: '', color: '', price: 0, active: true };
-const emptyQuote = { identificationType: 1, identificationNumber: '', customerFirstNames: '', customerLastNames: '', productId: '', downPayment: 0, termMonths: 24, monthlyInterestRate: 2.2, notes: '' };
+const emptyQuote = { identificationType: 1, identificationNumber: '', customerFirstNames: '', customerLastNames: '', phoneCountryCode: '+57', phoneNumber: '', productId: '', downPayment: 0, termMonths: 24, monthlyInterestRate: 2.2, notes: '' };
 const emptyCreditApplication = {
   customerId: '', productId: '', quoteId: '', dealId: '', identificationType: 1, identificationNumber: '', birthDate: '', mobile: '', address: '', city: '', occupation: '',
   monthlyIncome: 0, downPayment: 0, termMonths: 24, motorcycleValue: 0,
@@ -93,7 +118,15 @@ function Layout() {
     </Toolbar>
     <Divider />
     <Stack sx={{ p: 1 }}>
-      {nav.map((item) => (
+      {nav.map((item) => item.locked ? (
+        <Tooltip key={item.to} title="Disponible en la siguiente fase de la demostracion" placement="right">
+          <span>
+            <Button disabled startIcon={item.icon} sx={{ justifyContent: 'flex-start', my: .25, width: '100%', opacity: .48 }}>
+              {item.label}
+            </Button>
+          </span>
+        </Tooltip>
+      ) : (
         <Button key={item.to} component={NavLink} to={item.to} startIcon={item.icon} onClick={closeMobileNav} sx={{ justifyContent: 'flex-start', my: .25 }}>
           {item.label}
         </Button>
@@ -133,16 +166,29 @@ function Layout() {
             <Route path="/clientes/:id" element={<Customer360Page />} />
             <Route path="/productos" element={<ProductsPage />} />
             <Route path="/cotizaciones" element={<QuotesPage />} />
-            <Route path="/solicitudes-credito" element={<CreditApplicationsPage />} />
-            <Route path="/prospectos" element={<LeadsPage />} />
-            <Route path="/pipeline" element={<PipelinePage />} />
-            <Route path="/actividades" element={<ActivitiesPage />} />
+            <Route path="/solicitudes-credito" element={<LockedModulePage />} />
+            <Route path="/prospectos" element={<LockedModulePage />} />
+            <Route path="/pipeline" element={<LockedModulePage />} />
+            <Route path="/actividades" element={<LockedModulePage />} />
+            <Route path="/reportes" element={<LockedModulePage />} />
             <Route path="/configuracion" element={<SettingsPage />} />
           </Routes>
         </Box>
       </Box>
     </Box>
   );
+}
+
+function LockedModulePage() {
+  return <Card><CardContent>
+    <Stack spacing={1.5} alignItems="flex-start">
+      <Chip label="Siguiente fase" color="primary" variant="outlined" />
+      <Typography variant="h5" fontWeight={900}>Modulo reservado para la siguiente demostracion</Typography>
+      <Typography color="text.secondary">
+        Esta opcion esta preparada en el CRM, pero por ahora esta bloqueada para mostrar primero el flujo inicial: dashboard, clientes, productos y cotizaciones.
+      </Typography>
+    </Stack>
+  </CardContent></Card>;
 }
 
 function LoginPage() {
@@ -205,12 +251,15 @@ function DashboardPage() {
     <Grid container spacing={2}>
       <Grid item xs={12} md={7}>
         <Card><CardContent>
-          <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
-            <Typography variant="h6" fontWeight={900}>Alertas comerciales</Typography>
-            <Chip size="small" label={`${data?.alerts?.length ?? 0} pendientes`} variant="outlined" />
+          <Stack direction={{ xs: 'column', sm: 'row' }} alignItems={{ xs: 'flex-start', sm: 'center' }} justifyContent="space-between" gap={1} sx={{ mb: 1 }}>
+            <Box>
+              <Typography variant="h6" fontWeight={900}>Notificaciones internas</Typography>
+              <Typography variant="body2" color="text.secondary">Documentos, creditos, actividades y clientes que necesitan accion.</Typography>
+            </Box>
+            <Chip size="small" label={`${data?.alerts?.length ?? 0} pendientes`} color={data?.alerts?.some((alert) => alert.severity === 'error') ? 'error' : 'default'} variant="outlined" />
           </Stack>
           {data?.alerts?.length ? data.alerts.map((alert) => <Stack key={`${alert.type}${alert.title}${alert.createdAt}`} direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" gap={1.5} sx={{ py: 1.25, borderBottom: '1px solid #edf1f5' }}>
-            <Stack spacing={.5}>
+            <Stack spacing={.5} sx={{ minWidth: 0 }}>
               <Stack direction="row" gap={1} alignItems="center" flexWrap="wrap">
                 <StatusChip label={alert.type} tone={alertSeverityTone(alert.severity)} />
                 <Typography fontWeight={900}>{alert.title}</Typography>
@@ -218,8 +267,8 @@ function DashboardPage() {
               <Typography color="text.secondary">{alert.description}</Typography>
               <Typography variant="caption" color="text.secondary">{new Date(alert.createdAt).toLocaleString()}</Typography>
             </Stack>
-            {alert.actionUrl && <Button variant="outlined" onClick={() => navigate(alert.actionUrl!)}>Abrir</Button>}
-          </Stack>) : <EmptyState text="Sin alertas comerciales" />}
+            {alert.actionUrl && <Button variant="outlined" sx={{ alignSelf: { xs: 'stretch', md: 'center' } }} onClick={() => navigate(alert.actionUrl!)}>Abrir</Button>}
+          </Stack>) : <EmptyState text="Sin notificaciones internas" />}
         </CardContent></Card>
       </Grid>
       <Grid item xs={12} md={5}>
@@ -238,7 +287,22 @@ function CustomersPage() {
   const navigate = useNavigate();
 
   const save = async (payload: typeof emptyCustomer) => {
-    const body = { ...payload, status: Number(payload.status) };
+    const body = {
+      ...payload,
+      identificationType: payload.identificationType ? Number(payload.identificationType) : null,
+      identificationNumber: payload.identificationNumber || null,
+      companyName: payload.companyName || null,
+      email: payload.email || null,
+      phoneCountryCode: payload.phoneCountryCode || '+57',
+      phone: payload.phone || null,
+      address: payload.address || null,
+      city: payload.city || null,
+      birthDate: payload.birthDate ? new Date(payload.birthDate).toISOString() : null,
+      occupation: payload.occupation || null,
+      status: Number(payload.status),
+      tags: payload.tags || null,
+      notes: payload.notes || null
+    };
     const { data } = form.item
       ? await api.put<Customer>(`/api/customers/${form.item.id}`, body)
       : await api.post<Customer>('/api/customers', body);
@@ -259,13 +323,14 @@ function CustomersPage() {
     <Header title="Clientes" action="Nuevo cliente" onAction={() => setForm({ open: true })} onRefresh={reload} />
     <StatusBar loading={loading} error={error} />
     <EntityTable
-      headers={['Nombres', 'Apellidos', 'Email', 'Telefono', 'Estado', 'Etiquetas', 'Acciones']}
+      headers={['Identificacion', 'Nombres', 'Apellidos', 'Telefono', 'Ciudad', 'Estado', 'Etiquetas', 'Acciones']}
       empty="No hay clientes registrados"
       rows={rows.map((r) => [
+        r.identificationNumber || '-',
         r.firstNames || r.name,
         r.lastNames,
-        r.email,
         r.phone,
+        r.city,
         <StatusChip label={statusLabel(r.status)} tone={r.status === 1 ? 'success' : 'default'} />,
         r.tags,
         <Actions onView={() => navigate(`/clientes/${r.id}`)} onEdit={() => setForm({ open: true, item: r })} onDelete={canDelete ? () => setConfirm(r) : undefined} />
@@ -283,6 +348,8 @@ function Customer360Page() {
   const { data, loading, error, reload } = useResource<Customer360>(`/api/customers/${id}/summary`);
   const customer = data?.customer;
   const [activityForm, setActivityForm] = useState<FormMode<Activity>>({ open: false });
+  const [analysis, setAnalysis] = useState<CustomerAiAnalysis>();
+  const [analyzing, setAnalyzing] = useState(false);
   const [notice, setNotice] = useState<Notice>();
 
   const saveActivity = async (payload: typeof emptyActivity) => {
@@ -290,6 +357,19 @@ function Customer360Page() {
     setNotice({ type: 'success', text: 'Seguimiento registrado.' });
     setActivityForm({ open: false });
     reload();
+  };
+
+  const analyzeCustomer = async () => {
+    if (!customer) return;
+    setAnalyzing(true);
+    try {
+      const { data } = await api.get<CustomerAiAnalysis>(`/api/customers/${customer.id}/ai-analysis`);
+      setAnalysis(data);
+    } catch (err) {
+      setNotice({ type: 'error', text: apiError(err) });
+    } finally {
+      setAnalyzing(false);
+    }
   };
 
   return <Stack spacing={3}>
@@ -301,9 +381,24 @@ function Customer360Page() {
       secondaryAction={{ label: 'Volver', onClick: () => navigate('/clientes') }}
     />
     <StatusBar loading={loading} error={error} />
+    {customer && <Card><CardContent>
+      <Stack direction={{ xs: 'column', md: 'row' }} alignItems={{ xs: 'stretch', md: 'center' }} justifyContent="space-between" gap={2}>
+        <Box>
+          <Typography variant="h6" fontWeight={900}>Asistente comercial del cliente</Typography>
+          <Typography color="text.secondary">Resume el caso, detecta pendientes y sugiere la siguiente accion comercial.</Typography>
+        </Box>
+        <Button variant="contained" startIcon={<AutoAwesome />} onClick={analyzeCustomer} disabled={analyzing}>
+          {analyzing ? 'Analizando...' : 'Analizar con IA'}
+        </Button>
+      </Stack>
+    </CardContent></Card>}
     {customer && <Grid container spacing={2}>
+      <Grid item xs={12} md={3}><Metric label="Identificacion" value={customer.identificationNumber || '-'} /></Grid>
       <Grid item xs={12} md={3}><Metric label="Telefono / WhatsApp" value={customer.phone ? <Button size="small" startIcon={<WhatsApp />} href={whatsappUrl(customer.phone)} target="_blank" rel="noreferrer">{customer.phone}</Button> : '-'} /></Grid>
       <Grid item xs={12} md={3}><Metric label="Email" value={customer.email || '-'} /></Grid>
+      <Grid item xs={12} md={3}><Metric label="Ciudad" value={customer.city || '-'} /></Grid>
+      <Grid item xs={12} md={3}><Metric label="Direccion" value={customer.address || '-'} /></Grid>
+      <Grid item xs={12} md={3}><Metric label="Ocupacion" value={customer.occupation || '-'} /></Grid>
       <Grid item xs={12} md={3}><Metric label="Estado" value={statusLabel(customer.status)} /></Grid>
       <Grid item xs={12} md={3}><Metric label="Etiquetas" value={customer.tags || '-'} /></Grid>
     </Grid>}
@@ -341,6 +436,7 @@ function Customer360Page() {
       </Grid>
     </Grid>
     <ActivityDialog form={activityForm} customers={customer ? [customer] : []} deals={data?.deals ?? []} onClose={() => setActivityForm({ open: false })} onSave={saveActivity} />
+    <AiAnalysisDialog analysis={analysis} onClose={() => setAnalysis(undefined)} />
     <Notice notice={notice} onClose={() => setNotice(undefined)} />
   </Stack>;
 }
@@ -424,6 +520,7 @@ function QuotesPage() {
   const { data: rows = [], loading, error, reload, setData } = useResource<Quote[]>('/api/quotes', []);
   const { data: products = [] } = useResource<Product[]>('/api/products', []);
   const [form, setForm] = useState<FormMode<Quote>>({ open: false });
+  const [analysis, setAnalysis] = useState<CustomerAiAnalysis>();
   const [notice, setNotice] = useState<Notice>();
 
   const downloadPdf = async (quote: Quote) => {
@@ -443,6 +540,8 @@ function QuotesPage() {
       ...payload,
       identificationType: Number(payload.identificationType),
       identificationNumber: payload.identificationNumber || null,
+      phoneCountryCode: payload.phoneCountryCode || '+57',
+      phoneNumber: payload.phoneNumber || null,
       downPayment: Number(payload.downPayment),
       termMonths: Number(payload.termMonths),
       monthlyInterestRate: Number(payload.monthlyInterestRate),
@@ -455,11 +554,20 @@ function QuotesPage() {
     await downloadPdf(data);
   };
 
+  const analyzeCustomer = async (customerId: string) => {
+    try {
+      const { data } = await api.get<CustomerAiAnalysis>(`/api/customers/${customerId}/ai-analysis`);
+      setAnalysis(data);
+    } catch (err) {
+      setNotice({ type: 'error', text: apiError(err) });
+    }
+  };
+
   return <Stack spacing={3}>
     <Header title="Cotizaciones" action="Nueva cotizacion" onAction={() => setForm({ open: true })} onRefresh={reload} />
     <StatusBar loading={loading} error={error} />
     <EntityTable
-      headers={['Numero', 'Cliente', 'Identificacion', 'Producto', 'Valor', 'Cuota estimada', 'Valida hasta', 'PDF']}
+      headers={['Numero', 'Cliente', 'Identificacion', 'Producto', 'Valor', 'Cuota estimada', 'Valida hasta', 'Acciones']}
       empty="No hay cotizaciones registradas"
       rows={rows.map((r) => [
         r.number,
@@ -469,10 +577,11 @@ function QuotesPage() {
         money(r.productPrice),
         r.estimatedMonthlyPayment > 0 ? `${money(r.estimatedMonthlyPayment)} x ${r.termMonths}` : 'Sin simulacion',
         new Date(r.validUntil).toLocaleDateString(),
-        <Actions onDownload={() => downloadPdf(r)} />
+        <Actions onAi={() => analyzeCustomer(r.customerId)} onDownload={() => downloadPdf(r)} />
       ])}
     />
     <QuoteDialog form={form} products={products.filter((x) => x.active)} onClose={() => setForm({ open: false })} onSave={save} />
+    <AiAnalysisDialog analysis={analysis} onClose={() => setAnalysis(undefined)} />
     <Notice notice={notice} onClose={() => setNotice(undefined)} />
   </Stack>;
 }
@@ -484,6 +593,7 @@ function CreditApplicationsPage() {
   const { data: quotes = [] } = useResource<Quote[]>('/api/quotes', []);
   const { data: deals = [] } = useResource<Deal[]>('/api/pipeline/deals', []);
   const [form, setForm] = useState<FormMode<CreditApplication>>({ open: false });
+  const [analysis, setAnalysis] = useState<CustomerAiAnalysis>();
   const [notice, setNotice] = useState<Notice>();
 
   const save = async (payload: typeof emptyCreditApplication) => {
@@ -586,6 +696,15 @@ function CreditApplicationsPage() {
     }
   };
 
+  const analyzeCustomer = async (customerId: string) => {
+    try {
+      const { data } = await api.get<CustomerAiAnalysis>(`/api/customers/${customerId}/ai-analysis`);
+      setAnalysis(data);
+    } catch (err) {
+      setNotice({ type: 'error', text: apiError(err) });
+    }
+  };
+
   return <Stack spacing={3}>
     <Header title="Solicitudes de credito" action="Nueva solicitud" onAction={() => setForm({ open: true })} onRefresh={reload} />
     <StatusBar loading={loading} error={error} />
@@ -607,7 +726,7 @@ function CreditApplicationsPage() {
         <ApprovalSummary application={r} onDecision={decide} />,
         <CreditTemplateDownloads application={r} onDownload={downloadTemplate} />,
         <Stack direction="row" gap={1} alignItems="center">
-          <Actions onEdit={() => setForm({ open: true, item: r })} />
+          <Actions onAi={() => analyzeCustomer(r.customerId)} onEdit={() => setForm({ open: true, item: r })} />
           <TextField select size="small" label="Estado" value={r.status} onChange={(e) => changeStatus(r, Number(e.target.value))} sx={{ minWidth: 160 }}>
             {[1, 2, 3, 4, 5, 6, 7].map((x) => <MenuItem key={x} value={x}>{creditStatus(x)}</MenuItem>)}
           </TextField>
@@ -615,6 +734,7 @@ function CreditApplicationsPage() {
       ])}
     />
     <CreditApplicationDialog form={form} customers={customers} products={products.filter((x) => x.active)} quotes={quotes} deals={deals} onClose={() => setForm({ open: false })} onSave={save} />
+    <AiAnalysisDialog analysis={analysis} onClose={() => setAnalysis(undefined)} />
     <Notice notice={notice} onClose={() => setNotice(undefined)} />
   </Stack>;
 }
@@ -916,6 +1036,97 @@ function ActivitiesPage() {
   </Stack>;
 }
 
+function CommercialReportsPage() {
+  const [from, setFrom] = useState(currentMonthStart);
+  const [to, setTo] = useState(today);
+  const { data, loading, error, reload } = useResource<CommercialReports>(`/api/commercial-reports?from=${from}&to=${to}`);
+  const topQuoteCount = Math.max(1, ...(data?.topQuotedProducts.map((x) => x.quoteCount) ?? [1]));
+  const cards: { label: string; value: ReactNode }[] = [
+    { label: 'Cotizaciones', value: data?.summary.totalQuotes ?? 0 },
+    { label: 'Convertidas a credito', value: data?.summary.quotesConvertedToCredit ?? 0 },
+    { label: 'Conversion cotizacion', value: percent(data?.summary.quoteToCreditConversionRate) },
+    { label: 'Creditos aprobados', value: data?.summary.approvedCredits ?? 0 },
+    { label: 'Creditos rechazados', value: data?.summary.rejectedCredits ?? 0 },
+    { label: 'Tasa aprobacion', value: percent(data?.summary.creditApprovalRate) },
+    { label: 'Valor aprobado', value: money(data?.summary.approvedCreditAmount) }
+  ];
+
+  return <Stack spacing={3}>
+    <Header title="Reportes comerciales" onRefresh={reload} />
+    <Card><CardContent>
+      <Stack direction={{ xs: 'column', md: 'row' }} gap={2} alignItems={{ xs: 'stretch', md: 'center' }}>
+        <TextField label="Desde" type="date" value={from} onChange={(e) => setFrom(e.target.value)} InputLabelProps={{ shrink: true }} />
+        <TextField label="Hasta" type="date" value={to} onChange={(e) => setTo(e.target.value)} InputLabelProps={{ shrink: true }} />
+        <Button variant="outlined" onClick={reload}>Aplicar</Button>
+      </Stack>
+    </CardContent></Card>
+    <StatusBar loading={loading} error={error} />
+    <Grid container spacing={2}>{cards.map((card) => <Grid item xs={12} sm={6} md={card.label === 'Valor aprobado' ? 3 : 1.8} key={card.label}><Metric label={card.label} value={card.value} /></Grid>)}</Grid>
+    <Grid container spacing={2}>
+      <Grid item xs={12} lg={6}>
+        <Card><CardContent>
+          <Typography variant="h6" fontWeight={900} sx={{ mb: 1 }}>Ventas por vendedor</Typography>
+          <ReportTable
+            headers={['Vendedor', 'Cotizaciones', 'Aprobados', 'Valor']}
+            empty="Sin ventas aprobadas en el periodo"
+            rows={(data?.salesBySeller ?? []).map((row) => [
+              row.seller,
+              row.quotes,
+              row.approvedCredits,
+              money(row.approvedAmount)
+            ])}
+          />
+        </CardContent></Card>
+      </Grid>
+      <Grid item xs={12} lg={6}>
+        <Card><CardContent>
+          <Typography variant="h6" fontWeight={900} sx={{ mb: 1 }}>Cotizaciones por estado</Typography>
+          <ReportTable
+            headers={['Estado', 'Cantidad', 'Valor']}
+            empty="Sin cotizaciones en el periodo"
+            rows={(data?.quotesByStatus ?? []).map((row) => [
+              <StatusChip label={row.status} tone={row.status.includes('Vencida') ? 'warning' : row.status.includes('Convertida') ? 'success' : 'default'} />,
+              row.count,
+              money(row.amount)
+            ])}
+          />
+        </CardContent></Card>
+      </Grid>
+      <Grid item xs={12} lg={6}>
+        <Card><CardContent>
+          <Typography variant="h6" fontWeight={900} sx={{ mb: 1 }}>Creditos aprobados/rechazados</Typography>
+          <ReportTable
+            headers={['Estado', 'Cantidad', 'Valor']}
+            empty="Sin solicitudes de credito en el periodo"
+            rows={(data?.creditsByStatus ?? []).map((row) => [
+              <StatusChip label={row.status} tone={row.status === 'Aprobada' || row.status === 'Desembolsada' ? 'success' : row.status === 'Rechazada' ? 'error' : row.status === 'En estudio' ? 'warning' : 'default'} />,
+              row.count,
+              money(row.amount)
+            ])}
+          />
+        </CardContent></Card>
+      </Grid>
+      <Grid item xs={12} lg={6}>
+        <Card><CardContent>
+          <Typography variant="h6" fontWeight={900} sx={{ mb: 1 }}>Motos mas cotizadas</Typography>
+          {(data?.topQuotedProducts?.length ?? 0) ? <Stack spacing={1.25}>
+            {data!.topQuotedProducts.map((product) => <Box key={product.productId}>
+              <Stack direction="row" justifyContent="space-between" gap={1}>
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography fontWeight={900} noWrap>{product.productName}</Typography>
+                  <Typography color="text.secondary" fontSize={13} noWrap>{product.brand} {product.model} - {money(product.quotedAmount)}</Typography>
+                </Box>
+                <Chip size="small" label={`${product.quoteCount} cot.`} />
+              </Stack>
+              <LinearProgress variant="determinate" value={Math.min(100, product.quoteCount / topQuoteCount * 100)} sx={{ mt: .75 }} />
+            </Box>)}
+          </Stack> : <EmptyState text="Sin productos cotizados en el periodo" />}
+        </CardContent></Card>
+      </Grid>
+    </Grid>
+  </Stack>;
+}
+
 function SettingsPage() {
   const user = useAuthStore((s) => s.user);
   const canManage = useCanManage();
@@ -926,10 +1137,11 @@ function SettingsPage() {
   const [notice, setNotice] = useState<Notice>();
 
   const saveCompany = async (payload: typeof emptyCompany) => {
-    const body = {
+  const body = {
       name: payload.name,
       subdomain: payload.subdomain,
       customDomain: payload.customDomain || null,
+      logoDataUrl: payload.logoDataUrl || null,
       active: Boolean(payload.active)
     };
     const { data } = companyForm.item
@@ -961,9 +1173,10 @@ function SettingsPage() {
       </Stack>
       <StatusBar loading={loadingCompanies} error={companiesError} />
       <EntityTable
-        headers={['Nombre', 'Subdominio', 'Dominio', 'Estado', 'Acciones']}
+        headers={['Logo', 'Nombre', 'Subdominio', 'Dominio', 'Estado', 'Acciones']}
         empty="No hay empresas registradas"
         rows={companies.map((c) => [
+          c.logoDataUrl ? <Box component="img" src={c.logoDataUrl} alt={`Logo ${c.name}`} sx={{ width: 72, height: 36, objectFit: 'contain', display: 'block' }} /> : <Typography color="text.secondary" fontSize={13}>Sin logo</Typography>,
           c.name,
           c.subdomain,
           c.customDomain,
@@ -994,15 +1207,60 @@ function SettingsPage() {
 }
 
 function CompanyDialog({ form, onClose, onSave }: DialogProps<Company, typeof emptyCompany>) {
-  const initial = form.item ? { name: form.item.name, subdomain: form.item.subdomain, customDomain: form.item.customDomain ?? '', active: form.item.active } : emptyCompany;
+  const initial = form.item ? { name: form.item.name, subdomain: form.item.subdomain, customDomain: form.item.customDomain ?? '', logoDataUrl: form.item.logoDataUrl ?? '', active: form.item.active } : emptyCompany;
   return <FormDialog title={form.item ? 'Editar empresa' : 'Nueva empresa'} open={form.open} initial={initial} onClose={onClose} onSave={onSave}>
     {(v, set) => <>
+      <CompanyLogoPicker value={v.logoDataUrl} onChange={(logoDataUrl) => set({ logoDataUrl })} />
       <TextField required label="Nombre" value={v.name} onChange={(e) => set({ name: e.target.value })} />
       <TextField required label="Subdominio" value={v.subdomain} onChange={(e) => set({ subdomain: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') })} />
       <TextField label="Dominio personalizado" value={v.customDomain} onChange={(e) => set({ customDomain: e.target.value })} />
       <TextField select label="Estado" value={String(v.active)} onChange={(e) => set({ active: e.target.value === 'true' })}><MenuItem value="true">Activa</MenuItem><MenuItem value="false">Inactiva</MenuItem></TextField>
     </>}
   </FormDialog>;
+}
+
+function CompanyLogoPicker({ value, onChange }: { value?: string; onChange: (value: string) => void }) {
+  const [error, setError] = useState('');
+  const handleLogo = async (file?: File) => {
+    if (!file) return;
+    try {
+      setError('');
+      onChange(await normalizeCompanyLogo(file));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo procesar el logo.');
+    }
+  };
+
+  return <Stack spacing={1}>
+    <Typography variant="subtitle2" fontWeight={900} color="primary">Logo de la empresa</Typography>
+    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ xs: 'stretch', sm: 'center' }}>
+      <Box sx={{
+        width: 160,
+        height: 80,
+        border: '1px dashed',
+        borderColor: 'divider',
+        borderRadius: 1,
+        bgcolor: 'background.default',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden'
+      }}>
+        {value ? <Box component="img" src={value} alt="Logo de empresa" sx={{ width: '100%', height: '100%', objectFit: 'contain' }} /> : <Typography color="text.secondary" fontSize={13}>320 x 160 px</Typography>}
+      </Box>
+      <Stack spacing={1} sx={{ minWidth: 0 }}>
+        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+          <Button variant="outlined" component="label" startIcon={<UploadFile />}>
+            Cargar logo
+            <input hidden type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => void handleLogo(e.target.files?.[0])} />
+          </Button>
+          {value && <Button color="inherit" onClick={() => onChange('')}>Quitar</Button>}
+        </Stack>
+        <Typography variant="caption" color="text.secondary">PNG, JPG o WebP. Se ajusta automaticamente a 320 x 160 px.</Typography>
+      </Stack>
+    </Stack>
+    {error && <Alert severity="error">{error}</Alert>}
+  </Stack>;
 }
 
 function UserDialog({ form, companies, onClose, onSave }: DialogProps<User, typeof emptyUser> & { companies: Company[] }) {
@@ -1019,15 +1277,54 @@ function UserDialog({ form, companies, onClose, onSave }: DialogProps<User, type
 }
 
 function CustomerDialog({ form, onClose, onSave }: DialogProps<Customer, typeof emptyCustomer>) {
-  const initial = form.item ? { firstNames: form.item.firstNames || form.item.name, lastNames: form.item.lastNames ?? '', companyName: form.item.companyName ?? '', email: form.item.email, phone: form.item.phone ?? '', status: form.item.status, tags: form.item.tags ?? '' } : emptyCustomer;
+  const initial = form.item ? {
+    identificationType: form.item.identificationType ?? 1,
+    identificationNumber: form.item.identificationNumber ?? '',
+    firstNames: form.item.firstNames || form.item.name,
+    lastNames: form.item.lastNames ?? '',
+    companyName: form.item.companyName ?? '',
+    email: form.item.email ?? '',
+    phoneCountryCode: form.item.phoneCountryCode ?? '+57',
+    phone: form.item.phone ?? '',
+    address: form.item.address ?? '',
+    city: form.item.city ?? '',
+    birthDate: form.item.birthDate?.slice(0, 10) ?? '',
+    occupation: form.item.occupation ?? '',
+    status: form.item.status,
+    tags: form.item.tags ?? '',
+    notes: form.item.notes ?? ''
+  } : emptyCustomer;
   return <FormDialog title={form.item ? 'Editar cliente' : 'Nuevo cliente'} open={form.open} initial={initial} onClose={onClose} onSave={onSave}>
     {(v, set) => <>
-      <TextField required label="Nombres" value={v.firstNames} onChange={(e) => set({ firstNames: e.target.value })} />
-      <TextField required label="Apellidos" value={v.lastNames} onChange={(e) => set({ lastNames: e.target.value })} />
-      <TextField required label="Email" value={v.email} onChange={(e) => set({ email: e.target.value })} />
-      <TextField label="Telefono" value={v.phone} onChange={(e) => set({ phone: e.target.value })} />
+      <SectionTitle title="Identificacion" />
+      <FieldGrid>
+        <TextField fullWidth select label="Tipo identificacion" value={v.identificationType} onChange={(e) => set({ identificationType: Number(e.target.value) })}>{identificationOptions.map((option) => <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>)}</TextField>
+        <TextField fullWidth label="Numero identificacion" value={v.identificationNumber} onChange={(e) => set({ identificationNumber: e.target.value })} />
+      </FieldGrid>
+      <SectionTitle title="Datos personales" />
+      <FieldGrid>
+        <TextField fullWidth required label="Nombres" value={v.firstNames} onChange={(e) => set({ firstNames: e.target.value })} />
+        <TextField fullWidth required label="Apellidos" value={v.lastNames} onChange={(e) => set({ lastNames: e.target.value })} />
+      </FieldGrid>
+      <FieldGrid>
+        <TextField fullWidth label="Fecha nacimiento" type="date" value={v.birthDate} onChange={(e) => set({ birthDate: e.target.value })} InputLabelProps={{ shrink: true }} />
+        <TextField fullWidth label="Ocupacion" value={v.occupation} onChange={(e) => set({ occupation: e.target.value })} />
+      </FieldGrid>
+      <SectionTitle title="Contacto" />
+      <FieldGrid columns={3}>
+        <TextField fullWidth label="Indicativo" value={v.phoneCountryCode} onChange={(e) => set({ phoneCountryCode: e.target.value })} />
+        <TextField fullWidth label="Telefono / WhatsApp" value={v.phone} onChange={(e) => set({ phone: e.target.value })} sx={{ gridColumn: { sm: 'span 2' } }} />
+      </FieldGrid>
+      <TextField label="Email" value={v.email} onChange={(e) => set({ email: e.target.value })} />
+      <FieldGrid>
+        <TextField fullWidth label="Direccion" value={v.address} onChange={(e) => set({ address: e.target.value })} />
+        <TextField fullWidth label="Ciudad" value={v.city} onChange={(e) => set({ city: e.target.value })} />
+      </FieldGrid>
+      <SectionTitle title="Gestion comercial" />
+      <TextField label="Empresa o razon comercial" value={v.companyName} onChange={(e) => set({ companyName: e.target.value })} />
       <TextField select label="Estado" value={v.status} onChange={(e) => set({ status: Number(e.target.value) })}>{[1, 2, 3].map((x) => <MenuItem key={x} value={x}>{statusLabel(x)}</MenuItem>)}</TextField>
       <TextField label="Etiquetas" value={v.tags} onChange={(e) => set({ tags: e.target.value })} />
+      <TextField label="Observaciones" value={v.notes} onChange={(e) => set({ notes: e.target.value })} multiline minRows={2} />
     </>}
   </FormDialog>;
 }
@@ -1083,9 +1380,18 @@ function QuoteDialog({ form, products, onClose, onSave }: DialogProps<Quote, typ
         <TextField required select label="Tipo de identificacion" value={v.identificationType} onChange={(e) => set({ identificationType: Number(e.target.value) })}>
           {identificationOptions.map((option) => <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>)}
         </TextField>
-        <TextField label="Numero de identificacion" value={v.identificationNumber} onChange={(e) => set({ identificationNumber: e.target.value })} />
+        <TextField
+          label="Numero de identificacion"
+          value={v.identificationNumber}
+          onChange={(e) => set({ identificationNumber: e.target.value })}
+          InputProps={{ endAdornment: <IdentificationLookupAdornment identification={v.identificationNumber} /> }}
+        />
         <TextField required label="Nombres" value={v.customerFirstNames} onChange={(e) => set({ customerFirstNames: e.target.value })} />
         <TextField required label="Apellidos" value={v.customerLastNames} onChange={(e) => set({ customerLastNames: e.target.value })} />
+        <FieldGrid columns={3}>
+          <TextField fullWidth required label="Indicativo" value={v.phoneCountryCode} onChange={(e) => set({ phoneCountryCode: e.target.value })} />
+          <TextField fullWidth required label="Telefono / WhatsApp" value={v.phoneNumber} onChange={(e) => set({ phoneNumber: e.target.value })} sx={{ gridColumn: { sm: 'span 2' } }} />
+        </FieldGrid>
         <TextField required select label="Producto" value={v.productId} onChange={(e) => set({ productId: e.target.value })}>
           {products.length ? products.map((product) => <MenuItem key={product.id} value={product.id}>{productName(product)} ({product.category}) - {money(product.price)}</MenuItem>) : <MenuItem value="">No hay productos activos</MenuItem>}
         </TextField>
@@ -1169,7 +1475,14 @@ function CreditApplicationDialog({ form, customers, products, quotes, deals, onC
         }}>{products.map((x) => <MenuItem key={x.id} value={x.id}>{productName(x)} ({x.category}) - {money(x.price)}</MenuItem>)}</TextField>
         <FieldGrid>
           <TextField fullWidth required select label="Tipo identificacion" value={v.identificationType} onChange={(e) => set({ identificationType: Number(e.target.value) })}>{identificationOptions.map((option) => <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>)}</TextField>
-          <TextField fullWidth required label="Numero identificacion" value={v.identificationNumber} onChange={(e) => set({ identificationNumber: e.target.value })} />
+          <TextField
+            fullWidth
+            required
+            label="Numero identificacion"
+            value={v.identificationNumber}
+            onChange={(e) => set({ identificationNumber: e.target.value })}
+            InputProps={{ endAdornment: <IdentificationLookupAdornment identification={v.identificationNumber} /> }}
+          />
         </FieldGrid>
         <FieldGrid>
           <TextField fullWidth label="Fecha nacimiento" type="date" value={v.birthDate} onChange={(e) => set({ birthDate: e.target.value })} InputLabelProps={{ shrink: true }} />
@@ -1422,15 +1735,26 @@ function EntityTable({ headers, rows, empty }: { headers: string[]; rows: ReactN
   </Card>;
 }
 
+function ReportTable({ headers, rows, empty }: { headers: string[]; rows: ReactNode[][]; empty: string }) {
+  return <TableContainer sx={{ width: '100%', overflowX: 'auto' }}>
+    <Table size="small" sx={{ minWidth: 520 }}>
+      <TableHead><TableRow>{headers.map((h) => <TableCell key={h} sx={{ whiteSpace: 'nowrap', fontWeight: 800 }}>{h}</TableCell>)}</TableRow></TableHead>
+      <TableBody>{rows.length ? rows.map((row, i) => <TableRow key={i}>{row.map((c, j) => <TableCell key={j} sx={{ verticalAlign: 'top' }}>{c ?? '-'}</TableCell>)}</TableRow>) : <TableRow><TableCell colSpan={headers.length}><EmptyState text={empty} /></TableCell></TableRow>}</TableBody>
+    </Table>
+  </TableContainer>;
+}
+
 function tableMinWidth(headers: string[]) {
   return headers.includes('Plantillas') ? 1760 : 760;
 }
 
 function tableColumnSx(header: string) {
   const widths: Record<string, number> = {
+    Identificacion: 150,
     Numero: 150,
     Cliente: 170,
     Producto: 220,
+    Ciudad: 150,
     Estado: 150,
     Ingresos: 130,
     Codeudor: 170,
@@ -1449,9 +1773,59 @@ function tableColumnSx(header: string) {
   };
 }
 
-function Actions({ onView, onEdit, onDelete, onConvert, onDownload, onActivity, onWhatsapp, onStart, onComplete, onReschedule, onCancel, compact }: { onView?: () => void; onEdit?: () => void; onDelete?: () => void; onConvert?: () => void; onDownload?: () => void; onActivity?: () => void; onWhatsapp?: () => void; onStart?: () => void; onComplete?: () => void; onReschedule?: () => void; onCancel?: () => void; compact?: boolean }) {
+function AiAnalysisDialog({ analysis, onClose }: { analysis?: CustomerAiAnalysis; onClose: () => void }) {
+  const [copied, setCopied] = useState(false);
+  const copyMessage = async () => {
+    if (!analysis?.whatsappMessage) return;
+    await navigator.clipboard?.writeText(analysis.whatsappMessage).catch(() => undefined);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1800);
+  };
+  return <Dialog open={!!analysis} onClose={onClose} fullWidth maxWidth="md">
+    <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1 }}>
+      Analisis comercial con IA
+      <IconButton onClick={onClose}><Close /></IconButton>
+    </DialogTitle>
+    <DialogContent>
+      {analysis && <Stack spacing={2} sx={{ pt: 1 }}>
+        <Alert severity={analysis.riskLevel === 'Alto' ? 'error' : analysis.riskLevel === 'Medio' ? 'warning' : 'success'}>
+          Prioridad {analysis.priority} - Riesgo {analysis.riskLevel}
+        </Alert>
+        <Box>
+          <SectionTitle title="Resumen del caso" />
+          <Typography>{analysis.summary}</Typography>
+        </Box>
+        <Box>
+          <SectionTitle title="Pendientes" />
+          <Stack component="ul" sx={{ pl: 2, my: .5 }}>{analysis.pendingItems.map((item) => <Typography component="li" key={item}>{item}</Typography>)}</Stack>
+        </Box>
+        <Box>
+          <SectionTitle title="Siguiente mejor accion" />
+          <Typography>{analysis.nextBestAction}</Typography>
+        </Box>
+        <Box>
+          <SectionTitle title="Mensaje sugerido para WhatsApp" />
+          <Paper variant="outlined" sx={{ p: 2, bgcolor: '#f8fafc' }}>
+            <Typography>{analysis.whatsappMessage}</Typography>
+          </Paper>
+        </Box>
+        <Box>
+          <SectionTitle title="Senales usadas" />
+          <Stack component="ul" sx={{ pl: 2, my: .5 }}>{analysis.signals.map((item) => <Typography component="li" key={item}>{item}</Typography>)}</Stack>
+        </Box>
+      </Stack>}
+    </DialogContent>
+    <DialogActions sx={{ flexWrap: 'wrap' }}>
+      <Button onClick={onClose}>Cerrar</Button>
+      <Button variant="contained" startIcon={<WhatsApp />} onClick={copyMessage}>{copied ? 'Copiado' : 'Copiar mensaje'}</Button>
+    </DialogActions>
+  </Dialog>;
+}
+
+function Actions({ onView, onEdit, onDelete, onConvert, onDownload, onActivity, onWhatsapp, onAi, onStart, onComplete, onReschedule, onCancel, compact }: { onView?: () => void; onEdit?: () => void; onDelete?: () => void; onConvert?: () => void; onDownload?: () => void; onActivity?: () => void; onWhatsapp?: () => void; onAi?: () => void; onStart?: () => void; onComplete?: () => void; onReschedule?: () => void; onCancel?: () => void; compact?: boolean }) {
   return <Stack direction="row" gap={compact ? .5 : 1} sx={{ mt: compact ? 1 : 0, flexWrap: 'wrap' }}>
     {onView && <Tooltip title="Ver cliente 360"><IconButton size="small" onClick={onView}><Visibility fontSize="small" /></IconButton></Tooltip>}
+    {onAi && <Tooltip title="Analizar con IA"><IconButton size="small" color="primary" onClick={onAi}><AutoAwesome fontSize="small" /></IconButton></Tooltip>}
     {onWhatsapp && <Tooltip title="Abrir WhatsApp"><IconButton size="small" onClick={onWhatsapp}><WhatsApp fontSize="small" /></IconButton></Tooltip>}
     {onActivity && <Tooltip title="Registrar actividad"><IconButton size="small" onClick={onActivity}><AddTask fontSize="small" /></IconButton></Tooltip>}
     {onStart && <Tooltip title="Marcar en proceso"><IconButton size="small" onClick={onStart}><SyncAlt fontSize="small" /></IconButton></Tooltip>}
@@ -1543,6 +1917,62 @@ function toActivityPayload(payload: typeof emptyActivity | Activity) {
 }
 
 function money(value?: number) { return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(value ?? 0); }
+function percent(value?: number) { return `${new Intl.NumberFormat('es-CO', { maximumFractionDigits: 2 }).format(value ?? 0)}%`; }
+function identificationDigits(value?: string) { return (value ?? '').replace(/\D/g, ''); }
+async function openExternalLookup(url: string, identification?: string) {
+  const digits = identificationDigits(identification);
+  if (digits && navigator.clipboard?.writeText) await navigator.clipboard.writeText(digits).catch(() => undefined);
+  window.open(url, '_blank', 'noopener,noreferrer');
+}
+function readFileAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ''));
+    reader.onerror = () => reject(new Error('No se pudo leer el archivo.'));
+    reader.readAsDataURL(file);
+  });
+}
+function loadImage(dataUrl: string) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error('El archivo no parece ser una imagen valida.'));
+    image.src = dataUrl;
+  });
+}
+async function normalizeCompanyLogo(file: File) {
+  if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+    throw new Error('El logo debe estar en formato PNG, JPG o WebP.');
+  }
+  if (file.size > companyLogoMaxBytes) {
+    throw new Error('El logo no puede superar 1 MB.');
+  }
+
+  const image = await loadImage(await readFileAsDataUrl(file));
+  const canvas = document.createElement('canvas');
+  canvas.width = companyLogoWidth;
+  canvas.height = companyLogoHeight;
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('No se pudo preparar el logo.');
+
+  context.clearRect(0, 0, companyLogoWidth, companyLogoHeight);
+  const scale = Math.min(companyLogoWidth / image.width, companyLogoHeight / image.height);
+  const width = Math.round(image.width * scale);
+  const height = Math.round(image.height * scale);
+  const x = Math.round((companyLogoWidth - width) / 2);
+  const y = Math.round((companyLogoHeight - height) / 2);
+  context.drawImage(image, x, y, width, height);
+  return canvas.toDataURL('image/png');
+}
+function IdentificationLookupAdornment({ identification }: { identification?: string }) {
+  const digits = identificationDigits(identification);
+  return <InputAdornment position="end">
+    <Stack direction="row" spacing={.5}>
+      <Button size="small" variant="outlined" disabled={!digits} onClick={() => void openExternalLookup(simitUrl, digits)}>Simit</Button>
+      <Button size="small" variant="outlined" disabled={!digits} onClick={() => void openExternalLookup(runtUrl, digits)}>Runt</Button>
+    </Stack>
+  </InputAdornment>;
+}
 function timelineColor(tone: CustomerTimelineItem['tone']) {
   if (tone === 'success') return '#15803d';
   if (tone === 'warning') return '#b45309';
