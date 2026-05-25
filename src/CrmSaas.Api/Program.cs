@@ -26,6 +26,7 @@ builder.Host.UseSerilog((context, services, configuration) => configuration
     .WriteTo.File("logs/crm-saas-.log", rollingInterval: RollingInterval.Day, retainedFileCountLimit: 30));
 
 builder.Services.AddControllers();
+builder.Services.AddHttpClient();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddScoped<ICustomerService, CustomerService>();
 builder.Services.AddScoped<ILeadService, LeadService>();

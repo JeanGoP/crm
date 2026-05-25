@@ -16,8 +16,12 @@ public sealed class UpsertCustomerValidator : AbstractValidator<UpsertCustomerDt
 {
     public UpsertCustomerValidator()
     {
-        RuleFor(x => x.FirstNames).NotEmpty().MaximumLength(120);
-        RuleFor(x => x.LastNames).NotEmpty().MaximumLength(120);
+        RuleFor(x => x.FirstName).NotEmpty().MaximumLength(80).When(x => string.IsNullOrWhiteSpace(x.FirstNames));
+        RuleFor(x => x.FirstNames).NotEmpty().MaximumLength(120).When(x => string.IsNullOrWhiteSpace(x.FirstName));
+        RuleFor(x => x.MiddleName).MaximumLength(80);
+        RuleFor(x => x.LastName).NotEmpty().MaximumLength(80).When(x => string.IsNullOrWhiteSpace(x.LastNames));
+        RuleFor(x => x.LastNames).NotEmpty().MaximumLength(120).When(x => string.IsNullOrWhiteSpace(x.LastName));
+        RuleFor(x => x.SecondLastName).MaximumLength(80);
         RuleFor(x => x.Email).EmailAddress().MaximumLength(180).When(x => !string.IsNullOrWhiteSpace(x.Email));
         RuleFor(x => x.IdentificationNumber).MaximumLength(40);
         RuleFor(x => x.Phone).MaximumLength(60);
@@ -28,8 +32,12 @@ public sealed class UpsertLeadValidator : AbstractValidator<UpsertLeadDto>
 {
     public UpsertLeadValidator()
     {
-        RuleFor(x => x.FirstNames).NotEmpty().MaximumLength(120);
-        RuleFor(x => x.LastNames).NotEmpty().MaximumLength(120);
+        RuleFor(x => x.FirstName).NotEmpty().MaximumLength(80).When(x => string.IsNullOrWhiteSpace(x.FirstNames));
+        RuleFor(x => x.FirstNames).NotEmpty().MaximumLength(120).When(x => string.IsNullOrWhiteSpace(x.FirstName));
+        RuleFor(x => x.MiddleName).MaximumLength(80);
+        RuleFor(x => x.LastName).NotEmpty().MaximumLength(80).When(x => string.IsNullOrWhiteSpace(x.LastNames));
+        RuleFor(x => x.LastNames).NotEmpty().MaximumLength(120).When(x => string.IsNullOrWhiteSpace(x.LastName));
+        RuleFor(x => x.SecondLastName).MaximumLength(80);
         RuleFor(x => x.Email).NotEmpty().EmailAddress().MaximumLength(180);
         RuleFor(x => x.Source).NotEmpty().MaximumLength(120);
     }

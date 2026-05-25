@@ -64,6 +64,10 @@ public sealed class CustomerService(ICrmDbContext db, IMapper mapper) : ICustome
                 (x.Nombres + " " + x.Apellidos).Trim() == string.Empty ? x.Nombre : (x.Nombres + " " + x.Apellidos).Trim(),
                 x.Nombres,
                 x.Apellidos,
+                x.PrimerNombre,
+                x.SegundoNombre,
+                x.PrimerApellido,
+                x.SegundoApellido,
                 x.TipoIdentificacion,
                 x.NumeroIdentificacion,
                 x.EmpresaCliente,
@@ -108,7 +112,7 @@ public sealed class LeadService(ICrmDbContext db, IMapper mapper) : ILeadService
     public async Task<IReadOnlyCollection<LeadDto>> GetAsync(CancellationToken cancellationToken) =>
         await db.Prospectos
             .OrderByDescending(x => x.FechaCreacion)
-            .Select(x => new LeadDto(x.Id, (x.Nombres + " " + x.Apellidos).Trim() == string.Empty ? x.Nombre : (x.Nombres + " " + x.Apellidos).Trim(), x.Nombres, x.Apellidos, x.Email, x.Telefono, x.Fuente, x.Calificacion, x.Convertido, x.ClienteId))
+            .Select(x => new LeadDto(x.Id, (x.Nombres + " " + x.Apellidos).Trim() == string.Empty ? x.Nombre : (x.Nombres + " " + x.Apellidos).Trim(), x.Nombres, x.Apellidos, x.PrimerNombre, x.SegundoNombre, x.PrimerApellido, x.SegundoApellido, x.Email, x.Telefono, x.Fuente, x.Calificacion, x.Convertido, x.ClienteId))
             .ToListAsync(cancellationToken);
 
     public async Task<LeadDto> CreateAsync(UpsertLeadDto dto, CancellationToken cancellationToken)
@@ -137,6 +141,10 @@ public sealed class LeadService(ICrmDbContext db, IMapper mapper) : ILeadService
             Nombre = string.IsNullOrWhiteSpace(lead.Nombres) ? lead.Nombre : lead.Nombres,
             Nombres = string.IsNullOrWhiteSpace(lead.Nombres) ? lead.Nombre : lead.Nombres,
             Apellidos = lead.Apellidos,
+            PrimerNombre = lead.PrimerNombre,
+            SegundoNombre = lead.SegundoNombre,
+            PrimerApellido = lead.PrimerApellido,
+            SegundoApellido = lead.SegundoApellido,
             Email = lead.Email,
             Telefono = lead.Telefono,
             Estado = EstadoCliente.Activo,
@@ -260,6 +268,10 @@ file static class CrmDtoMapper
         DisplayName(x.Nombres, x.Apellidos, x.Nombre),
         x.Nombres,
         x.Apellidos,
+        x.PrimerNombre,
+        x.SegundoNombre,
+        x.PrimerApellido,
+        x.SegundoApellido,
         x.TipoIdentificacion,
         x.NumeroIdentificacion,
         x.EmpresaCliente,
@@ -273,7 +285,7 @@ file static class CrmDtoMapper
         x.Estado,
         x.Etiquetas,
         x.Observaciones);
-    public static LeadDto ToDto(Prospecto x) => new(x.Id, DisplayName(x.Nombres, x.Apellidos, x.Nombre), x.Nombres, x.Apellidos, x.Email, x.Telefono, x.Fuente, x.Calificacion, x.Convertido, x.ClienteId);
+    public static LeadDto ToDto(Prospecto x) => new(x.Id, DisplayName(x.Nombres, x.Apellidos, x.Nombre), x.Nombres, x.Apellidos, x.PrimerNombre, x.SegundoNombre, x.PrimerApellido, x.SegundoApellido, x.Email, x.Telefono, x.Fuente, x.Calificacion, x.Convertido, x.ClienteId);
     public static DealStageDto ToDto(EtapaNegocio x) => new(x.Id, x.Nombre, x.Orden, x.ProbabilidadPredeterminada, x.Activa);
     public static DealDto ToDto(Negocio x) => new(x.Id, x.Titulo, x.ClienteId, x.EtapaNegocioId, x.Valor, x.ProbabilidadCierre, x.FechaEstimadaCierre, x.Estado);
     public static ActivityDto ToDto(Actividad x) => new(x.Id, x.Titulo, x.Descripcion, x.Tipo, x.Estado, x.FechaProgramada, x.RecordatorioEn, x.ClienteId, x.NegocioId, x.UsuarioAsignadoId, null, null);

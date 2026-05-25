@@ -22,6 +22,10 @@ export interface Customer {
   name: string;
   firstNames: string;
   lastNames: string;
+  firstName: string;
+  middleName?: string;
+  lastName: string;
+  secondLastName?: string;
   identificationType?: number;
   identificationNumber?: string;
   companyName?: string;
@@ -42,6 +46,10 @@ export interface Lead {
   name: string;
   firstNames: string;
   lastNames: string;
+  firstName: string;
+  middleName?: string;
+  lastName: string;
+  secondLastName?: string;
   email: string;
   phone?: string;
   source: string;
@@ -105,6 +113,10 @@ export interface Quote {
   identificationNumber?: string;
   customerFirstNames: string;
   customerLastNames: string;
+  customerFirstName: string;
+  customerMiddleName?: string;
+  customerLastName: string;
+  customerSecondLastName?: string;
   customerId: string;
   productId: string;
   productName: string;
@@ -118,6 +130,23 @@ export interface Quote {
   quoteDate: string;
   validUntil: string;
   notes?: string;
+}
+
+export interface ColombianIdentityLookup {
+  documentNumber: string;
+  documentType?: string;
+  firstName?: string;
+  middleName?: string;
+  lastName?: string;
+  secondLastName?: string;
+  fullName?: string;
+  dateOfBirth?: string;
+  expeditionDate?: string;
+  expeditionCity?: string;
+  expeditionDepartment?: string;
+  gender?: string;
+  isAlive?: boolean;
+  source: 'database' | 'verifik' | string;
 }
 
 export interface CreditDocument {

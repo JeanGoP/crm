@@ -8,6 +8,10 @@ public sealed class Cliente : AuditableTenantEntity
     public string Nombre { get; set; } = string.Empty;
     public string Nombres { get; set; } = string.Empty;
     public string Apellidos { get; set; } = string.Empty;
+    public string PrimerNombre { get; set; } = string.Empty;
+    public string? SegundoNombre { get; set; }
+    public string PrimerApellido { get; set; } = string.Empty;
+    public string? SegundoApellido { get; set; }
     public TipoIdentificacionColombia? TipoIdentificacion { get; set; }
     public string? NumeroIdentificacion { get; set; }
     public string? EmpresaCliente { get; set; }
@@ -30,6 +34,10 @@ public sealed class Prospecto : AuditableTenantEntity
     public string Nombre { get; set; } = string.Empty;
     public string Nombres { get; set; } = string.Empty;
     public string Apellidos { get; set; } = string.Empty;
+    public string PrimerNombre { get; set; } = string.Empty;
+    public string? SegundoNombre { get; set; }
+    public string PrimerApellido { get; set; } = string.Empty;
+    public string? SegundoApellido { get; set; }
     public string Email { get; set; } = string.Empty;
     public string? Telefono { get; set; }
     public string Fuente { get; set; } = string.Empty;
@@ -116,6 +124,10 @@ public sealed class Cotizacion : AuditableTenantEntity
     public string? NumeroIdentificacion { get; set; }
     public string NombresCliente { get; set; } = string.Empty;
     public string ApellidosCliente { get; set; } = string.Empty;
+    public string PrimerNombreCliente { get; set; } = string.Empty;
+    public string? SegundoNombreCliente { get; set; }
+    public string PrimerApellidoCliente { get; set; } = string.Empty;
+    public string? SegundoApellidoCliente { get; set; }
     public Guid ClienteId { get; set; }
     public Cliente? Cliente { get; set; }
     public Guid ProductoId { get; set; }

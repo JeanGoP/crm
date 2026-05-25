@@ -1,7 +1,7 @@
 # Manual del Sistema CRM SaaS
 
 Ultima actualizacion: 2026-05-13  
-Version del manual: 2.9  
+Version del manual: 3.0  
 Sistema: CRM SaaS para ventas de motos a credito  
 Ambiente documentado: Desarrollo local conectado a SQL Server
 Zona horaria operativa: Colombia UTC-5
@@ -66,28 +66,32 @@ Si las credenciales son correctas, el sistema abre el Dashboard. Si hay un error
 El menu lateral permite moverse entre:
 
 - Dashboard
-- Clientes
-- Productos
 - Cotizaciones
 - Solicitudes credito
-- Prospectos
+- Clientes
 - Pipeline
 - Actividades
+- Productos
+- Prospectos
+- Reportes
 - Configuracion
 
 En la barra superior se muestra el usuario autenticado, su rol principal y el boton **Salir**.
 
 ### Modo demostracion inicial
 
-Para presentar primero el flujo basico al cliente, algunos modulos pueden aparecer opacos y bloqueados en el menu lateral. En esta etapa se muestran principalmente:
+El menu lateral muestra todos los modulos principales disponibles para operacion:
 
 - Dashboard
-- Clientes
-- Productos
 - Cotizaciones
+- Solicitudes de credito
+- Clientes
+- Pipeline
+- Actividades
+- Productos
+- Prospectos
+- Reportes
 - Configuracion
-
-Los modulos bloqueados quedan visibles como capacidades futuras, pero no permiten ingreso hasta habilitarlos en una siguiente fase.
 
 ## 6. Dashboard
 
@@ -142,8 +146,10 @@ Permite administrar los clientes de la empresa. Un cliente puede venir de una co
 
 ### Datos principales
 
-- Nombres
-- Apellidos
+- Primer nombre
+- Segundo nombre
+- Primer apellido
+- Segundo apellido
 - Tipo de identificacion
 - Numero de identificacion
 - Empresa o razon comercial opcional
@@ -163,7 +169,7 @@ Permite administrar los clientes de la empresa. Un cliente puede venir de una co
 1. Abra **Clientes**.
 2. Presione **Nuevo cliente**.
 3. Complete tipo y numero de identificacion si ya los tiene.
-4. Complete nombres y apellidos.
+4. Complete primer nombre, segundo nombre si aplica, primer apellido y segundo apellido si aplica.
 5. Registre fecha de nacimiento y ocupacion si aplican.
 6. Registre indicativo, telefono o WhatsApp, email, direccion y ciudad.
 7. Complete datos comerciales como empresa, estado, etiquetas y observaciones.
@@ -286,21 +292,37 @@ El campo **Numero de identificacion** incluye los botones **Simit** y **Runt**. 
 
 Estas paginas externas no exponen un enlace publico estable para consultar automaticamente con el numero ya diligenciado, por eso el CRM abre el sitio oficial y deja listo el numero para pegar.
 
+### Consulta de identidad con Verifik
+
+En la ventana de **Nueva cotizacion**, despues de escribir la cedula, el boton **Consultar** busca primero si esa identificacion ya existe en el maestro de clientes del CRM, incluso si pertenece a otra empresa. Si no existe en la base de datos, el backend consulta Verifik.
+
+Si el CRM o Verifik encuentran informacion, el sistema completa automaticamente:
+
+- Numero de identificacion normalizado
+- Primer nombre
+- Segundo nombre
+- Primer apellido
+- Segundo apellido
+
+La integracion usa el endpoint interno del CRM para no exponer el token de Verifik en el navegador. Verifik solo se consume cuando la cedula no existe previamente en la base de datos. Para habilitarla en un ambiente real, el administrador tecnico debe configurar la variable de entorno **Verifik__Token** en el backend.
+
 ### Crear cotizacion
 
 1. Abra **Cotizaciones**.
 2. Presione **Nueva cotizacion**.
 3. Seleccione el tipo de identificacion.
-4. Escriba numero de identificacion, nombres y apellidos.
-5. Confirme el indicativo telefonico. Por defecto el sistema propone **+57**.
-6. Escriba el telefono o WhatsApp del cliente.
-7. Seleccione el producto.
-8. Ingrese la cuota inicial.
-9. Defina el plazo en meses.
-10. Defina la tasa mensual.
-11. Revise el resumen del simulador: valor del producto, valor financiado, cuota estimada y total estimado.
-12. Agregue observaciones si aplica.
-13. Guarde.
+4. Escriba el numero de cedula.
+5. Si aplica, presione **Consultar** para completar primer nombre, segundo nombre, primer apellido y segundo apellido.
+6. Revise o complete los cuatro campos de nombre manualmente.
+7. Confirme el indicativo telefonico. Por defecto el sistema propone **+57**.
+8. Escriba el telefono o WhatsApp del cliente.
+9. Seleccione el producto.
+10. Ingrese la cuota inicial.
+11. Defina el plazo en meses.
+12. Defina la tasa mensual.
+13. Revise el resumen del simulador: valor del producto, valor financiado, cuota estimada y total estimado.
+14. Agregue observaciones si aplica.
+15. Guarde.
 
 ### Simulador de credito
 
@@ -720,11 +742,16 @@ Si aparece un error, revise primero los datos ingresados. Si el error persiste, 
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-05-25 | 3.4 | Se reorganiza el menu principal de acuerdo con el flujo comercial: dashboard, cotizaciones, clientes, credito, pipeline, actividades, productos, prospectos, reportes y configuracion. |
+| 2026-05-25 | 3.3 | Se habilitan todos los menus principales: solicitudes de credito, prospectos, pipeline, actividades y reportes. |
+| 2026-05-18 | 3.2 | El boton de consulta de identidad ahora se llama Consultar y busca primero en la base de datos antes de consumir Verifik. |
+| 2026-05-18 | 3.1 | Se separan los nombres de clientes, prospectos y cotizaciones en primer nombre, segundo nombre, primer apellido y segundo apellido. |
+| 2026-05-15 | 3.0 | Se agrega consulta de identidad con Verifik en la creacion de cotizaciones para completar nombres y apellidos desde la cedula. |
 | 2026-05-14 | 2.9 | Se agrega logo al crear o editar empresas, con normalizacion automatica a 320 x 160 px y vista previa en configuracion. |
 | 2026-05-13 | 2.8 | Se ajusta el registro de fechas operativas del CRM para usar hora de Colombia UTC-5 en lugar de UTC. |
 | 2026-05-13 | 2.7 | Se amplia el maestro de clientes con identificacion, indicativo, telefono, direccion, ciudad, fecha de nacimiento, ocupacion y observaciones. |
 | 2026-05-13 | 2.6 | Se agrega indicativo telefonico y telefono/WhatsApp obligatorio en la creacion de cotizaciones, guardandolo en el cliente creado. |
-| 2026-05-13 | 2.5 | Se bloquean visualmente los modulos desde solicitudes de credito hasta reportes para una demostracion inicial enfocada en opciones principales. |
+| 2026-05-13 | 2.5 | Se bloquearon visualmente los modulos desde solicitudes de credito hasta reportes para una demostracion inicial enfocada en opciones principales. |
 | 2026-05-13 | 2.4 | Se agrega el Asistente comercial del cliente con Analizar con IA desde Cliente 360, cotizaciones y solicitudes de credito. |
 | 2026-05-11 | 2.1 | Se actualizan las capturas del manual con una pantalla mas amplia y se agrega captura del modulo de reportes comerciales. |
 | 2026-05-08 | 2.0 | Se agrega modulo de reportes comerciales con ventas por vendedor, cotizaciones por estado, tasa de conversion, creditos aprobados/rechazados y motos mas cotizadas. |

@@ -9,9 +9,13 @@ public sealed class CrmMappingProfile : Profile
     public CrmMappingProfile()
     {
         CreateMap<UpsertCustomerDto, Cliente>()
-            .ForMember(dest => dest.Nombre, opt => opt.MapFrom(src => src.FirstNames.Trim()))
-            .ForMember(dest => dest.Nombres, opt => opt.MapFrom(src => src.FirstNames.Trim()))
-            .ForMember(dest => dest.Apellidos, opt => opt.MapFrom(src => src.LastNames.Trim()))
+            .ForMember(dest => dest.PrimerNombre, opt => opt.MapFrom(src => NameParts.FirstName(src.FirstName, src.FirstNames)))
+            .ForMember(dest => dest.SegundoNombre, opt => opt.MapFrom(src => NameParts.MiddleName(src.MiddleName, src.FirstNames)))
+            .ForMember(dest => dest.PrimerApellido, opt => opt.MapFrom(src => NameParts.LastName(src.LastName, src.LastNames)))
+            .ForMember(dest => dest.SegundoApellido, opt => opt.MapFrom(src => NameParts.SecondLastName(src.SecondLastName, src.LastNames)))
+            .ForMember(dest => dest.Nombre, opt => opt.MapFrom(src => NameParts.FirstNames(src.FirstName, src.MiddleName, src.FirstNames)))
+            .ForMember(dest => dest.Nombres, opt => opt.MapFrom(src => NameParts.FirstNames(src.FirstName, src.MiddleName, src.FirstNames)))
+            .ForMember(dest => dest.Apellidos, opt => opt.MapFrom(src => NameParts.LastNames(src.LastName, src.SecondLastName, src.LastNames)))
             .ForMember(dest => dest.TipoIdentificacion, opt => opt.MapFrom(src => src.IdentificationType))
             .ForMember(dest => dest.NumeroIdentificacion, opt => opt.MapFrom(src => src.IdentificationNumber))
             .ForMember(dest => dest.EmpresaCliente, opt => opt.MapFrom(src => src.CompanyName))
@@ -27,9 +31,13 @@ public sealed class CrmMappingProfile : Profile
             .ForMember(dest => dest.Observaciones, opt => opt.MapFrom(src => src.Notes));
 
         CreateMap<UpsertLeadDto, Prospecto>()
-            .ForMember(dest => dest.Nombre, opt => opt.MapFrom(src => src.FirstNames.Trim()))
-            .ForMember(dest => dest.Nombres, opt => opt.MapFrom(src => src.FirstNames.Trim()))
-            .ForMember(dest => dest.Apellidos, opt => opt.MapFrom(src => src.LastNames.Trim()))
+            .ForMember(dest => dest.PrimerNombre, opt => opt.MapFrom(src => NameParts.FirstName(src.FirstName, src.FirstNames)))
+            .ForMember(dest => dest.SegundoNombre, opt => opt.MapFrom(src => NameParts.MiddleName(src.MiddleName, src.FirstNames)))
+            .ForMember(dest => dest.PrimerApellido, opt => opt.MapFrom(src => NameParts.LastName(src.LastName, src.LastNames)))
+            .ForMember(dest => dest.SegundoApellido, opt => opt.MapFrom(src => NameParts.SecondLastName(src.SecondLastName, src.LastNames)))
+            .ForMember(dest => dest.Nombre, opt => opt.MapFrom(src => NameParts.FirstNames(src.FirstName, src.MiddleName, src.FirstNames)))
+            .ForMember(dest => dest.Nombres, opt => opt.MapFrom(src => NameParts.FirstNames(src.FirstName, src.MiddleName, src.FirstNames)))
+            .ForMember(dest => dest.Apellidos, opt => opt.MapFrom(src => NameParts.LastNames(src.LastName, src.SecondLastName, src.LastNames)))
             .ForMember(dest => dest.Telefono, opt => opt.MapFrom(src => src.Phone))
             .ForMember(dest => dest.Fuente, opt => opt.MapFrom(src => src.Source))
             .ForMember(dest => dest.Calificacion, opt => opt.MapFrom(src => src.Rating));
@@ -60,4 +68,27 @@ public sealed class CrmMappingProfile : Profile
             .ForMember(dest => dest.UsuarioAsignadoId, opt => opt.MapFrom(src => src.AssignedUserId));
     }
 
+}
+
+file static class NameParts
+{
+    public static string FirstNames(string? firstName, string? middleName, string fallback) =>
+        Join(FirstName(firstName, fallback), MiddleName(middleName, fallback));
+
+    public static string LastNames(string? lastName, string? secondLastName, string fallback) =>
+        Join(LastName(lastName, fallback), SecondLastName(secondLastName, fallback));
+
+    public static string FirstName(string? value, string fallback) => Clean(value) ?? Split(fallback).ElementAtOrDefault(0) ?? string.Empty;
+    public static string? MiddleName(string? value, string fallback) => Clean(value) ?? Join(Split(fallback).Skip(1));
+    public static string LastName(string? value, string fallback) => Clean(value) ?? Split(fallback).ElementAtOrDefault(0) ?? string.Empty;
+    public static string? SecondLastName(string? value, string fallback) => Clean(value) ?? Join(Split(fallback).Skip(1));
+
+    private static IReadOnlyList<string> Split(string? value) => (value ?? string.Empty).Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    private static string Join(params string?[] values) => string.Join(" ", values.Where(value => !string.IsNullOrWhiteSpace(value)).Select(value => value!.Trim()));
+    private static string? Join(IEnumerable<string> values)
+    {
+        var joined = string.Join(" ", values.Where(value => !string.IsNullOrWhiteSpace(value)).Select(value => value.Trim()));
+        return string.IsNullOrWhiteSpace(joined) ? null : joined;
+    }
 }

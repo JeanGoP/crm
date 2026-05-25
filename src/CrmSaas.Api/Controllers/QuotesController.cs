@@ -31,8 +31,15 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
     [HttpPost]
     public async Task<ActionResult<QuoteDto>> Create(CreateQuoteDto dto, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(dto.CustomerFirstNames)) throw new ValidationException("Los nombres del cliente son obligatorios.");
-        if (string.IsNullOrWhiteSpace(dto.CustomerLastNames)) throw new ValidationException("Los apellidos del cliente son obligatorios.");
+        var firstName = Clean(dto.CustomerFirstName) ?? Split(dto.CustomerFirstNames).ElementAtOrDefault(0) ?? string.Empty;
+        var middleName = Clean(dto.CustomerMiddleName) ?? Join(Split(dto.CustomerFirstNames).Skip(1));
+        var lastName = Clean(dto.CustomerLastName) ?? Split(dto.CustomerLastNames).ElementAtOrDefault(0) ?? string.Empty;
+        var secondLastName = Clean(dto.CustomerSecondLastName) ?? Join(Split(dto.CustomerLastNames).Skip(1));
+        var firstNames = Join(firstName, middleName);
+        var lastNames = Join(lastName, secondLastName);
+
+        if (string.IsNullOrWhiteSpace(firstName)) throw new ValidationException("El primer nombre del cliente es obligatorio.");
+        if (string.IsNullOrWhiteSpace(lastName)) throw new ValidationException("El primer apellido del cliente es obligatorio.");
         if (string.IsNullOrWhiteSpace(dto.PhoneNumber)) throw new ValidationException("El telefono del cliente es obligatorio.");
         if (dto.ProductId == Guid.Empty) throw new ValidationException("Debe seleccionar un producto para cotizar.");
         if (dto.DownPayment < 0) throw new ValidationException("La cuota inicial no puede ser negativa.");
@@ -47,15 +54,19 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             .FirstOrDefaultAsync(cancellationToken)
             ?? throw new InvalidOperationException("No hay etapas activas en el pipeline para crear la oportunidad.");
 
-        var fullName = $"{dto.CustomerFirstNames.Trim()} {dto.CustomerLastNames.Trim()}".Trim();
+        var fullName = $"{firstNames} {lastNames}".Trim();
         var phone = FormatPhone(dto.PhoneCountryCode, dto.PhoneNumber);
         var productName = ProductName(product);
         var simulation = CalculateSimulation(product.Precio, dto.DownPayment, dto.TermMonths, dto.MonthlyInterestRate);
         var customer = new Cliente
         {
-            Nombre = dto.CustomerFirstNames.Trim(),
-            Nombres = dto.CustomerFirstNames.Trim(),
-            Apellidos = dto.CustomerLastNames.Trim(),
+            Nombre = firstNames,
+            Nombres = firstNames,
+            Apellidos = lastNames,
+            PrimerNombre = firstName,
+            SegundoNombre = middleName,
+            PrimerApellido = lastName,
+            SegundoApellido = secondLastName,
             TipoIdentificacion = dto.IdentificationType,
             NumeroIdentificacion = dto.IdentificationNumber,
             Email = string.Empty,
@@ -73,8 +84,12 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             Numero = number,
             TipoIdentificacion = dto.IdentificationType,
             NumeroIdentificacion = dto.IdentificationNumber,
-            NombresCliente = dto.CustomerFirstNames.Trim(),
-            ApellidosCliente = dto.CustomerLastNames.Trim(),
+            NombresCliente = firstNames,
+            ApellidosCliente = lastNames,
+            PrimerNombreCliente = firstName,
+            SegundoNombreCliente = middleName,
+            PrimerApellidoCliente = lastName,
+            SegundoApellidoCliente = secondLastName,
             ClienteId = customer.Id,
             ProductoId = product.Id,
             PrecioProducto = product.Precio,
@@ -145,6 +160,10 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             x.NumeroIdentificacion,
             x.NombresCliente,
             x.ApellidosCliente,
+            x.PrimerNombreCliente,
+            x.SegundoNombreCliente,
+            x.PrimerApellidoCliente,
+            x.SegundoApellidoCliente,
             x.ClienteId,
             x.ProductoId,
             productName,
@@ -189,5 +208,14 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
         if (!normalizedCode.StartsWith("+")) normalizedCode = "+" + normalizedCode;
         var normalizedNumber = new string((phoneNumber ?? string.Empty).Where(char.IsDigit).ToArray());
         return $"{normalizedCode} {normalizedNumber}".Trim();
+    }
+
+    private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    private static IReadOnlyList<string> Split(string? value) => (value ?? string.Empty).Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    private static string Join(params string?[] values) => string.Join(" ", values.Where(value => !string.IsNullOrWhiteSpace(value)).Select(value => value!.Trim()));
+    private static string? Join(IEnumerable<string> values)
+    {
+        var joined = string.Join(" ", values.Where(value => !string.IsNullOrWhiteSpace(value)).Select(value => value.Trim()));
+        return string.IsNullOrWhiteSpace(joined) ? null : joined;
     }
 }

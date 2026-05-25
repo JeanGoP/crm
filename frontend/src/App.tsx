@@ -33,7 +33,7 @@ import AutoAwesome from '@mui/icons-material/AutoAwesome';
 import { AxiosError } from 'axios';
 import { api } from './api';
 import { useAuthStore } from './store';
-import { Activity, CommercialReports, Company, CreditApplication, CreditDocument, Customer, Customer360, CustomerAiAnalysis, CustomerTimelineItem, Dashboard, Deal, DealStage, Lead, Product, Quote, User } from './types';
+import { Activity, ColombianIdentityLookup, CommercialReports, Company, CreditApplication, CreditDocument, Customer, Customer360, CustomerAiAnalysis, CustomerTimelineItem, Dashboard, Deal, DealStage, Lead, Product, Quote, User } from './types';
 
 const drawerWidth = 248;
 const today = new Date().toISOString().slice(0, 10);
@@ -57,16 +57,18 @@ const theme = createTheme({
   typography: { fontFamily: '"Inter", "Segoe UI", Arial, sans-serif', button: { textTransform: 'none', fontWeight: 700 } }
 });
 
-const nav = [
+type NavItem = { to: string; label: string; icon: ReactNode; locked?: boolean };
+
+const nav: NavItem[] = [
   { to: '/', label: 'Dashboard', icon: <DashboardIcon /> },
-  { to: '/clientes', label: 'Clientes', icon: <Groups /> },
-  { to: '/productos', label: 'Productos', icon: <Inventory2 /> },
   { to: '/cotizaciones', label: 'Cotizaciones', icon: <ReceiptLong /> },
-  { to: '/solicitudes-credito', label: 'Solicitudes credito', icon: <Assignment />, locked: true },
-  { to: '/prospectos', label: 'Prospectos', icon: <Handshake />, locked: true },
-  { to: '/pipeline', label: 'Pipeline', icon: <ViewKanban />, locked: true },
-  { to: '/actividades', label: 'Actividades', icon: <EventNote />, locked: true },
-  { to: '/reportes', label: 'Reportes', icon: <Assessment />, locked: true },
+  { to: '/clientes', label: 'Clientes', icon: <Groups /> },
+  { to: '/solicitudes-credito', label: 'Solicitudes credito', icon: <Assignment /> },
+  { to: '/pipeline', label: 'Pipeline', icon: <ViewKanban /> },
+  { to: '/actividades', label: 'Actividades', icon: <EventNote /> },
+  { to: '/productos', label: 'Productos', icon: <Inventory2 /> },
+  { to: '/prospectos', label: 'Prospectos', icon: <Handshake /> },
+  { to: '/reportes', label: 'Reportes', icon: <Assessment /> },
   { to: '/configuracion', label: 'Configuracion', icon: <Settings /> }
 ];
 
@@ -78,6 +80,10 @@ const emptyCustomer = {
   identificationNumber: '',
   firstNames: '',
   lastNames: '',
+  firstName: '',
+  middleName: '',
+  lastName: '',
+  secondLastName: '',
   companyName: '',
   email: '',
   phoneCountryCode: '+57',
@@ -90,13 +96,13 @@ const emptyCustomer = {
   tags: '',
   notes: ''
 };
-const emptyLead = { firstNames: '', lastNames: '', email: '', phone: '', source: 'Web', rating: 1 };
+const emptyLead = { firstNames: '', lastNames: '', firstName: '', middleName: '', lastName: '', secondLastName: '', email: '', phone: '', source: 'Web', rating: 1 };
 const emptyDeal = { title: '', customerId: '', stageId: '', value: 0, closeProbability: 10, estimatedCloseDate: today, status: 1 };
 const emptyActivity = { title: '', description: '', type: 1, status: 1, scheduledAt: `${today}T09:00`, reminderAt: '', customerId: '', dealId: '', assignedUserId: '' };
 const emptyCompany = { name: '', subdomain: '', customDomain: '', logoDataUrl: '', active: true };
 const emptyUser = { fullName: '', email: '', password: '', companyId: '', roles: ['Vendedor'] };
 const emptyProduct = { name: '', category: 'Moto', brand: '', model: '', reference: '', description: '', engineCc: '', year: '', color: '', price: 0, active: true };
-const emptyQuote = { identificationType: 1, identificationNumber: '', customerFirstNames: '', customerLastNames: '', phoneCountryCode: '+57', phoneNumber: '', productId: '', downPayment: 0, termMonths: 24, monthlyInterestRate: 2.2, notes: '' };
+const emptyQuote = { identificationType: 1, identificationNumber: '', customerFirstNames: '', customerLastNames: '', customerFirstName: '', customerMiddleName: '', customerLastName: '', customerSecondLastName: '', phoneCountryCode: '+57', phoneNumber: '', productId: '', downPayment: 0, termMonths: 24, monthlyInterestRate: 2.2, notes: '' };
 const emptyCreditApplication = {
   customerId: '', productId: '', quoteId: '', dealId: '', identificationType: 1, identificationNumber: '', birthDate: '', mobile: '', address: '', city: '', occupation: '',
   monthlyIncome: 0, downPayment: 0, termMonths: 24, motorcycleValue: 0,
@@ -104,6 +110,16 @@ const emptyCreditApplication = {
   reference1Name: '', reference1Mobile: '', reference1Relationship: '', reference2Name: '', reference2Mobile: '', reference2Relationship: '',
   status: 1, notes: ''
 };
+
+function fullFirstNames(firstName?: string, middleName?: string, fallback?: string) {
+  const value = [firstName, middleName].filter(Boolean).join(' ').trim();
+  return value || fallback || '';
+}
+
+function fullLastNames(lastName?: string, secondLastName?: string, fallback?: string) {
+  const value = [lastName, secondLastName].filter(Boolean).join(' ').trim();
+  return value || fallback || '';
+}
 
 function Layout() {
   const { user, logout } = useAuthStore();
@@ -166,11 +182,11 @@ function Layout() {
             <Route path="/clientes/:id" element={<Customer360Page />} />
             <Route path="/productos" element={<ProductsPage />} />
             <Route path="/cotizaciones" element={<QuotesPage />} />
-            <Route path="/solicitudes-credito" element={<LockedModulePage />} />
-            <Route path="/prospectos" element={<LockedModulePage />} />
-            <Route path="/pipeline" element={<LockedModulePage />} />
-            <Route path="/actividades" element={<LockedModulePage />} />
-            <Route path="/reportes" element={<LockedModulePage />} />
+            <Route path="/solicitudes-credito" element={<CreditApplicationsPage />} />
+            <Route path="/prospectos" element={<LeadsPage />} />
+            <Route path="/pipeline" element={<PipelinePage />} />
+            <Route path="/actividades" element={<ActivitiesPage />} />
+            <Route path="/reportes" element={<CommercialReportsPage />} />
             <Route path="/configuracion" element={<SettingsPage />} />
           </Routes>
         </Box>
@@ -289,6 +305,8 @@ function CustomersPage() {
   const save = async (payload: typeof emptyCustomer) => {
     const body = {
       ...payload,
+      firstNames: fullFirstNames(payload.firstName, payload.middleName, payload.firstNames),
+      lastNames: fullLastNames(payload.lastName, payload.secondLastName, payload.lastNames),
       identificationType: payload.identificationType ? Number(payload.identificationType) : null,
       identificationNumber: payload.identificationNumber || null,
       companyName: payload.companyName || null,
@@ -323,12 +341,14 @@ function CustomersPage() {
     <Header title="Clientes" action="Nuevo cliente" onAction={() => setForm({ open: true })} onRefresh={reload} />
     <StatusBar loading={loading} error={error} />
     <EntityTable
-      headers={['Identificacion', 'Nombres', 'Apellidos', 'Telefono', 'Ciudad', 'Estado', 'Etiquetas', 'Acciones']}
+      headers={['Identificacion', 'Primer nombre', 'Segundo nombre', 'Primer apellido', 'Segundo apellido', 'Telefono', 'Ciudad', 'Estado', 'Etiquetas', 'Acciones']}
       empty="No hay clientes registrados"
       rows={rows.map((r) => [
         r.identificationNumber || '-',
-        r.firstNames || r.name,
-        r.lastNames,
+        r.firstName || r.firstNames || r.name,
+        r.middleName || '-',
+        r.lastName || r.lastNames,
+        r.secondLastName || '-',
         r.phone,
         r.city,
         <StatusChip label={statusLabel(r.status)} tone={r.status === 1 ? 'success' : 'default'} />,
@@ -538,6 +558,8 @@ function QuotesPage() {
   const save = async (payload: typeof emptyQuote) => {
     const body = {
       ...payload,
+      customerFirstNames: fullFirstNames(payload.customerFirstName, payload.customerMiddleName, payload.customerFirstNames),
+      customerLastNames: fullLastNames(payload.customerLastName, payload.customerSecondLastName, payload.customerLastNames),
       identificationType: Number(payload.identificationType),
       identificationNumber: payload.identificationNumber || null,
       phoneCountryCode: payload.phoneCountryCode || '+57',
@@ -571,7 +593,7 @@ function QuotesPage() {
       empty="No hay cotizaciones registradas"
       rows={rows.map((r) => [
         r.number,
-        `${r.customerFirstNames} ${r.customerLastNames}`.trim(),
+        `${fullFirstNames(r.customerFirstName, r.customerMiddleName, r.customerFirstNames)} ${fullLastNames(r.customerLastName, r.customerSecondLastName, r.customerLastNames)}`.trim(),
         `${identificationLabel(r.identificationType)} ${r.identificationNumber ?? ''}`.trim(),
         r.productName,
         money(r.productPrice),
@@ -797,7 +819,12 @@ function LeadsPage() {
   const canDelete = useCanManage();
 
   const save = async (payload: typeof emptyLead) => {
-    const body = { ...payload, rating: Number(payload.rating) };
+    const body = {
+      ...payload,
+      firstNames: fullFirstNames(payload.firstName, payload.middleName, payload.firstNames),
+      lastNames: fullLastNames(payload.lastName, payload.secondLastName, payload.lastNames),
+      rating: Number(payload.rating)
+    };
     const { data } = form.item
       ? await api.put<Lead>(`/api/leads/${form.item.id}`, body)
       : await api.post<Lead>('/api/leads', body);
@@ -824,11 +851,13 @@ function LeadsPage() {
     <Header title="Prospectos" action="Nuevo prospecto" onAction={() => setForm({ open: true })} onRefresh={reload} />
     <StatusBar loading={loading} error={error} />
     <EntityTable
-      headers={['Nombres', 'Apellidos', 'Email', 'Telefono', 'Fuente', 'Calificacion', 'Estado', 'Acciones']}
+      headers={['Primer nombre', 'Segundo nombre', 'Primer apellido', 'Segundo apellido', 'Email', 'Telefono', 'Fuente', 'Calificacion', 'Estado', 'Acciones']}
       empty="No hay prospectos registrados"
       rows={rows.map((r) => [
-        r.firstNames || r.name,
-        r.lastNames,
+        r.firstName || r.firstNames || r.name,
+        r.middleName || '-',
+        r.lastName || r.lastNames,
+        r.secondLastName || '-',
         r.email,
         r.phone,
         r.source,
@@ -1282,6 +1311,10 @@ function CustomerDialog({ form, onClose, onSave }: DialogProps<Customer, typeof 
     identificationNumber: form.item.identificationNumber ?? '',
     firstNames: form.item.firstNames || form.item.name,
     lastNames: form.item.lastNames ?? '',
+    firstName: form.item.firstName || (form.item.firstNames || form.item.name).split(' ')[0] || '',
+    middleName: form.item.middleName ?? (form.item.firstNames || '').split(' ').slice(1).join(' '),
+    lastName: form.item.lastName || (form.item.lastNames || '').split(' ')[0] || '',
+    secondLastName: form.item.secondLastName ?? (form.item.lastNames || '').split(' ').slice(1).join(' '),
     companyName: form.item.companyName ?? '',
     email: form.item.email ?? '',
     phoneCountryCode: form.item.phoneCountryCode ?? '+57',
@@ -1303,8 +1336,12 @@ function CustomerDialog({ form, onClose, onSave }: DialogProps<Customer, typeof 
       </FieldGrid>
       <SectionTitle title="Datos personales" />
       <FieldGrid>
-        <TextField fullWidth required label="Nombres" value={v.firstNames} onChange={(e) => set({ firstNames: e.target.value })} />
-        <TextField fullWidth required label="Apellidos" value={v.lastNames} onChange={(e) => set({ lastNames: e.target.value })} />
+        <TextField fullWidth required label="Primer nombre" value={v.firstName} onChange={(e) => set({ firstName: e.target.value, firstNames: fullFirstNames(e.target.value, v.middleName) })} />
+        <TextField fullWidth label="Segundo nombre" value={v.middleName} onChange={(e) => set({ middleName: e.target.value, firstNames: fullFirstNames(v.firstName, e.target.value) })} />
+      </FieldGrid>
+      <FieldGrid>
+        <TextField fullWidth required label="Primer apellido" value={v.lastName} onChange={(e) => set({ lastName: e.target.value, lastNames: fullLastNames(e.target.value, v.secondLastName) })} />
+        <TextField fullWidth label="Segundo apellido" value={v.secondLastName} onChange={(e) => set({ secondLastName: e.target.value, lastNames: fullLastNames(v.lastName, e.target.value) })} />
       </FieldGrid>
       <FieldGrid>
         <TextField fullWidth label="Fecha nacimiento" type="date" value={v.birthDate} onChange={(e) => set({ birthDate: e.target.value })} InputLabelProps={{ shrink: true }} />
@@ -1366,6 +1403,54 @@ function ProductDialog({ form, onClose, onSave }: DialogProps<Product, typeof em
 
 function QuoteDialog({ form, products, onClose, onSave }: DialogProps<Quote, typeof emptyQuote> & { products: Product[] }) {
   const initial = { ...emptyQuote, productId: products[0]?.id ?? '' };
+  const [identityLoading, setIdentityLoading] = useState(false);
+  const [identityNotice, setIdentityNotice] = useState<Notice>();
+
+  useEffect(() => {
+    if (!form.open) {
+      setIdentityLoading(false);
+      setIdentityNotice(undefined);
+    }
+  }, [form.open]);
+
+  const lookupIdentity = async (value: typeof emptyQuote, set: (patch: Partial<typeof emptyQuote>) => void) => {
+    const digits = identificationDigits(value.identificationNumber);
+    if (Number(value.identificationType) !== 1) {
+      setIdentityNotice({ type: 'error', text: 'La consulta esta disponible para cedula de ciudadania.' });
+      return;
+    }
+    if (digits.length < 5) {
+      setIdentityNotice({ type: 'error', text: 'Digite una cedula valida para consultar.' });
+      return;
+    }
+
+    setIdentityLoading(true);
+    setIdentityNotice(undefined);
+    try {
+      const { data } = await api.get<ColombianIdentityLookup>('/api/identity/colombia/cedula', { params: { documentNumber: digits } });
+      set({
+        identificationNumber: data.documentNumber || digits,
+        customerFirstName: data.firstName ?? value.customerFirstName,
+        customerMiddleName: data.middleName ?? value.customerMiddleName,
+        customerLastName: data.lastName ?? value.customerLastName,
+        customerSecondLastName: data.secondLastName ?? value.customerSecondLastName,
+        customerFirstNames: fullFirstNames(data.firstName ?? value.customerFirstName, data.middleName ?? value.customerMiddleName, value.customerFirstNames),
+        customerLastNames: fullLastNames(data.lastName ?? value.customerLastName, data.secondLastName ?? value.customerSecondLastName, value.customerLastNames)
+      });
+      const extra = [data.expeditionCity, data.expeditionDepartment].filter(Boolean).join(', ');
+      setIdentityNotice({
+        type: 'success',
+        text: data.source === 'database'
+          ? 'Datos encontrados en la base del CRM.'
+          : `Datos encontrados${extra ? ` - expedida en ${extra}` : ''}.`
+      });
+    } catch (err) {
+      setIdentityNotice({ type: 'error', text: apiError(err) });
+    } finally {
+      setIdentityLoading(false);
+    }
+  };
+
   return <FormDialog title="Nueva cotizacion" open={form.open} initial={initial} onClose={onClose} onSave={onSave}>
     {(v, set) => {
       const selectedProduct = products.find((product) => product.id === v.productId);
@@ -1386,8 +1471,21 @@ function QuoteDialog({ form, products, onClose, onSave }: DialogProps<Quote, typ
           onChange={(e) => set({ identificationNumber: e.target.value })}
           InputProps={{ endAdornment: <IdentificationLookupAdornment identification={v.identificationNumber} /> }}
         />
-        <TextField required label="Nombres" value={v.customerFirstNames} onChange={(e) => set({ customerFirstNames: e.target.value })} />
-        <TextField required label="Apellidos" value={v.customerLastNames} onChange={(e) => set({ customerLastNames: e.target.value })} />
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ xs: 'stretch', sm: 'center' }}>
+          <Button variant="outlined" startIcon={<AutoAwesome />} disabled={identityLoading || !identificationDigits(v.identificationNumber)} onClick={() => void lookupIdentity(v, set)}>
+            {identityLoading ? 'Consultando...' : 'Consultar'}
+          </Button>
+          <Typography variant="caption" color="text.secondary">Primero busca en el CRM; si no existe, consulta el proveedor externo.</Typography>
+        </Stack>
+        {identityNotice && <Alert severity={identityNotice.type === 'success' ? 'success' : identityNotice.type === 'info' ? 'info' : 'error'}>{identityNotice.text}</Alert>}
+        <FieldGrid>
+          <TextField fullWidth required label="Primer nombre" value={v.customerFirstName} onChange={(e) => set({ customerFirstName: e.target.value, customerFirstNames: fullFirstNames(e.target.value, v.customerMiddleName) })} />
+          <TextField fullWidth label="Segundo nombre" value={v.customerMiddleName} onChange={(e) => set({ customerMiddleName: e.target.value, customerFirstNames: fullFirstNames(v.customerFirstName, e.target.value) })} />
+        </FieldGrid>
+        <FieldGrid>
+          <TextField fullWidth required label="Primer apellido" value={v.customerLastName} onChange={(e) => set({ customerLastName: e.target.value, customerLastNames: fullLastNames(e.target.value, v.customerSecondLastName) })} />
+          <TextField fullWidth label="Segundo apellido" value={v.customerSecondLastName} onChange={(e) => set({ customerSecondLastName: e.target.value, customerLastNames: fullLastNames(v.customerLastName, e.target.value) })} />
+        </FieldGrid>
         <FieldGrid columns={3}>
           <TextField fullWidth required label="Indicativo" value={v.phoneCountryCode} onChange={(e) => set({ phoneCountryCode: e.target.value })} />
           <TextField fullWidth required label="Telefono / WhatsApp" value={v.phoneNumber} onChange={(e) => set({ phoneNumber: e.target.value })} sx={{ gridColumn: { sm: 'span 2' } }} />
@@ -1466,7 +1564,7 @@ function CreditApplicationDialog({ form, customers, products, quotes, deals, onC
           });
         }}>
           <MenuItem value="">Sin cotizacion</MenuItem>
-          {quotes.map((x) => <MenuItem key={x.id} value={x.id}>{x.number} - {x.customerFirstNames} {x.customerLastNames}</MenuItem>)}
+          {quotes.map((x) => <MenuItem key={x.id} value={x.id}>{x.number} - {fullFirstNames(x.customerFirstName, x.customerMiddleName, x.customerFirstNames)} {fullLastNames(x.customerLastName, x.customerSecondLastName, x.customerLastNames)}</MenuItem>)}
         </TextField>
         <TextField required select label="Cliente" value={v.customerId} onChange={(e) => set({ customerId: e.target.value })}>{customers.map((x) => <MenuItem key={x.id} value={x.id}>{x.firstNames || x.name} {x.lastNames}</MenuItem>)}</TextField>
         <TextField required select label="Producto principal" value={v.productId} onChange={(e) => {
@@ -1568,11 +1666,28 @@ function DocumentSummary({ application, onUpdate, onUpload, onDownload }: {
 }
 
 function LeadDialog({ form, onClose, onSave }: DialogProps<Lead, typeof emptyLead>) {
-  const initial = form.item ? { firstNames: form.item.firstNames || form.item.name, lastNames: form.item.lastNames ?? '', email: form.item.email, phone: form.item.phone ?? '', source: form.item.source, rating: form.item.rating } : emptyLead;
+  const initial = form.item ? {
+    firstNames: form.item.firstNames || form.item.name,
+    lastNames: form.item.lastNames ?? '',
+    firstName: form.item.firstName || (form.item.firstNames || form.item.name).split(' ')[0] || '',
+    middleName: form.item.middleName ?? (form.item.firstNames || '').split(' ').slice(1).join(' '),
+    lastName: form.item.lastName || (form.item.lastNames || '').split(' ')[0] || '',
+    secondLastName: form.item.secondLastName ?? (form.item.lastNames || '').split(' ').slice(1).join(' '),
+    email: form.item.email,
+    phone: form.item.phone ?? '',
+    source: form.item.source,
+    rating: form.item.rating
+  } : emptyLead;
   return <FormDialog title={form.item ? 'Editar prospecto' : 'Nuevo prospecto'} open={form.open} initial={initial} onClose={onClose} onSave={onSave}>
     {(v, set) => <>
-      <TextField required label="Nombres" value={v.firstNames} onChange={(e) => set({ firstNames: e.target.value })} />
-      <TextField required label="Apellidos" value={v.lastNames} onChange={(e) => set({ lastNames: e.target.value })} />
+      <FieldGrid>
+        <TextField fullWidth required label="Primer nombre" value={v.firstName} onChange={(e) => set({ firstName: e.target.value, firstNames: fullFirstNames(e.target.value, v.middleName) })} />
+        <TextField fullWidth label="Segundo nombre" value={v.middleName} onChange={(e) => set({ middleName: e.target.value, firstNames: fullFirstNames(v.firstName, e.target.value) })} />
+      </FieldGrid>
+      <FieldGrid>
+        <TextField fullWidth required label="Primer apellido" value={v.lastName} onChange={(e) => set({ lastName: e.target.value, lastNames: fullLastNames(e.target.value, v.secondLastName) })} />
+        <TextField fullWidth label="Segundo apellido" value={v.secondLastName} onChange={(e) => set({ secondLastName: e.target.value, lastNames: fullLastNames(v.lastName, e.target.value) })} />
+      </FieldGrid>
       <TextField required label="Email" value={v.email} onChange={(e) => set({ email: e.target.value })} />
       <TextField label="Telefono" value={v.phone} onChange={(e) => set({ phone: e.target.value })} />
       <TextField required label="Fuente" value={v.source} onChange={(e) => set({ source: e.target.value })} />

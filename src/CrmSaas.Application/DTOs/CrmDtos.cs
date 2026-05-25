@@ -7,6 +7,10 @@ public sealed record CustomerDto(
     string Name,
     string FirstNames,
     string LastNames,
+    string FirstName,
+    string? MiddleName,
+    string LastName,
+    string? SecondLastName,
     TipoIdentificacionColombia? IdentificationType,
     string? IdentificationNumber,
     string? CompanyName,
@@ -24,6 +28,10 @@ public sealed record UpsertCustomerDto(
     string? Name,
     string FirstNames,
     string LastNames,
+    string? FirstName,
+    string? MiddleName,
+    string? LastName,
+    string? SecondLastName,
     TipoIdentificacionColombia? IdentificationType,
     string? IdentificationNumber,
     string? CompanyName,
@@ -38,8 +46,8 @@ public sealed record UpsertCustomerDto(
     string? Tags,
     string? Notes);
 
-public sealed record LeadDto(Guid Id, string Name, string FirstNames, string LastNames, string Email, string? Phone, string Source, CalificacionProspecto Rating, bool Converted, Guid? CustomerId);
-public sealed record UpsertLeadDto(string? Name, string FirstNames, string LastNames, string Email, string? Phone, string Source, CalificacionProspecto Rating);
+public sealed record LeadDto(Guid Id, string Name, string FirstNames, string LastNames, string FirstName, string? MiddleName, string LastName, string? SecondLastName, string Email, string? Phone, string Source, CalificacionProspecto Rating, bool Converted, Guid? CustomerId);
+public sealed record UpsertLeadDto(string? Name, string FirstNames, string LastNames, string? FirstName, string? MiddleName, string? LastName, string? SecondLastName, string Email, string? Phone, string Source, CalificacionProspecto Rating);
 
 public sealed record DealStageDto(Guid Id, string Name, int Order, decimal DefaultProbability, bool Active);
 public sealed record UpsertDealStageDto(string Name, int Order, decimal DefaultProbability, bool Active);
@@ -72,6 +80,10 @@ public sealed record QuoteDto(
     string? IdentificationNumber,
     string CustomerFirstNames,
     string CustomerLastNames,
+    string CustomerFirstName,
+    string? CustomerMiddleName,
+    string CustomerLastName,
+    string? CustomerSecondLastName,
     Guid CustomerId,
     Guid ProductId,
     string ProductName,
@@ -90,6 +102,10 @@ public sealed record CreateQuoteDto(
     string? IdentificationNumber,
     string CustomerFirstNames,
     string CustomerLastNames,
+    string? CustomerFirstName,
+    string? CustomerMiddleName,
+    string? CustomerLastName,
+    string? CustomerSecondLastName,
     string? PhoneCountryCode,
     string? PhoneNumber,
     Guid ProductId,
@@ -97,6 +113,22 @@ public sealed record CreateQuoteDto(
     int TermMonths,
     decimal MonthlyInterestRate,
     string? Notes);
+
+public sealed record ColombianIdentityLookupDto(
+    string DocumentNumber,
+    string? DocumentType,
+    string? FirstName,
+    string? MiddleName,
+    string? LastName,
+    string? SecondLastName,
+    string? FullName,
+    DateTime? DateOfBirth,
+    DateTime? ExpeditionDate,
+    string? ExpeditionCity,
+    string? ExpeditionDepartment,
+    string? Gender,
+    bool? IsAlive,
+    string Source);
 
 public sealed record CreditApplicationDto(
     Guid Id,
