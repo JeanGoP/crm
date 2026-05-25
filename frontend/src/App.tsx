@@ -1,9 +1,9 @@
 ﻿import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Navigate, NavLink, Route, Routes, useNavigate, useParams } from 'react-router-dom';
 import {
-  Alert, AppBar, Box, Button, Card, CardContent, Chip, CssBaseline, Dialog, DialogActions,
+  Alert, AppBar, Box, Button, Card, CardContent, Checkbox, Chip, CssBaseline, Dialog, DialogActions,
   DialogContent, DialogTitle, Divider, Drawer, Grid, IconButton, LinearProgress, MenuItem,
-  Paper, Snackbar, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, InputAdornment,
+  FormControlLabel, Paper, Snackbar, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, InputAdornment,
   ThemeProvider, Toolbar, Tooltip, Typography, createTheme, useMediaQuery, useTheme
 } from '@mui/material';
 import DashboardIcon from '@mui/icons-material/Dashboard';
@@ -25,6 +25,7 @@ import ReceiptLong from '@mui/icons-material/ReceiptLong';
 import Download from '@mui/icons-material/Download';
 import UploadFile from '@mui/icons-material/UploadFile';
 import Assignment from '@mui/icons-material/Assignment';
+import LocalShipping from '@mui/icons-material/LocalShipping';
 import Visibility from '@mui/icons-material/Visibility';
 import AddTask from '@mui/icons-material/AddTask';
 import WhatsApp from '@mui/icons-material/WhatsApp';
@@ -33,7 +34,7 @@ import AutoAwesome from '@mui/icons-material/AutoAwesome';
 import { AxiosError } from 'axios';
 import { api } from './api';
 import { useAuthStore } from './store';
-import { Activity, ColombianIdentityLookup, CommercialReports, Company, CreditApplication, CreditDocument, Customer, Customer360, CustomerAiAnalysis, CustomerTimelineItem, Dashboard, Deal, DealStage, Lead, Product, Quote, User } from './types';
+import { Activity, ColombianIdentityLookup, CommercialReports, Company, CreditApplication, CreditDocument, Customer, Customer360, CustomerAiAnalysis, CustomerTimelineItem, Dashboard, Deal, DealStage, Lead, MotorcycleDelivery, Product, Quote, User } from './types';
 
 const drawerWidth = 248;
 const today = new Date().toISOString().slice(0, 10);
@@ -64,6 +65,7 @@ const nav: NavItem[] = [
   { to: '/cotizaciones', label: 'Cotizaciones', icon: <ReceiptLong /> },
   { to: '/clientes', label: 'Clientes', icon: <Groups /> },
   { to: '/solicitudes-credito', label: 'Solicitudes credito', icon: <Assignment /> },
+  { to: '/entregas', label: 'Entregas', icon: <LocalShipping /> },
   { to: '/pipeline', label: 'Pipeline', icon: <ViewKanban /> },
   { to: '/actividades', label: 'Actividades', icon: <EventNote /> },
   { to: '/productos', label: 'Productos', icon: <Inventory2 /> },
@@ -109,6 +111,23 @@ const emptyCreditApplication = {
   coDebtorName: '', coDebtorIdentification: '', coDebtorMobile: '', coDebtorRelationship: '', coDebtorMonthlyIncome: 0,
   reference1Name: '', reference1Mobile: '', reference1Relationship: '', reference2Name: '', reference2Mobile: '', reference2Relationship: '',
   status: 1, notes: ''
+};
+const emptyMotorcycleDelivery = {
+  creditApplicationId: '',
+  deliveryDate: `${today}T09:00`,
+  responsibleAdvisor: '',
+  vin: '',
+  chassisNumber: '',
+  engineNumber: '',
+  plate: '',
+  deliveryMileage: '',
+  helmetDelivered: false,
+  soatDelivered: false,
+  registrationDelivered: false,
+  warrantyManualDelivered: false,
+  deliveryCertificateSigned: false,
+  status: 1,
+  notes: ''
 };
 
 function fullFirstNames(firstName?: string, middleName?: string, fallback?: string) {
@@ -183,6 +202,7 @@ function Layout() {
             <Route path="/productos" element={<ProductsPage />} />
             <Route path="/cotizaciones" element={<QuotesPage />} />
             <Route path="/solicitudes-credito" element={<CreditApplicationsPage />} />
+            <Route path="/entregas" element={<MotorcycleDeliveriesPage />} />
             <Route path="/prospectos" element={<LeadsPage />} />
             <Route path="/pipeline" element={<PipelinePage />} />
             <Route path="/actividades" element={<ActivitiesPage />} />
@@ -779,6 +799,121 @@ function ApprovalSummary({ application, onDecision }: { application: CreditAppli
       {actions.length ? actions.map((action) => <Button key={action.status} size="small" variant="outlined" onClick={() => onDecision(application, action.status)}>{action.label}</Button>) : <Chip size="small" label="Sin acciones" variant="outlined" />}
     </Stack>
   </Stack>;
+}
+
+function MotorcycleDeliveriesPage() {
+  const { data: rows = [], loading, error, reload, setData } = useResource<MotorcycleDelivery[]>('/api/motorcycle-deliveries', []);
+  const { data: applications = [] } = useResource<CreditApplication[]>('/api/credit-applications', []);
+  const [form, setForm] = useState<FormMode<MotorcycleDelivery>>({ open: false });
+  const [notice, setNotice] = useState<Notice>();
+  const eligibleApplications = applications.filter((x) => x.status === 5 || x.status === 7);
+
+  const save = async (payload: typeof emptyMotorcycleDelivery) => {
+    const body = {
+      ...payload,
+      deliveryDate: new Date(payload.deliveryDate).toISOString(),
+      responsibleAdvisor: payload.responsibleAdvisor || null,
+      vin: payload.vin || null,
+      chassisNumber: payload.chassisNumber || null,
+      engineNumber: payload.engineNumber || null,
+      plate: payload.plate || null,
+      deliveryMileage: payload.deliveryMileage === '' ? null : Number(payload.deliveryMileage),
+      status: Number(payload.status),
+      notes: payload.notes || null
+    };
+    const { data } = form.item
+      ? await api.put<MotorcycleDelivery>(`/api/motorcycle-deliveries/${form.item.id}`, body)
+      : await api.post<MotorcycleDelivery>('/api/motorcycle-deliveries', body);
+    setData(form.item ? rows.map((x) => x.id === data.id ? data : x) : [data, ...rows]);
+    setNotice({ type: 'success', text: form.item ? 'Entrega actualizada.' : 'Entrega registrada.' });
+    setForm({ open: false });
+  };
+
+  return <Stack spacing={3}>
+    <Header title="Entregas de motos" action="Nueva entrega" onAction={() => setForm({ open: true })} onRefresh={reload} />
+    <StatusBar loading={loading} error={error} />
+    <EntityTable
+      headers={['Numero', 'Cliente', 'Producto', 'Estado', 'Fecha', 'Tecnicos', 'Documentos', 'Acciones']}
+      empty="No hay entregas registradas"
+      rows={rows.map((r) => [
+        r.number,
+        <Row primary={r.customerName} secondary={r.creditApplicationNumber} />,
+        r.productName,
+        <StatusChip label={deliveryStatus(r.status)} tone={r.status === 2 ? 'success' : r.status === 3 ? 'error' : 'warning'} />,
+        <Row primary={new Date(r.deliveryDate).toLocaleString()} secondary={r.responsibleAdvisor ?? 'Sin asesor'} />,
+        <Stack spacing={.5}>
+          <Typography variant="body2">Chasis: {r.chassisNumber || '-'}</Typography>
+          <Typography variant="body2">Motor: {r.engineNumber || '-'}</Typography>
+          <Typography variant="body2">Placa: {r.plate || '-'}</Typography>
+        </Stack>,
+        <DeliveryChecklist delivery={r} />,
+        <Actions onEdit={() => setForm({ open: true, item: r })} />
+      ])}
+    />
+    <MotorcycleDeliveryDialog form={form} applications={eligibleApplications} onClose={() => setForm({ open: false })} onSave={save} />
+    <Notice notice={notice} onClose={() => setNotice(undefined)} />
+  </Stack>;
+}
+
+function DeliveryChecklist({ delivery }: { delivery: MotorcycleDelivery }) {
+  const items = [
+    ['Casco', delivery.helmetDelivered],
+    ['SOAT', delivery.soatDelivered],
+    ['Matricula', delivery.registrationDelivered],
+    ['Garantia', delivery.warrantyManualDelivered],
+    ['Acta', delivery.deliveryCertificateSigned]
+  ];
+  return <Stack direction="row" gap={.5} flexWrap="wrap">
+    {items.map(([label, ok]) => <Chip key={String(label)} size="small" label={label} color={ok ? 'success' : undefined} variant={ok ? 'filled' : 'outlined'} />)}
+  </Stack>;
+}
+
+function MotorcycleDeliveryDialog({ form, applications, onClose, onSave }: DialogProps<MotorcycleDelivery, typeof emptyMotorcycleDelivery> & { applications: CreditApplication[] }) {
+  const initial = form.item ? {
+    creditApplicationId: form.item.creditApplicationId,
+    deliveryDate: toInputDateTime(form.item.deliveryDate),
+    responsibleAdvisor: form.item.responsibleAdvisor ?? '',
+    vin: form.item.vin ?? '',
+    chassisNumber: form.item.chassisNumber ?? '',
+    engineNumber: form.item.engineNumber ?? '',
+    plate: form.item.plate ?? '',
+    deliveryMileage: form.item.deliveryMileage?.toString() ?? '',
+    helmetDelivered: form.item.helmetDelivered,
+    soatDelivered: form.item.soatDelivered,
+    registrationDelivered: form.item.registrationDelivered,
+    warrantyManualDelivered: form.item.warrantyManualDelivered,
+    deliveryCertificateSigned: form.item.deliveryCertificateSigned,
+    status: form.item.status,
+    notes: form.item.notes ?? ''
+  } : { ...emptyMotorcycleDelivery, creditApplicationId: applications[0]?.id ?? '' };
+
+  return <FormDialog open={form.open} title={form.item ? 'Editar entrega' : 'Nueva entrega'} initial={initial} onClose={onClose} onSave={onSave}>
+    {(v, set) => <>
+      <TextField select label="Solicitud aprobada" value={v.creditApplicationId} onChange={(e) => set({ creditApplicationId: e.target.value })} disabled={!!form.item} fullWidth>
+        {applications.map((x) => <MenuItem key={x.id} value={x.id}>{x.number} - {x.customerName} - {x.productName}</MenuItem>)}
+      </TextField>
+      <Grid container spacing={2}>
+        <Grid item xs={12} md={6}><TextField type="datetime-local" label="Fecha entrega" value={v.deliveryDate} onChange={(e) => set({ deliveryDate: e.target.value })} fullWidth InputLabelProps={{ shrink: true }} /></Grid>
+        <Grid item xs={12} md={6}><TextField label="Asesor responsable" value={v.responsibleAdvisor} onChange={(e) => set({ responsibleAdvisor: e.target.value })} fullWidth /></Grid>
+        <Grid item xs={12} md={6}><TextField label="VIN" value={v.vin} onChange={(e) => set({ vin: e.target.value })} fullWidth /></Grid>
+        <Grid item xs={12} md={6}><TextField label="Numero chasis" value={v.chassisNumber} onChange={(e) => set({ chassisNumber: e.target.value })} fullWidth /></Grid>
+        <Grid item xs={12} md={6}><TextField label="Numero motor" value={v.engineNumber} onChange={(e) => set({ engineNumber: e.target.value })} fullWidth /></Grid>
+        <Grid item xs={12} md={3}><TextField label="Placa" value={v.plate} onChange={(e) => set({ plate: e.target.value })} fullWidth /></Grid>
+        <Grid item xs={12} md={3}><TextField type="number" label="Kilometraje" value={v.deliveryMileage} onChange={(e) => set({ deliveryMileage: e.target.value })} fullWidth /></Grid>
+      </Grid>
+      <TextField select label="Estado" value={v.status} onChange={(e) => set({ status: Number(e.target.value) })} fullWidth>
+        {[1, 2, 3].map((x) => <MenuItem key={x} value={x}>{deliveryStatus(x)}</MenuItem>)}
+      </TextField>
+      <Grid container spacing={1}>
+        <Grid item xs={12} sm={6}><FormControlLabel control={<Checkbox checked={v.helmetDelivered} onChange={(e) => set({ helmetDelivered: e.target.checked })} />} label="Casco entregado" /></Grid>
+        <Grid item xs={12} sm={6}><FormControlLabel control={<Checkbox checked={v.soatDelivered} onChange={(e) => set({ soatDelivered: e.target.checked })} />} label="SOAT entregado" /></Grid>
+        <Grid item xs={12} sm={6}><FormControlLabel control={<Checkbox checked={v.registrationDelivered} onChange={(e) => set({ registrationDelivered: e.target.checked })} />} label="Matricula entregada" /></Grid>
+        <Grid item xs={12} sm={6}><FormControlLabel control={<Checkbox checked={v.warrantyManualDelivered} onChange={(e) => set({ warrantyManualDelivered: e.target.checked })} />} label="Manual/garantia" /></Grid>
+        <Grid item xs={12}><FormControlLabel control={<Checkbox checked={v.deliveryCertificateSigned} onChange={(e) => set({ deliveryCertificateSigned: e.target.checked })} />} label="Acta de entrega firmada" /></Grid>
+      </Grid>
+      <TextField label="Observaciones" value={v.notes} onChange={(e) => set({ notes: e.target.value })} fullWidth multiline minRows={2} />
+    </>}
+  </FormDialog>;
 }
 
 type CreditTemplate = { id: 'solicitud-credito' | 'autorizacion-datos' | 'carta-aprobacion' | 'orden-entrega'; label: string; disabled?: (application: CreditApplication) => boolean; reason?: string };
@@ -2157,6 +2292,7 @@ function activityStatus(value: number) { return ['-', 'Pendiente', 'En proceso',
 function dealStatus(value: number) { return ['-', 'Abierto', 'Ganado', 'Perdido'][value] ?? 'Abierto'; }
 function creditStatus(value: number) { return ['-', 'Borrador', 'Documentos pendientes', 'Documentos recibidos', 'En estudio', 'Aprobada', 'Rechazada', 'Desembolsada'][value] ?? 'Borrador'; }
 function documentStatus(value: number) { return ['-', 'Pendiente', 'Recibido', 'Validado', 'Rechazado'][value] ?? 'Pendiente'; }
+function deliveryStatus(value: number) { return ['-', 'Programada', 'Entregada', 'Cancelada'][value] ?? 'Programada'; }
 const identificationOptions = [
   { value: 1, label: 'Cedula de ciudadania' },
   { value: 2, label: 'Cedula de extranjeria' },

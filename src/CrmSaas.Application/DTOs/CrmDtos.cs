@@ -218,6 +218,47 @@ public sealed record UpsertCreditDocumentDto(TipoDocumentoCredito Type, string N
 public sealed record ChangeCreditApplicationStatusDto(EstadoSolicitudCredito Status);
 public sealed record CreditApplicationDecisionDto(EstadoSolicitudCredito Status, string? Notes);
 
+public sealed record MotorcycleDeliveryDto(
+    Guid Id,
+    string Number,
+    Guid CreditApplicationId,
+    string CreditApplicationNumber,
+    Guid CustomerId,
+    string CustomerName,
+    Guid ProductId,
+    string ProductName,
+    DateTime DeliveryDate,
+    string? ResponsibleAdvisor,
+    string? Vin,
+    string? ChassisNumber,
+    string? EngineNumber,
+    string? Plate,
+    int? DeliveryMileage,
+    bool HelmetDelivered,
+    bool SoatDelivered,
+    bool RegistrationDelivered,
+    bool WarrantyManualDelivered,
+    bool DeliveryCertificateSigned,
+    EstadoEntregaMoto Status,
+    string? Notes);
+
+public sealed record UpsertMotorcycleDeliveryDto(
+    Guid CreditApplicationId,
+    DateTime DeliveryDate,
+    string? ResponsibleAdvisor,
+    string? Vin,
+    string? ChassisNumber,
+    string? EngineNumber,
+    string? Plate,
+    int? DeliveryMileage,
+    bool HelmetDelivered,
+    bool SoatDelivered,
+    bool RegistrationDelivered,
+    bool WarrantyManualDelivered,
+    bool DeliveryCertificateSigned,
+    EstadoEntregaMoto Status,
+    string? Notes);
+
 public sealed record Customer360Dto(
     CustomerDto Customer,
     IReadOnlyCollection<QuoteDto> Quotes,

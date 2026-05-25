@@ -23,6 +23,7 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
     public DbSet<Cotizacion> Cotizaciones => Set<Cotizacion>();
     public DbSet<SolicitudCredito> SolicitudesCredito => Set<SolicitudCredito>();
     public DbSet<DocumentoSolicitudCredito> DocumentosSolicitudCredito => Set<DocumentoSolicitudCredito>();
+    public DbSet<EntregaMoto> EntregasMoto => Set<EntregaMoto>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -42,6 +43,7 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
         modelBuilder.Entity<Cotizacion>().ToTable("Cotizaciones");
         modelBuilder.Entity<SolicitudCredito>().ToTable("SolicitudesCredito");
         modelBuilder.Entity<DocumentoSolicitudCredito>().ToTable("DocumentosSolicitudCredito");
+        modelBuilder.Entity<EntregaMoto>().ToTable("EntregasMoto");
 
         foreach (var entityType in modelBuilder.Model.GetEntityTypes().Where(t => typeof(AuditableTenantEntity).IsAssignableFrom(t.ClrType)))
         {
@@ -79,6 +81,17 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
         modelBuilder.Entity<SolicitudCredito>().Property(x => x.UsuarioDecision).HasMaxLength(180);
         modelBuilder.Entity<SolicitudCredito>().HasIndex(x => new { x.EmpresaId, x.Numero }).IsUnique();
         modelBuilder.Entity<DocumentoSolicitudCredito>().HasIndex(x => new { x.EmpresaId, x.SolicitudCreditoId, x.Tipo });
+        modelBuilder.Entity<EntregaMoto>().Property(x => x.Numero).HasMaxLength(40);
+        modelBuilder.Entity<EntregaMoto>().Property(x => x.AsesorResponsable).HasMaxLength(180);
+        modelBuilder.Entity<EntregaMoto>().Property(x => x.Vin).HasMaxLength(80);
+        modelBuilder.Entity<EntregaMoto>().Property(x => x.NumeroChasis).HasMaxLength(80);
+        modelBuilder.Entity<EntregaMoto>().Property(x => x.NumeroMotor).HasMaxLength(80);
+        modelBuilder.Entity<EntregaMoto>().Property(x => x.Placa).HasMaxLength(20);
+        modelBuilder.Entity<EntregaMoto>().HasIndex(x => new { x.EmpresaId, x.Numero }).IsUnique();
+        modelBuilder.Entity<EntregaMoto>().HasIndex(x => new { x.EmpresaId, x.SolicitudCreditoId }).IsUnique();
+        modelBuilder.Entity<EntregaMoto>().HasOne(x => x.SolicitudCredito).WithMany().HasForeignKey(x => x.SolicitudCreditoId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<EntregaMoto>().HasOne(x => x.Cliente).WithMany().HasForeignKey(x => x.ClienteId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<EntregaMoto>().HasOne(x => x.Producto).WithMany().HasForeignKey(x => x.ProductoId).OnDelete(DeleteBehavior.Restrict);
 
         modelBuilder.Entity<Empresa>().HasQueryFilter(x => !tenantContext.EmpresaId.HasValue || x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<Usuario>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
@@ -96,6 +109,7 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
         modelBuilder.Entity<Cotizacion>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<SolicitudCredito>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<DocumentoSolicitudCredito>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
+        modelBuilder.Entity<EntregaMoto>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

@@ -1,14 +1,14 @@
 # Manual del Sistema CRM SaaS
 
-Ultima actualizacion: 2026-05-13  
-Version del manual: 3.0  
+Ultima actualizacion: 2026-05-25  
+Version del manual: 3.5  
 Sistema: CRM SaaS para ventas de motos a credito  
 Ambiente documentado: Desarrollo local conectado a SQL Server
 Zona horaria operativa: Colombia UTC-5
 
 ## 1. Objetivo del sistema
 
-El CRM permite gestionar el proceso comercial completo de una empresa de venta de motos a credito: clientes, productos, cotizaciones, solicitudes de credito, documentos, prospectos, pipeline, actividades, reportes comerciales, usuarios, roles y empresas.
+El CRM permite gestionar el proceso comercial completo de una empresa de venta de motos a credito: clientes, productos, cotizaciones, solicitudes de credito, entregas, documentos, prospectos, pipeline, actividades, reportes comerciales, usuarios, roles y empresas.
 
 El sistema esta pensado para operar como SaaS multiempresa. Cada usuario pertenece a una empresa y los datos que registra quedan asociados automaticamente a esa empresa.
 
@@ -67,8 +67,9 @@ El menu lateral permite moverse entre:
 
 - Dashboard
 - Cotizaciones
-- Solicitudes credito
 - Clientes
+- Solicitudes credito
+- Entregas
 - Pipeline
 - Actividades
 - Productos
@@ -84,8 +85,9 @@ El menu lateral muestra todos los modulos principales disponibles para operacion
 
 - Dashboard
 - Cotizaciones
-- Solicitudes de credito
 - Clientes
+- Solicitudes de credito
+- Entregas
 - Pipeline
 - Actividades
 - Productos
@@ -475,7 +477,36 @@ Reglas principales:
 - Rechazada: negocio perdido.
 - Desembolsada: negocio ganado y etapa entregada.
 
-## 11. Prospectos
+## 11. Entregas
+
+### Para que sirve
+
+Permite registrar la entrega fisica de la moto despues de que una solicitud de credito fue aprobada o desembolsada. Esta opcion completa el ciclo comercial desde la cotizacion hasta la entrega al cliente.
+
+### Datos principales
+
+- Solicitud aprobada asociada.
+- Fecha y hora de entrega.
+- Asesor responsable.
+- VIN, numero de chasis, numero de motor y placa.
+- Kilometraje al momento de entrega.
+- Checklist: casco, SOAT, matricula, manual/garantia y acta de entrega firmada.
+- Estado: programada, entregada o cancelada.
+- Observaciones.
+
+### Crear entrega
+
+1. Abra **Entregas**.
+2. Presione **Nueva entrega**.
+3. Seleccione una solicitud aprobada o desembolsada.
+4. Complete los datos tecnicos de la moto.
+5. Marque los documentos y elementos entregados.
+6. Si la entrega ya se realizo, cambie el estado a **Entregada**.
+7. Guarde.
+
+Cuando una entrega se marca como **Entregada**, la solicitud relacionada queda como **Desembolsada**, lo que permite cerrar el proceso comercial.
+
+## 12. Prospectos
 
 ![Prospectos](./assets/manual/07-prospectos.png)
 
@@ -514,7 +545,7 @@ Permite registrar personas interesadas que aun no son clientes. Un prospecto rep
 3. El sistema crea el cliente con nombres y apellidos separados.
 4. Continue completando la informacion desde **Clientes**.
 
-## 12. Pipeline
+## 13. Pipeline
 
 ![Pipeline](./assets/manual/08-pipeline.png)
 
@@ -556,7 +587,7 @@ Permite visualizar y gestionar los negocios de venta a credito por etapas.
 
 Si una solicitud de credito esta relacionada con un negocio, los cambios de estado pueden actualizar la etapa del pipeline.
 
-## 13. Actividades
+## 14. Actividades
 
 ![Actividades](./assets/manual/09-actividades.png)
 
@@ -616,7 +647,7 @@ Desde la tabla de actividades se puede:
 - Relacionar la actividad al cliente o negocio correcto.
 - Marcar como completada cuando se realice.
 
-## 14. Reportes comerciales
+## 15. Reportes comerciales
 
 ![Reportes comerciales](./assets/manual/11-reportes.png)
 
@@ -658,7 +689,7 @@ Por defecto el sistema muestra el mes actual.
 4. Revise indicadores y tablas.
 5. Use los resultados para priorizar vendedores, productos y seguimiento comercial.
 
-## 15. Configuracion
+## 16. Configuracion
 
 ![Configuracion](./assets/manual/10-configuracion.png)
 
@@ -711,7 +742,7 @@ Datos principales:
 5. Asigne uno o varios roles.
 6. Guarde.
 
-## 16. Manejo de errores
+## 17. Manejo de errores
 
 El sistema muestra mensajes cuando una accion no se puede completar.
 
@@ -728,20 +759,22 @@ Recomendacion:
 
 Si aparece un error, revise primero los datos ingresados. Si el error persiste, contacte al administrador tecnico con la fecha, usuario y pantalla donde ocurrio.
 
-## 17. Recomendaciones operativas
+## 18. Recomendaciones operativas
 
 - Mantener productos actualizados antes de cotizar.
 - Crear cotizacion antes de iniciar credito cuando el cliente aun esta decidiendo.
 - Usar prospectos para interesados que no han pedido cotizacion formal.
 - Convertir prospectos a clientes cuando el proceso avance.
 - Subir documentos reales en la solicitud de credito.
+- Registrar la entrega de la moto cuando la solicitud este aprobada y validar datos tecnicos antes de marcarla como entregada.
 - Mantener el pipeline actualizado para que el dashboard refleje la realidad comercial.
 - Registrar actividades despues de cada interaccion importante.
 
-## 18. Historial del manual
+## 19. Historial del manual
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-05-25 | 3.5 | Se agrega el modulo Entregas para registrar entrega fisica de motos, datos tecnicos, checklist y cierre de solicitudes aprobadas. |
 | 2026-05-25 | 3.4 | Se reorganiza el menu principal de acuerdo con el flujo comercial: dashboard, cotizaciones, clientes, credito, pipeline, actividades, productos, prospectos, reportes y configuracion. |
 | 2026-05-25 | 3.3 | Se habilitan todos los menus principales: solicitudes de credito, prospectos, pipeline, actividades y reportes. |
 | 2026-05-18 | 3.2 | El boton de consulta de identidad ahora se llama Consultar y busca primero en la base de datos antes de consumir Verifik. |

@@ -9,3 +9,4 @@ public enum TipoIdentificacionColombia { CedulaCiudadania = 1, CedulaExtranjeria
 public enum EstadoSolicitudCredito { Borrador = 1, DocumentosPendientes = 2, DocumentosRecibidos = 3, EnEstudio = 4, Aprobada = 5, Rechazada = 6, Desembolsada = 7 }
 public enum TipoDocumentoCredito { Cedula = 1, SoporteIngresos = 2, ReciboServicio = 3, Referencias = 4, Otro = 5 }
 public enum EstadoDocumentoCredito { Pendiente = 1, Recibido = 2, Validado = 3, Rechazado = 4 }
+public enum EstadoEntregaMoto { Programada = 1, Entregada = 2, Cancelada = 3 }

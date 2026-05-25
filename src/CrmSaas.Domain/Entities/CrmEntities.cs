@@ -204,3 +204,28 @@ public sealed class DocumentoSolicitudCredito : AuditableTenantEntity
     public long? TamanoBytes { get; set; }
     public DateTime? FechaCarga { get; set; }
 }
+
+public sealed class EntregaMoto : AuditableTenantEntity
+{
+    public string Numero { get; set; } = string.Empty;
+    public Guid SolicitudCreditoId { get; set; }
+    public SolicitudCredito? SolicitudCredito { get; set; }
+    public Guid ClienteId { get; set; }
+    public Cliente? Cliente { get; set; }
+    public Guid ProductoId { get; set; }
+    public Producto? Producto { get; set; }
+    public DateTime FechaEntrega { get; set; } = ColombiaTime.Now;
+    public string? AsesorResponsable { get; set; }
+    public string? Vin { get; set; }
+    public string? NumeroChasis { get; set; }
+    public string? NumeroMotor { get; set; }
+    public string? Placa { get; set; }
+    public int? KilometrajeEntrega { get; set; }
+    public bool CascoEntregado { get; set; }
+    public bool SoatEntregado { get; set; }
+    public bool MatriculaEntregada { get; set; }
+    public bool ManualGarantiaEntregado { get; set; }
+    public bool ActaEntregaFirmada { get; set; }
+    public EstadoEntregaMoto Estado { get; set; } = EstadoEntregaMoto.Programada;
+    public string? Observaciones { get; set; }
+}

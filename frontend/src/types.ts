@@ -206,6 +206,31 @@ export interface CreditApplication {
   documents: CreditDocument[];
 }
 
+export interface MotorcycleDelivery {
+  id: string;
+  number: string;
+  creditApplicationId: string;
+  creditApplicationNumber: string;
+  customerId: string;
+  customerName: string;
+  productId: string;
+  productName: string;
+  deliveryDate: string;
+  responsibleAdvisor?: string;
+  vin?: string;
+  chassisNumber?: string;
+  engineNumber?: string;
+  plate?: string;
+  deliveryMileage?: number;
+  helmetDelivered: boolean;
+  soatDelivered: boolean;
+  registrationDelivered: boolean;
+  warrantyManualDelivered: boolean;
+  deliveryCertificateSigned: boolean;
+  status: number;
+  notes?: string;
+}
+
 export interface Customer360 {
   customer: Customer;
   quotes: Quote[];
