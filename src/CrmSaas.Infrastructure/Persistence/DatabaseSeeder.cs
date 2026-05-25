@@ -76,15 +76,14 @@ public static class DatabaseSeeder
         if (!await db.EtapasNegocio.IgnoreQueryFilters().AnyAsync(x => x.EmpresaId == empresaId, cancellationToken))
         {
             db.EtapasNegocio.AddRange(
-                new EtapaNegocio { EmpresaId = empresaId, Nombre = "Nuevo prospecto", Orden = 1, ProbabilidadPredeterminada = 10 },
-                new EtapaNegocio { EmpresaId = empresaId, Nombre = "Contacto inicial", Orden = 2, ProbabilidadPredeterminada = 20 },
-                new EtapaNegocio { EmpresaId = empresaId, Nombre = "Preaprobacion", Orden = 3, ProbabilidadPredeterminada = 35 },
-                new EtapaNegocio { EmpresaId = empresaId, Nombre = "Documentos recibidos", Orden = 4, ProbabilidadPredeterminada = 50 },
-                new EtapaNegocio { EmpresaId = empresaId, Nombre = "Estudio de credito", Orden = 5, ProbabilidadPredeterminada = 65 },
-                new EtapaNegocio { EmpresaId = empresaId, Nombre = "Aprobado", Orden = 6, ProbabilidadPredeterminada = 80 },
-                new EtapaNegocio { EmpresaId = empresaId, Nombre = "Separada", Orden = 7, ProbabilidadPredeterminada = 90 },
-                new EtapaNegocio { EmpresaId = empresaId, Nombre = "Entregada", Orden = 8, ProbabilidadPredeterminada = 100 },
-                new EtapaNegocio { EmpresaId = empresaId, Nombre = "Perdido", Orden = 9, ProbabilidadPredeterminada = 0 });
+                new EtapaNegocio { EmpresaId = empresaId, Nombre = "Cotizado", Orden = 1, ProbabilidadPredeterminada = 10 },
+                new EtapaNegocio { EmpresaId = empresaId, Nombre = "Interesado", Orden = 2, ProbabilidadPredeterminada = 20 },
+                new EtapaNegocio { EmpresaId = empresaId, Nombre = "Documentos pendientes", Orden = 3, ProbabilidadPredeterminada = 35 },
+                new EtapaNegocio { EmpresaId = empresaId, Nombre = "Credito en estudio", Orden = 4, ProbabilidadPredeterminada = 65 },
+                new EtapaNegocio { EmpresaId = empresaId, Nombre = "Aprobado", Orden = 5, ProbabilidadPredeterminada = 80 },
+                new EtapaNegocio { EmpresaId = empresaId, Nombre = "Rechazado", Orden = 6, ProbabilidadPredeterminada = 0 },
+                new EtapaNegocio { EmpresaId = empresaId, Nombre = "Entregado", Orden = 7, ProbabilidadPredeterminada = 100 },
+                new EtapaNegocio { EmpresaId = empresaId, Nombre = "Desistido", Orden = 8, ProbabilidadPredeterminada = 0 });
         }
 
         await db.SaveChangesAsync(cancellationToken);

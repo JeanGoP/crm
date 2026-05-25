@@ -1,7 +1,7 @@
 # Manual del Sistema CRM SaaS
 
 Ultima actualizacion: 2026-05-25  
-Version del manual: 3.5  
+Version del manual: 3.6  
 Sistema: CRM SaaS para ventas de motos a credito  
 Ambiente documentado: Desarrollo local conectado a SQL Server
 Zona horaria operativa: Colombia UTC-5
@@ -362,23 +362,26 @@ Permite gestionar el tramite de credito de un producto para un cliente.
 
 ### Estados de solicitud
 
-- Borrador
+- Cotizado
+- Interesado
 - Documentos pendientes
-- Documentos recibidos
-- En estudio
-- Aprobada
-- Rechazada
-- Desembolsada
+- Credito en estudio
+- Aprobado
+- Rechazado
+- Entregado
+- Desistido
 
 ### Flujo de aprobacion
 
 El sistema permite avanzar la solicitud con acciones controladas:
 
 - **Enviar:** pasa de borrador a documentos pendientes y registra la fecha de envio.
+- **Interesado:** marca que el cliente desea continuar despues de la cotizacion.
 - **Estudio:** pasa a estudio cuando todos los documentos estan recibidos o validados.
 - **Aprobar:** solo se permite desde el estado en estudio.
 - **Rechazar:** marca la solicitud como rechazada y mueve el pipeline a perdido si existe negocio relacionado.
-- **Desembolsar:** solo se permite despues de aprobar y marca el negocio como ganado/entregado si esta relacionado.
+- **Entregar:** solo se permite despues de aprobar y marca el negocio como ganado/entregado si esta relacionado.
+- **Desistir:** cierra el caso cuando el cliente decide no continuar.
 
 Cada decision guarda:
 
@@ -462,7 +465,7 @@ En la columna **Acciones**, el icono de **IA** permite analizar el cliente asoci
 ### Validar o rechazar documentos
 
 1. En el selector de estado del documento, cambie a **Validado** o **Rechazado**.
-2. Si todos los documentos estan recibidos o validados, la solicitud pasa a **Documentos recibidos**.
+2. Si todos los documentos estan recibidos o validados, la solicitud pasa a **Credito en estudio**.
 
 ### Relacion con pipeline
 
@@ -470,12 +473,14 @@ Cuando la solicitud cambia de estado, el negocio relacionado puede moverse autom
 
 Reglas principales:
 
-- Documentos pendientes: etapa de preaprobacion.
-- Documentos recibidos: etapa documentos recibidos.
-- En estudio: etapa estudio de credito.
-- Aprobada: etapa aprobado.
-- Rechazada: negocio perdido.
-- Desembolsada: negocio ganado y etapa entregada.
+- Cotizado: etapa cotizado.
+- Interesado: etapa interesado.
+- Documentos pendientes: etapa documentos pendientes.
+- Credito en estudio: etapa credito en estudio.
+- Aprobado: etapa aprobado.
+- Rechazado: negocio perdido.
+- Entregado: negocio ganado y etapa entregado.
+- Desistido: negocio perdido.
 
 ## 11. Entregas
 
@@ -504,7 +509,7 @@ Permite registrar la entrega fisica de la moto despues de que una solicitud de c
 6. Si la entrega ya se realizo, cambie el estado a **Entregada**.
 7. Guarde.
 
-Cuando una entrega se marca como **Entregada**, la solicitud relacionada queda como **Desembolsada**, lo que permite cerrar el proceso comercial.
+Cuando una entrega se marca como **Entregada**, la solicitud relacionada queda como **Entregado**, lo que permite cerrar el proceso comercial.
 
 ## 12. Prospectos
 
@@ -555,15 +560,14 @@ Permite visualizar y gestionar los negocios de venta a credito por etapas.
 
 ### Etapas sugeridas
 
-- Nuevo
-- Contacto inicial
-- Cotizacion
-- Preaprobacion
-- Documentos recibidos
-- Estudio de credito
+- Cotizado
+- Interesado
+- Documentos pendientes
+- Credito en estudio
 - Aprobado
-- Entregada
-- Perdido
+- Rechazado
+- Entregado
+- Desistido
 
 ### Crear negocio
 
@@ -774,6 +778,7 @@ Si aparece un error, revise primero los datos ingresados. Si el error persiste, 
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-05-25 | 3.6 | Se ajustan los estados comerciales de motos a credito: Cotizado, Interesado, Documentos pendientes, Credito en estudio, Aprobado, Rechazado, Entregado y Desistido. |
 | 2026-05-25 | 3.5 | Se agrega el modulo Entregas para registrar entrega fisica de motos, datos tecnicos, checklist y cierre de solicitudes aprobadas. |
 | 2026-05-25 | 3.4 | Se reorganiza el menu principal de acuerdo con el flujo comercial: dashboard, cotizaciones, clientes, credito, pipeline, actividades, productos, prospectos, reportes y configuracion. |
 | 2026-05-25 | 3.3 | Se habilitan todos los menus principales: solicitudes de credito, prospectos, pipeline, actividades y reportes. |

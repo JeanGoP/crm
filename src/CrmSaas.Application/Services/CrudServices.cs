@@ -601,13 +601,15 @@ public sealed class CommercialReportService(ICrmDbContext db) : ICommercialRepor
 
     private static string CreditStatusLabel(EstadoSolicitudCredito status) => status switch
     {
-        EstadoSolicitudCredito.Borrador => "Borrador",
+        EstadoSolicitudCredito.Borrador => "Cotizado",
         EstadoSolicitudCredito.DocumentosPendientes => "Documentos pendientes",
-        EstadoSolicitudCredito.DocumentosRecibidos => "Documentos recibidos",
-        EstadoSolicitudCredito.EnEstudio => "En estudio",
-        EstadoSolicitudCredito.Aprobada => "Aprobada",
-        EstadoSolicitudCredito.Rechazada => "Rechazada",
-        EstadoSolicitudCredito.Desembolsada => "Desembolsada",
+        EstadoSolicitudCredito.DocumentosRecibidos => "Credito en estudio",
+        EstadoSolicitudCredito.EnEstudio => "Credito en estudio",
+        EstadoSolicitudCredito.Aprobada => "Aprobado",
+        EstadoSolicitudCredito.Rechazada => "Rechazado",
+        EstadoSolicitudCredito.Desembolsada => "Entregado",
+        EstadoSolicitudCredito.Interesado => "Interesado",
+        EstadoSolicitudCredito.Desistida => "Desistido",
         _ => "Sin estado"
     };
 }

@@ -258,8 +258,8 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
                 application.FechaCreacion,
                 "Solicitud",
                 $"Solicitud {application.Numero}",
-                $"{(application.Producto is null ? "Producto" : ProductName(application.Producto))} - {application.Estado}.",
-                application.Estado is EstadoSolicitudCredito.Rechazada ? "error" : application.Estado is EstadoSolicitudCredito.Aprobada or EstadoSolicitudCredito.Desembolsada ? "success" : "warning",
+                $"{(application.Producto is null ? "Producto" : ProductName(application.Producto))} - {CreditStatus(application.Estado)}.",
+                application.Estado is EstadoSolicitudCredito.Rechazada or EstadoSolicitudCredito.Desistida ? "error" : application.Estado is EstadoSolicitudCredito.Aprobada or EstadoSolicitudCredito.Desembolsada ? "success" : "warning",
                 application.Id));
 
             AddDecision(items, application.FechaEnvio, "Solicitud enviada", $"{application.Numero} paso a documentos pendientes.", "info", application.Id);
@@ -351,7 +351,7 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
 
         if (latestApplication is not null)
         {
-            signals.Add($"Solicitud de credito {latestApplication.Numero} en estado {latestApplication.Estado}.");
+            signals.Add($"Solicitud de credito {latestApplication.Numero} en estado {CreditStatus(latestApplication.Estado)}.");
             var pendingDocs = latestApplication.Documentos
                 .Where(x => x.Estado is EstadoDocumentoCredito.Pendiente or EstadoDocumentoCredito.Rechazado)
                 .Select(x => $"{x.Nombre}: {x.Estado}")
@@ -374,7 +374,7 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
 
         var riskLevel = "Bajo";
         var priority = "Media";
-        if (latestApplication?.Estado is EstadoSolicitudCredito.Rechazada || overdueActivities.Count > 0 || latestApplication?.Documentos.Any(x => x.Estado == EstadoDocumentoCredito.Rechazado) == true)
+        if (latestApplication?.Estado is EstadoSolicitudCredito.Rechazada or EstadoSolicitudCredito.Desistida || overdueActivities.Count > 0 || latestApplication?.Documentos.Any(x => x.Estado == EstadoDocumentoCredito.Rechazado) == true)
         {
             riskLevel = "Alto";
             priority = "Alta";
@@ -419,7 +419,7 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
     {
         var parts = new List<string> { $"{customerName} tiene un proceso comercial en seguimiento." };
         if (quote is not null) parts.Add($"Su ultima cotizacion es {quote.Numero} por {ProductName(quote.Producto!)}.");
-        if (application is not null) parts.Add($"La solicitud de credito {application.Numero} esta en estado {application.Estado}.");
+        if (application is not null) parts.Add($"La solicitud de credito {application.Numero} esta en estado {CreditStatus(application.Estado)}.");
         if (deal is not null) parts.Add($"Tiene un negocio abierto con probabilidad {deal.ProbabilidadCierre:N0}%.");
         if (daysWithoutFollowUp > 0) parts.Add($"El ultimo movimiento detectado fue hace {daysWithoutFollowUp} dia(s).");
         return string.Join(" ", parts);
@@ -436,6 +436,20 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
     private static string Money(decimal value) => "$" + value.ToString("N0");
 
     private sealed record DealTimelineEntry(DealDto Deal, DateTime OccurredAt);
+
+    private static string CreditStatus(EstadoSolicitudCredito status) => status switch
+    {
+        EstadoSolicitudCredito.Borrador => "Cotizado",
+        EstadoSolicitudCredito.DocumentosPendientes => "Documentos pendientes",
+        EstadoSolicitudCredito.DocumentosRecibidos => "Credito en estudio",
+        EstadoSolicitudCredito.EnEstudio => "Credito en estudio",
+        EstadoSolicitudCredito.Aprobada => "Aprobado",
+        EstadoSolicitudCredito.Rechazada => "Rechazado",
+        EstadoSolicitudCredito.Desembolsada => "Entregado",
+        EstadoSolicitudCredito.Interesado => "Interesado",
+        EstadoSolicitudCredito.Desistida => "Desistido",
+        _ => status.ToString()
+    };
 
     private static string ProductName(Producto product)
     {

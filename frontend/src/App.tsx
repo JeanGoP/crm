@@ -129,6 +129,7 @@ const emptyMotorcycleDelivery = {
   status: 1,
   notes: ''
 };
+const creditStatusOptions = [1, 8, 2, 4, 5, 6, 7, 9];
 
 function fullFirstNames(firstName?: string, middleName?: string, fallback?: string) {
   const value = [firstName, middleName].filter(Boolean).join(' ').trim();
@@ -757,7 +758,7 @@ function CreditApplicationsPage() {
         r.number,
         r.customerName,
         r.productName,
-        <StatusChip label={creditStatus(r.status)} tone={r.status === 5 || r.status === 7 ? 'success' : r.status === 6 ? 'error' : r.status === 4 ? 'warning' : 'default'} />,
+        <StatusChip label={creditStatus(r.status)} tone={creditTone(r.status)} />,
         money(r.monthlyIncome),
         r.coDebtorName ? <Row primary={r.coDebtorName} secondary={r.coDebtorMobile ?? 'Sin celular'} /> : '-',
         [r.reference1Name, r.reference2Name].filter(Boolean).length ? <Stack spacing={.5}>
@@ -770,7 +771,7 @@ function CreditApplicationsPage() {
         <Stack direction="row" gap={1} alignItems="center">
           <Actions onAi={() => analyzeCustomer(r.customerId)} onEdit={() => setForm({ open: true, item: r })} />
           <TextField select size="small" label="Estado" value={r.status} onChange={(e) => changeStatus(r, Number(e.target.value))} sx={{ minWidth: 160 }}>
-            {[1, 2, 3, 4, 5, 6, 7].map((x) => <MenuItem key={x} value={x}>{creditStatus(x)}</MenuItem>)}
+            {creditStatusOptions.map((x) => <MenuItem key={x} value={x}>{creditStatus(x)}</MenuItem>)}
           </TextField>
         </Stack>
       ])}
@@ -783,11 +784,13 @@ function CreditApplicationsPage() {
 
 function ApprovalSummary({ application, onDecision }: { application: CreditApplication; onDecision: (application: CreditApplication, status: number, notes?: string) => Promise<void> }) {
   const actions = [
-    { status: 2, label: 'Enviar', show: application.status === 1 },
-    { status: 4, label: 'Estudio', show: application.status === 3 },
+    { status: 8, label: 'Interesado', show: application.status === 1 },
+    { status: 2, label: 'Documentos', show: application.status === 1 || application.status === 8 },
+    { status: 4, label: 'Estudio', show: application.status === 2 || application.status === 3 },
     { status: 5, label: 'Aprobar', show: application.status === 4 },
     { status: 6, label: 'Rechazar', show: application.status === 4 || application.status === 5 },
-    { status: 7, label: 'Desembolsar', show: application.status === 5 }
+    { status: 7, label: 'Entregar', show: application.status === 5 },
+    { status: 9, label: 'Desistir', show: ![6, 7, 9].includes(application.status) }
   ].filter((x) => x.show);
   const lastDate = application.disbursedAt ?? application.approvedAt ?? application.rejectedAt ?? application.reviewStartedAt ?? application.submittedAt;
   return <Stack spacing={.75} sx={{ minWidth: 180, maxWidth: 210 }}>
@@ -1061,11 +1064,12 @@ function PipelinePage() {
     setActivityForm({ open: false });
   };
 
-  const defaultStageId = stages[0]?.id ?? '';
+  const visibleStages = stages.filter((stage) => stage.active);
+  const defaultStageId = visibleStages[0]?.id ?? '';
   return <Stack spacing={3}>
     <Header title="Pipeline de ventas a credito" action="Nueva venta" onAction={() => setForm({ open: true })} onRefresh={() => { reloadStages(); reloadDeals(); }} secondaryAction={canManage ? { label: 'Nueva etapa', onClick: () => setStageForm({ open: true }) } : undefined} />
     <StatusBar loading={loadingStages || loadingDeals} error={stagesError || dealsError} />
-    <Box className="kanban">{stages.map((stage) => <Paper className="kanbanColumn" key={stage.id}>
+    <Box className="kanban">{visibleStages.map((stage) => <Paper className="kanbanColumn" key={stage.id}>
       <Stack direction="row" justifyContent="space-between" alignItems="center">
         <Stack>
           <Typography fontWeight={800}>{stage.name}</Typography>
@@ -1096,7 +1100,7 @@ function PipelinePage() {
       </Card>;
       })}
     </Paper>)}</Box>
-    <DealDialog form={form} stages={stages} customers={customers} defaultStageId={defaultStageId} onClose={() => setForm({ open: false })} onSave={saveDeal} />
+    <DealDialog form={form} stages={visibleStages} customers={customers} defaultStageId={defaultStageId} onClose={() => setForm({ open: false })} onSave={saveDeal} />
     <StageDialog form={stageForm} onClose={() => setStageForm({ open: false })} onSave={saveStage} />
     <ActivityDialog form={activityForm} customers={customers} deals={deals} onClose={() => setActivityForm({ open: false })} onSave={saveActivity} />
     <ConfirmDialog title="Eliminar negocio" text={`Se eliminara ${confirm?.title}.`} open={!!confirm} onClose={() => setConfirm(undefined)} onConfirm={remove} />
@@ -1263,7 +1267,7 @@ function CommercialReportsPage() {
             headers={['Estado', 'Cantidad', 'Valor']}
             empty="Sin solicitudes de credito en el periodo"
             rows={(data?.creditsByStatus ?? []).map((row) => [
-              <StatusChip label={row.status} tone={row.status === 'Aprobada' || row.status === 'Desembolsada' ? 'success' : row.status === 'Rechazada' ? 'error' : row.status === 'En estudio' ? 'warning' : 'default'} />,
+              <StatusChip label={row.status} tone={row.status === 'Aprobado' || row.status === 'Entregado' ? 'success' : row.status === 'Rechazado' || row.status === 'Desistido' ? 'error' : row.status === 'Credito en estudio' || row.status === 'Documentos pendientes' ? 'warning' : 'default'} />,
               row.count,
               money(row.amount)
             ])}
@@ -1756,7 +1760,7 @@ function CreditApplicationDialog({ form, customers, products, quotes, deals, onC
           <TextField fullWidth label="Relacion referencia 2" value={v.reference2Relationship} onChange={(e) => set({ reference2Relationship: e.target.value })} />
         </FieldGrid>
         <TextField select label="Negocio pipeline" value={v.dealId} onChange={(e) => set({ dealId: e.target.value })}><MenuItem value="">Sin negocio</MenuItem>{deals.map((x) => <MenuItem key={x.id} value={x.id}>{x.title}</MenuItem>)}</TextField>
-        <TextField select label="Estado" value={v.status} onChange={(e) => set({ status: Number(e.target.value) })}>{[1, 2, 3, 4, 5, 6, 7].map((x) => <MenuItem key={x} value={x}>{creditStatus(x)}</MenuItem>)}</TextField>
+        <TextField select label="Estado" value={v.status} onChange={(e) => set({ status: Number(e.target.value) })}>{creditStatusOptions.map((x) => <MenuItem key={x} value={x}>{creditStatus(x)}</MenuItem>)}</TextField>
         <TextField label="Observaciones" value={v.notes} onChange={(e) => set({ notes: e.target.value })} multiline minRows={2} />
         {selectedCustomer && <Alert severity="info">Cliente seleccionado: {selectedCustomer.firstNames || selectedCustomer.name} {selectedCustomer.lastNames}</Alert>}
       </>;
@@ -2290,7 +2294,25 @@ function ratingLabel(value: number) { return ['-', 'Frio', 'Tibio', 'Caliente'][
 function typeLabel(value: number) { return ['-', 'Tarea', 'Llamada', 'Reunion'][value] ?? 'Tarea'; }
 function activityStatus(value: number) { return ['-', 'Pendiente', 'En proceso', 'Completada', 'Cancelada'][value] ?? 'Pendiente'; }
 function dealStatus(value: number) { return ['-', 'Abierto', 'Ganado', 'Perdido'][value] ?? 'Abierto'; }
-function creditStatus(value: number) { return ['-', 'Borrador', 'Documentos pendientes', 'Documentos recibidos', 'En estudio', 'Aprobada', 'Rechazada', 'Desembolsada'][value] ?? 'Borrador'; }
+function creditStatus(value: number) {
+  return ({
+    1: 'Cotizado',
+    2: 'Documentos pendientes',
+    3: 'Credito en estudio',
+    4: 'Credito en estudio',
+    5: 'Aprobado',
+    6: 'Rechazado',
+    7: 'Entregado',
+    8: 'Interesado',
+    9: 'Desistido'
+  } as Record<number, string>)[value] ?? 'Cotizado';
+}
+function creditTone(value: number): 'success' | 'warning' | 'error' | 'default' {
+  if (value === 5 || value === 7) return 'success';
+  if (value === 6 || value === 9) return 'error';
+  if (value === 2 || value === 3 || value === 4) return 'warning';
+  return 'default';
+}
 function documentStatus(value: number) { return ['-', 'Pendiente', 'Recibido', 'Validado', 'Rechazado'][value] ?? 'Pendiente'; }
 function deliveryStatus(value: number) { return ['-', 'Programada', 'Entregada', 'Cancelada'][value] ?? 'Programada'; }
 const identificationOptions = [

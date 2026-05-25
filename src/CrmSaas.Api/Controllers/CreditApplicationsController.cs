@@ -331,7 +331,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
     {
         if (entity.Documentos.Count > 0 && entity.Documentos.All(x => x.Estado is EstadoDocumentoCredito.Recibido or EstadoDocumentoCredito.Validado))
         {
-            entity.Estado = EstadoSolicitudCredito.DocumentosRecibidos;
+            entity.Estado = EstadoSolicitudCredito.EnEstudio;
         }
     }
 
@@ -351,6 +351,11 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         {
             throw new ValidationException("Solo se puede desembolsar una solicitud aprobada.");
         }
+
+        if (status == EstadoSolicitudCredito.Desistida && entity.Estado == EstadoSolicitudCredito.Desembolsada)
+        {
+            throw new ValidationException("No se puede desistir una solicitud ya entregada.");
+        }
     }
 
     private void ApplyDecision(SolicitudCredito entity, EstadoSolicitudCredito status, string? notes)
@@ -362,6 +367,9 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         switch (status)
         {
             case EstadoSolicitudCredito.DocumentosPendientes:
+                entity.FechaEnvio ??= now;
+                break;
+            case EstadoSolicitudCredito.Interesado:
                 entity.FechaEnvio ??= now;
                 break;
             case EstadoSolicitudCredito.EnEstudio:
@@ -376,6 +384,9 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
                 break;
             case EstadoSolicitudCredito.Desembolsada:
                 entity.FechaDesembolso ??= now;
+                break;
+            case EstadoSolicitudCredito.Desistida:
+                entity.FechaRechazo ??= now;
                 break;
         }
     }
@@ -406,12 +417,15 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
 
         var stageName = application.Estado switch
         {
-            EstadoSolicitudCredito.DocumentosPendientes => "Preaprobacion",
-            EstadoSolicitudCredito.DocumentosRecibidos => "Documentos recibidos",
-            EstadoSolicitudCredito.EnEstudio => "Estudio de credito",
+            EstadoSolicitudCredito.Cotizado => "Cotizado",
+            EstadoSolicitudCredito.Interesado => "Interesado",
+            EstadoSolicitudCredito.DocumentosPendientes => "Documentos pendientes",
+            EstadoSolicitudCredito.DocumentosRecibidos => "Credito en estudio",
+            EstadoSolicitudCredito.EnEstudio => "Credito en estudio",
             EstadoSolicitudCredito.Aprobada => "Aprobado",
-            EstadoSolicitudCredito.Rechazada => "Perdido",
-            EstadoSolicitudCredito.Desembolsada => "Entregada",
+            EstadoSolicitudCredito.Rechazada => "Rechazado",
+            EstadoSolicitudCredito.Desembolsada => "Entregado",
+            EstadoSolicitudCredito.Desistida => "Desistido",
             _ => null
         };
 
@@ -428,7 +442,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
 
         deal.Estado = application.Estado switch
         {
-            EstadoSolicitudCredito.Rechazada => EstadoNegocio.Perdido,
+            EstadoSolicitudCredito.Rechazada or EstadoSolicitudCredito.Desistida => EstadoNegocio.Perdido,
             EstadoSolicitudCredito.Desembolsada => EstadoNegocio.Ganado,
             _ => EstadoNegocio.Abierto
         };
