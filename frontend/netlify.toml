@@ -3,6 +3,12 @@
   publish = "dist"
 
 [[redirects]]
+  from = "/crmapi-proxy/*"
+  to = "http://stecno.dyndns.org/crmapi/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200

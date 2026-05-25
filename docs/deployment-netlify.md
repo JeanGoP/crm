@@ -26,6 +26,29 @@ VITE_TENANT=demo
 
 `VITE_API_URL` debe apuntar al dominio HTTPS donde quedo publicada la API en IIS.
 
+### Opcion temporal si la API aun no tiene HTTPS
+
+Si la API esta publicada solo por HTTP, por ejemplo:
+
+```text
+http://stecno.dyndns.org/crmapi/
+```
+
+el navegador bloqueara llamadas directas desde Netlify por contenido mixto. Para probar mientras se instala HTTPS en IIS, usar el proxy incluido en `frontend/netlify.toml`:
+
+```text
+VITE_API_URL=/crmapi-proxy
+VITE_TENANT=demo
+```
+
+Con esa configuracion, el frontend llama a Netlify por HTTPS y Netlify reenvia internamente hacia:
+
+```text
+http://stecno.dyndns.org/crmapi/
+```
+
+Esta opcion sirve para prueba inicial. Para produccion formal se recomienda instalar certificado SSL en IIS y usar `VITE_API_URL=https://...`.
+
 ## 3. Deploy
 
 Ejecutar deploy desde Netlify. Al terminar, Netlify entregara un dominio como:
