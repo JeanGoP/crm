@@ -329,9 +329,27 @@ public sealed class DashboardService(ICrmDbContext db) : IDashboardService
     private async Task<IReadOnlyCollection<CommercialAlertDto>> BuildAlertsAsync(DateTime today, DateTime tomorrow, CancellationToken cancellationToken)
     {
         var alerts = new List<CommercialAlertDto>();
+        const string automaticQuoteFollowUpTitle = "Llamar al cliente mañana";
 
         alerts.AddRange(await db.Actividades
-            .Where(x => (x.Estado == EstadoActividad.Pendiente || x.Estado == EstadoActividad.EnProceso) && x.FechaProgramada < today)
+            .Where(x => x.Titulo == automaticQuoteFollowUpTitle
+                && (x.Estado == EstadoActividad.Pendiente || x.Estado == EstadoActividad.EnProceso)
+                && x.FechaProgramada < today)
+            .OrderBy(x => x.FechaProgramada)
+            .Take(5)
+            .Select(x => new CommercialAlertDto(
+                "Cotizacion",
+                "error",
+                "Seguimiento de cotizacion vencido",
+                x.Titulo + " esta vencida. Actualice la actividad o registre el avance comercial.",
+                x.FechaProgramada,
+                x.ClienteId == null ? "/actividades" : "/clientes/" + x.ClienteId))
+            .ToListAsync(cancellationToken));
+
+        alerts.AddRange(await db.Actividades
+            .Where(x => x.Titulo != automaticQuoteFollowUpTitle
+                && (x.Estado == EstadoActividad.Pendiente || x.Estado == EstadoActividad.EnProceso)
+                && x.FechaProgramada < today)
             .OrderBy(x => x.FechaProgramada)
             .Take(5)
             .Select(x => new CommercialAlertDto(

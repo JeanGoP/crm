@@ -17,6 +17,8 @@ namespace CrmSaas.Api.Controllers;
 [Route("api/quotes")]
 public sealed class QuotesController(CrmDbContext db, ITenantContext tenantContext) : ControllerBase
 {
+    private const string AutomaticFollowUpTitle = "Llamar al cliente mañana";
+
     [HttpGet]
     public async Task<ActionResult<IReadOnlyCollection<QuoteDto>>> Get(CancellationToken cancellationToken)
     {
@@ -115,8 +117,8 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
         };
         var followUp = new Actividad
         {
-            Titulo = $"Seguimiento cotizacion {number}",
-            Descripcion = $"Contactar a {fullName} para resolver dudas y avanzar la venta de {productName}.",
+            Titulo = AutomaticFollowUpTitle,
+            Descripcion = $"Cotizacion {number}: contactar a {fullName} para resolver dudas y avanzar la venta de {productName}.",
             Tipo = TipoActividad.Llamada,
             Estado = EstadoActividad.Pendiente,
             FechaProgramada = now.AddDays(1),

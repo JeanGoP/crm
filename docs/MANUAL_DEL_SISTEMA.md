@@ -1,7 +1,7 @@
 # Manual del Sistema CRM SaaS
 
 Ultima actualizacion: 2026-05-25  
-Version del manual: 3.6  
+Version del manual: 3.7  
 Sistema: CRM SaaS para ventas de motos a credito  
 Ambiente documentado: Desarrollo local conectado a SQL Server
 Zona horaria operativa: Colombia UTC-5
@@ -350,7 +350,9 @@ En la tabla de cotizaciones, el icono de **IA** permite analizar el cliente asoc
 
 Cuando se crea una cotizacion, el cliente queda disponible en **Clientes** para completar sus datos si avanza hacia credito o venta.
 
-Adicionalmente, el sistema crea automaticamente una actividad de seguimiento para el dia siguiente. Esta actividad queda relacionada con el cliente y el negocio del pipeline, para que el vendedor recuerde llamar, resolver dudas y avanzar la venta.
+Adicionalmente, el sistema crea automaticamente una actividad de seguimiento llamada **Llamar al cliente mañana** para el dia siguiente. Esta actividad queda relacionada con el cliente y el negocio del pipeline, para que el vendedor recuerde llamar, resolver dudas y avanzar la venta.
+
+Si esa actividad no se completa, cancela o reprograma despues de vencida, el Dashboard muestra la alerta **Seguimiento de cotizacion vencido**.
 
 ## 10. Solicitudes de credito
 
@@ -778,6 +780,7 @@ Si aparece un error, revise primero los datos ingresados. Si el error persiste, 
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-05-26 | 3.7 | Se precisa la agenda automatica al crear cotizaciones: actividad Llamar al cliente mañana y alerta especifica si el seguimiento queda vencido. |
 | 2026-05-25 | 3.6 | Se ajustan los estados comerciales de motos a credito: Cotizado, Interesado, Documentos pendientes, Credito en estudio, Aprobado, Rechazado, Entregado y Desistido. |
 | 2026-05-25 | 3.5 | Se agrega el modulo Entregas para registrar entrega fisica de motos, datos tecnicos, checklist y cierre de solicitudes aprobadas. |
 | 2026-05-25 | 3.4 | Se reorganiza el menu principal de acuerdo con el flujo comercial: dashboard, cotizaciones, clientes, credito, pipeline, actividades, productos, prospectos, reportes y configuracion. |
