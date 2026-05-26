@@ -148,8 +148,10 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
     {
         var productName = x.Producto is null ? "Producto" : ProductName(x.Producto);
         var termMonths = x.PlazoMeses <= 0 ? 24 : x.PlazoMeses;
-        var financedAmount = x.ValorFinanciado <= 0 && x.CuotaMensualEstimada <= 0 ? Math.Max(x.PrecioProducto - x.CuotaInicial, 0) : x.ValorFinanciado;
-        var totalPayment = x.TotalPagarEstimado <= 0 ? x.PrecioProducto : x.TotalPagarEstimado;
+        var financedAmount = x.ValorFinanciado <= 0 && x.CuotaMensualEstimada <= 0
+            ? Math.Max(x.PrecioProducto + x.Seguro + x.GastosAdministrativos - x.CuotaInicial, 0)
+            : x.ValorFinanciado;
+        var totalPayment = x.TotalPagarEstimado <= 0 ? x.CuotaInicial + financedAmount : x.TotalPagarEstimado;
         return new QuoteDto(
             x.Id,
             x.Numero,
@@ -166,6 +168,8 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
             productName,
             x.PrecioProducto,
             x.CuotaInicial,
+            x.Seguro,
+            x.GastosAdministrativos,
             termMonths,
             x.TasaInteresMensual,
             financedAmount,

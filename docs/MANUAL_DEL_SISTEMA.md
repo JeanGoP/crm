@@ -1,7 +1,7 @@
 # Manual del Sistema CRM SaaS
 
 Ultima actualizacion: 2026-05-25  
-Version del manual: 3.7  
+Version del manual: 3.8  
 Sistema: CRM SaaS para ventas de motos a credito  
 Ambiente documentado: Desarrollo local conectado a SQL Server
 Zona horaria operativa: Colombia UTC-5
@@ -322,16 +322,17 @@ La integracion usa el endpoint interno del CRM para no exponer el token de Verif
 10. Ingrese la cuota inicial.
 11. Defina el plazo en meses.
 12. Defina la tasa mensual.
-13. Revise el resumen del simulador: valor del producto, valor financiado, cuota estimada y total estimado.
-14. Agregue observaciones si aplica.
-15. Guarde.
+13. Ingrese seguro y gastos administrativos si aplican.
+14. Revise el resumen del simulador: valor del producto, total financiado, cuota aproximada y total estimado.
+15. Agregue observaciones si aplica.
+16. Guarde.
 
 ### Simulador de credito
 
 El simulador calcula automaticamente:
 
-- **Valor financiado:** precio del producto menos cuota inicial.
-- **Cuota mensual estimada:** valor aproximado de la cuota segun plazo y tasa mensual.
+- **Total financiado:** precio del producto mas seguro y gastos administrativos, menos cuota inicial.
+- **Cuota aproximada:** valor aproximado de la cuota segun plazo, tasa mensual y total financiado.
 - **Total estimado a pagar:** cuota inicial mas la suma de las cuotas mensuales.
 
 El calculo es una estimacion comercial. La aprobacion final y las condiciones definitivas dependen del proceso de credito.
@@ -780,6 +781,7 @@ Si aparece un error, revise primero los datos ingresados. Si el error persiste, 
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-05-26 | 3.8 | Se fortalece el simulador financiero de cotizaciones con seguro, gastos administrativos, total financiado, cuota aproximada y total estimado. |
 | 2026-05-26 | 3.7 | Se precisa la agenda automatica al crear cotizaciones: actividad Llamar al cliente mañana y alerta especifica si el seguimiento queda vencido. |
 | 2026-05-25 | 3.6 | Se ajustan los estados comerciales de motos a credito: Cotizado, Interesado, Documentos pendientes, Credito en estudio, Aprobado, Rechazado, Entregado y Desistido. |
 | 2026-05-25 | 3.5 | Se agrega el modulo Entregas para registrar entrega fisica de motos, datos tecnicos, checklist y cierre de solicitudes aprobadas. |

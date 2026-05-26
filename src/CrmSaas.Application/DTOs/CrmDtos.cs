@@ -89,6 +89,8 @@ public sealed record QuoteDto(
     string ProductName,
     decimal ProductPrice,
     decimal DownPayment,
+    decimal Insurance,
+    decimal AdministrativeFees,
     int TermMonths,
     decimal MonthlyInterestRate,
     decimal FinancedAmount,
@@ -110,6 +112,8 @@ public sealed record CreateQuoteDto(
     string? PhoneNumber,
     Guid ProductId,
     decimal DownPayment,
+    decimal Insurance,
+    decimal AdministrativeFees,
     int TermMonths,
     decimal MonthlyInterestRate,
     string? Notes);

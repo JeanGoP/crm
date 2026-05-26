@@ -104,7 +104,7 @@ const emptyActivity = { title: '', description: '', type: 1, status: 1, schedule
 const emptyCompany = { name: '', subdomain: '', customDomain: '', logoDataUrl: '', active: true };
 const emptyUser = { fullName: '', email: '', password: '', companyId: '', roles: ['Vendedor'] };
 const emptyProduct = { name: '', category: 'Moto', brand: '', model: '', reference: '', description: '', engineCc: '', year: '', color: '', price: 0, active: true };
-const emptyQuote = { identificationType: 1, identificationNumber: '', customerFirstNames: '', customerLastNames: '', customerFirstName: '', customerMiddleName: '', customerLastName: '', customerSecondLastName: '', phoneCountryCode: '+57', phoneNumber: '', productId: '', downPayment: 0, termMonths: 24, monthlyInterestRate: 2.2, notes: '' };
+const emptyQuote = { identificationType: 1, identificationNumber: '', customerFirstNames: '', customerLastNames: '', customerFirstName: '', customerMiddleName: '', customerLastName: '', customerSecondLastName: '', phoneCountryCode: '+57', phoneNumber: '', productId: '', downPayment: 0, insurance: 0, administrativeFees: 0, termMonths: 24, monthlyInterestRate: 2.2, notes: '' };
 const emptyCreditApplication = {
   customerId: '', productId: '', quoteId: '', dealId: '', identificationType: 1, identificationNumber: '', birthDate: '', mobile: '', address: '', city: '', occupation: '',
   monthlyIncome: 0, downPayment: 0, termMonths: 24, motorcycleValue: 0,
@@ -454,7 +454,7 @@ function Customer360Page() {
       <Grid item xs={12} md={6}>
         <Card><CardContent>
           <Typography variant="h6" fontWeight={900}>Cotizaciones</Typography>
-          {data?.quotes.length ? data.quotes.map((q) => <Row key={q.id} primary={`${q.number} - ${q.productName}`} secondary={`${money(q.productPrice)} - cuota ${money(q.estimatedMonthlyPayment)} x ${q.termMonths} - ${new Date(q.quoteDate).toLocaleDateString()}`} />) : <EmptyState text="Sin cotizaciones" />}
+          {data?.quotes.length ? data.quotes.map((q) => <Row key={q.id} primary={`${q.number} - ${q.productName}`} secondary={`Financiado ${money(q.financedAmount)} - cuota aprox. ${money(q.estimatedMonthlyPayment)} x ${q.termMonths} - ${new Date(q.quoteDate).toLocaleDateString()}`} />) : <EmptyState text="Sin cotizaciones" />}
         </CardContent></Card>
       </Grid>
       <Grid item xs={12} md={6}>
@@ -586,6 +586,8 @@ function QuotesPage() {
       phoneCountryCode: payload.phoneCountryCode || '+57',
       phoneNumber: payload.phoneNumber || null,
       downPayment: Number(payload.downPayment),
+      insurance: Number(payload.insurance),
+      administrativeFees: Number(payload.administrativeFees),
       termMonths: Number(payload.termMonths),
       monthlyInterestRate: Number(payload.monthlyInterestRate),
       notes: payload.notes || null
@@ -610,14 +612,14 @@ function QuotesPage() {
     <Header title="Cotizaciones" action="Nueva cotizacion" onAction={() => setForm({ open: true })} onRefresh={reload} />
     <StatusBar loading={loading} error={error} />
     <EntityTable
-      headers={['Numero', 'Cliente', 'Identificacion', 'Producto', 'Valor', 'Cuota estimada', 'Valida hasta', 'Acciones']}
+      headers={['Numero', 'Cliente', 'Identificacion', 'Producto', 'Total financiado', 'Cuota aprox.', 'Valida hasta', 'Acciones']}
       empty="No hay cotizaciones registradas"
       rows={rows.map((r) => [
         r.number,
         `${fullFirstNames(r.customerFirstName, r.customerMiddleName, r.customerFirstNames)} ${fullLastNames(r.customerLastName, r.customerSecondLastName, r.customerLastNames)}`.trim(),
         `${identificationLabel(r.identificationType)} ${r.identificationNumber ?? ''}`.trim(),
         r.productName,
-        money(r.productPrice),
+        money(r.financedAmount),
         r.estimatedMonthlyPayment > 0 ? `${money(r.estimatedMonthlyPayment)} x ${r.termMonths}` : 'Sin simulacion',
         new Date(r.validUntil).toLocaleDateString(),
         <Actions onAi={() => analyzeCustomer(r.customerId)} onDownload={() => downloadPdf(r)} />
@@ -1594,10 +1596,13 @@ function QuoteDialog({ form, products, onClose, onSave }: DialogProps<Quote, typ
     {(v, set) => {
       const selectedProduct = products.find((product) => product.id === v.productId);
       const productPrice = selectedProduct?.price ?? 0;
-      const downPayment = Math.min(Number(v.downPayment) || 0, productPrice);
+      const insurance = Math.max(Number(v.insurance) || 0, 0);
+      const administrativeFees = Math.max(Number(v.administrativeFees) || 0, 0);
+      const totalToFinance = productPrice + insurance + administrativeFees;
+      const downPayment = Math.min(Number(v.downPayment) || 0, totalToFinance);
       const termMonths = Math.max(Number(v.termMonths) || 1, 1);
       const monthlyInterestRate = Math.max(Number(v.monthlyInterestRate) || 0, 0);
-      const financedAmount = Math.max(productPrice - downPayment, 0);
+      const financedAmount = Math.max(totalToFinance - downPayment, 0);
       const monthlyPayment = estimateMonthlyPayment(financedAmount, termMonths, monthlyInterestRate);
       const totalPayment = downPayment + monthlyPayment * termMonths;
       return <>
@@ -1637,13 +1642,17 @@ function QuoteDialog({ form, products, onClose, onSave }: DialogProps<Quote, typ
           <TextField fullWidth label="Plazo meses" type="number" value={v.termMonths} onChange={(e) => set({ termMonths: Number(e.target.value) })} />
           <TextField fullWidth label="Tasa mensual %" type="number" value={v.monthlyInterestRate} onChange={(e) => set({ monthlyInterestRate: Number(e.target.value) })} />
         </FieldGrid>
+        <FieldGrid columns={2}>
+          <TextField fullWidth label="Seguro" type="number" value={v.insurance} onChange={(e) => set({ insurance: Number(e.target.value) })} />
+          <TextField fullWidth label="Gastos administrativos" type="number" value={v.administrativeFees} onChange={(e) => set({ administrativeFees: Number(e.target.value) })} />
+        </FieldGrid>
         <Paper variant="outlined" sx={{ p: 2, bgcolor: '#f8fafc' }}>
           <FieldGrid columns={3}>
             <Box><Typography variant="caption" color="text.secondary">Valor producto</Typography><Typography fontWeight={700}>{money(productPrice)}</Typography></Box>
-            <Box><Typography variant="caption" color="text.secondary">Valor financiado</Typography><Typography fontWeight={700}>{money(financedAmount)}</Typography></Box>
-            <Box><Typography variant="caption" color="text.secondary">Cuota estimada</Typography><Typography fontWeight={700}>{money(monthlyPayment)}</Typography></Box>
+            <Box><Typography variant="caption" color="text.secondary">Total financiado</Typography><Typography fontWeight={700}>{money(financedAmount)}</Typography></Box>
+            <Box><Typography variant="caption" color="text.secondary">Cuota aproximada</Typography><Typography fontWeight={700}>{money(monthlyPayment)}</Typography></Box>
           </FieldGrid>
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1.5 }}>Total estimado a pagar: {money(totalPayment)}</Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1.5 }}>Base: {money(totalToFinance)} · Total estimado a pagar: {money(totalPayment)}</Typography>
         </Paper>
         <TextField label="Observaciones" value={v.notes} onChange={(e) => set({ notes: e.target.value })} multiline minRows={2} />
       </>;

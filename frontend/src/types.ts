@@ -122,6 +122,8 @@ export interface Quote {
   productName: string;
   productPrice: number;
   downPayment: number;
+  insurance: number;
+  administrativeFees: number;
   termMonths: number;
   monthlyInterestRate: number;
   financedAmount: number;

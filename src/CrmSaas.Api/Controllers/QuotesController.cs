@@ -45,6 +45,8 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
         if (string.IsNullOrWhiteSpace(dto.PhoneNumber)) throw new ValidationException("El telefono del cliente es obligatorio.");
         if (dto.ProductId == Guid.Empty) throw new ValidationException("Debe seleccionar un producto para cotizar.");
         if (dto.DownPayment < 0) throw new ValidationException("La cuota inicial no puede ser negativa.");
+        if (dto.Insurance < 0) throw new ValidationException("El seguro no puede ser negativo.");
+        if (dto.AdministrativeFees < 0) throw new ValidationException("Los gastos administrativos no pueden ser negativos.");
         if (dto.TermMonths <= 0) throw new ValidationException("El plazo debe ser mayor a cero.");
         if (dto.MonthlyInterestRate < 0) throw new ValidationException("La tasa mensual no puede ser negativa.");
 
@@ -59,7 +61,7 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
         var fullName = $"{firstNames} {lastNames}".Trim();
         var phone = FormatPhone(dto.PhoneCountryCode, dto.PhoneNumber);
         var productName = ProductName(product);
-        var simulation = CalculateSimulation(product.Precio, dto.DownPayment, dto.TermMonths, dto.MonthlyInterestRate);
+        var simulation = CalculateSimulation(product.Precio, dto.DownPayment, dto.Insurance, dto.AdministrativeFees, dto.TermMonths, dto.MonthlyInterestRate);
         var customer = new Cliente
         {
             Nombre = firstNames,
@@ -96,6 +98,8 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             ProductoId = product.Id,
             PrecioProducto = product.Precio,
             CuotaInicial = simulation.DownPayment,
+            Seguro = simulation.Insurance,
+            GastosAdministrativos = simulation.AdministrativeFees,
             PlazoMeses = dto.TermMonths,
             TasaInteresMensual = dto.MonthlyInterestRate,
             ValorFinanciado = simulation.FinancedAmount,
@@ -153,8 +157,10 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             ? "Producto"
             : ProductName(x.Producto);
         var termMonths = x.PlazoMeses <= 0 ? 24 : x.PlazoMeses;
-        var financedAmount = x.ValorFinanciado <= 0 && x.CuotaMensualEstimada <= 0 ? Math.Max(x.PrecioProducto - x.CuotaInicial, 0) : x.ValorFinanciado;
-        var totalPayment = x.TotalPagarEstimado <= 0 ? x.PrecioProducto : x.TotalPagarEstimado;
+        var financedAmount = x.ValorFinanciado <= 0 && x.CuotaMensualEstimada <= 0
+            ? Math.Max(x.PrecioProducto + x.Seguro + x.GastosAdministrativos - x.CuotaInicial, 0)
+            : x.ValorFinanciado;
+        var totalPayment = x.TotalPagarEstimado <= 0 ? x.CuotaInicial + financedAmount : x.TotalPagarEstimado;
         return new QuoteDto(
             x.Id,
             x.Numero,
@@ -171,6 +177,8 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             productName,
             x.PrecioProducto,
             x.CuotaInicial,
+            x.Seguro,
+            x.GastosAdministrativos,
             termMonths,
             x.TasaInteresMensual,
             financedAmount,
@@ -181,10 +189,13 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             x.Observaciones);
     }
 
-    private static CreditSimulation CalculateSimulation(decimal productPrice, decimal downPayment, int termMonths, decimal monthlyInterestRate)
+    private static CreditSimulation CalculateSimulation(decimal productPrice, decimal downPayment, decimal insurance, decimal administrativeFees, int termMonths, decimal monthlyInterestRate)
     {
-        var normalizedDownPayment = Math.Min(downPayment, productPrice);
-        var financedAmount = Math.Max(productPrice - normalizedDownPayment, 0);
+        var normalizedInsurance = Math.Max(insurance, 0);
+        var normalizedAdministrativeFees = Math.Max(administrativeFees, 0);
+        var totalToFinance = productPrice + normalizedInsurance + normalizedAdministrativeFees;
+        var normalizedDownPayment = Math.Min(downPayment, totalToFinance);
+        var financedAmount = Math.Max(totalToFinance - normalizedDownPayment, 0);
         var monthlyRate = monthlyInterestRate / 100;
         var monthlyPayment = financedAmount == 0
             ? 0
@@ -193,10 +204,10 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
                 : financedAmount * monthlyRate / (1 - (decimal)Math.Pow(1 + (double)monthlyRate, -termMonths));
         monthlyPayment = Math.Round(monthlyPayment, 0, MidpointRounding.AwayFromZero);
         var totalPayment = normalizedDownPayment + (monthlyPayment * termMonths);
-        return new CreditSimulation(normalizedDownPayment, financedAmount, monthlyPayment, totalPayment);
+        return new CreditSimulation(normalizedDownPayment, normalizedInsurance, normalizedAdministrativeFees, financedAmount, monthlyPayment, totalPayment);
     }
 
-    private sealed record CreditSimulation(decimal DownPayment, decimal FinancedAmount, decimal MonthlyPayment, decimal TotalPayment);
+    private sealed record CreditSimulation(decimal DownPayment, decimal Insurance, decimal AdministrativeFees, decimal FinancedAmount, decimal MonthlyPayment, decimal TotalPayment);
 
     private static string ProductName(Producto product)
     {

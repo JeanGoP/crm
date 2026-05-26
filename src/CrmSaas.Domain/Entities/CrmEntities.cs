@@ -134,6 +134,8 @@ public sealed class Cotizacion : AuditableTenantEntity
     public Producto? Producto { get; set; }
     public decimal PrecioProducto { get; set; }
     public decimal CuotaInicial { get; set; }
+    public decimal Seguro { get; set; }
+    public decimal GastosAdministrativos { get; set; }
     public int PlazoMeses { get; set; } = 24;
     public decimal TasaInteresMensual { get; set; }
     public decimal ValorFinanciado { get; set; }
