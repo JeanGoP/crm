@@ -1,6 +1,6 @@
 <!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Manual del Sistema CRM SaaS</title><style>:root{color-scheme:light;--ink:#111827;--muted:#526071;--line:#d8e0e8;--brand:#155e75;--paper:#fff;--bg:#f5f7fb}body{margin:0;font-family:Inter,Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--ink);line-height:1.65}main{max-width:1040px;margin:0 auto;padding:42px 24px 72px}h1{font-size:38px;line-height:1.1;margin:0 0 18px;color:#0f172a}h2{font-size:26px;margin:44px 0 12px;padding-top:18px;border-top:1px solid var(--line);color:#0f172a}h3{font-size:18px;margin:24px 0 8px;color:var(--brand)}p,li{font-size:15px;color:var(--ink)}p{margin:8px 0}ul{margin:8px 0 14px 24px;padding:0}code{background:#eef5f8;color:#0f4f63;padding:2px 5px;border-radius:4px}figure{margin:18px 0 28px;border:1px solid var(--line);background:var(--paper);border-radius:10px;overflow:hidden;box-shadow:0 8px 22px rgba(15,23,42,.08)}figure img{display:block;width:100%;height:auto}figcaption{font-size:13px;color:var(--muted);padding:10px 14px;background:#fbfdff;border-top:1px solid var(--line)}.step{display:flex;gap:10px;align-items:flex-start;margin:8px 0}.step span{display:inline-flex;flex:0 0 auto;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:var(--brand);color:white;font-size:13px;font-weight:700;margin-top:1px}table{width:100%;border-collapse:collapse;margin:14px 0 24px;background:var(--paper);border:1px solid var(--line)}th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);font-size:14px;vertical-align:top}th{background:#eef5f8;color:#0f4f63}@media print{body{background:white}main{max-width:none;padding:0}figure{break-inside:avoid;box-shadow:none}h2{break-after:avoid}}</style></head><body><main><h1>Manual del Sistema CRM SaaS</h1>
 <p>Ultima actualizacion: 2026-05-25</p>
-<p>Version del manual: 3.8</p>
+<p>Version del manual: 3.9</p>
 <p>Sistema: CRM SaaS para ventas de motos a credito</p>
 <p>Ambiente documentado: Desarrollo local conectado a SQL Server</p>
 <p>Zona horaria operativa: Colombia UTC-5</p>
@@ -221,6 +221,7 @@
 <li>Observaciones</li>
 </ul>
 <h3>Consultas externas SIMIT y RUNT</h3>
+<p>En la ventana de <strong>Nueva cotizacion</strong>, el boton <strong>Consultar</strong> busca primero si la identificacion ya existe en el maestro de clientes del CRM, incluso si pertenece a otra empresa. Si no existe, el backend consulta Verifik y, cuando encuentra informacion, guarda automaticamente un cliente minimo para futuras consultas.</p>
 <p>El campo <strong>Numero de identificacion</strong> incluye los botones <strong>Simit</strong> y <strong>Runt</strong>. Al presionar cualquiera, el sistema abre la pagina oficial correspondiente y copia el numero de identificacion al portapapeles para pegarlo en la consulta.</p>
 <p>Estas paginas externas no exponen un enlace publico estable para consultar automaticamente con el numero ya diligenciado, por eso el CRM abre el sitio oficial y deja listo el numero para pegar.</p>
 <h3>Crear cotizacion</h3>
@@ -600,6 +601,7 @@
 <h2>19. Historial del manual</h2>
 <p>| Fecha | Version | Cambio |</p>
 <p>| --- | --- | --- |</p>
+<p>| 2026-05-27 | 3.9 | La consulta con Verifik ahora guarda automaticamente el cliente cuando la cedula no existia en la base y evita duplicados al crear cotizaciones. |</p>
 <p>| 2026-05-26 | 3.8 | Se fortalece el simulador financiero de cotizaciones con seguro, gastos administrativos, total financiado, cuota aproximada y total estimado. |</p>
 <p>| 2026-05-26 | 3.7 | Se precisa la agenda automatica al crear cotizaciones: actividad Llamar al cliente mañana y alerta especifica si el seguimiento queda vencido. |</p>
 <p>| 2026-05-25 | 3.6 | Se ajustan los estados comerciales de motos a credito: Cotizado, Interesado, Documentos pendientes, Credito en estudio, Aprobado, Rechazado, Entregado y Desistido. |</p>

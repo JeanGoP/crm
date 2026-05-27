@@ -62,24 +62,53 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
         var phone = FormatPhone(dto.PhoneCountryCode, dto.PhoneNumber);
         var productName = ProductName(product);
         var simulation = CalculateSimulation(product.Precio, dto.DownPayment, dto.Insurance, dto.AdministrativeFees, dto.TermMonths, dto.MonthlyInterestRate);
-        var customer = new Cliente
+        var normalizedIdentification = NormalizeIdentification(dto.IdentificationNumber);
+        var customer = string.IsNullOrWhiteSpace(normalizedIdentification)
+            ? null
+            : await db.Clientes
+                .Where(x => x.NumeroIdentificacion != null)
+                .FirstOrDefaultAsync(x => x.NumeroIdentificacion!
+                    .Replace(".", "")
+                    .Replace("-", "")
+                    .Replace(" ", "") == normalizedIdentification, cancellationToken);
+
+        if (customer is null)
         {
-            Nombre = firstNames,
-            Nombres = firstNames,
-            Apellidos = lastNames,
-            PrimerNombre = firstName,
-            SegundoNombre = middleName,
-            PrimerApellido = lastName,
-            SegundoApellido = secondLastName,
-            TipoIdentificacion = dto.IdentificationType,
-            NumeroIdentificacion = dto.IdentificationNumber,
-            Email = string.Empty,
-            IndicativoTelefono = string.IsNullOrWhiteSpace(dto.PhoneCountryCode) ? "+57" : dto.PhoneCountryCode.Trim(),
-            Telefono = phone,
-            Estado = EstadoCliente.Activo,
-            Etiquetas = "cotizacion"
-        };
-        db.Clientes.Add(customer);
+            customer = new Cliente
+            {
+                Nombre = firstNames,
+                Nombres = firstNames,
+                Apellidos = lastNames,
+                PrimerNombre = firstName,
+                SegundoNombre = middleName,
+                PrimerApellido = lastName,
+                SegundoApellido = secondLastName,
+                TipoIdentificacion = dto.IdentificationType,
+                NumeroIdentificacion = normalizedIdentification ?? dto.IdentificationNumber,
+                Email = string.Empty,
+                IndicativoTelefono = string.IsNullOrWhiteSpace(dto.PhoneCountryCode) ? "+57" : dto.PhoneCountryCode.Trim(),
+                Telefono = phone,
+                Estado = EstadoCliente.Activo,
+                Etiquetas = "cotizacion"
+            };
+            db.Clientes.Add(customer);
+        }
+        else
+        {
+            customer.Nombre = firstNames;
+            customer.Nombres = firstNames;
+            customer.Apellidos = lastNames;
+            customer.PrimerNombre = firstName;
+            customer.SegundoNombre = middleName;
+            customer.PrimerApellido = lastName;
+            customer.SegundoApellido = secondLastName;
+            customer.TipoIdentificacion = dto.IdentificationType;
+            customer.NumeroIdentificacion = normalizedIdentification ?? dto.IdentificationNumber;
+            customer.IndicativoTelefono = string.IsNullOrWhiteSpace(dto.PhoneCountryCode) ? customer.IndicativoTelefono : dto.PhoneCountryCode.Trim();
+            customer.Telefono = string.IsNullOrWhiteSpace(phone) ? customer.Telefono : phone;
+            customer.Estado = EstadoCliente.Activo;
+            customer.Etiquetas = MergeTags(customer.Etiquetas, "cotizacion");
+        }
 
         var now = ColombiaTime.Now;
         var number = $"COT-{now:yyyyMMddHHmmss}";
@@ -224,6 +253,19 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
     }
 
     private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    private static string? NormalizeIdentification(string? value)
+    {
+        var digits = new string((value ?? string.Empty).Where(char.IsDigit).ToArray());
+        return string.IsNullOrWhiteSpace(digits) ? null : digits;
+    }
+
+    private static string MergeTags(string? current, string tag)
+    {
+        var tags = (current ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+        if (!tags.Any(x => string.Equals(x, tag, StringComparison.OrdinalIgnoreCase))) tags.Add(tag);
+        return string.Join(", ", tags);
+    }
+
     private static IReadOnlyList<string> Split(string? value) => (value ?? string.Empty).Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
     private static string Join(params string?[] values) => string.Join(" ", values.Where(value => !string.IsNullOrWhiteSpace(value)).Select(value => value!.Trim()));
     private static string? Join(IEnumerable<string> values)

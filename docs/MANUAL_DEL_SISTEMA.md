@@ -1,7 +1,7 @@
 # Manual del Sistema CRM SaaS
 
 Ultima actualizacion: 2026-05-25  
-Version del manual: 3.8  
+Version del manual: 3.9  
 Sistema: CRM SaaS para ventas de motos a credito  
 Ambiente documentado: Desarrollo local conectado a SQL Server
 Zona horaria operativa: Colombia UTC-5
@@ -306,7 +306,7 @@ Si el CRM o Verifik encuentran informacion, el sistema completa automaticamente:
 - Primer apellido
 - Segundo apellido
 
-La integracion usa el endpoint interno del CRM para no exponer el token de Verifik en el navegador. Verifik solo se consume cuando la cedula no existe previamente en la base de datos. Para habilitarla en un ambiente real, el administrador tecnico debe configurar la variable de entorno **Verifik__Token** en el backend.
+La integracion usa el endpoint interno del CRM para no exponer el token de Verifik en el navegador. Verifik solo se consume cuando la cedula no existe previamente en la base de datos. Cuando Verifik encuentra informacion, el CRM guarda automaticamente un cliente minimo con esa identificacion para futuras consultas. Para habilitarla en un ambiente real, el administrador tecnico debe configurar la variable de entorno **Verifik__Token** en el backend.
 
 ### Crear cotizacion
 
@@ -781,6 +781,7 @@ Si aparece un error, revise primero los datos ingresados. Si el error persiste, 
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-05-27 | 3.9 | La consulta con Verifik ahora guarda automaticamente el cliente cuando la cedula no existia en la base y evita duplicados al crear cotizaciones. |
 | 2026-05-26 | 3.8 | Se fortalece el simulador financiero de cotizaciones con seguro, gastos administrativos, total financiado, cuota aproximada y total estimado. |
 | 2026-05-26 | 3.7 | Se precisa la agenda automatica al crear cotizaciones: actividad Llamar al cliente mañana y alerta especifica si el seguimiento queda vencido. |
 | 2026-05-25 | 3.6 | Se ajustan los estados comerciales de motos a credito: Cotizado, Interesado, Documentos pendientes, Credito en estudio, Aprobado, Rechazado, Entregado y Desistido. |

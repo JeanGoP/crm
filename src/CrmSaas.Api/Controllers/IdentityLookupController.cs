@@ -3,6 +3,8 @@ using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using CrmSaas.Application.DTOs;
+using CrmSaas.Domain.Entities;
+using CrmSaas.Domain.Enums;
 using CrmSaas.Infrastructure.Persistence;
 using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
@@ -98,8 +100,32 @@ public sealed class IdentityLookupController(IHttpClientFactory httpClientFactor
         }
 
         var names = NameParts.FromVerifik(result.Data);
+        var normalizedDocument = result.Data.DocumentNumber ?? digits;
+        var verifikFullName = BuildFullName(names, result.Data.FullName);
+        var customer = new Cliente
+        {
+            Nombre = verifikFullName,
+            Nombres = Join(names.FirstName, names.MiddleName),
+            Apellidos = Join(names.LastName, names.SecondLastName),
+            PrimerNombre = names.FirstName ?? string.Empty,
+            SegundoNombre = names.MiddleName,
+            PrimerApellido = names.LastName ?? string.Empty,
+            SegundoApellido = names.SecondLastName,
+            TipoIdentificacion = TipoIdentificacionColombia.CedulaCiudadania,
+            NumeroIdentificacion = normalizedDocument,
+            FechaNacimiento = result.Data.DateOfBirth,
+            Email = string.Empty,
+            IndicativoTelefono = "+57",
+            Telefono = string.Empty,
+            Estado = EstadoCliente.Activo,
+            Etiquetas = "verifik",
+            Observaciones = "Cliente creado automaticamente desde consulta Verifik."
+        };
+        db.Clientes.Add(customer);
+        await db.SaveChangesAsync(cancellationToken);
+
         return Ok(new ColombianIdentityLookupDto(
-            result.Data.DocumentNumber ?? digits,
+            normalizedDocument,
             result.Data.DocumentType,
             names.FirstName,
             names.MiddleName,
@@ -160,6 +186,12 @@ public sealed class IdentityLookupController(IHttpClientFactory httpClientFactor
     private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     private static IReadOnlyList<string> Split(string? value) => (value ?? string.Empty).Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
     private static string Join(params string?[] values) => string.Join(" ", values.Where(value => !string.IsNullOrWhiteSpace(value)).Select(value => value!.Trim()));
+    private static string BuildFullName(NameParts names, string? fallback)
+    {
+        var fullName = $"{Join(names.FirstName, names.MiddleName)} {Join(names.LastName, names.SecondLastName)}".Trim();
+        return string.IsNullOrWhiteSpace(fullName) ? Clean(fallback) ?? "Cliente Verifik" : fullName;
+    }
+
     private static string? Join(IEnumerable<string> values)
     {
         var joined = string.Join(" ", values.Where(value => !string.IsNullOrWhiteSpace(value)).Select(value => value.Trim()));

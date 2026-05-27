@@ -1583,7 +1583,7 @@ function QuoteDialog({ form, products, onClose, onSave }: DialogProps<Quote, typ
         type: 'success',
         text: data.source === 'database'
           ? 'Datos encontrados en la base del CRM.'
-          : `Datos encontrados${extra ? ` - expedida en ${extra}` : ''}.`
+          : `Datos encontrados y guardados en clientes${extra ? ` - expedida en ${extra}` : ''}.`
       });
     } catch (err) {
       setIdentityNotice({ type: 'error', text: apiError(err) });
