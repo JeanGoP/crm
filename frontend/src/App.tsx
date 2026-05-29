@@ -1021,6 +1021,8 @@ function PipelinePage() {
   const [activityForm, setActivityForm] = useState<FormMode<Activity>>({ open: false });
   const [confirm, setConfirm] = useState<Deal>();
   const [notice, setNotice] = useState<Notice>();
+  const [draggingDealId, setDraggingDealId] = useState<string>();
+  const [dragOverStageId, setDragOverStageId] = useState<string>();
   const canManage = useCanManage();
   const navigate = useNavigate();
 
@@ -1068,10 +1070,56 @@ function PipelinePage() {
 
   const visibleStages = stages.filter((stage) => stage.active);
   const defaultStageId = visibleStages[0]?.id ?? '';
+  const moveDeal = async (deal: Deal, stage: DealStage) => {
+    if (deal.stageId === stage.id) return;
+    const previousDeals = deals;
+    const movedDeal: Deal = {
+      ...deal,
+      stageId: stage.id,
+      closeProbability: Number(stage.defaultProbability),
+      status: dealStatusForStage(stage.name)
+    };
+    setDeals(deals.map((x) => x.id === deal.id ? movedDeal : x));
+    setNotice({ type: 'info', text: `Moviendo a ${stage.name}...` });
+    try {
+      const { data } = await api.put<Deal>(`/api/pipeline/deals/${deal.id}`, {
+        title: movedDeal.title,
+        customerId: movedDeal.customerId || null,
+        stageId: movedDeal.stageId,
+        value: Number(movedDeal.value),
+        closeProbability: Number(movedDeal.closeProbability),
+        status: Number(movedDeal.status),
+        estimatedCloseDate: new Date(movedDeal.estimatedCloseDate).toISOString()
+      });
+      setDeals((current) => (current ?? []).map((x) => x.id === data.id ? data : x));
+      setNotice({ type: 'success', text: `Negocio movido a ${stage.name}.` });
+    } catch (err) {
+      setDeals(previousDeals);
+      setNotice({ type: 'error', text: apiError(err) });
+    }
+  };
+
   return <Stack spacing={3}>
     <Header title="Pipeline de ventas a credito" action="Nueva venta" onAction={() => setForm({ open: true })} onRefresh={() => { reloadStages(); reloadDeals(); }} secondaryAction={canManage ? { label: 'Nueva etapa', onClick: () => setStageForm({ open: true }) } : undefined} />
     <StatusBar loading={loadingStages || loadingDeals} error={stagesError || dealsError} />
-    <Box className="kanban">{visibleStages.map((stage) => <Paper className="kanbanColumn" key={stage.id}>
+    <Box className="kanban">{visibleStages.map((stage) => <Paper
+      className={`kanbanColumn${dragOverStageId === stage.id ? ' kanbanColumnOver' : ''}`}
+      key={stage.id}
+      onDragOver={(event) => {
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
+        setDragOverStageId(stage.id);
+      }}
+      onDragLeave={() => setDragOverStageId((current) => current === stage.id ? undefined : current)}
+      onDrop={(event) => {
+        event.preventDefault();
+        const dealId = event.dataTransfer.getData('text/plain') || draggingDealId;
+        const deal = deals.find((x) => x.id === dealId);
+        setDraggingDealId(undefined);
+        setDragOverStageId(undefined);
+        if (deal) void moveDeal(deal, stage);
+      }}
+    >
       <Stack direction="row" justifyContent="space-between" alignItems="center">
         <Stack>
           <Typography fontWeight={800}>{stage.name}</Typography>
@@ -1082,7 +1130,21 @@ function PipelinePage() {
       {deals.filter((d) => d.stageId === stage.id).map((deal) => {
         const dealCustomer = customers.find((x) => x.id === deal.customerId);
         const dealCustomerPhone = dealCustomer?.phone;
-        return <Card key={deal.id} sx={{ mt: 1 }}>
+        return <Card
+          key={deal.id}
+          className={`kanbanCard${draggingDealId === deal.id ? ' kanbanCardDragging' : ''}`}
+          draggable
+          onDragStart={(event) => {
+            setDraggingDealId(deal.id);
+            event.dataTransfer.effectAllowed = 'move';
+            event.dataTransfer.setData('text/plain', deal.id);
+          }}
+          onDragEnd={() => {
+            setDraggingDealId(undefined);
+            setDragOverStageId(undefined);
+          }}
+          sx={{ mt: 1 }}
+        >
         <CardContent>
           <Stack direction="row" justifyContent="space-between" gap={1}>
             <Typography fontWeight={800}>{deal.title}</Typography>
@@ -2303,6 +2365,12 @@ function ratingLabel(value: number) { return ['-', 'Frio', 'Tibio', 'Caliente'][
 function typeLabel(value: number) { return ['-', 'Tarea', 'Llamada', 'Reunion'][value] ?? 'Tarea'; }
 function activityStatus(value: number) { return ['-', 'Pendiente', 'En proceso', 'Completada', 'Cancelada'][value] ?? 'Pendiente'; }
 function dealStatus(value: number) { return ['-', 'Abierto', 'Ganado', 'Perdido'][value] ?? 'Abierto'; }
+function dealStatusForStage(stageName: string) {
+  const normalized = stageName.trim().toLowerCase();
+  if (normalized.includes('entregado')) return 2;
+  if (normalized.includes('rechazado') || normalized.includes('desistido') || normalized.includes('perdido')) return 3;
+  return 1;
+}
 function creditStatus(value: number) {
   return ({
     1: 'Cotizado',

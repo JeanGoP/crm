@@ -1,7 +1,7 @@
 # Manual del Sistema CRM SaaS
 
-Ultima actualizacion: 2026-05-25  
-Version del manual: 3.9  
+Ultima actualizacion: 2026-05-29  
+Version del manual: 4.0  
 Sistema: CRM SaaS para ventas de motos a credito  
 Ambiente documentado: Desarrollo local conectado a SQL Server
 Zona horaria operativa: Colombia UTC-5
@@ -590,6 +590,14 @@ Permite visualizar y gestionar los negocios de venta a credito por etapas.
 - Editar negocio.
 - Cambiar estado.
 
+### Mover negocios entre etapas
+
+En la vista pipeline, arrastre la tarjeta del negocio y sueltela sobre otra columna para cambiar su estado comercial. El CRM actualiza la etapa, la probabilidad por defecto de la nueva columna y el estado del negocio cuando aplica:
+
+- **Entregado:** marca el negocio como ganado.
+- **Rechazado, Desistido o Perdido:** marca el negocio como perdido.
+- Las demas etapas mantienen el negocio abierto.
+
 ### Automatizacion desde credito
 
 Si una solicitud de credito esta relacionada con un negocio, los cambios de estado pueden actualizar la etapa del pipeline.
@@ -781,6 +789,7 @@ Si aparece un error, revise primero los datos ingresados. Si el error persiste, 
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-05-29 | 4.0 | Se agrega movimiento drag and drop en el pipeline para arrastrar negocios entre etapas y actualizar estado/probabilidad automaticamente. |
 | 2026-05-27 | 3.9 | La consulta con Verifik ahora guarda automaticamente el cliente cuando la cedula no existia en la base y evita duplicados al crear cotizaciones. |
 | 2026-05-26 | 3.8 | Se fortalece el simulador financiero de cotizaciones con seguro, gastos administrativos, total financiado, cuota aproximada y total estimado. |
 | 2026-05-26 | 3.7 | Se precisa la agenda automatica al crear cotizaciones: actividad Llamar al cliente mañana y alerta especifica si el seguimiento queda vencido. |

@@ -40,6 +40,27 @@ a {
   min-height: 520px;
   padding: 16px;
   background: #eef4f7;
+  transition: background-color .16s ease, outline-color .16s ease, transform .16s ease;
+}
+
+.kanbanColumnOver {
+  background: #dbeafe;
+  outline: 2px solid #155e75;
+  outline-offset: -2px;
+}
+
+.kanbanCard {
+  cursor: grab;
+  transition: opacity .16s ease, transform .16s ease, box-shadow .16s ease;
+}
+
+.kanbanCard:active {
+  cursor: grabbing;
+}
+
+.kanbanCardDragging {
+  opacity: .58;
+  transform: rotate(.35deg) scale(.99);
 }
 
 @media (max-width: 700px) {
