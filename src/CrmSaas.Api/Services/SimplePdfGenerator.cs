@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.IO.Compression;
 using System.Text;
 using CrmSaas.Domain.Common;
 using CrmSaas.Application.DTOs;
@@ -332,11 +333,9 @@ public static class SimplePdfGenerator
 
     private static byte[] CreateQuotePdf(QuoteDto quote, string companyName, QuotePdfImage? productImage)
     {
-        var jpeg = IsJpeg(productImage) ? productImage : null;
-        var imageSize = jpeg is null ? null : TryReadJpegSize(jpeg.Data);
-        if (imageSize is null) jpeg = null;
+        var pdfImage = TryCreatePdfImage(productImage);
 
-        var content = QuotePageContent(quote, companyName, jpeg is not null);
+        var content = QuotePageContent(quote, companyName, pdfImage is not null);
         var objects = new List<PdfObject>
         {
             new("<< /Type /Catalog /Pages 2 0 R >>"),
@@ -346,10 +345,11 @@ public static class SimplePdfGenerator
         };
 
         var imageObjectNumber = 0;
-        if (jpeg is not null && imageSize is not null)
+        if (pdfImage is not null)
         {
             imageObjectNumber = 5;
-            objects.Add(new($"<< /Type /XObject /Subtype /Image /Width {imageSize.Value.Width} /Height {imageSize.Value.Height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length {jpeg.Data.Length} >>", jpeg.Data));
+            var decodeParms = string.IsNullOrWhiteSpace(pdfImage.DecodeParms) ? string.Empty : $" /DecodeParms {pdfImage.DecodeParms}";
+            objects.Add(new($"<< /Type /XObject /Subtype /Image /Width {pdfImage.Width} /Height {pdfImage.Height} /ColorSpace /{pdfImage.ColorSpace} /BitsPerComponent 8 /Filter /{pdfImage.Filter}{decodeParms} /Length {pdfImage.Data.Length} >>", pdfImage.Data));
         }
 
         var pageNumber = objects.Count + 1;
@@ -396,7 +396,7 @@ public static class SimplePdfGenerator
         else
         {
             commands.AppendLine("0.90 0.94 0.96 rg 196 404 220 154 re f");
-            commands.AppendLine("0.32 0.38 0.45 rg BT /F1 11 Tf 234 478 Td (Sin foto principal JPG) Tj ET");
+            commands.AppendLine("0.32 0.38 0.45 rg BT /F1 11 Tf 225 478 Td (Sin foto principal compatible) Tj ET");
         }
 
         DrawSection(commands, 34, 248, 544, 124, "SIMULACION FINANCIERA");
@@ -471,6 +471,163 @@ public static class SimplePdfGenerator
         image.Data.Length > 4 &&
         image.Data[0] == 0xFF &&
         image.Data[1] == 0xD8;
+
+    private sealed record PdfImageData(byte[] Data, int Width, int Height, string ColorSpace, string Filter, string? DecodeParms);
+
+    private static PdfImageData? TryCreatePdfImage(QuotePdfImage? image)
+    {
+        if (IsJpeg(image))
+        {
+            var size = TryReadJpegSize(image!.Data);
+            return size is null
+                ? null
+                : new PdfImageData(image.Data, size.Value.Width, size.Value.Height, "DeviceRGB", "DCTDecode", null);
+        }
+
+        if (image is not null && image.ContentType.Equals("image/png", StringComparison.OrdinalIgnoreCase))
+        {
+            return TryCreatePngPdfImage(image.Data);
+        }
+
+        return null;
+    }
+
+    private static PdfImageData? TryCreatePngPdfImage(byte[] data)
+    {
+        if (data.Length < 33 || !data.Take(8).SequenceEqual(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 })) return null;
+
+        var offset = 8;
+        int width = 0, height = 0, bitDepth = 0, colorType = 0, interlace = 0;
+        var compressed = new MemoryStream();
+
+        while (offset + 8 <= data.Length)
+        {
+            var length = ReadBigEndianInt(data, offset);
+            var type = Encoding.ASCII.GetString(data, offset + 4, 4);
+            var chunkStart = offset + 8;
+            if (length < 0 || chunkStart + length > data.Length) return null;
+
+            if (type == "IHDR")
+            {
+                width = ReadBigEndianInt(data, chunkStart);
+                height = ReadBigEndianInt(data, chunkStart + 4);
+                bitDepth = data[chunkStart + 8];
+                colorType = data[chunkStart + 9];
+                interlace = data[chunkStart + 12];
+            }
+            else if (type == "IDAT")
+            {
+                compressed.Write(data, chunkStart, length);
+            }
+            else if (type == "IEND")
+            {
+                break;
+            }
+
+            offset = chunkStart + length + 4;
+        }
+
+        if (width <= 0 || height <= 0 || bitDepth != 8 || interlace != 0 || compressed.Length == 0) return null;
+
+        var sourceChannels = colorType switch
+        {
+            0 => 1,
+            2 => 3,
+            4 => 2,
+            6 => 4,
+            _ => 0
+        };
+        if (sourceChannels == 0) return null;
+
+        compressed.Position = 0;
+        using var zlib = new ZLibStream(compressed, CompressionMode.Decompress);
+        using var raw = new MemoryStream();
+        zlib.CopyTo(raw);
+        var rawBytes = raw.ToArray();
+        var stride = width * sourceChannels;
+        var expected = (stride + 1) * height;
+        if (rawBytes.Length < expected) return null;
+
+        var unfiltered = UnfilterPng(rawBytes, width, height, sourceChannels);
+        var targetChannels = colorType is 0 or 4 ? 1 : 3;
+        using var imageRows = new MemoryStream();
+        for (var row = 0; row < height; row++)
+        {
+            imageRows.WriteByte(0);
+            var rowStart = row * stride;
+            for (var col = 0; col < width; col++)
+            {
+                var pixelStart = rowStart + col * sourceChannels;
+                if (targetChannels == 1)
+                {
+                    imageRows.WriteByte(unfiltered[pixelStart]);
+                }
+                else
+                {
+                    imageRows.WriteByte(unfiltered[pixelStart]);
+                    imageRows.WriteByte(unfiltered[pixelStart + 1]);
+                    imageRows.WriteByte(unfiltered[pixelStart + 2]);
+                }
+            }
+        }
+
+        using var encoded = new MemoryStream();
+        using (var compressor = new ZLibStream(encoded, CompressionLevel.SmallestSize, leaveOpen: true))
+        {
+            imageRows.Position = 0;
+            imageRows.CopyTo(compressor);
+        }
+
+        var colorSpace = targetChannels == 1 ? "DeviceGray" : "DeviceRGB";
+        var decodeParms = $"<< /Predictor 15 /Colors {targetChannels} /BitsPerComponent 8 /Columns {width} >>";
+        return new PdfImageData(encoded.ToArray(), width, height, colorSpace, "FlateDecode", decodeParms);
+    }
+
+    private static byte[] UnfilterPng(byte[] rawBytes, int width, int height, int channels)
+    {
+        var stride = width * channels;
+        var output = new byte[stride * height];
+        var input = 0;
+
+        for (var row = 0; row < height; row++)
+        {
+            var filter = rawBytes[input++];
+            var current = row * stride;
+            var previous = current - stride;
+            for (var col = 0; col < stride; col++)
+            {
+                var raw = rawBytes[input++];
+                var left = col >= channels ? output[current + col - channels] : 0;
+                var up = row > 0 ? output[previous + col] : 0;
+                var upperLeft = row > 0 && col >= channels ? output[previous + col - channels] : 0;
+                var value = filter switch
+                {
+                    0 => raw,
+                    1 => raw + left,
+                    2 => raw + up,
+                    3 => raw + ((left + up) / 2),
+                    4 => raw + Paeth(left, up, upperLeft),
+                    _ => raw
+                };
+                output[current + col] = unchecked((byte)value);
+            }
+        }
+
+        return output;
+    }
+
+    private static int Paeth(int left, int up, int upperLeft)
+    {
+        var p = left + up - upperLeft;
+        var pa = Math.Abs(p - left);
+        var pb = Math.Abs(p - up);
+        var pc = Math.Abs(p - upperLeft);
+        if (pa <= pb && pa <= pc) return left;
+        return pb <= pc ? up : upperLeft;
+    }
+
+    private static int ReadBigEndianInt(byte[] data, int offset) =>
+        (data[offset] << 24) + (data[offset + 1] << 16) + (data[offset + 2] << 8) + data[offset + 3];
 
     private static (int Width, int Height)? TryReadJpegSize(byte[] data)
     {

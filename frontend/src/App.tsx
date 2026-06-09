@@ -1695,7 +1695,7 @@ function ProductPhotosManager({ product, onChanged }: { product: Product; onChan
       <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', sm: 'center' }} gap={1}>
         <Box>
           <Typography fontWeight={800}>Fotos del producto</Typography>
-          <Typography variant="caption" color="text.secondary">Puede cargar varias fotos y marcar cual se imprime en la cotizacion. Para PDF profesional use JPG/JPEG.</Typography>
+          <Typography variant="caption" color="text.secondary">Puede cargar varias fotos y marcar cual se imprime en la cotizacion. El PDF admite JPG/JPEG y PNG compatibles.</Typography>
         </Box>
         <Button component="label" variant="outlined" startIcon={<UploadFile />} disabled={uploading}>
           {uploading ? 'Subiendo...' : 'Adjuntar fotos'}
@@ -1713,7 +1713,6 @@ function ProductPhotosManager({ product, onChanged }: { product: Product; onChan
             </Tooltip>
             <Stack direction="row" gap={1} flexWrap="wrap">
               <Chip size="small" color={photo.isQuoteDefault ? 'success' : 'default'} label={photo.isQuoteDefault ? 'Foto PDF' : readableFileSize(photo.sizeBytes)} />
-              {!photo.contentType.includes('jpeg') && !photo.contentType.includes('jpg') && photo.isQuoteDefault && <Chip size="small" color="warning" label="PDF usa JPG" />}
             </Stack>
             <Stack direction="row" gap={1}>
               <Button type="button" size="small" variant={photo.isQuoteDefault ? 'contained' : 'outlined'} onClick={() => void setDefault(photo)}>Usar en PDF</Button>
@@ -1831,7 +1830,6 @@ function QuoteDialog({ form, products, onClose, onSave }: DialogProps<Quote, typ
                   ? 'Se usara la foto marcada como Foto PDF en el producto.'
                   : 'Este producto no tiene foto principal. Puede configurarla en Productos.'}
               </Typography>
-              {((selectedProduct.photos ?? []).find((photo) => photo.isQuoteDefault)?.contentType ?? '').includes('png') && <Typography variant="caption" color="warning.main">Para que la imagen se imprima en PDF, cargue una version JPG/JPEG como principal.</Typography>}
             </Box>
           </Stack>
         </Paper>}
