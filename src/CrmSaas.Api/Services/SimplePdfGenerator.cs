@@ -498,6 +498,8 @@ public static class SimplePdfGenerator
 
         var offset = 8;
         int width = 0, height = 0, bitDepth = 0, colorType = 0, interlace = 0;
+        byte[]? palette = null;
+        byte[]? transparency = null;
         var compressed = new MemoryStream();
 
         while (offset + 8 <= data.Length)
@@ -519,6 +521,14 @@ public static class SimplePdfGenerator
             {
                 compressed.Write(data, chunkStart, length);
             }
+            else if (type == "PLTE")
+            {
+                palette = data.Skip(chunkStart).Take(length).ToArray();
+            }
+            else if (type == "tRNS")
+            {
+                transparency = data.Skip(chunkStart).Take(length).ToArray();
+            }
             else if (type == "IEND")
             {
                 break;
@@ -533,11 +543,13 @@ public static class SimplePdfGenerator
         {
             0 => 1,
             2 => 3,
+            3 => 1,
             4 => 2,
             6 => 4,
             _ => 0
         };
         if (sourceChannels == 0) return null;
+        if (colorType == 3 && (palette is null || palette.Length < 3)) return null;
 
         compressed.Position = 0;
         using var zlib = new ZLibStream(compressed, CompressionMode.Decompress);
@@ -549,7 +561,7 @@ public static class SimplePdfGenerator
         if (rawBytes.Length < expected) return null;
 
         var unfiltered = UnfilterPng(rawBytes, width, height, sourceChannels);
-        var targetChannels = colorType is 0 or 4 ? 1 : 3;
+        const int targetChannels = 3;
         using var imageRows = new MemoryStream();
         for (var row = 0; row < height; row++)
         {
@@ -558,16 +570,10 @@ public static class SimplePdfGenerator
             for (var col = 0; col < width; col++)
             {
                 var pixelStart = rowStart + col * sourceChannels;
-                if (targetChannels == 1)
-                {
-                    imageRows.WriteByte(unfiltered[pixelStart]);
-                }
-                else
-                {
-                    imageRows.WriteByte(unfiltered[pixelStart]);
-                    imageRows.WriteByte(unfiltered[pixelStart + 1]);
-                    imageRows.WriteByte(unfiltered[pixelStart + 2]);
-                }
+                var (r, g, b) = PngPixelToRgb(unfiltered, pixelStart, colorType, palette, transparency);
+                imageRows.WriteByte(r);
+                imageRows.WriteByte(g);
+                imageRows.WriteByte(b);
             }
         }
 
@@ -578,9 +584,40 @@ public static class SimplePdfGenerator
             imageRows.CopyTo(compressor);
         }
 
-        var colorSpace = targetChannels == 1 ? "DeviceGray" : "DeviceRGB";
         var decodeParms = $"<< /Predictor 15 /Colors {targetChannels} /BitsPerComponent 8 /Columns {width} >>";
-        return new PdfImageData(encoded.ToArray(), width, height, colorSpace, "FlateDecode", decodeParms);
+        return new PdfImageData(encoded.ToArray(), width, height, "DeviceRGB", "FlateDecode", decodeParms);
+    }
+
+    private static (byte R, byte G, byte B) PngPixelToRgb(byte[] data, int pixelStart, int colorType, byte[]? palette, byte[]? transparency)
+    {
+        return colorType switch
+        {
+            0 => (data[pixelStart], data[pixelStart], data[pixelStart]),
+            2 => (data[pixelStart], data[pixelStart + 1], data[pixelStart + 2]),
+            3 => PalettePixelToRgb(data[pixelStart], palette!, transparency),
+            4 => BlendWithWhite(data[pixelStart], data[pixelStart], data[pixelStart], data[pixelStart + 1]),
+            6 => BlendWithWhite(data[pixelStart], data[pixelStart + 1], data[pixelStart + 2], data[pixelStart + 3]),
+            _ => (255, 255, 255)
+        };
+    }
+
+    private static (byte R, byte G, byte B) PalettePixelToRgb(byte index, byte[] palette, byte[]? transparency)
+    {
+        var paletteIndex = index * 3;
+        if (paletteIndex + 2 >= palette.Length) return (255, 255, 255);
+        var alpha = transparency is not null && index < transparency.Length ? transparency[index] : (byte)255;
+        return BlendWithWhite(palette[paletteIndex], palette[paletteIndex + 1], palette[paletteIndex + 2], alpha);
+    }
+
+    private static (byte R, byte G, byte B) BlendWithWhite(byte r, byte g, byte b, byte alpha)
+    {
+        if (alpha == 255) return (r, g, b);
+        if (alpha == 0) return (255, 255, 255);
+        return (
+            (byte)((r * alpha + 255 * (255 - alpha)) / 255),
+            (byte)((g * alpha + 255 * (255 - alpha)) / 255),
+            (byte)((b * alpha + 255 * (255 - alpha)) / 255)
+        );
     }
 
     private static byte[] UnfilterPng(byte[] rawBytes, int width, int height, int channels)
