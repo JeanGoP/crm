@@ -572,6 +572,7 @@ function QuotesPage() {
   const { data: products = [] } = useResource<Product[]>('/api/products', []);
   const [form, setForm] = useState<FormMode<Quote>>({ open: false });
   const [analysis, setAnalysis] = useState<CustomerAiAnalysis>();
+  const [previewQuote, setPreviewQuote] = useState<Quote>();
   const [notice, setNotice] = useState<Notice>();
 
   const downloadPdf = async (quote: Quote) => {
@@ -604,9 +605,9 @@ function QuotesPage() {
     };
     const { data } = await api.post<Quote>('/api/quotes', body);
     setData([data, ...rows]);
-    setNotice({ type: 'success', text: 'Cotizacion creada. El cliente quedo registrado para completar sus datos.' });
+    setNotice({ type: 'success', text: 'Cotizacion creada. Revise la vista previa antes de descargar o imprimir.' });
     setForm({ open: false });
-    await downloadPdf(data);
+    setPreviewQuote(data);
   };
 
   const analyzeCustomer = async (customerId: string) => {
@@ -632,10 +633,11 @@ function QuotesPage() {
         money(r.financedAmount),
         r.estimatedMonthlyPayment > 0 ? `${money(r.estimatedMonthlyPayment)} x ${r.termMonths}` : 'Sin simulacion',
         new Date(r.validUntil).toLocaleDateString(),
-        <Actions onAi={() => analyzeCustomer(r.customerId)} onDownload={() => downloadPdf(r)} />
+        <Actions onAi={() => analyzeCustomer(r.customerId)} onDownload={() => setPreviewQuote(r)} />
       ])}
     />
     <QuoteDialog form={form} products={products.filter((x) => x.active)} onClose={() => setForm({ open: false })} onSave={save} />
+    <QuotePdfPreviewDialog quote={previewQuote} onClose={() => setPreviewQuote(undefined)} onDownload={downloadPdf} />
     <AiAnalysisDialog analysis={analysis} onClose={() => setAnalysis(undefined)} />
     <Notice notice={notice} onClose={() => setNotice(undefined)} />
   </Stack>;
@@ -1854,6 +1856,84 @@ function QuoteDialog({ form, products, onClose, onSave }: DialogProps<Quote, typ
       </>;
     }}
   </FormDialog>;
+}
+
+function QuotePdfPreviewDialog({ quote, onClose, onDownload }: { quote?: Quote; onClose: () => void; onDownload: (quote: Quote) => Promise<void> }) {
+  const muiTheme = useTheme();
+  const fullScreen = useMediaQuery(muiTheme.breakpoints.down('sm'));
+  const [url, setUrl] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let objectUrl = '';
+    if (!quote) {
+      setUrl('');
+      setError('');
+      setLoading(false);
+      return undefined;
+    }
+
+    setLoading(true);
+    setError('');
+    api.get<Blob>(`/api/quotes/${quote.id}/pdf`, { responseType: 'blob' })
+      .then(({ data }) => {
+        objectUrl = URL.createObjectURL(data);
+        setUrl(objectUrl);
+      })
+      .catch((err) => setError(apiError(err)))
+      .finally(() => setLoading(false));
+
+    return () => {
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [quote?.id]);
+
+  const print = () => {
+    if (!url) return;
+    const win = window.open(url, '_blank');
+    if (!win) {
+      setError('El navegador bloqueo la ventana de impresion. Permita ventanas emergentes para imprimir.');
+      return;
+    }
+    win.addEventListener('load', () => {
+      win.focus();
+      win.print();
+    }, { once: true });
+  };
+
+  return <Dialog open={!!quote} onClose={onClose} fullWidth maxWidth="lg" fullScreen={fullScreen}>
+    <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1 }}>
+      <Box>
+        <Typography fontWeight={900}>Vista previa de cotizacion</Typography>
+        <Typography variant="caption" color="text.secondary">{quote?.number}</Typography>
+      </Box>
+      <IconButton onClick={onClose}><Close /></IconButton>
+    </DialogTitle>
+    <DialogContent sx={{ p: { xs: 1.5, sm: 2 } }}>
+      <Stack spacing={2}>
+        {loading && <LinearProgress />}
+        {error && <Alert severity="error">{error}</Alert>}
+        {!loading && !error && url && <Box
+          component="iframe"
+          title={`Cotizacion ${quote?.number}`}
+          src={url}
+          sx={{
+            width: '100%',
+            height: { xs: '70vh', sm: '76vh' },
+            border: '1px solid #d8e0e8',
+            borderRadius: 1,
+            bgcolor: '#f8fafc'
+          }}
+        />}
+      </Stack>
+    </DialogContent>
+    <DialogActions sx={{ px: { xs: 2, sm: 3 }, pb: 2, flexWrap: 'wrap' }}>
+      <Button onClick={onClose}>Cerrar</Button>
+      <Button startIcon={<Download />} disabled={!quote || !url} onClick={() => quote && void onDownload(quote)}>Descargar PDF</Button>
+      <Button variant="contained" disabled={!url} onClick={print}>Imprimir</Button>
+    </DialogActions>
+  </Dialog>;
 }
 
 function CreditApplicationDialog({ form, customers, products, quotes, deals, onClose, onSave }: DialogProps<CreditApplication, typeof emptyCreditApplication> & { customers: Customer[]; products: Product[]; quotes: Quote[]; deals: Deal[] }) {

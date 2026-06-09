@@ -1,7 +1,7 @@
 # Manual de usuario - CRM Comercial
 
 Ultima actualizacion: 2026-06-09  
-Version del manual: 5.1  
+Version del manual: 5.2  
 Sistema: CRM para gestion comercial y ventas a credito  
 
 ## 1. Bienvenida
@@ -213,10 +213,15 @@ Cotizaciones permite generar una propuesta comercial para un cliente. Es uno de 
 
 - Se crea o actualiza el cliente con los datos correctos.
 - Se guarda la cotizacion.
-- Se genera el PDF de la cotizacion con formato profesional.
+- Se abre una vista previa del PDF en pantalla.
+- Desde la vista previa se decide si se descarga o se imprime.
 - Si el producto tiene una foto principal compatible, se incluye en el PDF.
 - Se puede crear seguimiento automatico para llamar al cliente.
 - El negocio puede reflejarse en el pipeline comercial.
+
+### Vista previa del PDF
+
+Despues de guardar una cotizacion, el sistema no imprime ni descarga automaticamente. Primero muestra el PDF en pantalla para que el usuario revise datos del cliente, producto, valores, foto y condiciones. Si todo esta correcto, puede usar **Descargar PDF** o **Imprimir**.
 
 ## 11. Simulador financiero
 
@@ -482,6 +487,7 @@ El sistema muestra mensajes cuando algo no puede completarse.
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-06-09 | 5.2 | La cotizacion ya no descarga ni imprime automaticamente; primero abre vista previa del PDF y luego permite descargar o imprimir. |
 | 2026-06-09 | 5.1 | Se documenta la carga de varias fotos por producto, seleccion de foto principal compatible para PDF y mejora visual del PDF de cotizacion. |
 | 2026-06-09 | 5.0 | Se reconstruye el manual para usuario final, con explicaciones operativas, paso a paso y recomendaciones de uso. |
 | 2026-05-29 | 4.0 | Se agrega movimiento drag and drop en el pipeline para arrastrar negocios entre etapas y actualizar estado/probabilidad automaticamente. |
