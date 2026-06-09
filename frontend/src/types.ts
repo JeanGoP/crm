@@ -91,6 +91,15 @@ export interface Activity {
   dealTitle?: string;
 }
 
+export interface ProductPhoto {
+  id: string;
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+  isQuoteDefault: boolean;
+  dataUrl: string;
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -104,6 +113,7 @@ export interface Product {
   color?: string;
   price: number;
   active: boolean;
+  photos: ProductPhoto[];
 }
 
 export interface Quote {

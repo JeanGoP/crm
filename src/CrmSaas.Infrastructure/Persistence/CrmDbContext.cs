@@ -20,6 +20,7 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
     public DbSet<Nota> Notas => Set<Nota>();
     public DbSet<Archivo> Archivos => Set<Archivo>();
     public DbSet<Producto> Productos => Set<Producto>();
+    public DbSet<ProductoFoto> ProductoFotos => Set<ProductoFoto>();
     public DbSet<Cotizacion> Cotizaciones => Set<Cotizacion>();
     public DbSet<SolicitudCredito> SolicitudesCredito => Set<SolicitudCredito>();
     public DbSet<DocumentoSolicitudCredito> DocumentosSolicitudCredito => Set<DocumentoSolicitudCredito>();
@@ -40,6 +41,7 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
         modelBuilder.Entity<Nota>().ToTable("Notas");
         modelBuilder.Entity<Archivo>().ToTable("Archivos");
         modelBuilder.Entity<Producto>().ToTable("Productos");
+        modelBuilder.Entity<ProductoFoto>().ToTable("ProductoFotos");
         modelBuilder.Entity<Cotizacion>().ToTable("Cotizaciones");
         modelBuilder.Entity<SolicitudCredito>().ToTable("SolicitudesCredito");
         modelBuilder.Entity<DocumentoSolicitudCredito>().ToTable("DocumentosSolicitudCredito");
@@ -67,6 +69,10 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
         modelBuilder.Entity<Producto>().Property(x => x.Precio).HasPrecision(18, 2);
         modelBuilder.Entity<Producto>().HasIndex(x => new { x.EmpresaId, x.Categoria });
         modelBuilder.Entity<Producto>().HasIndex(x => new { x.EmpresaId, x.Referencia });
+        modelBuilder.Entity<ProductoFoto>().Property(x => x.NombreArchivo).HasMaxLength(220);
+        modelBuilder.Entity<ProductoFoto>().Property(x => x.ContentType).HasMaxLength(80);
+        modelBuilder.Entity<ProductoFoto>().HasIndex(x => new { x.EmpresaId, x.ProductoId });
+        modelBuilder.Entity<ProductoFoto>().HasOne(x => x.Producto).WithMany(x => x.Fotos).HasForeignKey(x => x.ProductoId).OnDelete(DeleteBehavior.Cascade);
         modelBuilder.Entity<Cotizacion>().Property(x => x.PrecioProducto).HasPrecision(18, 2);
         modelBuilder.Entity<Cotizacion>().Property(x => x.CuotaInicial).HasPrecision(18, 2);
         modelBuilder.Entity<Cotizacion>().Property(x => x.Seguro).HasPrecision(18, 2);
@@ -108,6 +114,7 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
         modelBuilder.Entity<Nota>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<Archivo>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<Producto>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
+        modelBuilder.Entity<ProductoFoto>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<Cotizacion>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<SolicitudCredito>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<DocumentoSolicitudCredito>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);

@@ -17,10 +17,10 @@ public sealed class ProductsController(CrmDbContext db) : ControllerBase
     public async Task<ActionResult<IReadOnlyCollection<ProductDto>>> Get(CancellationToken cancellationToken)
     {
         var products = await db.Productos
+            .Include(x => x.Fotos)
             .OrderBy(x => x.Categoria).ThenBy(x => x.Nombre)
-            .Select(x => new ProductDto(x.Id, x.Nombre, x.Categoria, x.Marca, x.Modelo, x.Referencia, x.Descripcion, x.Cilindraje, x.Anio, x.Color, x.Precio, x.Activo))
             .ToListAsync(cancellationToken);
-        return Ok(products);
+        return Ok(products.Select(ToDto).ToList());
     }
 
     [HttpPost]
@@ -52,7 +52,10 @@ public sealed class ProductsController(CrmDbContext db) : ControllerBase
     public async Task<ActionResult<ProductDto>> Update(Guid id, UpsertProductDto dto, CancellationToken cancellationToken)
     {
         Validate(dto);
-        var product = await db.Productos.FindAsync([id], cancellationToken) ?? throw new KeyNotFoundException("Producto no encontrado.");
+        var product = await db.Productos
+            .Include(x => x.Fotos)
+            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
+            ?? throw new KeyNotFoundException("Producto no encontrado.");
         product.Nombre = dto.Name.Trim();
         product.Categoria = NormalizeCategory(dto.Category);
         product.Marca = dto.Brand.Trim();
@@ -72,13 +75,115 @@ public sealed class ProductsController(CrmDbContext db) : ControllerBase
     [Authorize(Roles = "Administrador,Supervisor")]
     public async Task<ActionResult<ProductDto>> Delete(Guid id, CancellationToken cancellationToken)
     {
-        var product = await db.Productos.FindAsync([id], cancellationToken) ?? throw new KeyNotFoundException("Producto no encontrado.");
+        var product = await db.Productos
+            .Include(x => x.Fotos)
+            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
+            ?? throw new KeyNotFoundException("Producto no encontrado.");
         product.Activo = false;
         await db.SaveChangesAsync(cancellationToken);
         return Ok(ToDto(product));
     }
 
-    private static ProductDto ToDto(Producto x) => new(x.Id, x.Nombre, x.Categoria, x.Marca, x.Modelo, x.Referencia, x.Descripcion, x.Cilindraje, x.Anio, x.Color, x.Precio, x.Activo);
+    [HttpPost("{id:guid}/photos")]
+    [Authorize(Roles = "Administrador,Supervisor")]
+    [RequestSizeLimit(20_000_000)]
+    public async Task<ActionResult<ProductDto>> UploadPhotos(Guid id, [FromForm] List<IFormFile> files, CancellationToken cancellationToken)
+    {
+        var product = await db.Productos
+            .Include(x => x.Fotos)
+            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
+            ?? throw new KeyNotFoundException("Producto no encontrado.");
+
+        if (files.Count == 0) throw new ValidationException("Debe seleccionar al menos una foto.");
+        var nextOrder = product.Fotos.Count == 0 ? 1 : product.Fotos.Max(x => x.Orden) + 1;
+        var hasDefault = product.Fotos.Any(x => x.EsPrincipalCotizacion);
+
+        foreach (var file in files)
+        {
+            ValidatePhoto(file);
+            await using var stream = file.OpenReadStream();
+            using var memory = new MemoryStream();
+            await stream.CopyToAsync(memory, cancellationToken);
+            var photo = new ProductoFoto
+            {
+                ProductoId = product.Id,
+                NombreArchivo = Path.GetFileName(file.FileName),
+                ContentType = file.ContentType,
+                TamanoBytes = file.Length,
+                Datos = memory.ToArray(),
+                EsPrincipalCotizacion = !hasDefault,
+                Orden = nextOrder++
+            };
+            hasDefault = true;
+            db.ProductoFotos.Add(photo);
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        await db.Entry(product).Collection(x => x.Fotos).LoadAsync(cancellationToken);
+        return Ok(ToDto(product));
+    }
+
+    [HttpPut("{id:guid}/photos/{photoId:guid}/quote-default")]
+    [Authorize(Roles = "Administrador,Supervisor")]
+    public async Task<ActionResult<ProductDto>> SetQuoteDefaultPhoto(Guid id, Guid photoId, CancellationToken cancellationToken)
+    {
+        var product = await db.Productos
+            .Include(x => x.Fotos)
+            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
+            ?? throw new KeyNotFoundException("Producto no encontrado.");
+
+        if (!product.Fotos.Any(x => x.Id == photoId)) throw new KeyNotFoundException("Foto no encontrada.");
+        foreach (var photo in product.Fotos) photo.EsPrincipalCotizacion = photo.Id == photoId;
+        await db.SaveChangesAsync(cancellationToken);
+        return Ok(ToDto(product));
+    }
+
+    [HttpDelete("{id:guid}/photos/{photoId:guid}")]
+    [Authorize(Roles = "Administrador,Supervisor")]
+    public async Task<ActionResult<ProductDto>> DeletePhoto(Guid id, Guid photoId, CancellationToken cancellationToken)
+    {
+        var product = await db.Productos
+            .Include(x => x.Fotos)
+            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
+            ?? throw new KeyNotFoundException("Producto no encontrado.");
+        var photo = product.Fotos.FirstOrDefault(x => x.Id == photoId) ?? throw new KeyNotFoundException("Foto no encontrada.");
+        var wasDefault = photo.EsPrincipalCotizacion;
+        db.ProductoFotos.Remove(photo);
+        if (wasDefault)
+        {
+            var next = product.Fotos.Where(x => x.Id != photoId).OrderBy(x => x.Orden).FirstOrDefault();
+            if (next is not null) next.EsPrincipalCotizacion = true;
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        await db.Entry(product).Collection(x => x.Fotos).LoadAsync(cancellationToken);
+        return Ok(ToDto(product));
+    }
+
+    private static ProductDto ToDto(Producto x) => new(
+        x.Id,
+        x.Nombre,
+        x.Categoria,
+        x.Marca,
+        x.Modelo,
+        x.Referencia,
+        x.Descripcion,
+        x.Cilindraje,
+        x.Anio,
+        x.Color,
+        x.Precio,
+        x.Activo,
+        x.Fotos
+            .OrderByDescending(photo => photo.EsPrincipalCotizacion)
+            .ThenBy(photo => photo.Orden)
+            .Select(photo => new ProductPhotoDto(
+                photo.Id,
+                photo.NombreArchivo,
+                photo.ContentType,
+                photo.TamanoBytes,
+                photo.EsPrincipalCotizacion,
+                $"data:{photo.ContentType};base64,{Convert.ToBase64String(photo.Datos)}"))
+            .ToList());
 
     private static void Validate(UpsertProductDto dto)
     {
@@ -86,6 +191,17 @@ public sealed class ProductsController(CrmDbContext db) : ControllerBase
         if (string.IsNullOrWhiteSpace(dto.Category)) throw new ValidationException("La categoria es obligatoria.");
         if (string.IsNullOrWhiteSpace(dto.Reference)) throw new ValidationException("La referencia es obligatoria.");
         if (dto.Price <= 0) throw new ValidationException("El precio debe ser mayor a cero.");
+    }
+
+    private static void ValidatePhoto(IFormFile file)
+    {
+        if (file.Length <= 0) throw new ValidationException("La foto esta vacia.");
+        if (file.Length > 5_000_000) throw new ValidationException("Cada foto debe pesar maximo 5 MB.");
+        var allowed = new[] { "image/jpeg", "image/jpg", "image/png", "image/webp" };
+        if (!allowed.Contains(file.ContentType, StringComparer.OrdinalIgnoreCase))
+        {
+            throw new ValidationException("Solo se permiten imagenes JPG, PNG o WebP.");
+        }
     }
 
     private static string NormalizeCategory(string category) => string.IsNullOrWhiteSpace(category) ? "General" : category.Trim();

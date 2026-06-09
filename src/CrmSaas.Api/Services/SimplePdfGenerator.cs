@@ -6,50 +6,15 @@ using CrmSaas.Domain.Enums;
 
 namespace CrmSaas.Api.Services;
 
+public sealed record QuotePdfImage(byte[] Data, string ContentType, string FileName);
+
 public static class SimplePdfGenerator
 {
     private static readonly CultureInfo ColombianCulture = CultureInfo.GetCultureInfo("es-CO");
 
-    public static byte[] Quote(QuoteDto quote, string companyName)
+    public static byte[] Quote(QuoteDto quote, string companyName, QuotePdfImage? productImage = null)
     {
-        var lines = new List<string>
-        {
-            "COTIZACION COMERCIAL",
-            $"Numero: {quote.Number}",
-            $"Empresa: {companyName}",
-            $"Fecha: {Date(quote.QuoteDate)}",
-            $"Valida hasta: {Date(quote.ValidUntil)}",
-            "",
-            "DATOS DEL CLIENTE",
-            $"Tipo identificacion: {quote.IdentificationType}",
-            $"Identificacion: {Value(quote.IdentificationNumber)}",
-            $"Nombres: {quote.CustomerFirstNames}",
-            $"Apellidos: {quote.CustomerLastNames}",
-            "",
-            "PRODUCTO COTIZADO",
-            $"Producto: {quote.ProductName}",
-            $"Valor comercial: {Money(quote.ProductPrice)}",
-            "",
-            "SIMULACION DE CREDITO",
-            $"Cuota inicial: {Money(quote.DownPayment)}",
-            $"Seguro: {Money(quote.Insurance)}",
-            $"Gastos administrativos: {Money(quote.AdministrativeFees)}",
-            $"Total financiado: {Money(quote.FinancedAmount)}",
-            $"Plazo: {quote.TermMonths} meses",
-            $"Tasa mensual: {quote.MonthlyInterestRate:N2}%",
-            $"Cuota aproximada: {Money(quote.EstimatedMonthlyPayment)}",
-            $"Total estimado a pagar: {Money(quote.EstimatedTotalPayment)}",
-            "",
-            "CONDICIONES",
-            "La presente cotizacion es informativa y esta sujeta a validacion comercial, disponibilidad del producto, estudio de credito, aprobacion de la entidad financiadora y politicas internas vigentes.",
-            $"Observaciones: {Value(quote.Notes)}",
-            "",
-            "FIRMAS",
-            "Asesor comercial: ______________________________",
-            "Cliente: ________________________________________"
-        };
-
-        return CreatePdf(lines, $"{quote.Number}.pdf");
+        return CreateQuotePdf(quote, companyName, productImage);
     }
 
     public static byte[] CreditApplication(CreditApplicationDto application, string companyName, string template)
@@ -364,4 +329,219 @@ public static class SimplePdfGenerator
         .Normalize(NormalizationForm.FormD)
         .Where(c => c < 128)
         .Aggregate(new StringBuilder(), (sb, c) => sb.Append(c), sb => sb.ToString());
+
+    private static byte[] CreateQuotePdf(QuoteDto quote, string companyName, QuotePdfImage? productImage)
+    {
+        var jpeg = IsJpeg(productImage) ? productImage : null;
+        var imageSize = jpeg is null ? null : TryReadJpegSize(jpeg.Data);
+        if (imageSize is null) jpeg = null;
+
+        var content = QuotePageContent(quote, companyName, jpeg is not null);
+        var objects = new List<PdfObject>
+        {
+            new("<< /Type /Catalog /Pages 2 0 R >>"),
+            new(string.Empty),
+            new("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"),
+            new("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>")
+        };
+
+        var imageObjectNumber = 0;
+        if (jpeg is not null && imageSize is not null)
+        {
+            imageObjectNumber = 5;
+            objects.Add(new($"<< /Type /XObject /Subtype /Image /Width {imageSize.Value.Width} /Height {imageSize.Value.Height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length {jpeg.Data.Length} >>", jpeg.Data));
+        }
+
+        var pageNumber = objects.Count + 1;
+        var contentNumber = pageNumber + 1;
+        var resources = imageObjectNumber > 0
+            ? $"<< /Font << /F1 3 0 R /F2 4 0 R >> /XObject << /Im1 {imageObjectNumber} 0 R >> >>"
+            : "<< /Font << /F1 3 0 R /F2 4 0 R >> >>";
+        objects.Add(new($"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources {resources} /Contents {contentNumber} 0 R >>"));
+        objects.Add(new($"<< /Length {Encoding.ASCII.GetByteCount(content)} >>", Encoding.ASCII.GetBytes(content)));
+        objects[1] = new($"<< /Type /Pages /Kids [{pageNumber} 0 R] /Count 1 >>");
+
+        return BuildPdf(objects, $"{quote.Number}.pdf");
+    }
+
+    private static string QuotePageContent(QuoteDto quote, string companyName, bool includeImage)
+    {
+        var customerName = $"{quote.CustomerFirstName} {quote.CustomerMiddleName} {quote.CustomerLastName} {quote.CustomerSecondLastName}"
+            .Replace("  ", " ")
+            .Trim();
+        if (string.IsNullOrWhiteSpace(customerName)) customerName = $"{quote.CustomerFirstNames} {quote.CustomerLastNames}".Trim();
+
+        var commands = new StringBuilder();
+        commands.AppendLine("0.961 0.980 0.988 rg 0 0 612 792 re f");
+        commands.AppendLine("0.082 0.373 0.459 rg 0 724 612 68 re f");
+        commands.AppendLine("1 1 1 rg BT /F2 22 Tf 40 756 Td (COTIZACION COMERCIAL) Tj ET");
+        commands.AppendLine($"1 1 1 rg BT /F1 10 Tf 40 738 Td ({Escape(companyName)}) Tj ET");
+        commands.AppendLine($"1 1 1 rg BT /F2 12 Tf 430 756 Td ({Escape(quote.Number)}) Tj ET");
+        commands.AppendLine($"1 1 1 rg BT /F1 9 Tf 430 738 Td (Fecha: {Escape(Date(quote.QuoteDate))}) Tj ET");
+
+        DrawSection(commands, 34, 590, 250, 104, "CLIENTE");
+        Text(commands, 50, 660, "Nombre", customerName);
+        Text(commands, 50, 636, "Identificacion", $"{IdentificationType(quote.IdentificationType)} {Value(quote.IdentificationNumber)}");
+        Text(commands, 50, 612, "Valida hasta", Date(quote.ValidUntil));
+
+        DrawSection(commands, 306, 590, 272, 104, "PRODUCTO");
+        Text(commands, 322, 660, "Producto", quote.ProductName);
+        Text(commands, 322, 636, "Valor comercial", Money(quote.ProductPrice));
+        Text(commands, 322, 612, "Formato", includeImage ? "Foto comercial incluida" : "Foto no disponible para PDF");
+
+        if (includeImage)
+        {
+            commands.AppendLine("q 220 0 0 154 196 404 cm /Im1 Do Q");
+        }
+        else
+        {
+            commands.AppendLine("0.90 0.94 0.96 rg 196 404 220 154 re f");
+            commands.AppendLine("0.32 0.38 0.45 rg BT /F1 11 Tf 234 478 Td (Sin foto principal JPG) Tj ET");
+        }
+
+        DrawSection(commands, 34, 248, 544, 124, "SIMULACION FINANCIERA");
+        FinancialRow(commands, 52, 330, "Precio producto", Money(quote.ProductPrice), "Cuota inicial", Money(quote.DownPayment), "Plazo", $"{quote.TermMonths} meses");
+        FinancialRow(commands, 52, 300, "Seguro", Money(quote.Insurance), "Gastos adm.", Money(quote.AdministrativeFees), "Tasa mensual", $"{quote.MonthlyInterestRate:N2}%");
+        commands.AppendLine("0.082 0.373 0.459 rg 52 265 508 44 re f");
+        commands.AppendLine($"1 1 1 rg BT /F2 13 Tf 70 292 Td (Total financiado: {Escape(Money(quote.FinancedAmount))}) Tj ET");
+        commands.AppendLine($"1 1 1 rg BT /F2 13 Tf 326 292 Td (Cuota aprox.: {Escape(Money(quote.EstimatedMonthlyPayment))}) Tj ET");
+        commands.AppendLine($"1 1 1 rg BT /F1 9 Tf 70 274 Td (Total estimado a pagar: {Escape(Money(quote.EstimatedTotalPayment))}) Tj ET");
+
+        DrawSection(commands, 34, 120, 544, 96, "CONDICIONES");
+        var conditions = "Cotizacion informativa sujeta a disponibilidad del producto, validacion comercial, estudio de credito, aprobacion de la entidad financiadora y politicas internas vigentes.";
+        Paragraph(commands, 52, 185, conditions, 93, 11);
+        Paragraph(commands, 52, 150, $"Observaciones: {Value(quote.Notes)}", 93, 10);
+
+        commands.AppendLine("0.72 0.77 0.82 RG 1 w 52 74 m 252 74 l S 342 74 m 542 74 l S");
+        commands.AppendLine("0.10 0.12 0.16 rg BT /F1 9 Tf 78 58 Td (Asesor comercial) Tj ET");
+        commands.AppendLine("0.10 0.12 0.16 rg BT /F1 9 Tf 420 58 Td (Cliente) Tj ET");
+        commands.AppendLine("0.35 0.40 0.46 rg BT /F1 8 Tf 40 28 Td (Documento generado por CRM Comercial. Valores aproximados sujetos a aprobacion final.) Tj ET");
+        return commands.ToString();
+    }
+
+    private static void DrawSection(StringBuilder commands, int x, int y, int width, int height, string title)
+    {
+        commands.AppendLine("1 1 1 rg " + x + " " + y + " " + width + " " + height + " re f");
+        commands.AppendLine("0.86 0.89 0.93 RG 1 w " + x + " " + y + " " + width + " " + height + " re S");
+        commands.AppendLine("0.082 0.373 0.459 rg BT /F2 11 Tf " + (x + 16) + " " + (y + height - 24) + " Td (" + Escape(title) + ") Tj ET");
+    }
+
+    private static void Text(StringBuilder commands, int x, int y, string label, string value)
+    {
+        commands.AppendLine("0.40 0.45 0.52 rg BT /F1 8 Tf " + x + " " + y + " Td (" + Escape(label.ToUpperInvariant()) + ") Tj ET");
+        commands.AppendLine("0.08 0.10 0.14 rg BT /F2 10 Tf " + x + " " + (y - 13) + " Td (" + Escape(Shorten(value, 37)) + ") Tj ET");
+    }
+
+    private static void FinancialRow(StringBuilder commands, int x, int y, string label1, string value1, string label2, string value2, string label3, string value3)
+    {
+        Text(commands, x, y, label1, value1);
+        Text(commands, x + 170, y, label2, value2);
+        Text(commands, x + 350, y, label3, value3);
+    }
+
+    private static void Paragraph(StringBuilder commands, int x, int y, string value, int maxChars, int fontSize)
+    {
+        var lineY = y;
+        foreach (var line in WrapText(value, maxChars).Take(3))
+        {
+            commands.AppendLine($"0.16 0.20 0.27 rg BT /F1 {fontSize} Tf {x} {lineY} Td ({Escape(line)}) Tj ET");
+            lineY -= 16;
+        }
+    }
+
+    private static IEnumerable<string> WrapText(string value, int maxChars)
+    {
+        var current = value.Trim();
+        while (current.Length > maxChars)
+        {
+            var split = current.LastIndexOf(' ', maxChars);
+            if (split <= 0) split = maxChars;
+            yield return current[..split].TrimEnd();
+            current = current[split..].TrimStart();
+        }
+        if (!string.IsNullOrWhiteSpace(current)) yield return current;
+    }
+
+    private static string Shorten(string value, int max) => value.Length <= max ? value : value[..Math.Max(0, max - 1)] + "…";
+
+    private static bool IsJpeg(QuotePdfImage? image) =>
+        image is not null &&
+        (image.ContentType.Equals("image/jpeg", StringComparison.OrdinalIgnoreCase) ||
+         image.ContentType.Equals("image/jpg", StringComparison.OrdinalIgnoreCase)) &&
+        image.Data.Length > 4 &&
+        image.Data[0] == 0xFF &&
+        image.Data[1] == 0xD8;
+
+    private static (int Width, int Height)? TryReadJpegSize(byte[] data)
+    {
+        var index = 2;
+        while (index + 9 < data.Length)
+        {
+            if (data[index] != 0xFF) { index++; continue; }
+            var marker = data[index + 1];
+            var length = (data[index + 2] << 8) + data[index + 3];
+            if (length < 2 || index + length + 2 > data.Length) return null;
+            if (marker is >= 0xC0 and <= 0xC3 or >= 0xC5 and <= 0xC7 or >= 0xC9 and <= 0xCB or >= 0xCD and <= 0xCF)
+            {
+                var height = (data[index + 5] << 8) + data[index + 6];
+                var width = (data[index + 7] << 8) + data[index + 8];
+                return (width, height);
+            }
+            index += length + 2;
+        }
+        return null;
+    }
+
+    private sealed record PdfObject(string Header, byte[]? Stream = null);
+
+    private static byte[] BuildPdf(IReadOnlyList<PdfObject> objects, string title)
+    {
+        using var output = new MemoryStream();
+        WriteAscii(output, "%PDF-1.4\n");
+        WriteAscii(output, $"% {Escape(title)}\n");
+        var offsets = new List<long> { 0 };
+
+        for (var i = 0; i < objects.Count; i++)
+        {
+            offsets.Add(output.Position);
+            WriteAscii(output, $"{i + 1} 0 obj\n");
+            WriteAscii(output, objects[i].Header);
+            if (objects[i].Stream is not null)
+            {
+                WriteAscii(output, "\nstream\n");
+                output.Write(objects[i].Stream);
+                WriteAscii(output, "\nendstream");
+            }
+            WriteAscii(output, "\nendobj\n");
+        }
+
+        var xrefOffset = output.Position;
+        WriteAscii(output, "xref\n");
+        WriteAscii(output, $"0 {objects.Count + 1}\n");
+        WriteAscii(output, "0000000000 65535 f \n");
+        foreach (var offset in offsets.Skip(1)) WriteAscii(output, $"{offset:0000000000} 00000 n \n");
+        WriteAscii(output, "trailer\n");
+        WriteAscii(output, $"<< /Size {objects.Count + 1} /Root 1 0 R >>\n");
+        WriteAscii(output, "startxref\n");
+        WriteAscii(output, xrefOffset.ToString(CultureInfo.InvariantCulture));
+        WriteAscii(output, "\n%%EOF");
+        return output.ToArray();
+    }
+
+    private static void WriteAscii(Stream stream, string value)
+    {
+        var bytes = Encoding.ASCII.GetBytes(value);
+        stream.Write(bytes, 0, bytes.Length);
+    }
+
+    private static string IdentificationType(TipoIdentificacionColombia type) => type switch
+    {
+        TipoIdentificacionColombia.CedulaCiudadania => "CC",
+        TipoIdentificacionColombia.CedulaExtranjeria => "CE",
+        TipoIdentificacionColombia.Nit => "NIT",
+        TipoIdentificacionColombia.Pasaporte => "Pasaporte",
+        TipoIdentificacionColombia.TarjetaIdentidad => "TI",
+        TipoIdentificacionColombia.PermisoProteccionTemporal => "PPT",
+        _ => type.ToString()
+    };
 }

@@ -115,6 +115,19 @@ public sealed class Producto : AuditableTenantEntity
     public string? Color { get; set; }
     public decimal Precio { get; set; }
     public bool Activo { get; set; } = true;
+    public ICollection<ProductoFoto> Fotos { get; set; } = [];
+}
+
+public sealed class ProductoFoto : AuditableTenantEntity
+{
+    public Guid ProductoId { get; set; }
+    public Producto? Producto { get; set; }
+    public string NombreArchivo { get; set; } = string.Empty;
+    public string ContentType { get; set; } = string.Empty;
+    public long TamanoBytes { get; set; }
+    public byte[] Datos { get; set; } = [];
+    public bool EsPrincipalCotizacion { get; set; }
+    public int Orden { get; set; }
 }
 
 public sealed class Cotizacion : AuditableTenantEntity

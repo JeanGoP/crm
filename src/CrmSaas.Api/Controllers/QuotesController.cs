@@ -172,11 +172,21 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
     [HttpGet("{id:guid}/pdf")]
     public async Task<IActionResult> Pdf(Guid id, CancellationToken cancellationToken)
     {
-        var quote = await db.Cotizaciones.Include(x => x.Producto).FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
+        var quote = await db.Cotizaciones
+            .Include(x => x.Producto)
+            .ThenInclude(x => x!.Fotos)
+            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
             ?? throw new KeyNotFoundException("Cotizacion no encontrada.");
         var company = await db.Empresas.IgnoreQueryFilters().FirstOrDefaultAsync(x => x.Id == tenantContext.EmpresaId, cancellationToken);
         var dto = ToDto(quote);
-        var bytes = SimplePdfGenerator.Quote(dto, company?.Nombre ?? "Empresa");
+        var quotePhoto = quote.Producto?.Fotos
+            .OrderByDescending(x => x.EsPrincipalCotizacion)
+            .ThenBy(x => x.Orden)
+            .FirstOrDefault();
+        var image = quotePhoto is null
+            ? null
+            : new QuotePdfImage(quotePhoto.Datos, quotePhoto.ContentType, quotePhoto.NombreArchivo);
+        var bytes = SimplePdfGenerator.Quote(dto, company?.Nombre ?? "Empresa", image);
         return File(bytes, "application/pdf", $"{quote.Numero}.pdf");
     }
 

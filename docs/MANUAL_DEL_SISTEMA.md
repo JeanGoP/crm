@@ -1,7 +1,7 @@
 # Manual de usuario - CRM Comercial
 
 Ultima actualizacion: 2026-06-09  
-Version del manual: 5.0  
+Version del manual: 5.1  
 Sistema: CRM para gestion comercial y ventas a credito  
 
 ## 1. Bienvenida
@@ -172,6 +172,18 @@ El modulo Productos permite administrar lo que la empresa vende o cotiza. Aunque
 5. Ingrese precio y estado.
 6. Guarde.
 
+### Adjuntar fotos al producto
+
+1. Cree o edite el producto.
+2. En la seccion **Fotos del producto**, presione **Adjuntar fotos**.
+3. Seleccione una o varias imagenes.
+4. Revise las miniaturas cargadas.
+5. Presione **Usar en PDF** sobre la foto que desea mostrar en la cotizacion.
+
+### Foto para la cotizacion
+
+La foto marcada como **Foto PDF** sera la imagen comercial que aparecera en el PDF de cotizacion. Para obtener un PDF mas profesional y compatible, se recomienda usar imagenes **JPG/JPEG** como foto principal.
+
 ### Recomendacion de uso
 
 Mantenga precios, modelos y estados actualizados. Una cotizacion depende de que el producto tenga informacion correcta.
@@ -201,7 +213,8 @@ Cotizaciones permite generar una propuesta comercial para un cliente. Es uno de 
 
 - Se crea o actualiza el cliente con los datos correctos.
 - Se guarda la cotizacion.
-- Se puede generar el PDF de la cotizacion.
+- Se genera el PDF de la cotizacion con formato profesional.
+- Si el producto tiene una foto principal en formato JPG/JPEG, se incluye en el PDF.
 - Se puede crear seguimiento automatico para llamar al cliente.
 - El negocio puede reflejarse en el pipeline comercial.
 
@@ -469,6 +482,7 @@ El sistema muestra mensajes cuando algo no puede completarse.
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-06-09 | 5.1 | Se documenta la carga de varias fotos por producto, seleccion de foto principal para PDF y mejora visual del PDF de cotizacion. |
 | 2026-06-09 | 5.0 | Se reconstruye el manual para usuario final, con explicaciones operativas, paso a paso y recomendaciones de uso. |
 | 2026-05-29 | 4.0 | Se agrega movimiento drag and drop en el pipeline para arrastrar negocios entre etapas y actualizar estado/probabilidad automaticamente. |
 | 2026-05-27 | 3.9 | La consulta con Verifik guarda automaticamente el cliente cuando la cedula no existia y evita duplicados al crear cotizaciones. |

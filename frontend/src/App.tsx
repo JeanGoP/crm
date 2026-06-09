@@ -34,7 +34,7 @@ import AutoAwesome from '@mui/icons-material/AutoAwesome';
 import { AxiosError } from 'axios';
 import { api } from './api';
 import { useAuthStore } from './store';
-import { Activity, ColombianIdentityLookup, CommercialReports, Company, CreditApplication, CreditDocument, Customer, Customer360, CustomerAiAnalysis, CustomerTimelineItem, Dashboard, Deal, DealStage, Lead, MotorcycleDelivery, Product, Quote, User } from './types';
+import { Activity, ColombianIdentityLookup, CommercialReports, Company, CreditApplication, CreditDocument, Customer, Customer360, CustomerAiAnalysis, CustomerTimelineItem, Dashboard, Deal, DealStage, Lead, MotorcycleDelivery, Product, ProductPhoto, Quote, User } from './types';
 
 const drawerWidth = 248;
 const today = new Date().toISOString().slice(0, 10);
@@ -538,10 +538,20 @@ function ProductsPage() {
     <Header title="Productos" action={canManage ? 'Nuevo producto' : undefined} onAction={() => setForm({ open: true })} onRefresh={reload} />
     <StatusBar loading={loading} error={error} />
     <EntityTable
-      headers={['Producto', 'Categoria', 'Marca', 'Referencia', 'Caracteristicas', 'Precio', 'Estado', 'Acciones']}
+      headers={['Producto', 'Fotos', 'Categoria', 'Marca', 'Referencia', 'Caracteristicas', 'Precio', 'Estado', 'Acciones']}
       empty="No hay productos registrados"
       rows={rows.map((r) => [
-        productName(r),
+        <Stack direction="row" spacing={1.5} alignItems="center">
+          <ProductPhotoThumb photo={(r.photos ?? []).find((photo) => photo.isQuoteDefault) ?? (r.photos ?? [])[0]} />
+          <Box>
+            <Typography fontWeight={800}>{productName(r)}</Typography>
+            <Typography variant="caption" color="text.secondary">{r.description || 'Sin descripcion'}</Typography>
+          </Box>
+        </Stack>,
+        <Stack spacing={.5}>
+          <Chip size="small" label={`${r.photos?.length ?? 0} foto${(r.photos?.length ?? 0) === 1 ? '' : 's'}`} variant="outlined" />
+          {(r.photos ?? []).some((photo) => photo.isQuoteDefault) && <Typography variant="caption" color="text.secondary">Principal PDF lista</Typography>}
+        </Stack>,
         r.category,
         r.brand,
         r.reference,
@@ -551,7 +561,7 @@ function ProductsPage() {
         <Actions onEdit={canManage ? () => setForm({ open: true, item: r }) : undefined} onDelete={canManage && r.active ? () => setConfirm(r) : undefined} />
       ])}
     />
-    <ProductDialog form={form} onClose={() => setForm({ open: false })} onSave={save} />
+    <ProductDialog form={form} onClose={() => setForm({ open: false })} onSave={save} onChanged={reload} />
     <ConfirmDialog title="Inactivar producto" text={`Se inactivara ${confirm ? productName(confirm) : ''}. Las cotizaciones existentes conservaran el historial.`} open={!!confirm} onClose={() => setConfirm(undefined)} onConfirm={remove} confirmLabel="Inactivar" />
     <Notice notice={notice} onClose={() => setNotice(undefined)} />
   </Stack>;
@@ -1569,7 +1579,7 @@ function CustomerDialog({ form, onClose, onSave }: DialogProps<Customer, typeof 
   </FormDialog>;
 }
 
-function ProductDialog({ form, onClose, onSave }: DialogProps<Product, typeof emptyProduct>) {
+function ProductDialog({ form, onClose, onSave, onChanged }: DialogProps<Product, typeof emptyProduct> & { onChanged: () => void }) {
   const initial = form.item ? {
     name: form.item.name,
     category: form.item.category,
@@ -1600,8 +1610,120 @@ function ProductDialog({ form, onClose, onSave }: DialogProps<Product, typeof em
       <TextField label="Color" value={v.color} onChange={(e) => set({ color: e.target.value })} />
       <TextField required label="Precio" type="number" value={v.price} onChange={(e) => set({ price: Number(e.target.value) })} />
       <TextField select label="Estado" value={String(v.active)} onChange={(e) => set({ active: e.target.value === 'true' })}><MenuItem value="true">Activa</MenuItem><MenuItem value="false">Inactiva</MenuItem></TextField>
+      {form.item && <ProductPhotosManager product={form.item} onChanged={onChanged} />}
+      {!form.item && <Alert severity="info">Guarde el producto primero. Luego podra editarlo para adjuntar una o varias fotos y elegir la foto principal del PDF.</Alert>}
     </>}
   </FormDialog>;
+}
+
+function ProductPhotoThumb({ photo, size = 54 }: { photo?: ProductPhoto; size?: number }) {
+  return <Box
+    sx={{
+      width: size,
+      height: size,
+      borderRadius: 1,
+      overflow: 'hidden',
+      bgcolor: '#e2e8f0',
+      border: '1px solid #d8e0e8',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      flex: '0 0 auto'
+    }}
+  >
+    {photo
+      ? <Box component="img" src={photo.dataUrl} alt={photo.fileName} sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      : <Inventory2 fontSize="small" color="disabled" />}
+  </Box>;
+}
+
+function ProductPhotosManager({ product, onChanged }: { product: Product; onChanged: () => void }) {
+  const [photos, setPhotos] = useState<ProductPhoto[]>(product.photos ?? []);
+  const [uploading, setUploading] = useState(false);
+  const [notice, setNotice] = useState<Notice>();
+
+  useEffect(() => {
+    setPhotos(product.photos ?? []);
+    setNotice(undefined);
+    setUploading(false);
+  }, [product.id, product.photos]);
+
+  const replaceProduct = (updated: Product) => {
+    setPhotos(updated.photos ?? []);
+    onChanged();
+  };
+
+  const upload = async (files: FileList | null) => {
+    if (!files?.length) return;
+    const formData = new FormData();
+    Array.from(files).forEach((file) => formData.append('files', file));
+    setUploading(true);
+    setNotice(undefined);
+    try {
+      const { data } = await api.post<Product>(`/api/products/${product.id}/photos`, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+      replaceProduct(data);
+      setNotice({ type: 'success', text: 'Fotos cargadas correctamente.' });
+    } catch (err) {
+      setNotice({ type: 'error', text: apiError(err) });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const setDefault = async (photo: ProductPhoto) => {
+    try {
+      const { data } = await api.put<Product>(`/api/products/${product.id}/photos/${photo.id}/quote-default`);
+      replaceProduct(data);
+      setNotice({ type: 'success', text: 'Foto principal del PDF actualizada.' });
+    } catch (err) {
+      setNotice({ type: 'error', text: apiError(err) });
+    }
+  };
+
+  const remove = async (photo: ProductPhoto) => {
+    try {
+      const { data } = await api.delete<Product>(`/api/products/${product.id}/photos/${photo.id}`);
+      replaceProduct(data);
+      setNotice({ type: 'success', text: 'Foto eliminada.' });
+    } catch (err) {
+      setNotice({ type: 'error', text: apiError(err) });
+    }
+  };
+
+  return <Paper variant="outlined" sx={{ p: 2, bgcolor: '#f8fafc' }}>
+    <Stack spacing={1.5}>
+      <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', sm: 'center' }} gap={1}>
+        <Box>
+          <Typography fontWeight={800}>Fotos del producto</Typography>
+          <Typography variant="caption" color="text.secondary">Puede cargar varias fotos y marcar cual se imprime en la cotizacion. Para PDF profesional use JPG/JPEG.</Typography>
+        </Box>
+        <Button component="label" variant="outlined" startIcon={<UploadFile />} disabled={uploading}>
+          {uploading ? 'Subiendo...' : 'Adjuntar fotos'}
+          <input hidden multiple type="file" accept="image/jpeg,image/jpg,image/png,image/webp" onChange={(event) => void upload(event.target.files)} />
+        </Button>
+      </Stack>
+      {notice && <Alert severity={notice.type === 'success' ? 'success' : 'error'}>{notice.text}</Alert>}
+      {photos.length === 0 && <Alert severity="info">Este producto aun no tiene fotos. La cotizacion se generara sin imagen del producto.</Alert>}
+      {photos.length > 0 && <Box className="productPhotoGrid">
+        {photos.map((photo) => <Paper key={photo.id} variant="outlined" className="productPhotoCard">
+          <Box component="img" src={photo.dataUrl} alt={photo.fileName} className="productPhotoImage" />
+          <Stack spacing={1} sx={{ p: 1 }}>
+            <Tooltip title={photo.fileName}>
+              <Typography variant="caption" noWrap>{photo.fileName}</Typography>
+            </Tooltip>
+            <Stack direction="row" gap={1} flexWrap="wrap">
+              <Chip size="small" color={photo.isQuoteDefault ? 'success' : 'default'} label={photo.isQuoteDefault ? 'Foto PDF' : readableFileSize(photo.sizeBytes)} />
+              {!photo.contentType.includes('jpeg') && !photo.contentType.includes('jpg') && photo.isQuoteDefault && <Chip size="small" color="warning" label="PDF usa JPG" />}
+            </Stack>
+            <Stack direction="row" gap={1}>
+              <Button type="button" size="small" variant={photo.isQuoteDefault ? 'contained' : 'outlined'} onClick={() => void setDefault(photo)}>Usar en PDF</Button>
+              <IconButton size="small" color="error" onClick={() => void remove(photo)}><Delete fontSize="small" /></IconButton>
+            </Stack>
+          </Stack>
+        </Paper>)}
+      </Box>}
+    </Stack>
+  </Paper>;
 }
 
 function QuoteDialog({ form, products, onClose, onSave }: DialogProps<Quote, typeof emptyQuote> & { products: Product[] }) {
@@ -1699,6 +1821,20 @@ function QuoteDialog({ form, products, onClose, onSave }: DialogProps<Quote, typ
         <TextField required select label="Producto" value={v.productId} onChange={(e) => set({ productId: e.target.value })}>
           {products.length ? products.map((product) => <MenuItem key={product.id} value={product.id}>{productName(product)} ({product.category}) - {money(product.price)}</MenuItem>) : <MenuItem value="">No hay productos activos</MenuItem>}
         </TextField>
+        {selectedProduct && <Paper variant="outlined" sx={{ p: 2, bgcolor: '#f8fafc' }}>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems={{ xs: 'stretch', sm: 'center' }}>
+            <ProductPhotoThumb photo={(selectedProduct.photos ?? []).find((photo) => photo.isQuoteDefault) ?? (selectedProduct.photos ?? [])[0]} size={88} />
+            <Box>
+              <Typography fontWeight={800}>Foto que saldra en el PDF</Typography>
+              <Typography variant="body2" color="text.secondary">
+                {(selectedProduct.photos ?? []).some((photo) => photo.isQuoteDefault)
+                  ? 'Se usara la foto marcada como Foto PDF en el producto.'
+                  : 'Este producto no tiene foto principal. Puede configurarla en Productos.'}
+              </Typography>
+              {((selectedProduct.photos ?? []).find((photo) => photo.isQuoteDefault)?.contentType ?? '').includes('png') && <Typography variant="caption" color="warning.main">Para que la imagen se imprima en PDF, cargue una version JPG/JPEG como principal.</Typography>}
+            </Box>
+          </Stack>
+        </Paper>}
         <FieldGrid columns={3}>
           <TextField fullWidth label="Cuota inicial" type="number" value={v.downPayment} onChange={(e) => set({ downPayment: Number(e.target.value) })} />
           <TextField fullWidth label="Plazo meses" type="number" value={v.termMonths} onChange={(e) => set({ termMonths: Number(e.target.value) })} />
@@ -2354,6 +2490,11 @@ function alertSeverityTone(severity?: string): 'success' | 'warning' | 'error' |
 }
 function productName(product: Product) {
   return product.name?.trim() || [product.brand, product.model, product.reference].filter(Boolean).join(' ').trim() || 'Producto';
+}
+function readableFileSize(bytes: number) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 KB';
+  if (bytes < 1024 * 1024) return `${Math.ceil(bytes / 1024)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 function addDaysIso(value: string, days: number) {
   const date = new Date(value);

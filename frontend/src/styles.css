@@ -63,6 +63,25 @@ a {
   transform: rotate(.35deg) scale(.99);
 }
 
+.productPhotoGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.productPhotoCard {
+  overflow: hidden;
+  min-width: 0;
+}
+
+.productPhotoImage {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  background: #e2e8f0;
+}
+
 @media (max-width: 700px) {
   .kanban {
     grid-template-columns: 1fr;
