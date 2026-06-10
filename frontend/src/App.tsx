@@ -1975,10 +1975,6 @@ function QuoteSimulationPreview({ value, selectedProduct }: { value: typeof empt
         <Box><Typography variant="caption" color="text.secondary">Total financiado</Typography><Typography fontWeight={700}>{money(preview.financedAmount)}</Typography></Box>
         <Box><Typography variant="caption" color="text.secondary">Cuota aproximada</Typography><Typography fontWeight={700}>{money(preview.estimatedMonthlyPayment)}</Typography></Box>
       </FieldGrid>
-      <Typography variant="caption" color="text.secondary">
-        Base: {money(totalToFinance)} · {preview.termMonths} cuotas · Total estimado a pagar: {money(preview.estimatedTotalPayment)} · Tipo: {preview.creditType} · Tasa usada: {preview.monthlyInterestRate.toFixed(3)}%
-        {preview.usedCompanyFinancialSettings ? ' · Calculado con la tabla financiera de la empresa' : ''}
-      </Typography>
     </Stack>
   </Paper>;
 }
