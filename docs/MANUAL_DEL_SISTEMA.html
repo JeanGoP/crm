@@ -1,7 +1,7 @@
 <!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Manual de usuario - CRM Comercial</title><style>:root{color-scheme:light;--ink:#111827;--muted:#526071;--line:#d8e0e8;--brand:#155e75;--paper:#fff;--bg:#f5f7fb}body{margin:0;font-family:Inter,Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--ink);line-height:1.65}main{max-width:1040px;margin:0 auto;padding:42px 24px 72px}h1{font-size:38px;line-height:1.1;margin:0 0 18px;color:#0f172a}h2{font-size:26px;margin:44px 0 12px;padding-top:18px;border-top:1px solid var(--line);color:#0f172a}h3{font-size:18px;margin:24px 0 8px;color:var(--brand)}p,li{font-size:15px;color:var(--ink)}p{margin:8px 0}ul{margin:8px 0 14px 24px;padding:0}code{background:#eef5f8;color:#0f4f63;padding:2px 5px;border-radius:4px}figure{margin:18px 0 28px;border:1px solid var(--line);background:var(--paper);border-radius:10px;overflow:hidden;box-shadow:0 8px 22px rgba(15,23,42,.08)}figure img{display:block;width:100%;height:auto}figcaption{font-size:13px;color:var(--muted);padding:10px 14px;background:#fbfdff;border-top:1px solid var(--line)}table{width:100%;border-collapse:collapse;margin:14px 0 24px;background:var(--paper);border:1px solid var(--line)}th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);font-size:14px;vertical-align:top}th{background:#eef5f8;color:#0f4f63}.cover{background:#fff;border:1px solid var(--line);border-radius:10px;padding:24px 28px;margin-bottom:28px;box-shadow:0 8px 22px rgba(15,23,42,.06)}@media print{body{background:white}main{max-width:none;padding:0}figure{break-inside:avoid;box-shadow:none}h2{break-after:avoid}.cover{box-shadow:none}}</style></head><body><main>
 <div class="cover"><h1>Manual de usuario - CRM Comercial</h1>
 <p><strong>Ultima actualizacion:</strong> 2026-06-09</p>
-<p><strong>Version del manual:</strong> 5.3</p>
+<p><strong>Version del manual:</strong> 5.4</p>
 <p><strong>Sistema:</strong> CRM para gestion comercial y ventas a credito</p></div>
 <h2>1. Bienvenida</h2>
 <p>Este manual explica como usar el CRM en la operacion diaria. Esta dirigido a vendedores, supervisores y administradores que necesitan registrar clientes, crear cotizaciones, hacer seguimiento comercial, gestionar solicitudes de credito, controlar entregas y revisar reportes.</p>
@@ -142,7 +142,7 @@
 <p>6. Complete primer nombre, segundo nombre, primer apellido y segundo apellido.</p>
 <p>7. Ingrese indicativo y telefono. Por defecto se usa el indicativo de Colombia <strong>+57</strong>.</p>
 <p>8. Seleccione el producto que desea cotizar.</p>
-<p>9. Complete los valores financieros necesarios.</p>
+<p>9. Digite la cuota inicial y el numero de cuotas.</p>
 <p>10. Guarde la cotizacion.</p>
 <h3>Que ocurre al guardar</h3>
 <ul>
@@ -164,8 +164,8 @@
 <ul>
 <li><strong>Precio del producto:</strong> valor base del producto.</li>
 <li><strong>Cuota inicial:</strong> dinero que entrega el cliente al inicio.</li>
-<li><strong>Plazo:</strong> numero de meses de financiacion.</li>
-<li><strong>Tasa:</strong> porcentaje usado para calcular la financiacion.</li>
+<li><strong>Numero de cuotas:</strong> cantidad de pagos que tendra la financiacion.</li>
+<li><strong>Tasa:</strong> porcentaje tomado automaticamente desde la configuracion financiera de la empresa cuando la tabla esta activa.</li>
 <li><strong>Seguro:</strong> valor adicional del seguro, si aplica.</li>
 <li><strong>Gastos administrativos:</strong> cobros asociados al proceso.</li>
 <li><strong>Total financiado:</strong> valor que queda pendiente despues de la cuota inicial y cargos.</li>
@@ -174,6 +174,7 @@
 </ul>
 <h3>Tabla financiera por empresa</h3>
 <p>Cada empresa puede tener su propia configuracion financiera. Cuando la tabla de la empresa esta activa, la cotizacion calcula la cuota con los parametros configurados por el administrador: salario minimo vigente, tasas maximas legales, tasa de factores, plazo maximo y redondeo de cuota.</p>
+<p>En la cotizacion el vendedor solo debe escoger el producto, digitar la cuota inicial y el numero de cuotas. Con esos datos el sistema toma el valor de la moto, calcula el total financiado y genera el valor aproximado de cada cuota.</p>
 <p>En la empresa demo se usa la tabla Montelibano cargada desde el archivo de amortizacion: salario minimo de <strong>$ 1.400.000</strong>, consumo <strong>29,72% EA</strong>, bajo monto <strong>56,33% EA</strong>, factor mensual <strong>4,5%</strong>, plazo maximo <strong>30 meses</strong> y redondeo a miles.</p>
 <h3>Recomendacion de uso</h3>
 <p>Explique al cliente que la cuota es aproximada y puede cambiar segun la aprobacion final, politica de credito o condiciones de la entidad financiadora.</p>
@@ -363,6 +364,7 @@
 <h2>23. Historial del manual</h2>
 <table>
 <thead><tr><th>Fecha</th><th>Version</th><th>Cambio</th></tr></thead><tbody>
+<tr><td>2026-06-09</td><td>5.4</td><td>Se aclara que la cotizacion calcula la cuota desde la tabla financiera de la empresa usando valor del producto, cuota inicial y numero de cuotas.</td></tr>
 <tr><td>2026-06-09</td><td>5.3</td><td>Se agrega configuracion financiera por empresa para cotizaciones, basada en la tabla de amortizacion Montelibano, con tasas legales, factor mensual, plazo maximo y redondeo.</td></tr>
 <tr><td>2026-06-09</td><td>5.2</td><td>La cotizacion ya no descarga ni imprime automaticamente; primero abre vista previa del PDF y luego permite descargar o imprimir.</td></tr>
 <tr><td>2026-06-09</td><td>5.1</td><td>Se documenta la carga de varias fotos por producto, seleccion de foto principal compatible para PDF y mejora visual del PDF de cotizacion.</td></tr>

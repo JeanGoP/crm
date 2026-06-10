@@ -400,7 +400,7 @@ public static class SimplePdfGenerator
         }
 
         DrawSection(commands, 34, 248, 544, 124, "SIMULACION FINANCIERA");
-        FinancialRow(commands, 52, 330, "Precio producto", Money(quote.ProductPrice), "Cuota inicial", Money(quote.DownPayment), "Plazo", $"{quote.TermMonths} meses");
+        FinancialRow(commands, 52, 330, "Precio producto", Money(quote.ProductPrice), "Cuota inicial", Money(quote.DownPayment), "Numero cuotas", $"{quote.TermMonths}");
         FinancialRow(commands, 52, 300, "Seguro", Money(quote.Insurance), "Gastos adm.", Money(quote.AdministrativeFees), "Tasa mensual", $"{quote.MonthlyInterestRate:N3}%");
         Text(commands, 52, 282, "Tipo credito", string.IsNullOrWhiteSpace(quote.CreditType) ? "N/A" : quote.CreditType);
         commands.AppendLine("0.082 0.373 0.459 rg 52 265 508 44 re f");

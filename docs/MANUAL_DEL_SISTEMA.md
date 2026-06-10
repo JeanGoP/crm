@@ -1,7 +1,7 @@
 # Manual de usuario - CRM Comercial
 
 Ultima actualizacion: 2026-06-09  
-Version del manual: 5.3
+Version del manual: 5.4
 Sistema: CRM para gestion comercial y ventas a credito  
 
 ## 1. Bienvenida
@@ -206,7 +206,7 @@ Cotizaciones permite generar una propuesta comercial para un cliente. Es uno de 
 6. Complete primer nombre, segundo nombre, primer apellido y segundo apellido.
 7. Ingrese indicativo y telefono. Por defecto se usa el indicativo de Colombia **+57**.
 8. Seleccione el producto que desea cotizar.
-9. Complete los valores financieros necesarios.
+9. Digite la cuota inicial y el numero de cuotas.
 10. Guarde la cotizacion.
 
 ### Que ocurre al guardar
@@ -235,8 +235,8 @@ El simulador ayuda a estimar las condiciones de una venta a credito.
 
 - **Precio del producto:** valor base del producto.
 - **Cuota inicial:** dinero que entrega el cliente al inicio.
-- **Plazo:** numero de meses de financiacion.
-- **Tasa:** porcentaje usado para calcular la financiacion.
+- **Numero de cuotas:** cantidad de pagos que tendra la financiacion.
+- **Tasa:** porcentaje tomado automaticamente desde la configuracion financiera de la empresa cuando la tabla esta activa.
 - **Seguro:** valor adicional del seguro, si aplica.
 - **Gastos administrativos:** cobros asociados al proceso.
 - **Total financiado:** valor que queda pendiente despues de la cuota inicial y cargos.
@@ -246,6 +246,8 @@ El simulador ayuda a estimar las condiciones de una venta a credito.
 ### Tabla financiera por empresa
 
 Cada empresa puede tener su propia configuracion financiera. Cuando la tabla de la empresa esta activa, la cotizacion calcula la cuota con los parametros configurados por el administrador: salario minimo vigente, tasas maximas legales, tasa de factores, plazo maximo y redondeo de cuota.
+
+En la cotizacion el vendedor solo debe escoger el producto, digitar la cuota inicial y el numero de cuotas. Con esos datos el sistema toma el valor de la moto, calcula el total financiado y genera el valor aproximado de cada cuota.
 
 En la empresa demo se usa la tabla Montelibano cargada desde el archivo de amortizacion: salario minimo de **$ 1.400.000**, consumo **29,72% EA**, bajo monto **56,33% EA**, factor mensual **4,5%**, plazo maximo **30 meses** y redondeo a miles.
 
@@ -506,6 +508,7 @@ El sistema muestra mensajes cuando algo no puede completarse.
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-06-09 | 5.4 | Se aclara que la cotizacion calcula la cuota desde la tabla financiera de la empresa usando valor del producto, cuota inicial y numero de cuotas. |
 | 2026-06-09 | 5.3 | Se agrega configuracion financiera por empresa para cotizaciones, basada en la tabla de amortizacion Montelibano, con tasas legales, factor mensual, plazo maximo y redondeo. |
 | 2026-06-09 | 5.2 | La cotizacion ya no descarga ni imprime automaticamente; primero abre vista previa del PDF y luego permite descargar o imprimir. |
 | 2026-06-09 | 5.1 | Se documenta la carga de varias fotos por producto, seleccion de foto principal compatible para PDF y mejora visual del PDF de cotizacion. |

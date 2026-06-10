@@ -1898,10 +1898,9 @@ function QuoteDialog({ form, products, onClose, onSave }: DialogProps<Quote, typ
             </Box>
           </Stack>
         </Paper>}
-        <FieldGrid columns={3}>
+        <FieldGrid columns={2}>
           <TextField fullWidth label="Cuota inicial" type="number" value={v.downPayment} onChange={(e) => set({ downPayment: Number(e.target.value) })} />
-          <TextField fullWidth label="Plazo meses" type="number" value={v.termMonths} onChange={(e) => set({ termMonths: Number(e.target.value) })} />
-          <TextField fullWidth label="Tasa mensual %" type="number" value={v.monthlyInterestRate} onChange={(e) => set({ monthlyInterestRate: Number(e.target.value) })} />
+          <TextField fullWidth label="Numero de cuotas" type="number" value={v.termMonths} onChange={(e) => set({ termMonths: Number(e.target.value) })} />
         </FieldGrid>
         <FieldGrid columns={2}>
           <TextField fullWidth label="Seguro" type="number" value={v.insurance} onChange={(e) => set({ insurance: Number(e.target.value) })} />
@@ -1977,8 +1976,8 @@ function QuoteSimulationPreview({ value, selectedProduct }: { value: typeof empt
         <Box><Typography variant="caption" color="text.secondary">Cuota aproximada</Typography><Typography fontWeight={700}>{money(preview.estimatedMonthlyPayment)}</Typography></Box>
       </FieldGrid>
       <Typography variant="caption" color="text.secondary">
-        Base: {money(totalToFinance)} · Total estimado a pagar: {money(preview.estimatedTotalPayment)} · Tipo: {preview.creditType} · Tasa usada: {preview.monthlyInterestRate.toFixed(3)}%
-        {preview.usedCompanyFinancialSettings ? ' · Tabla empresa activa' : ''}
+        Base: {money(totalToFinance)} · {preview.termMonths} cuotas · Total estimado a pagar: {money(preview.estimatedTotalPayment)} · Tipo: {preview.creditType} · Tasa usada: {preview.monthlyInterestRate.toFixed(3)}%
+        {preview.usedCompanyFinancialSettings ? ' · Calculado con la tabla financiera de la empresa' : ''}
       </Typography>
     </Stack>
   </Paper>;
