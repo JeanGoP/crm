@@ -1,7 +1,7 @@
 # Manual de usuario - CRM Comercial
 
 Ultima actualizacion: 2026-06-09  
-Version del manual: 5.6
+Version del manual: 5.7
 Sistema: CRM para gestion comercial y ventas a credito  
 
 ## 1. Bienvenida
@@ -229,31 +229,29 @@ Despues de guardar una cotizacion, el sistema no imprime ni descarga automaticam
 
 ### Para que sirve
 
-El simulador ayuda a estimar las condiciones de una venta a credito.
+El simulador ayuda a estimar rapidamente el valor de la cuota cuando el cliente quiere comprar a credito. Se usa dentro de la cotizacion para que el asesor pueda entregar una propuesta clara antes de continuar con la solicitud de credito.
+
+### Como se usa
+
+1. Seleccione el producto que el cliente desea cotizar.
+2. Digite la cuota inicial que el cliente va a entregar.
+3. Indique el numero de cuotas.
+4. Agregue seguro o gastos adicionales si aplican.
+5. Revise el total financiado y la cuota aproximada.
 
 ### Campos principales
 
 - **Precio del producto:** valor base del producto.
 - **Cuota inicial:** dinero que entrega el cliente al inicio.
 - **Numero de cuotas:** cantidad de pagos que tendra la financiacion.
-- **Tasa:** porcentaje tomado automaticamente desde la configuracion financiera de la empresa cuando la tabla esta activa.
 - **Seguro:** valor adicional del seguro, si aplica.
 - **Gastos administrativos:** cobros asociados al proceso.
 - **Total financiado:** valor que queda pendiente despues de la cuota inicial y cargos.
 - **Cuota aproximada:** valor estimado de la cuota mensual.
-- **Tipo de credito:** el sistema puede clasificar automaticamente entre consumo y bajo monto segun la configuracion financiera de la empresa.
-
-### Tabla financiera por empresa
-
-Cada empresa puede tener su propia configuracion financiera. Cuando la tabla de la empresa esta activa, la cotizacion calcula la cuota con los parametros configurados por el administrador: salario minimo vigente, tasas maximas legales, tasa de factores, plazo maximo y redondeo de cuota.
-
-En la cotizacion el vendedor solo debe escoger el producto, digitar la cuota inicial y el numero de cuotas. Con esos datos el sistema toma el valor de la moto, calcula el total financiado y genera el valor aproximado de cada cuota.
-
-En la empresa demo se usa la tabla Montelibano cargada desde el archivo de amortizacion: salario minimo de **$ 1.400.000**, consumo **29,72% EA**, bajo monto **56,33% EA**, factor mensual **4,5%**, plazo maximo **30 meses** y redondeo a miles.
 
 ### Recomendacion de uso
 
-Explique al cliente que la cuota es aproximada y puede cambiar segun la aprobacion final, politica de credito o condiciones de la entidad financiadora.
+Explique al cliente que la cuota es aproximada y puede cambiar segun la aprobacion final, politicas de credito, documentos entregados o condiciones comerciales vigentes.
 
 ## 12. Solicitudes de credito
 
@@ -444,15 +442,15 @@ Configuracion permite administrar datos generales del sistema. Esta opcion norma
 - **Usuarios:** crear usuarios y asignarlos a una empresa.
 - **Roles:** administrar permisos segun el perfil del usuario.
 - **Etapas del pipeline:** configurar las columnas comerciales.
-- **Configuracion financiera:** definir tasas, salario minimo, plazo maximo, redondeo y uso de tabla por empresa para las cotizaciones.
+- **Configuracion financiera:** definir las condiciones usadas por la empresa para calcular cuotas en las cotizaciones.
 
 ### Configuracion financiera
 
 1. Entre a **Configuracion**.
 2. Busque la tarjeta **Configuracion financiera**.
-3. Presione **Editar tabla**.
-4. Ajuste salario minimo vigente, tasa de consumo EA, tasa de bajo monto EA, factor mensual, plazo maximo y redondeo.
-5. Active o desactive **Usar tabla Montelibano en cotizaciones**.
+3. Presione **Editar**.
+4. Ajuste los parametros de financiacion autorizados por la empresa.
+5. Verifique plazo maximo y redondeo de cuota.
 6. Guarde.
 
 Los cambios aplican a las nuevas cotizaciones de la empresa. Las cotizaciones ya creadas conservan los valores calculados al momento de generarse.
@@ -518,6 +516,7 @@ El sistema muestra mensajes cuando algo no puede completarse.
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-06-09 | 5.7 | Se limpia el manual para usuario final, se actualiza el simulador de credito y se retiran referencias internas de configuracion financiera. |
 | 2026-06-09 | 5.6 | Se mejora la reprogramacion de actividades con accesos rapidos de fecha, selector de hora y resumen antes de guardar. |
 | 2026-06-09 | 5.5 | El boton de actividades ahora se llama Reprogramar y permite escoger fecha y hora de reprogramacion. |
 | 2026-06-09 | 5.4 | Se aclara que la cotizacion calcula la cuota desde la tabla financiera de la empresa usando valor del producto, cuota inicial y numero de cuotas. |
