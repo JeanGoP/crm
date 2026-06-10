@@ -478,7 +478,7 @@ function Customer360Page() {
       </Grid>
     </Grid>
     <ActivityDialog form={activityForm} customers={customer ? [customer] : []} deals={data?.deals ?? []} onClose={() => setActivityForm({ open: false })} onSave={saveActivity} />
-    <AiAnalysisDialog analysis={analysis} onClose={() => setAnalysis(undefined)} />
+    <AiAnalysisDialog analysis={analysis} phone={customer?.phone} onClose={() => setAnalysis(undefined)} />
     <Notice notice={notice} onClose={() => setNotice(undefined)} />
   </Stack>;
 }
@@ -571,8 +571,10 @@ function ProductsPage() {
 function QuotesPage() {
   const { data: rows = [], loading, error, reload, setData } = useResource<Quote[]>('/api/quotes', []);
   const { data: products = [] } = useResource<Product[]>('/api/products', []);
+  const { data: customers = [] } = useResource<Customer[]>('/api/customers', []);
   const [form, setForm] = useState<FormMode<Quote>>({ open: false });
   const [analysis, setAnalysis] = useState<CustomerAiAnalysis>();
+  const [analysisPhone, setAnalysisPhone] = useState<string>();
   const [previewQuote, setPreviewQuote] = useState<Quote>();
   const [notice, setNotice] = useState<Notice>();
 
@@ -611,10 +613,11 @@ function QuotesPage() {
     setPreviewQuote(data);
   };
 
-  const analyzeCustomer = async (customerId: string) => {
+  const analyzeCustomer = async (customerId: string, phone?: string) => {
     try {
       const { data } = await api.get<CustomerAiAnalysis>(`/api/customers/${customerId}/ai-analysis`);
       setAnalysis(data);
+      setAnalysisPhone(phone);
     } catch (err) {
       setNotice({ type: 'error', text: apiError(err) });
     }
@@ -634,12 +637,12 @@ function QuotesPage() {
         money(r.financedAmount),
         r.estimatedMonthlyPayment > 0 ? `${money(r.estimatedMonthlyPayment)} x ${r.termMonths}` : 'Sin simulacion',
         new Date(r.validUntil).toLocaleDateString(),
-        <Actions onAi={() => analyzeCustomer(r.customerId)} onDownload={() => setPreviewQuote(r)} />
+        <Actions onAi={() => analyzeCustomer(r.customerId, customers.find((x) => x.id === r.customerId)?.phone)} onDownload={() => setPreviewQuote(r)} />
       ])}
     />
     <QuoteDialog form={form} products={products.filter((x) => x.active)} onClose={() => setForm({ open: false })} onSave={save} />
     <QuotePdfPreviewDialog quote={previewQuote} onClose={() => setPreviewQuote(undefined)} onDownload={downloadPdf} />
-    <AiAnalysisDialog analysis={analysis} onClose={() => setAnalysis(undefined)} />
+    <AiAnalysisDialog analysis={analysis} phone={analysisPhone} onClose={() => { setAnalysis(undefined); setAnalysisPhone(undefined); }} />
     <Notice notice={notice} onClose={() => setNotice(undefined)} />
   </Stack>;
 }
@@ -652,6 +655,7 @@ function CreditApplicationsPage() {
   const { data: deals = [] } = useResource<Deal[]>('/api/pipeline/deals', []);
   const [form, setForm] = useState<FormMode<CreditApplication>>({ open: false });
   const [analysis, setAnalysis] = useState<CustomerAiAnalysis>();
+  const [analysisPhone, setAnalysisPhone] = useState<string>();
   const [notice, setNotice] = useState<Notice>();
 
   const save = async (payload: typeof emptyCreditApplication) => {
@@ -754,10 +758,11 @@ function CreditApplicationsPage() {
     }
   };
 
-  const analyzeCustomer = async (customerId: string) => {
+  const analyzeCustomer = async (customerId: string, phone?: string) => {
     try {
       const { data } = await api.get<CustomerAiAnalysis>(`/api/customers/${customerId}/ai-analysis`);
       setAnalysis(data);
+      setAnalysisPhone(phone);
     } catch (err) {
       setNotice({ type: 'error', text: apiError(err) });
     }
@@ -784,7 +789,7 @@ function CreditApplicationsPage() {
         <ApprovalSummary application={r} onDecision={decide} />,
         <CreditTemplateDownloads application={r} onDownload={downloadTemplate} />,
         <Stack direction="row" gap={1} alignItems="center">
-          <Actions onAi={() => analyzeCustomer(r.customerId)} onEdit={() => setForm({ open: true, item: r })} />
+          <Actions onAi={() => analyzeCustomer(r.customerId, r.mobile)} onEdit={() => setForm({ open: true, item: r })} />
           <TextField select size="small" label="Estado" value={r.status} onChange={(e) => changeStatus(r, Number(e.target.value))} sx={{ minWidth: 160 }}>
             {creditStatusOptions.map((x) => <MenuItem key={x} value={x}>{creditStatus(x)}</MenuItem>)}
           </TextField>
@@ -792,7 +797,7 @@ function CreditApplicationsPage() {
       ])}
     />
     <CreditApplicationDialog form={form} customers={customers} products={products.filter((x) => x.active)} quotes={quotes} deals={deals} onClose={() => setForm({ open: false })} onSave={save} />
-    <AiAnalysisDialog analysis={analysis} onClose={() => setAnalysis(undefined)} />
+    <AiAnalysisDialog analysis={analysis} phone={analysisPhone} onClose={() => { setAnalysis(undefined); setAnalysisPhone(undefined); }} />
     <Notice notice={notice} onClose={() => setNotice(undefined)} />
   </Stack>;
 }
@@ -2528,11 +2533,15 @@ function tableColumnSx(header: string) {
   };
 }
 
-function AiAnalysisDialog({ analysis, onClose }: { analysis?: CustomerAiAnalysis; onClose: () => void }) {
+function AiAnalysisDialog({ analysis, phone, onClose }: { analysis?: CustomerAiAnalysis; phone?: string; onClose: () => void }) {
   const [copied, setCopied] = useState(false);
-  const copyMessage = async () => {
+  const sendMessage = async () => {
     if (!analysis?.whatsappMessage) return;
-    await navigator.clipboard?.writeText(analysis.whatsappMessage).catch(() => undefined);
+    const message = analysis.whatsappMessage;
+    if (phone) {
+      window.open(whatsappUrl(phone, message), '_blank', 'noopener,noreferrer');
+    }
+    await navigator.clipboard?.writeText(message).catch(() => undefined);
     setCopied(true);
     setTimeout(() => setCopied(false), 1800);
   };
@@ -2572,7 +2581,9 @@ function AiAnalysisDialog({ analysis, onClose }: { analysis?: CustomerAiAnalysis
     </DialogContent>
     <DialogActions sx={{ flexWrap: 'wrap' }}>
       <Button onClick={onClose}>Cerrar</Button>
-      <Button variant="contained" startIcon={<WhatsApp />} onClick={copyMessage}>{copied ? 'Copiado' : 'Copiar mensaje'}</Button>
+      <Button variant="contained" startIcon={<WhatsApp />} onClick={sendMessage}>
+        {phone ? 'Enviar por WhatsApp' : copied ? 'Copiado' : 'Copiar mensaje'}
+      </Button>
     </DialogActions>
   </Dialog>;
 }
@@ -2778,10 +2789,11 @@ function estimateMonthlyPayment(financedAmount: number, termMonths: number, mont
     : financedAmount * rate / (1 - Math.pow(1 + rate, -termMonths));
   return Math.round(payment);
 }
-function whatsappUrl(value: string) {
+function whatsappUrl(value: string, message?: string) {
   const digits = value.replace(/\D/g, '');
   const withCountry = digits.startsWith('57') ? digits : `57${digits}`;
-  return `https://wa.me/${withCountry}`;
+  const text = message ? `?text=${encodeURIComponent(message)}` : '';
+  return `https://wa.me/${withCountry}${text}`;
 }
 function activityDueState(activity: Activity) {
   if (activity.status === 3 || activity.status === 4) return 'done';

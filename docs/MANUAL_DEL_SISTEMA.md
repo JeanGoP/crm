@@ -1,7 +1,7 @@
 # Manual de usuario - CRM Comercial
 
-Ultima actualizacion: 2026-06-09  
-Version del manual: 5.8
+Ultima actualizacion: 2026-06-10  
+Version del manual: 5.9
 Sistema: CRM para gestion comercial y ventas a credito  
 
 ## 1. Bienvenida
@@ -154,6 +154,20 @@ Cliente 360 muestra toda la informacion importante de un cliente en una sola pan
 ### Recomendacion de uso
 
 Antes de llamar o escribir a un cliente, abra Cliente 360. Asi puede ver que se ha hablado, que documentos faltan y cual es el siguiente paso.
+
+### Asistente comercial con IA
+
+El boton **Analizar con IA** resume el caso del cliente, muestra pendientes, prioridad, riesgo, siguiente mejor accion y un mensaje sugerido para WhatsApp.
+
+Para usar el mensaje:
+
+1. Abra el analisis con **Analizar con IA**.
+2. Revise el mensaje sugerido.
+3. Presione **Enviar por WhatsApp**.
+4. El sistema abre WhatsApp con el cliente y deja el mensaje listo para enviar.
+5. Revise el texto y envie el mensaje cuando este correcto.
+
+Si el cliente no tiene telefono registrado, el sistema permite copiar el mensaje para usarlo manualmente.
 
 ## 9. Productos
 
@@ -516,6 +530,7 @@ El sistema muestra mensajes cuando algo no puede completarse.
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-06-10 | 5.9 | El analisis comercial con IA permite enviar el mensaje sugerido por WhatsApp con el texto listo para el cliente. |
 | 2026-06-09 | 5.8 | Se actualizan los pantallazos del manual desde el CRM publicado con una vista mas amplia de las pantallas principales. |
 | 2026-06-09 | 5.7 | Se limpia el manual para usuario final, se actualiza el simulador de credito y se retiran referencias internas de configuracion financiera. |
 | 2026-06-09 | 5.6 | Se mejora la reprogramacion de actividades con accesos rapidos de fecha, selector de hora y resumen antes de guardar. |
