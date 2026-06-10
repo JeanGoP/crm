@@ -1,7 +1,7 @@
 # Manual de usuario - CRM Comercial
 
 Ultima actualizacion: 2026-06-09  
-Version del manual: 5.7
+Version del manual: 5.8
 Sistema: CRM para gestion comercial y ventas a credito  
 
 ## 1. Bienvenida
@@ -516,11 +516,12 @@ El sistema muestra mensajes cuando algo no puede completarse.
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-06-09 | 5.8 | Se actualizan los pantallazos del manual desde el CRM publicado con una vista mas amplia de las pantallas principales. |
 | 2026-06-09 | 5.7 | Se limpia el manual para usuario final, se actualiza el simulador de credito y se retiran referencias internas de configuracion financiera. |
 | 2026-06-09 | 5.6 | Se mejora la reprogramacion de actividades con accesos rapidos de fecha, selector de hora y resumen antes de guardar. |
 | 2026-06-09 | 5.5 | El boton de actividades ahora se llama Reprogramar y permite escoger fecha y hora de reprogramacion. |
 | 2026-06-09 | 5.4 | Se aclara que la cotizacion calcula la cuota desde la tabla financiera de la empresa usando valor del producto, cuota inicial y numero de cuotas. |
-| 2026-06-09 | 5.3 | Se agrega configuracion financiera por empresa para cotizaciones, basada en la tabla de amortizacion Montelibano, con tasas legales, factor mensual, plazo maximo y redondeo. |
+| 2026-06-09 | 5.3 | Se agrega configuracion financiera por empresa para cotizaciones, con factor mensual, plazo maximo y redondeo de cuota. |
 | 2026-06-09 | 5.2 | La cotizacion ya no descarga ni imprime automaticamente; primero abre vista previa del PDF y luego permite descargar o imprimir. |
 | 2026-06-09 | 5.1 | Se documenta la carga de varias fotos por producto, seleccion de foto principal compatible para PDF y mejora visual del PDF de cotizacion. |
 | 2026-06-09 | 5.0 | Se reconstruye el manual para usuario final, con explicaciones operativas, paso a paso y recomendaciones de uso. |

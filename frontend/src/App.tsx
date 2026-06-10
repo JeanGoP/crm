@@ -1446,7 +1446,7 @@ function SettingsPage() {
         <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', sm: 'center' }} gap={1}>
           <Box>
             <Typography variant="h5" fontWeight={900}>Configuracion financiera</Typography>
-            <Typography color="text.secondary" fontSize={14}>Tabla de financiacion usada por la empresa al crear cotizaciones.</Typography>
+            <Typography color="text.secondary" fontSize={14}>Condiciones usadas por la empresa al crear cotizaciones.</Typography>
           </Box>
           {canManage && <Button variant="outlined" startIcon={<Edit />} onClick={() => setFinancialForm({ open: true, item: financialSettings })}>Editar tabla</Button>}
         </Stack>
@@ -1458,7 +1458,7 @@ function SettingsPage() {
           <Grid item xs={6} md={3}><Metric label="Factor mensual" value={`${financialSettings.factorMonthlyRate}%`} /></Grid>
           <Grid item xs={6} md={3}><Metric label="Plazo maximo" value={`${financialSettings.maxTermMonths} meses`} /></Grid>
           <Grid item xs={6} md={3}><Metric label="Redondeo cuota" value={money(financialSettings.paymentRounding)} /></Grid>
-          <Grid item xs={6} md={3}><Metric label="Tabla Montelibano" value={financialSettings.useMontelibanoTable ? 'Activa' : 'Manual'} /></Grid>
+          <Grid item xs={6} md={3}><Metric label="Tabla financiera" value={financialSettings.useMontelibanoTable ? 'Activa' : 'Manual'} /></Grid>
           <Grid item xs={6} md={3}><Metric label="Estado" value={financialSettings.active ? 'Activa' : 'Inactiva'} /></Grid>
         </Grid>}
       </Stack>
@@ -1589,7 +1589,7 @@ function FinancialSettingsDialog({ form, onClose, onSave }: DialogProps<Financia
   return <FormDialog title="Configuracion financiera" open={form.open} initial={initial} onClose={onClose} onSave={onSave}>
     {(v, set) => <>
       <FormControlLabel control={<Checkbox checked={v.active} onChange={(e) => set({ active: e.target.checked })} />} label="Configuracion activa" />
-      <FormControlLabel control={<Checkbox checked={v.useMontelibanoTable} onChange={(e) => set({ useMontelibanoTable: e.target.checked })} />} label="Usar tabla Montelibano en cotizaciones" />
+      <FormControlLabel control={<Checkbox checked={v.useMontelibanoTable} onChange={(e) => set({ useMontelibanoTable: e.target.checked })} />} label="Usar tabla financiera en cotizaciones" />
       <TextField required label="Salario minimo vigente" type="number" value={v.minimumWage} onChange={(e) => set({ minimumWage: Number(e.target.value) })} />
       <Grid container spacing={1.5}>
         <Grid item xs={12} sm={6}><TextField fullWidth required label="Tasa consumo EA (%)" type="number" value={v.consumerAnnualRate} onChange={(e) => set({ consumerAnnualRate: Number(e.target.value) })} /></Grid>
