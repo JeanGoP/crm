@@ -392,73 +392,84 @@ public static class SimplePdfGenerator
         if (string.IsNullOrWhiteSpace(customerName)) customerName = $"{quote.CustomerFirstNames} {quote.CustomerLastNames}".Trim();
 
         var commands = new StringBuilder();
-        commands.AppendLine("1 1 1 rg 0 0 612 792 re f");
-        commands.AppendLine("0.10 0.10 0.10 RG 1 w 28 28 556 736 re S");
+        commands.AppendLine("0.98 0.99 1 rg 0 0 612 792 re f");
+        commands.AppendLine("1 1 1 rg 30 30 552 732 re f");
+        commands.AppendLine("0.84 0.88 0.92 RG 1 w 30 30 552 732 re S");
 
+        commands.AppendLine("0.082 0.373 0.459 rg 30 705 552 57 re f");
         if (includeLogo)
         {
-            commands.AppendLine("q 176 0 0 86 42 672 cm /Logo Do Q");
+            commands.AppendLine("q 112 0 0 48 46 711 cm /Logo Do Q");
         }
         else
         {
-            commands.AppendLine($"0.05 0.05 0.05 rg BT /F2 20 Tf 48 716 Td ({Escape(companyName)}) Tj ET");
+            commands.AppendLine($"1 1 1 rg BT /F2 18 Tf 48 735 Td ({Escape(companyName)}) Tj ET");
         }
+        commands.AppendLine($"1 1 1 rg BT /F2 12 Tf 392 738 Td ({Escape(quote.Number)}) Tj ET");
+        commands.AppendLine($"1 1 1 rg BT /F1 9 Tf 392 722 Td (Fecha: {Escape(Date(quote.QuoteDate))}) Tj ET");
 
-        commands.AppendLine($"0.08 0.08 0.08 rg BT /F2 11 Tf 52 656 Td ({Escape(companyName)}) Tj ET");
-        Paragraph(commands, 52, 638, "Sedes y canales de atencion configurables por la empresa.", 48, 8);
-        commands.AppendLine($"0.08 0.08 0.08 rg BT /F2 9 Tf 436 742 Td (Cotizacion: {Escape(quote.Number)}) Tj ET");
+        DrawPanel(commands, 46, 575, 250, 110, "CLIENTE");
+        KeyValue(commands, 62, 653, "Nombre", customerName, 70, 166);
+        KeyValue(commands, 62, 631, "Identificacion", $"{IdentificationType(quote.IdentificationType)} {Value(quote.IdentificationNumber)}", 70, 166);
+        KeyValue(commands, 62, 609, "Telefono", Value(customerPhone), 70, 166);
+        KeyValue(commands, 62, 587, "Direccion", Value(customerAddress), 70, 166);
 
-        LabelValue(commands, 350, 706, "Cliente:", customerName, 12, 12, 130);
-        LabelValue(commands, 350, 682, "C.C.:", Value(quote.IdentificationNumber), 12, 12, 130);
-        LabelValue(commands, 350, 658, "Vehiculo:", quote.ProductName, 12, 12, 130);
-        LabelValue(commands, 350, 634, "Direccion:", Value(customerAddress), 12, 12, 130);
-        LabelValue(commands, 350, 610, "Telefono:", Value(customerPhone), 12, 12, 130);
-        LabelValue(commands, 350, 586, "Fecha:", Date(quote.QuoteDate), 12, 12, 130);
+        DrawPanel(commands, 316, 575, 250, 110, "PRODUCTO");
+        KeyValue(commands, 332, 653, "Producto", quote.ProductName, 74, 156);
+        KeyValue(commands, 332, 631, "Precio", Money(quote.ProductPrice), 74, 156);
+        KeyValue(commands, 332, 609, "Valida hasta", Date(quote.ValidUntil), 74, 156);
+        KeyValue(commands, 332, 587, "Tipo credito", Value(quote.CreditType, "Credito"), 74, 156);
 
         if (includeProductImage)
         {
-            commands.AppendLine("q 128 0 0 76 52 560 cm /Product Do Q");
+            commands.AppendLine("q 138 0 0 82 237 480 cm /Product Do Q");
         }
 
-        LabelValue(commands, 52, 518, "Precio:", MoneyPlain(quote.ProductPrice), 12, 16, 120);
-        LabelValue(commands, 52, 486, "Cuota inicial:", MoneyPlain(quote.DownPayment), 12, 16, 120);
-
+        DrawPanel(commands, 46, 332, 250, 214, "CUOTAS APROXIMADAS");
+        KeyValue(commands, 62, 512, "Precio", Money(quote.ProductPrice), 82, 140);
+        KeyValue(commands, 62, 490, "Cuota inicial", Money(quote.DownPayment), 82, 140);
+        commands.AppendLine("0.90 0.94 0.96 rg 62 458 216 22 re f");
+        commands.AppendLine("0.09 0.11 0.15 rg BT /F2 8 Tf 76 466 Td (PLAZO) Tj ET");
+        commands.AppendLine("0.09 0.11 0.15 rg BT /F2 8 Tf 154 466 Td (CUOTA) Tj ET");
         var terms = new[] { 1, 6, 12, 18, 24, 30, 36 };
-        var x1 = 94;
-        var y = 438;
-        for (var i = 0; i < terms.Length; i++)
+        var termY = 440;
+        foreach (var term in terms)
         {
-            var x = i < 4 ? x1 : 210;
-            var rowY = i < 4 ? y - (i * 34) : y - ((i - 4) * 34);
-            var payment = terms[i] == quote.TermMonths ? quote.EstimatedMonthlyPayment : EstimatePaymentForTerm(quote.FinancedAmount, terms[i], quote.MonthlyInterestRate);
-            commands.AppendLine($"0.07 0.07 0.07 rg BT /F2 14 Tf {x} {rowY} Td ({terms[i]}:) Tj ET");
-            commands.AppendLine($"0.07 0.07 0.07 rg BT /F2 14 Tf {x + 28} {rowY} Td ({Escape(MoneyPlain(payment))}) Tj ET");
+            var payment = term == quote.TermMonths ? quote.EstimatedMonthlyPayment : EstimatePaymentForTerm(quote.FinancedAmount, term, quote.MonthlyInterestRate);
+            var isSelected = term == quote.TermMonths;
+            if (isSelected) commands.AppendLine($"0.90 0.97 0.94 rg 62 {termY - 5} 216 20 re f");
+            commands.AppendLine($"0.08 0.10 0.14 rg BT /F{(isSelected ? "2" : "1")} 10 Tf 80 {termY} Td ({term} meses) Tj ET");
+            commands.AppendLine($"0.08 0.10 0.14 rg BT /F{(isSelected ? "2" : "1")} 10 Tf 154 {termY} Td ({Escape(Money(payment))}) Tj ET");
+            termY -= 22;
         }
 
+        DrawPanel(commands, 316, 332, 250, 214, "RESUMEN DEL CREDITO");
         var creditBase = Math.Max(quote.ProductPrice - quote.DownPayment, 0);
-        LabelValue(commands, 320, 462, "Valor a financiar", MoneyPlain(creditBase), 11, 11, 120);
-        LabelValue(commands, 320, 432, "SOAT", MoneyPlain(quote.Insurance), 11, 11, 120);
-        LabelValue(commands, 320, 402, "Matricula", MoneyPlain(quote.AdministrativeFees), 11, 11, 120);
-        LabelValue(commands, 320, 372, "Otros", "0", 11, 11, 120);
-        LabelValue(commands, 320, 342, "Total Credito", MoneyPlain(quote.FinancedAmount), 11, 11, 120);
-        LabelValue(commands, 320, 312, "Tipo de credito", Value(quote.CreditType, "Credito"), 11, 11, 120);
-        LabelValue(commands, 320, 282, "Plazo (meses)", quote.TermMonths.ToString(CultureInfo.InvariantCulture), 11, 11, 120);
-        LabelValue(commands, 320, 252, "Cuota Mensual", MoneyPlain(quote.EstimatedMonthlyPayment), 11, 11, 120);
+        CreditRow(commands, 332, 512, "Valor a financiar", Money(creditBase));
+        CreditRow(commands, 332, 488, "SOAT / Seguro", Money(quote.Insurance));
+        CreditRow(commands, 332, 464, "Gastos / Matricula", Money(quote.AdministrativeFees));
+        CreditRow(commands, 332, 440, "Otros", Money(0));
+        commands.AppendLine("0.082 0.373 0.459 rg 332 396 218 38 re f");
+        commands.AppendLine($"1 1 1 rg BT /F2 10 Tf 346 419 Td (Total credito) Tj ET");
+        commands.AppendLine($"1 1 1 rg BT /F2 12 Tf 446 419 Td ({Escape(Money(quote.FinancedAmount))}) Tj ET");
+        commands.AppendLine($"1 1 1 rg BT /F1 9 Tf 346 404 Td (Cuota seleccionada: {quote.TermMonths} meses - {Escape(Money(quote.EstimatedMonthlyPayment))}) Tj ET");
+        KeyValue(commands, 332, 370, "Total estimado", Money(quote.EstimatedTotalPayment), 88, 130);
+        KeyValue(commands, 332, 350, "Tasa mensual", $"{quote.MonthlyInterestRate:N3}%", 88, 130);
 
-        commands.AppendLine("0.94 0.94 0.94 rg 458 250 110 275 re f");
-        commands.AppendLine("0.70 0.70 0.70 RG 0.6 w 458 250 110 275 re S");
-        RequirementBlock(commands, 470, 502, "Empleados", new[] { "Fotocopia Cedula", "Carta Laboral o 2 ultimas", "colillas de Pago", "Recibo Servicio Publico" });
-        RequirementBlock(commands, 470, 386, "Comerciante", new[] { "Fotocopia Cedula", "Certificado de Ingresos", "Camara de Comercio /", "Extractos Bancarios" });
-        RequirementBlock(commands, 470, 286, "Pensionados", new[] { "Fotocopia Cedula", "2 ultimas colillas", "Recibo Servicio Publico" });
+        DrawPanel(commands, 46, 190, 520, 112, "REQUISITOS GENERALES");
+        RequirementColumn(commands, 62, 266, "Empleados", new[] { "Fotocopia Cedula", "Carta laboral o dos ultimas colillas", "Recibo de servicio publico" });
+        RequirementColumn(commands, 232, 266, "Independientes", new[] { "Fotocopia Cedula", "Certificado de ingresos", "Camara de comercio o extractos" });
+        RequirementColumn(commands, 402, 266, "Pensionados", new[] { "Fotocopia Cedula", "Dos ultimas colillas", "Recibo de servicio publico" });
 
-        LabelValue(commands, 52, 168, "Asesor:", Value(advisor, "Asesor comercial"), 13, 13, 150);
-        LabelValue(commands, 52, 138, "Tel:", Value(customerPhone), 13, 13, 150);
-        LabelValue(commands, 52, 108, "Correo:", " ", 13, 13, 150);
+        DrawPanel(commands, 46, 98, 250, 64, "ASESOR");
+        KeyValue(commands, 62, 132, "Nombre", Value(advisor, "Asesor comercial"), 52, 166);
+        KeyValue(commands, 62, 112, "Contacto", Value(customerPhone), 52, 166);
 
-        var legal = "Autorizacion de Habeas Data: Con la firma del presente documento, el titular de la informacion queda autorizado a la compania para el uso de los datos de la siguiente forma: identificacion del titular para la atencion a solicitudes en los canales de atencion, actualizacion de datos, contacto comercial de productos, mejoramiento y evaluacion de la satisfaccion del servicio, gestion de cobranzas, fidelizacion de clientes y envio de informacion comercial.";
-        commands.AppendLine($"0.08 0.08 0.08 rg BT /F2 8 Tf 320 168 Td (NIT: {Escape(companyName)}) Tj ET");
-        Paragraph(commands, 320, 150, legal, 48, 7, 7);
-        Paragraph(commands, 320, 66, $"Observaciones: {Value(quote.Notes, "N/A")}", 48, 7);
+        DrawPanel(commands, 316, 98, 250, 64, "OBSERVACIONES");
+        Paragraph(commands, 332, 134, Value(quote.Notes, "Cotizacion sujeta a aprobacion final y disponibilidad del producto."), 46, 8, 3);
+
+        var legal = "Autorizacion de tratamiento de datos: con la firma o aceptacion de esta cotizacion, el cliente autoriza el uso de sus datos para gestion comercial, estudio de credito, seguimiento, cobranza e informacion relacionada con productos y servicios.";
+        Paragraph(commands, 46, 72, legal, 116, 7, 2);
         return commands.ToString();
     }
 
@@ -466,6 +477,36 @@ public static class SimplePdfGenerator
     {
         commands.AppendLine($"0.09 0.09 0.09 rg BT /F2 {labelSize} Tf {x} {y} Td ({Escape(label)}) Tj ET");
         commands.AppendLine($"0.09 0.09 0.09 rg BT /F1 {valueSize} Tf {x + valueWidth} {y} Td ({Escape(Shorten(value, 28))}) Tj ET");
+    }
+
+    private static void DrawPanel(StringBuilder commands, int x, int y, int width, int height, string title)
+    {
+        commands.AppendLine($"1 1 1 rg {x} {y} {width} {height} re f");
+        commands.AppendLine($"0.84 0.88 0.92 RG 0.8 w {x} {y} {width} {height} re S");
+        commands.AppendLine($"0.082 0.373 0.459 rg BT /F2 10 Tf {x + 14} {y + height - 20} Td ({Escape(title)}) Tj ET");
+    }
+
+    private static void KeyValue(StringBuilder commands, int x, int y, string label, string value, int labelWidth, int valueMaxChars)
+    {
+        commands.AppendLine($"0.36 0.42 0.48 rg BT /F1 8 Tf {x} {y} Td ({Escape(label.ToUpperInvariant())}) Tj ET");
+        commands.AppendLine($"0.08 0.10 0.14 rg BT /F2 9 Tf {x + labelWidth} {y} Td ({Escape(Shorten(value, valueMaxChars))}) Tj ET");
+    }
+
+    private static void CreditRow(StringBuilder commands, int x, int y, string label, string value)
+    {
+        commands.AppendLine($"0.36 0.42 0.48 rg BT /F1 8 Tf {x} {y} Td ({Escape(label.ToUpperInvariant())}) Tj ET");
+        commands.AppendLine($"0.08 0.10 0.14 rg BT /F2 9 Tf {x + 122} {y} Td ({Escape(Shorten(value, 18))}) Tj ET");
+    }
+
+    private static void RequirementColumn(StringBuilder commands, int x, int y, string title, IReadOnlyCollection<string> lines)
+    {
+        commands.AppendLine($"0.08 0.10 0.14 rg BT /F2 9 Tf {x} {y} Td ({Escape(title)}) Tj ET");
+        var lineY = y - 18;
+        foreach (var line in lines)
+        {
+            commands.AppendLine($"0.22 0.26 0.32 rg BT /F1 7 Tf {x} {lineY} Td ({Escape(Shorten(line, 34))}) Tj ET");
+            lineY -= 13;
+        }
     }
 
     private static void RequirementBlock(StringBuilder commands, int x, int y, string title, IReadOnlyCollection<string> lines)
