@@ -1,7 +1,7 @@
 # Manual de usuario - CRM Comercial
 
 Ultima actualizacion: 2026-06-10  
-Version del manual: 5.9
+Version del manual: 6.0
 Sistema: CRM para gestion comercial y ventas a credito  
 
 ## 1. Bienvenida
@@ -236,6 +236,8 @@ Cotizaciones permite generar una propuesta comercial para un cliente. Es uno de 
 ### Vista previa del PDF
 
 Despues de guardar una cotizacion, el sistema no imprime ni descarga automaticamente. Primero muestra el PDF en pantalla para que el usuario revise datos del cliente, producto, valores, foto y condiciones. Si todo esta correcto, puede usar **Descargar PDF** o **Imprimir**.
+
+El PDF toma automaticamente el nombre y logo configurados en la empresa. El formato muestra datos del cliente, producto, precio, cuota inicial, alternativas de cuotas, desglose del credito, requisitos generales y texto de autorizacion de datos.
 
 ## 11. Simulador financiero
 
@@ -530,6 +532,7 @@ El sistema muestra mensajes cuando algo no puede completarse.
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-06-10 | 6.0 | El PDF de cotizacion adopta un formato comercial con logo/nombre de empresa, datos del cliente, tabla de cuotas, desglose del credito, requisitos y autorizacion de datos. |
 | 2026-06-10 | 5.9 | El analisis comercial con IA permite enviar el mensaje sugerido por WhatsApp con el texto listo para el cliente. |
 | 2026-06-09 | 5.8 | Se actualizan los pantallazos del manual desde el CRM publicado con una vista mas amplia de las pantallas principales. |
 | 2026-06-09 | 5.7 | Se limpia el manual para usuario final, se actualiza el simulador de credito y se retiran referencias internas de configuracion financiera. |

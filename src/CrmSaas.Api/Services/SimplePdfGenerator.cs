@@ -13,9 +13,9 @@ public static class SimplePdfGenerator
 {
     private static readonly CultureInfo ColombianCulture = CultureInfo.GetCultureInfo("es-CO");
 
-    public static byte[] Quote(QuoteDto quote, string companyName, QuotePdfImage? productImage = null)
+    public static byte[] Quote(QuoteDto quote, string companyName, QuotePdfImage? productImage = null, QuotePdfImage? companyLogo = null, string? customerPhone = null, string? customerAddress = null, string? advisor = null)
     {
-        return CreateQuotePdf(quote, companyName, productImage);
+        return CreateQuotePdf(quote, companyName, productImage, companyLogo, customerPhone, customerAddress, advisor);
     }
 
     public static byte[] CreditApplication(CreditApplicationDto application, string companyName, string template)
@@ -297,8 +297,22 @@ public static class SimplePdfGenerator
         !line.Contains(':');
 
     private static string Money(decimal? value) => value.HasValue ? value.Value.ToString("C0", ColombianCulture) : "N/A";
+    private static string MoneyPlain(decimal? value) => value.HasValue ? value.Value.ToString("N0", ColombianCulture) : "N/A";
     private static string Date(DateTime? value) => value.HasValue ? value.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "N/A";
     private static string Value(string? value) => string.IsNullOrWhiteSpace(value) ? "N/A" : value.Trim();
+    private static string Value(string? value, string fallback) => string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
+
+    private static decimal EstimatePaymentForTerm(decimal financedAmount, int termMonths, decimal monthlyInterestRate)
+    {
+        if (financedAmount <= 0 || termMonths <= 0) return 0;
+        var rate = monthlyInterestRate / 100m;
+        if (rate <= 0) return Math.Round(financedAmount / termMonths, 0);
+
+        var rateDouble = (double)rate;
+        var amountDouble = (double)financedAmount;
+        var payment = amountDouble * rateDouble / (1 - Math.Pow(1 + rateDouble, -termMonths));
+        return Math.Round((decimal)payment, 0);
+    }
 
     private static string CreditStatus(EstadoSolicitudCredito status) => status switch
     {
@@ -331,11 +345,12 @@ public static class SimplePdfGenerator
         .Where(c => c < 128)
         .Aggregate(new StringBuilder(), (sb, c) => sb.Append(c), sb => sb.ToString());
 
-    private static byte[] CreateQuotePdf(QuoteDto quote, string companyName, QuotePdfImage? productImage)
+    private static byte[] CreateQuotePdf(QuoteDto quote, string companyName, QuotePdfImage? productImage, QuotePdfImage? companyLogo, string? customerPhone, string? customerAddress, string? advisor)
     {
+        var logoImage = TryCreatePdfImage(companyLogo);
         var pdfImage = TryCreatePdfImage(productImage);
 
-        var content = QuotePageContent(quote, companyName, pdfImage is not null);
+        var content = QuotePageContent(quote, companyName, logoImage is not null, pdfImage is not null, customerPhone, customerAddress, advisor);
         var objects = new List<PdfObject>
         {
             new("<< /Type /Catalog /Pages 2 0 R >>"),
@@ -344,19 +359,14 @@ public static class SimplePdfGenerator
             new("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>")
         };
 
-        var imageObjectNumber = 0;
-        if (pdfImage is not null)
-        {
-            imageObjectNumber = 5;
-            var decodeParms = string.IsNullOrWhiteSpace(pdfImage.DecodeParms) ? string.Empty : $" /DecodeParms {pdfImage.DecodeParms}";
-            objects.Add(new($"<< /Type /XObject /Subtype /Image /Width {pdfImage.Width} /Height {pdfImage.Height} /ColorSpace /{pdfImage.ColorSpace} /BitsPerComponent 8 /Filter /{pdfImage.Filter}{decodeParms} /Length {pdfImage.Data.Length} >>", pdfImage.Data));
-        }
+        var xObjects = new List<string>();
+        AddImageObject(objects, xObjects, "Logo", logoImage);
+        AddImageObject(objects, xObjects, "Product", pdfImage);
 
         var pageNumber = objects.Count + 1;
         var contentNumber = pageNumber + 1;
-        var resources = imageObjectNumber > 0
-            ? $"<< /Font << /F1 3 0 R /F2 4 0 R >> /XObject << /Im1 {imageObjectNumber} 0 R >> >>"
-            : "<< /Font << /F1 3 0 R /F2 4 0 R >> >>";
+        var xObjectResources = xObjects.Count > 0 ? $" /XObject << {string.Join(" ", xObjects)} >>" : string.Empty;
+        var resources = $"<< /Font << /F1 3 0 R /F2 4 0 R >>{xObjectResources} >>";
         objects.Add(new($"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources {resources} /Contents {contentNumber} 0 R >>"));
         objects.Add(new($"<< /Length {Encoding.ASCII.GetByteCount(content)} >>", Encoding.ASCII.GetBytes(content)));
         objects[1] = new($"<< /Type /Pages /Kids [{pageNumber} 0 R] /Count 1 >>");
@@ -364,7 +374,17 @@ public static class SimplePdfGenerator
         return BuildPdf(objects, $"{quote.Number}.pdf");
     }
 
-    private static string QuotePageContent(QuoteDto quote, string companyName, bool includeImage)
+    private static void AddImageObject(List<PdfObject> objects, List<string> xObjects, string name, PdfImageData? image)
+    {
+        if (image is null) return;
+
+        var objectNumber = objects.Count + 1;
+        var decodeParms = string.IsNullOrWhiteSpace(image.DecodeParms) ? string.Empty : $" /DecodeParms {image.DecodeParms}";
+        objects.Add(new($"<< /Type /XObject /Subtype /Image /Width {image.Width} /Height {image.Height} /ColorSpace /{image.ColorSpace} /BitsPerComponent 8 /Filter /{image.Filter}{decodeParms} /Length {image.Data.Length} >>", image.Data));
+        xObjects.Add($"/{name} {objectNumber} 0 R");
+    }
+
+    private static string QuotePageContent(QuoteDto quote, string companyName, bool includeLogo, bool includeProductImage, string? customerPhone, string? customerAddress, string? advisor)
     {
         var customerName = $"{quote.CustomerFirstName} {quote.CustomerMiddleName} {quote.CustomerLastName} {quote.CustomerSecondLastName}"
             .Replace("  ", " ")
@@ -372,52 +392,91 @@ public static class SimplePdfGenerator
         if (string.IsNullOrWhiteSpace(customerName)) customerName = $"{quote.CustomerFirstNames} {quote.CustomerLastNames}".Trim();
 
         var commands = new StringBuilder();
-        commands.AppendLine("0.961 0.980 0.988 rg 0 0 612 792 re f");
-        commands.AppendLine("0.082 0.373 0.459 rg 0 724 612 68 re f");
-        commands.AppendLine("1 1 1 rg BT /F2 22 Tf 40 756 Td (COTIZACION COMERCIAL) Tj ET");
-        commands.AppendLine($"1 1 1 rg BT /F1 10 Tf 40 738 Td ({Escape(companyName)}) Tj ET");
-        commands.AppendLine($"1 1 1 rg BT /F2 12 Tf 430 756 Td ({Escape(quote.Number)}) Tj ET");
-        commands.AppendLine($"1 1 1 rg BT /F1 9 Tf 430 738 Td (Fecha: {Escape(Date(quote.QuoteDate))}) Tj ET");
+        commands.AppendLine("1 1 1 rg 0 0 612 792 re f");
+        commands.AppendLine("0.10 0.10 0.10 RG 1 w 28 28 556 736 re S");
 
-        DrawSection(commands, 34, 590, 250, 104, "CLIENTE");
-        Text(commands, 50, 660, "Nombre", customerName);
-        Text(commands, 50, 636, "Identificacion", $"{IdentificationType(quote.IdentificationType)} {Value(quote.IdentificationNumber)}");
-        Text(commands, 50, 612, "Valida hasta", Date(quote.ValidUntil));
-
-        DrawSection(commands, 306, 590, 272, 104, "PRODUCTO");
-        Text(commands, 322, 660, "Producto", quote.ProductName);
-        Text(commands, 322, 636, "Valor comercial", Money(quote.ProductPrice));
-        Text(commands, 322, 612, "Formato", includeImage ? "Foto comercial incluida" : "Foto no disponible para PDF");
-
-        if (includeImage)
+        if (includeLogo)
         {
-            commands.AppendLine("q 220 0 0 154 196 404 cm /Im1 Do Q");
+            commands.AppendLine("q 176 0 0 86 42 672 cm /Logo Do Q");
         }
         else
         {
-            commands.AppendLine("0.90 0.94 0.96 rg 196 404 220 154 re f");
-            commands.AppendLine("0.32 0.38 0.45 rg BT /F1 11 Tf 225 478 Td (Sin foto principal compatible) Tj ET");
+            commands.AppendLine($"0.05 0.05 0.05 rg BT /F2 20 Tf 48 716 Td ({Escape(companyName)}) Tj ET");
         }
 
-        DrawSection(commands, 34, 248, 544, 124, "SIMULACION FINANCIERA");
-        FinancialRow(commands, 52, 330, "Precio producto", Money(quote.ProductPrice), "Cuota inicial", Money(quote.DownPayment), "Numero cuotas", $"{quote.TermMonths}");
-        FinancialRow(commands, 52, 300, "Seguro", Money(quote.Insurance), "Gastos adm.", Money(quote.AdministrativeFees), "Tasa mensual", $"{quote.MonthlyInterestRate:N3}%");
-        Text(commands, 52, 282, "Tipo credito", string.IsNullOrWhiteSpace(quote.CreditType) ? "N/A" : quote.CreditType);
-        commands.AppendLine("0.082 0.373 0.459 rg 52 265 508 44 re f");
-        commands.AppendLine($"1 1 1 rg BT /F2 13 Tf 70 292 Td (Total financiado: {Escape(Money(quote.FinancedAmount))}) Tj ET");
-        commands.AppendLine($"1 1 1 rg BT /F2 13 Tf 326 292 Td (Cuota aprox.: {Escape(Money(quote.EstimatedMonthlyPayment))}) Tj ET");
-        commands.AppendLine($"1 1 1 rg BT /F1 9 Tf 70 274 Td (Total estimado a pagar: {Escape(Money(quote.EstimatedTotalPayment))}) Tj ET");
+        commands.AppendLine($"0.08 0.08 0.08 rg BT /F2 11 Tf 52 656 Td ({Escape(companyName)}) Tj ET");
+        Paragraph(commands, 52, 638, "Sedes y canales de atencion configurables por la empresa.", 48, 8);
+        commands.AppendLine($"0.08 0.08 0.08 rg BT /F2 9 Tf 436 742 Td (Cotizacion: {Escape(quote.Number)}) Tj ET");
 
-        DrawSection(commands, 34, 120, 544, 96, "CONDICIONES");
-        var conditions = "Cotizacion informativa sujeta a disponibilidad del producto, validacion comercial, estudio de credito, aprobacion de la entidad financiadora y politicas internas vigentes.";
-        Paragraph(commands, 52, 185, conditions, 93, 11);
-        Paragraph(commands, 52, 150, $"Observaciones: {Value(quote.Notes)}", 93, 10);
+        LabelValue(commands, 350, 706, "Cliente:", customerName, 12, 12, 130);
+        LabelValue(commands, 350, 682, "C.C.:", Value(quote.IdentificationNumber), 12, 12, 130);
+        LabelValue(commands, 350, 658, "Vehiculo:", quote.ProductName, 12, 12, 130);
+        LabelValue(commands, 350, 634, "Direccion:", Value(customerAddress), 12, 12, 130);
+        LabelValue(commands, 350, 610, "Telefono:", Value(customerPhone), 12, 12, 130);
+        LabelValue(commands, 350, 586, "Fecha:", Date(quote.QuoteDate), 12, 12, 130);
 
-        commands.AppendLine("0.72 0.77 0.82 RG 1 w 52 74 m 252 74 l S 342 74 m 542 74 l S");
-        commands.AppendLine("0.10 0.12 0.16 rg BT /F1 9 Tf 78 58 Td (Asesor comercial) Tj ET");
-        commands.AppendLine("0.10 0.12 0.16 rg BT /F1 9 Tf 420 58 Td (Cliente) Tj ET");
-        commands.AppendLine("0.35 0.40 0.46 rg BT /F1 8 Tf 40 28 Td (Documento generado por CRM Comercial. Valores aproximados sujetos a aprobacion final.) Tj ET");
+        if (includeProductImage)
+        {
+            commands.AppendLine("q 128 0 0 76 52 560 cm /Product Do Q");
+        }
+
+        LabelValue(commands, 52, 518, "Precio:", MoneyPlain(quote.ProductPrice), 12, 16, 120);
+        LabelValue(commands, 52, 486, "Cuota inicial:", MoneyPlain(quote.DownPayment), 12, 16, 120);
+
+        var terms = new[] { 1, 6, 12, 18, 24, 30, 36 };
+        var x1 = 94;
+        var y = 438;
+        for (var i = 0; i < terms.Length; i++)
+        {
+            var x = i < 4 ? x1 : 210;
+            var rowY = i < 4 ? y - (i * 34) : y - ((i - 4) * 34);
+            var payment = terms[i] == quote.TermMonths ? quote.EstimatedMonthlyPayment : EstimatePaymentForTerm(quote.FinancedAmount, terms[i], quote.MonthlyInterestRate);
+            commands.AppendLine($"0.07 0.07 0.07 rg BT /F2 14 Tf {x} {rowY} Td ({terms[i]}:) Tj ET");
+            commands.AppendLine($"0.07 0.07 0.07 rg BT /F2 14 Tf {x + 28} {rowY} Td ({Escape(MoneyPlain(payment))}) Tj ET");
+        }
+
+        var creditBase = Math.Max(quote.ProductPrice - quote.DownPayment, 0);
+        LabelValue(commands, 320, 462, "Valor a financiar", MoneyPlain(creditBase), 11, 11, 120);
+        LabelValue(commands, 320, 432, "SOAT", MoneyPlain(quote.Insurance), 11, 11, 120);
+        LabelValue(commands, 320, 402, "Matricula", MoneyPlain(quote.AdministrativeFees), 11, 11, 120);
+        LabelValue(commands, 320, 372, "Otros", "0", 11, 11, 120);
+        LabelValue(commands, 320, 342, "Total Credito", MoneyPlain(quote.FinancedAmount), 11, 11, 120);
+        LabelValue(commands, 320, 312, "Tipo de credito", Value(quote.CreditType, "Credito"), 11, 11, 120);
+        LabelValue(commands, 320, 282, "Plazo (meses)", quote.TermMonths.ToString(CultureInfo.InvariantCulture), 11, 11, 120);
+        LabelValue(commands, 320, 252, "Cuota Mensual", MoneyPlain(quote.EstimatedMonthlyPayment), 11, 11, 120);
+
+        commands.AppendLine("0.94 0.94 0.94 rg 458 250 110 275 re f");
+        commands.AppendLine("0.70 0.70 0.70 RG 0.6 w 458 250 110 275 re S");
+        RequirementBlock(commands, 470, 502, "Empleados", new[] { "Fotocopia Cedula", "Carta Laboral o 2 ultimas", "colillas de Pago", "Recibo Servicio Publico" });
+        RequirementBlock(commands, 470, 386, "Comerciante", new[] { "Fotocopia Cedula", "Certificado de Ingresos", "Camara de Comercio /", "Extractos Bancarios" });
+        RequirementBlock(commands, 470, 286, "Pensionados", new[] { "Fotocopia Cedula", "2 ultimas colillas", "Recibo Servicio Publico" });
+
+        LabelValue(commands, 52, 168, "Asesor:", Value(advisor, "Asesor comercial"), 13, 13, 150);
+        LabelValue(commands, 52, 138, "Tel:", Value(customerPhone), 13, 13, 150);
+        LabelValue(commands, 52, 108, "Correo:", " ", 13, 13, 150);
+
+        var legal = "Autorizacion de Habeas Data: Con la firma del presente documento, el titular de la informacion queda autorizado a la compania para el uso de los datos de la siguiente forma: identificacion del titular para la atencion a solicitudes en los canales de atencion, actualizacion de datos, contacto comercial de productos, mejoramiento y evaluacion de la satisfaccion del servicio, gestion de cobranzas, fidelizacion de clientes y envio de informacion comercial.";
+        commands.AppendLine($"0.08 0.08 0.08 rg BT /F2 8 Tf 320 168 Td (NIT: {Escape(companyName)}) Tj ET");
+        Paragraph(commands, 320, 150, legal, 48, 7, 7);
+        Paragraph(commands, 320, 66, $"Observaciones: {Value(quote.Notes, "N/A")}", 48, 7);
         return commands.ToString();
+    }
+
+    private static void LabelValue(StringBuilder commands, int x, int y, string label, string value, int labelSize, int valueSize, int valueWidth)
+    {
+        commands.AppendLine($"0.09 0.09 0.09 rg BT /F2 {labelSize} Tf {x} {y} Td ({Escape(label)}) Tj ET");
+        commands.AppendLine($"0.09 0.09 0.09 rg BT /F1 {valueSize} Tf {x + valueWidth} {y} Td ({Escape(Shorten(value, 28))}) Tj ET");
+    }
+
+    private static void RequirementBlock(StringBuilder commands, int x, int y, string title, IReadOnlyCollection<string> lines)
+    {
+        commands.AppendLine($"0.08 0.08 0.08 rg BT /F2 10 Tf {x} {y} Td ({Escape(title)}) Tj ET");
+        var lineY = y - 18;
+        foreach (var line in lines)
+        {
+            commands.AppendLine($"0.10 0.10 0.10 rg BT /F1 8 Tf {x} {lineY} Td ({Escape(line)}) Tj ET");
+            lineY -= 13;
+        }
     }
 
     private static void DrawSection(StringBuilder commands, int x, int y, int width, int height, string title)
@@ -440,10 +499,10 @@ public static class SimplePdfGenerator
         Text(commands, x + 350, y, label3, value3);
     }
 
-    private static void Paragraph(StringBuilder commands, int x, int y, string value, int maxChars, int fontSize)
+    private static void Paragraph(StringBuilder commands, int x, int y, string value, int maxChars, int fontSize, int maxLines = 3)
     {
         var lineY = y;
-        foreach (var line in WrapText(value, maxChars).Take(3))
+        foreach (var line in WrapText(value, maxChars).Take(maxLines))
         {
             commands.AppendLine($"0.16 0.20 0.27 rg BT /F1 {fontSize} Tf {x} {lineY} Td ({Escape(line)}) Tj ET");
             lineY -= 16;

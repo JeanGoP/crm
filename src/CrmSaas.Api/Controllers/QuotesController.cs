@@ -203,6 +203,7 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
     public async Task<IActionResult> Pdf(Guid id, CancellationToken cancellationToken)
     {
         var quote = await db.Cotizaciones
+            .Include(x => x.Cliente)
             .Include(x => x.Producto)
             .ThenInclude(x => x!.Fotos)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
@@ -216,8 +217,35 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
         var image = quotePhoto is null
             ? null
             : new QuotePdfImage(quotePhoto.Datos, quotePhoto.ContentType, quotePhoto.NombreArchivo);
-        var bytes = SimplePdfGenerator.Quote(dto, company?.Nombre ?? "Empresa", image);
+        var logo = ToPdfImage(company?.LogoDataUrl, "logo-empresa.png");
+        var bytes = SimplePdfGenerator.Quote(
+            dto,
+            company?.Nombre ?? "Empresa",
+            image,
+            logo,
+            quote.Cliente?.Telefono,
+            quote.Cliente?.Direccion,
+            quote.UsuarioCreacion);
         return File(bytes, "application/pdf", $"{quote.Numero}.pdf");
+    }
+
+    private static QuotePdfImage? ToPdfImage(string? dataUrl, string fileName)
+    {
+        if (string.IsNullOrWhiteSpace(dataUrl)) return null;
+        var comma = dataUrl.IndexOf(',');
+        if (comma <= 0) return null;
+        var header = dataUrl[..comma];
+        var contentTypeEnd = header.IndexOf(';');
+        if (!header.StartsWith("data:", StringComparison.OrdinalIgnoreCase) || contentTypeEnd <= 5) return null;
+        var contentType = header[5..contentTypeEnd];
+        try
+        {
+            return new QuotePdfImage(Convert.FromBase64String(dataUrl[(comma + 1)..]), contentType, fileName);
+        }
+        catch (FormatException)
+        {
+            return null;
+        }
     }
 
     private static QuoteDto ToDto(Cotizacion x)
