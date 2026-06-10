@@ -1,7 +1,7 @@
 # Manual de usuario - CRM Comercial
 
 Ultima actualizacion: 2026-06-09  
-Version del manual: 5.4
+Version del manual: 5.5
 Sistema: CRM para gestion comercial y ventas a credito  
 
 ## 1. Bienvenida
@@ -396,6 +396,14 @@ Actividades funciona como agenda comercial. Permite programar tareas, llamadas y
 - **Completada**
 - **Cancelada**
 
+### Reprogramar una actividad
+
+1. En la lista de actividades, presione el boton **Reprogramar**.
+2. Seleccione la nueva fecha y hora.
+3. Guarde el cambio.
+
+Si la actividad tenia recordatorio, el sistema conserva la misma anticipacion frente a la nueva fecha programada.
+
 ### Seguimiento automatico
 
 Al crear una cotizacion, el sistema puede generar una actividad automatica como **Llamar al cliente manana**. Si no se actualiza, puede aparecer como alerta de seguimiento vencido.
@@ -508,6 +516,7 @@ El sistema muestra mensajes cuando algo no puede completarse.
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-06-09 | 5.5 | El boton de actividades ahora se llama Reprogramar y permite escoger fecha y hora de reprogramacion. |
 | 2026-06-09 | 5.4 | Se aclara que la cotizacion calcula la cuota desde la tabla financiera de la empresa usando valor del producto, cuota inicial y numero de cuotas. |
 | 2026-06-09 | 5.3 | Se agrega configuracion financiera por empresa para cotizaciones, basada en la tabla de amortizacion Montelibano, con tasas legales, factor mensual, plazo maximo y redondeo. |
 | 2026-06-09 | 5.2 | La cotizacion ya no descarga ni imprime automaticamente; primero abre vista previa del PDF y luego permite descargar o imprimir. |

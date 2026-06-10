@@ -1191,6 +1191,7 @@ function ActivitiesPage() {
   const { data: deals = [] } = useResource<Deal[]>('/api/pipeline/deals', []);
   const [form, setForm] = useState<FormMode<Activity>>({ open: false });
   const [confirm, setConfirm] = useState<Activity>();
+  const [reschedule, setReschedule] = useState<Activity>();
   const [notice, setNotice] = useState<Notice>();
   const [statusFilter, setStatusFilter] = useState<'open' | 'all' | 'done'>('open');
   const [dueFilter, setDueFilter] = useState<'all' | 'overdue' | 'today' | 'upcoming'>('all');
@@ -1218,6 +1219,15 @@ function ActivitiesPage() {
     const { data } = await api.put<Activity>(`/api/activities/${activity.id}`, toActivityPayload({ ...activity, ...patch }));
     setData(rows.map((x) => x.id === data.id ? data : x));
     setNotice({ type: 'success', text: message });
+  };
+
+  const saveReschedule = async (scheduledAt: string) => {
+    if (!reschedule) return;
+    const reminderAt = reschedule.reminderAt
+      ? moveReminderKeepingOffset(reschedule.scheduledAt, reschedule.reminderAt, scheduledAt)
+      : undefined;
+    await updateActivity(reschedule, { scheduledAt, reminderAt }, 'Actividad reprogramada.');
+    setReschedule(undefined);
   };
 
   const remove = async () => {
@@ -1268,7 +1278,7 @@ function ActivitiesPage() {
         <Actions
           onStart={r.status === 1 ? () => updateActivity(r, { status: 2 }, 'Actividad marcada en proceso.') : undefined}
           onComplete={r.status !== 3 ? () => updateActivity(r, { status: 3 }, 'Actividad completada.') : undefined}
-          onReschedule={r.status === 1 || r.status === 2 ? () => updateActivity(r, { scheduledAt: addDaysIso(r.scheduledAt, 1), reminderAt: r.reminderAt ? addDaysIso(r.reminderAt, 1) : undefined }, 'Actividad reprogramada para manana.') : undefined}
+          onReschedule={r.status === 1 || r.status === 2 ? () => setReschedule(r) : undefined}
           onCancel={r.status !== 4 ? () => updateActivity(r, { status: 4 }, 'Actividad cancelada.') : undefined}
           onEdit={() => setForm({ open: true, item: r })}
           onDelete={canDelete ? () => setConfirm(r) : undefined}
@@ -1276,6 +1286,7 @@ function ActivitiesPage() {
       ])}
     />
     <ActivityDialog form={form} customers={customers} deals={deals} onClose={() => setForm({ open: false })} onSave={save} />
+    <RescheduleActivityDialog activity={reschedule} onClose={() => setReschedule(undefined)} onSave={saveReschedule} />
     <ConfirmDialog title="Eliminar actividad" text={`Se eliminara ${confirm?.title}.`} open={!!confirm} onClose={() => setConfirm(undefined)} onConfirm={remove} />
     <Notice notice={notice} onClose={() => setNotice(undefined)} />
   </Stack>;
@@ -2302,6 +2313,68 @@ function ActivityDialog({ form, customers, deals, onClose, onSave }: DialogProps
   </FormDialog>;
 }
 
+function RescheduleActivityDialog({ activity, onClose, onSave }: { activity?: Activity; onClose: () => void; onSave: (scheduledAt: string) => Promise<void> }) {
+  const muiTheme = useTheme();
+  const fullScreen = useMediaQuery(muiTheme.breakpoints.down('sm'));
+  const [scheduledAt, setScheduledAt] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (activity) {
+      setScheduledAt(toInputDateTime(activity.scheduledAt));
+      setError('');
+    }
+  }, [activity]);
+
+  const save = async () => {
+    if (!scheduledAt) {
+      setError('Seleccione la nueva fecha y hora.');
+      return;
+    }
+
+    setSaving(true);
+    setError('');
+    try {
+      await onSave(scheduledAt);
+    } catch (err) {
+      setError(apiError(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return <Dialog open={!!activity} onClose={saving ? undefined : onClose} fullWidth maxWidth="xs" fullScreen={fullScreen}>
+    <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1 }}>
+      Reprogramar actividad
+      <IconButton onClick={onClose} disabled={saving}><Close /></IconButton>
+    </DialogTitle>
+    <DialogContent sx={{ px: { xs: 2, sm: 3 } }}>
+      <Stack spacing={2} sx={{ pt: 1 }}>
+        {error && <Alert severity="error">{error}</Alert>}
+        <Box>
+          <Typography fontWeight={800}>{activity?.title}</Typography>
+          <Typography color="text.secondary" fontSize={13}>{activity?.customerName ?? 'Sin cliente asociado'}</Typography>
+        </Box>
+        <TextField
+          label="Nueva fecha y hora"
+          type="datetime-local"
+          value={scheduledAt}
+          onChange={(event) => setScheduledAt(event.target.value)}
+          InputLabelProps={{ shrink: true }}
+          fullWidth
+          required
+        />
+        {activity?.reminderAt && <Alert severity="info">El recordatorio se conservara con la misma anticipacion.</Alert>}
+      </Stack>
+    </DialogContent>
+    <DialogActions sx={{ px: { xs: 2, sm: 3 }, pb: 2, flexWrap: 'wrap' }}>
+      <Button onClick={onClose} disabled={saving}>Cancelar</Button>
+      <Button variant="contained" onClick={save} disabled={saving}>{saving ? 'Guardando...' : 'Reprogramar'}</Button>
+    </DialogActions>
+  </Dialog>;
+}
+
 type DialogProps<TItem, TPayload> = { form: FormMode<TItem>; onClose: () => void; onSave: (payload: TPayload) => Promise<void> };
 
 function FieldGrid({ children, columns = 2 }: { children: ReactNode; columns?: 2 | 3 }) {
@@ -2490,7 +2563,7 @@ function Actions({ onView, onEdit, onDelete, onConvert, onDownload, onActivity, 
     {onActivity && <Tooltip title="Registrar actividad"><IconButton size="small" onClick={onActivity}><AddTask fontSize="small" /></IconButton></Tooltip>}
     {onStart && <Tooltip title="Marcar en proceso"><IconButton size="small" onClick={onStart}><SyncAlt fontSize="small" /></IconButton></Tooltip>}
     {onComplete && <Tooltip title="Completar"><IconButton size="small" color="success" onClick={onComplete}><CheckCircle fontSize="small" /></IconButton></Tooltip>}
-    {onReschedule && <Tooltip title="Reprogramar para manana"><IconButton size="small" onClick={onReschedule}><EventNote fontSize="small" /></IconButton></Tooltip>}
+    {onReschedule && <Tooltip title="Reprogramar"><IconButton size="small" onClick={onReschedule}><EventNote fontSize="small" /></IconButton></Tooltip>}
     {onCancel && <Tooltip title="Cancelar"><IconButton size="small" color="warning" onClick={onCancel}><Close fontSize="small" /></IconButton></Tooltip>}
     {onEdit && <Tooltip title="Editar"><IconButton size="small" onClick={onEdit}><Edit fontSize="small" /></IconButton></Tooltip>}
     {onConvert && <Tooltip title="Convertir a cliente"><IconButton size="small" onClick={onConvert}><SyncAlt fontSize="small" /></IconButton></Tooltip>}
@@ -2695,10 +2768,9 @@ function readableFileSize(bytes: number) {
   if (bytes < 1024 * 1024) return `${Math.ceil(bytes / 1024)} KB`;
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
-function addDaysIso(value: string, days: number) {
-  const date = new Date(value);
-  date.setDate(date.getDate() + days);
-  return date.toISOString();
+function moveReminderKeepingOffset(previousScheduledAt: string, previousReminderAt: string, nextScheduledAt: string) {
+  const offset = new Date(previousScheduledAt).getTime() - new Date(previousReminderAt).getTime();
+  return new Date(new Date(nextScheduledAt).getTime() - offset).toISOString();
 }
 function statusLabel(value: number) { return ['-', 'Activo', 'Inactivo', 'Suspendido'][value] ?? 'Activo'; }
 function ratingLabel(value: number) { return ['-', 'Frio', 'Tibio', 'Caliente'][value] ?? 'Frio'; }
