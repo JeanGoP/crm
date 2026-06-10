@@ -73,6 +73,24 @@ public static class DatabaseSeeder
 
         await db.SaveChangesAsync(cancellationToken);
 
+        if (!await db.ConfiguracionesFinancierasEmpresa.IgnoreQueryFilters().AnyAsync(x => x.EmpresaId == empresaId, cancellationToken))
+        {
+            db.ConfiguracionesFinancierasEmpresa.Add(new ConfiguracionFinancieraEmpresa
+            {
+                EmpresaId = empresaId,
+                SalarioMinimoVigente = 1400000,
+                TasaConsumoEa = 29.72m,
+                TasaBajoMontoEa = 56.33m,
+                TasaFactorMensual = 4.5m,
+                PlazoMaximoMeses = 30,
+                RedondeoCuota = 1000,
+                UsarTablaMontelibano = true,
+                Activa = true
+            });
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+
         if (!await db.EtapasNegocio.IgnoreQueryFilters().AnyAsync(x => x.EmpresaId == empresaId, cancellationToken))
         {
             db.EtapasNegocio.AddRange(

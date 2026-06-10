@@ -130,6 +130,18 @@ public sealed class ProductoFoto : AuditableTenantEntity
     public int Orden { get; set; }
 }
 
+public sealed class ConfiguracionFinancieraEmpresa : AuditableTenantEntity
+{
+    public decimal SalarioMinimoVigente { get; set; } = 1400000;
+    public decimal TasaConsumoEa { get; set; } = 29.72m;
+    public decimal TasaBajoMontoEa { get; set; } = 56.33m;
+    public decimal TasaFactorMensual { get; set; } = 4.5m;
+    public int PlazoMaximoMeses { get; set; } = 30;
+    public int RedondeoCuota { get; set; } = 1000;
+    public bool UsarTablaMontelibano { get; set; } = true;
+    public bool Activa { get; set; } = true;
+}
+
 public sealed class Cotizacion : AuditableTenantEntity
 {
     public string Numero { get; set; } = string.Empty;
@@ -154,6 +166,8 @@ public sealed class Cotizacion : AuditableTenantEntity
     public decimal ValorFinanciado { get; set; }
     public decimal CuotaMensualEstimada { get; set; }
     public decimal TotalPagarEstimado { get; set; }
+    public string? TipoCredito { get; set; }
+    public bool UsoConfiguracionFinancieraEmpresa { get; set; }
     public DateTime FechaCotizacion { get; set; } = ColombiaTime.Now;
     public DateTime ValidaHasta { get; set; } = ColombiaTime.Now.AddDays(7);
     public string? Observaciones { get; set; }

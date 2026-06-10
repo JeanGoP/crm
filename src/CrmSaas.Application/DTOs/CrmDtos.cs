@@ -74,6 +74,45 @@ public sealed record ProductPhotoDto(Guid Id, string FileName, string ContentTyp
 public sealed record ProductDto(Guid Id, string Name, string Category, string Brand, string Model, string Reference, string? Description, int? EngineCc, int? Year, string? Color, decimal Price, bool Active, IReadOnlyCollection<ProductPhotoDto> Photos);
 public sealed record UpsertProductDto(string Name, string Category, string Brand, string Model, string Reference, string? Description, int? EngineCc, int? Year, string? Color, decimal Price, bool Active);
 
+public sealed record FinancialSettingsDto(
+    Guid Id,
+    decimal MinimumWage,
+    decimal ConsumerAnnualRate,
+    decimal LowAmountAnnualRate,
+    decimal FactorMonthlyRate,
+    int MaxTermMonths,
+    int PaymentRounding,
+    bool UseMontelibanoTable,
+    bool Active);
+public sealed record UpsertFinancialSettingsDto(
+    decimal MinimumWage,
+    decimal ConsumerAnnualRate,
+    decimal LowAmountAnnualRate,
+    decimal FactorMonthlyRate,
+    int MaxTermMonths,
+    int PaymentRounding,
+    bool UseMontelibanoTable,
+    bool Active);
+public sealed record QuoteSimulationDto(
+    Guid ProductId,
+    decimal ProductPrice,
+    decimal DownPayment,
+    decimal Insurance,
+    decimal AdministrativeFees,
+    int TermMonths,
+    decimal MonthlyInterestRate);
+public sealed record QuoteSimulationResultDto(
+    decimal DownPayment,
+    decimal Insurance,
+    decimal AdministrativeFees,
+    int TermMonths,
+    decimal MonthlyInterestRate,
+    decimal FinancedAmount,
+    decimal EstimatedMonthlyPayment,
+    decimal EstimatedTotalPayment,
+    string CreditType,
+    bool UsedCompanyFinancialSettings);
+
 public sealed record QuoteDto(
     Guid Id,
     string Number,
@@ -97,6 +136,8 @@ public sealed record QuoteDto(
     decimal FinancedAmount,
     decimal EstimatedMonthlyPayment,
     decimal EstimatedTotalPayment,
+    string? CreditType,
+    bool UsedCompanyFinancialSettings,
     DateTime QuoteDate,
     DateTime ValidUntil,
     string? Notes);

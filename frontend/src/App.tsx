@@ -34,7 +34,7 @@ import AutoAwesome from '@mui/icons-material/AutoAwesome';
 import { AxiosError } from 'axios';
 import { api } from './api';
 import { useAuthStore } from './store';
-import { Activity, ColombianIdentityLookup, CommercialReports, Company, CreditApplication, CreditDocument, Customer, Customer360, CustomerAiAnalysis, CustomerTimelineItem, Dashboard, Deal, DealStage, Lead, MotorcycleDelivery, Product, ProductPhoto, Quote, User } from './types';
+import { Activity, ColombianIdentityLookup, CommercialReports, Company, CreditApplication, CreditDocument, Customer, Customer360, CustomerAiAnalysis, CustomerTimelineItem, Dashboard, Deal, DealStage, FinancialSettings, Lead, MotorcycleDelivery, Product, ProductPhoto, Quote, QuoteSimulationResult, User } from './types';
 
 const drawerWidth = 248;
 const today = new Date().toISOString().slice(0, 10);
@@ -104,6 +104,7 @@ const emptyActivity = { title: '', description: '', type: 1, status: 1, schedule
 const emptyCompany = { name: '', subdomain: '', customDomain: '', logoDataUrl: '', active: true };
 const emptyUser = { fullName: '', email: '', password: '', companyId: '', roles: ['Vendedor'] };
 const emptyProduct = { name: '', category: 'Moto', brand: '', model: '', reference: '', description: '', engineCc: '', year: '', color: '', price: 0, active: true };
+const emptyFinancialSettings = { minimumWage: 1400000, consumerAnnualRate: 29.72, lowAmountAnnualRate: 56.33, factorMonthlyRate: 4.5, maxTermMonths: 30, paymentRounding: 1000, useMontelibanoTable: true, active: true };
 const emptyQuote = { identificationType: 1, identificationNumber: '', customerFirstNames: '', customerLastNames: '', customerFirstName: '', customerMiddleName: '', customerLastName: '', customerSecondLastName: '', phoneCountryCode: '+57', phoneNumber: '', productId: '', downPayment: 0, insurance: 0, administrativeFees: 0, termMonths: 24, monthlyInterestRate: 2.2, notes: '' };
 const emptyCreditApplication = {
   customerId: '', productId: '', quoteId: '', dealId: '', identificationType: 1, identificationNumber: '', birthDate: '', mobile: '', address: '', city: '', occupation: '',
@@ -1376,8 +1377,10 @@ function SettingsPage() {
   const canManage = useCanManage();
   const { data: companies = [], loading: loadingCompanies, error: companiesError, reload: reloadCompanies, setData: setCompanies } = useResource<Company[]>('/api/companies', []);
   const { data: users = [], loading: loadingUsers, error: usersError, reload: reloadUsers, setData: setUsers } = useResource<User[]>('/api/users', []);
+  const { data: financialSettings, loading: loadingFinancialSettings, error: financialSettingsError, reload: reloadFinancialSettings, setData: setFinancialSettings } = useResource<FinancialSettings>('/api/financial-settings');
   const [companyForm, setCompanyForm] = useState<FormMode<Company>>({ open: false });
   const [userForm, setUserForm] = useState<FormMode<User>>({ open: false });
+  const [financialForm, setFinancialForm] = useState<FormMode<FinancialSettings>>({ open: false });
   const [notice, setNotice] = useState<Notice>();
 
   const saveCompany = async (payload: typeof emptyCompany) => {
@@ -1403,13 +1406,52 @@ function SettingsPage() {
     setUserForm({ open: false });
   };
 
+  const saveFinancialSettings = async (payload: typeof emptyFinancialSettings) => {
+    const body = {
+      minimumWage: Number(payload.minimumWage),
+      consumerAnnualRate: Number(payload.consumerAnnualRate),
+      lowAmountAnnualRate: Number(payload.lowAmountAnnualRate),
+      factorMonthlyRate: Number(payload.factorMonthlyRate),
+      maxTermMonths: Number(payload.maxTermMonths),
+      paymentRounding: Number(payload.paymentRounding),
+      useMontelibanoTable: Boolean(payload.useMontelibanoTable),
+      active: Boolean(payload.active)
+    };
+    const { data } = await api.put<FinancialSettings>('/api/financial-settings', body);
+    setFinancialSettings(data);
+    setNotice({ type: 'success', text: 'Configuracion financiera actualizada.' });
+    setFinancialForm({ open: false });
+  };
+
   return <Stack spacing={3}>
-    <Header title="Configuracion" onRefresh={() => { reloadCompanies(); reloadUsers(); }} />
+    <Header title="Configuracion" onRefresh={() => { reloadCompanies(); reloadUsers(); reloadFinancialSettings(); }} />
     <Card><CardContent><Grid container spacing={2}>
       <Grid item xs={12} md={6}><TextField fullWidth label="API URL" value={import.meta.env.VITE_API_URL ?? ''} InputProps={{ readOnly: true }} /></Grid>
       <Grid item xs={12} md={6}><TextField fullWidth label="Tenant" value={import.meta.env.VITE_TENANT ?? 'demo'} InputProps={{ readOnly: true }} /></Grid>
       <Grid item xs={12}><Chip icon={<CheckCircle />} label={`Sesion activa: ${user?.email} (${user?.roles.join(', ')})`} /></Grid>
     </Grid></CardContent></Card>
+    <Card><CardContent>
+      <Stack spacing={2}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', sm: 'center' }} gap={1}>
+          <Box>
+            <Typography variant="h5" fontWeight={900}>Configuracion financiera</Typography>
+            <Typography color="text.secondary" fontSize={14}>Tabla de financiacion usada por la empresa al crear cotizaciones.</Typography>
+          </Box>
+          {canManage && <Button variant="outlined" startIcon={<Edit />} onClick={() => setFinancialForm({ open: true, item: financialSettings })}>Editar tabla</Button>}
+        </Stack>
+        <StatusBar loading={loadingFinancialSettings} error={financialSettingsError} />
+        {financialSettings && <Grid container spacing={1.5}>
+          <Grid item xs={6} md={3}><Metric label="Salario minimo" value={money(financialSettings.minimumWage)} /></Grid>
+          <Grid item xs={6} md={3}><Metric label="Consumo EA" value={`${financialSettings.consumerAnnualRate}%`} /></Grid>
+          <Grid item xs={6} md={3}><Metric label="Bajo monto EA" value={`${financialSettings.lowAmountAnnualRate}%`} /></Grid>
+          <Grid item xs={6} md={3}><Metric label="Factor mensual" value={`${financialSettings.factorMonthlyRate}%`} /></Grid>
+          <Grid item xs={6} md={3}><Metric label="Plazo maximo" value={`${financialSettings.maxTermMonths} meses`} /></Grid>
+          <Grid item xs={6} md={3}><Metric label="Redondeo cuota" value={money(financialSettings.paymentRounding)} /></Grid>
+          <Grid item xs={6} md={3}><Metric label="Tabla Montelibano" value={financialSettings.useMontelibanoTable ? 'Activa' : 'Manual'} /></Grid>
+          <Grid item xs={6} md={3}><Metric label="Estado" value={financialSettings.active ? 'Activa' : 'Inactiva'} /></Grid>
+        </Grid>}
+      </Stack>
+    </CardContent></Card>
     {canManage && <>
       <Stack direction="row" justifyContent="space-between" alignItems="center">
         <Typography variant="h5" fontWeight={900}>Empresas</Typography>
@@ -1446,6 +1488,7 @@ function SettingsPage() {
     </>}
     <CompanyDialog form={companyForm} onClose={() => setCompanyForm({ open: false })} onSave={saveCompany} />
     <UserDialog form={userForm} companies={companies.filter((x) => x.active)} onClose={() => setUserForm({ open: false })} onSave={saveUser} />
+    <FinancialSettingsDialog form={financialForm} onClose={() => setFinancialForm({ open: false })} onSave={saveFinancialSettings} />
     <Notice notice={notice} onClose={() => setNotice(undefined)} />
   </Stack>;
 }
@@ -1516,6 +1559,36 @@ function UserDialog({ form, companies, onClose, onSave }: DialogProps<User, type
       <TextField required label="Contrasena temporal" type="password" value={v.password} onChange={(e) => set({ password: e.target.value })} />
       <TextField required select label="Empresa" value={v.companyId} onChange={(e) => set({ companyId: e.target.value })}>{companies.map((c) => <MenuItem key={c.id} value={c.id}>{c.name} ({c.subdomain})</MenuItem>)}</TextField>
       <TextField select label="Rol" value={v.roles[0] ?? 'Vendedor'} onChange={(e) => set({ roles: [e.target.value] })}>{['Administrador', 'Supervisor', 'Vendedor'].map((role) => <MenuItem key={role} value={role}>{role}</MenuItem>)}</TextField>
+    </>}
+  </FormDialog>;
+}
+
+function FinancialSettingsDialog({ form, onClose, onSave }: DialogProps<FinancialSettings, typeof emptyFinancialSettings>) {
+  const initial = form.item ? {
+    minimumWage: form.item.minimumWage,
+    consumerAnnualRate: form.item.consumerAnnualRate,
+    lowAmountAnnualRate: form.item.lowAmountAnnualRate,
+    factorMonthlyRate: form.item.factorMonthlyRate,
+    maxTermMonths: form.item.maxTermMonths,
+    paymentRounding: form.item.paymentRounding,
+    useMontelibanoTable: form.item.useMontelibanoTable,
+    active: form.item.active
+  } : emptyFinancialSettings;
+
+  return <FormDialog title="Configuracion financiera" open={form.open} initial={initial} onClose={onClose} onSave={onSave}>
+    {(v, set) => <>
+      <FormControlLabel control={<Checkbox checked={v.active} onChange={(e) => set({ active: e.target.checked })} />} label="Configuracion activa" />
+      <FormControlLabel control={<Checkbox checked={v.useMontelibanoTable} onChange={(e) => set({ useMontelibanoTable: e.target.checked })} />} label="Usar tabla Montelibano en cotizaciones" />
+      <TextField required label="Salario minimo vigente" type="number" value={v.minimumWage} onChange={(e) => set({ minimumWage: Number(e.target.value) })} />
+      <Grid container spacing={1.5}>
+        <Grid item xs={12} sm={6}><TextField fullWidth required label="Tasa consumo EA (%)" type="number" value={v.consumerAnnualRate} onChange={(e) => set({ consumerAnnualRate: Number(e.target.value) })} /></Grid>
+        <Grid item xs={12} sm={6}><TextField fullWidth required label="Tasa bajo monto EA (%)" type="number" value={v.lowAmountAnnualRate} onChange={(e) => set({ lowAmountAnnualRate: Number(e.target.value) })} /></Grid>
+      </Grid>
+      <Grid container spacing={1.5}>
+        <Grid item xs={12} sm={4}><TextField fullWidth required label="Factor mensual (%)" type="number" value={v.factorMonthlyRate} onChange={(e) => set({ factorMonthlyRate: Number(e.target.value) })} /></Grid>
+        <Grid item xs={12} sm={4}><TextField fullWidth required label="Plazo maximo" type="number" value={v.maxTermMonths} onChange={(e) => set({ maxTermMonths: Number(e.target.value) })} /></Grid>
+        <Grid item xs={12} sm={4}><TextField fullWidth required label="Redondeo cuota" type="number" value={v.paymentRounding} onChange={(e) => set({ paymentRounding: Number(e.target.value) })} /></Grid>
+      </Grid>
     </>}
   </FormDialog>;
 }
@@ -1780,16 +1853,6 @@ function QuoteDialog({ form, products, onClose, onSave }: DialogProps<Quote, typ
   return <FormDialog title="Nueva cotizacion" open={form.open} initial={initial} onClose={onClose} onSave={onSave}>
     {(v, set) => {
       const selectedProduct = products.find((product) => product.id === v.productId);
-      const productPrice = selectedProduct?.price ?? 0;
-      const insurance = Math.max(Number(v.insurance) || 0, 0);
-      const administrativeFees = Math.max(Number(v.administrativeFees) || 0, 0);
-      const totalToFinance = productPrice + insurance + administrativeFees;
-      const downPayment = Math.min(Number(v.downPayment) || 0, totalToFinance);
-      const termMonths = Math.max(Number(v.termMonths) || 1, 1);
-      const monthlyInterestRate = Math.max(Number(v.monthlyInterestRate) || 0, 0);
-      const financedAmount = Math.max(totalToFinance - downPayment, 0);
-      const monthlyPayment = estimateMonthlyPayment(financedAmount, termMonths, monthlyInterestRate);
-      const totalPayment = downPayment + monthlyPayment * termMonths;
       return <>
         <TextField required select label="Tipo de identificacion" value={v.identificationType} onChange={(e) => set({ identificationType: Number(e.target.value) })}>
           {identificationOptions.map((option) => <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>)}
@@ -1844,18 +1907,81 @@ function QuoteDialog({ form, products, onClose, onSave }: DialogProps<Quote, typ
           <TextField fullWidth label="Seguro" type="number" value={v.insurance} onChange={(e) => set({ insurance: Number(e.target.value) })} />
           <TextField fullWidth label="Gastos administrativos" type="number" value={v.administrativeFees} onChange={(e) => set({ administrativeFees: Number(e.target.value) })} />
         </FieldGrid>
-        <Paper variant="outlined" sx={{ p: 2, bgcolor: '#f8fafc' }}>
-          <FieldGrid columns={3}>
-            <Box><Typography variant="caption" color="text.secondary">Valor producto</Typography><Typography fontWeight={700}>{money(productPrice)}</Typography></Box>
-            <Box><Typography variant="caption" color="text.secondary">Total financiado</Typography><Typography fontWeight={700}>{money(financedAmount)}</Typography></Box>
-            <Box><Typography variant="caption" color="text.secondary">Cuota aproximada</Typography><Typography fontWeight={700}>{money(monthlyPayment)}</Typography></Box>
-          </FieldGrid>
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1.5 }}>Base: {money(totalToFinance)} · Total estimado a pagar: {money(totalPayment)}</Typography>
-        </Paper>
+        <QuoteSimulationPreview value={v} selectedProduct={selectedProduct} />
         <TextField label="Observaciones" value={v.notes} onChange={(e) => set({ notes: e.target.value })} multiline minRows={2} />
       </>;
     }}
   </FormDialog>;
+}
+
+function QuoteSimulationPreview({ value, selectedProduct }: { value: typeof emptyQuote; selectedProduct?: Product }) {
+  const [simulation, setSimulation] = useState<QuoteSimulationResult>();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const productPrice = selectedProduct?.price ?? 0;
+
+  useEffect(() => {
+    if (!selectedProduct?.id) {
+      setSimulation(undefined);
+      setError('');
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => {
+      setLoading(true);
+      setError('');
+      api.post<QuoteSimulationResult>('/api/quotes/simulate', {
+        productId: selectedProduct.id,
+        productPrice: selectedProduct.price,
+        downPayment: Number(value.downPayment),
+        insurance: Number(value.insurance),
+        administrativeFees: Number(value.administrativeFees),
+        termMonths: Number(value.termMonths),
+        monthlyInterestRate: Number(value.monthlyInterestRate)
+      })
+        .then(({ data }) => setSimulation(data))
+        .catch((err) => setError(apiError(err)))
+        .finally(() => setLoading(false));
+    }, 250);
+
+    return () => window.clearTimeout(timer);
+  }, [selectedProduct?.id, selectedProduct?.price, value.downPayment, value.insurance, value.administrativeFees, value.termMonths, value.monthlyInterestRate]);
+
+  const insurance = Math.max(Number(value.insurance) || 0, 0);
+  const administrativeFees = Math.max(Number(value.administrativeFees) || 0, 0);
+  const totalToFinance = productPrice + insurance + administrativeFees;
+  const fallbackDownPayment = Math.min(Number(value.downPayment) || 0, totalToFinance);
+  const fallbackTermMonths = Math.max(Number(value.termMonths) || 1, 1);
+  const fallbackFinanced = Math.max(totalToFinance - fallbackDownPayment, 0);
+  const fallbackPayment = estimateMonthlyPayment(fallbackFinanced, fallbackTermMonths, Number(value.monthlyInterestRate) || 0);
+  const preview = simulation ?? {
+    downPayment: fallbackDownPayment,
+    insurance,
+    administrativeFees,
+    termMonths: fallbackTermMonths,
+    monthlyInterestRate: Number(value.monthlyInterestRate) || 0,
+    financedAmount: fallbackFinanced,
+    estimatedMonthlyPayment: fallbackPayment,
+    estimatedTotalPayment: fallbackDownPayment + fallbackPayment * fallbackTermMonths,
+    creditType: 'Vista previa',
+    usedCompanyFinancialSettings: false
+  };
+
+  return <Paper variant="outlined" sx={{ p: 2, bgcolor: '#f8fafc' }}>
+    <Stack spacing={1.5}>
+      {loading && <LinearProgress />}
+      {error && <Alert severity="warning">{error}</Alert>}
+      <FieldGrid columns={3}>
+        <Box><Typography variant="caption" color="text.secondary">Valor producto</Typography><Typography fontWeight={700}>{money(productPrice)}</Typography></Box>
+        <Box><Typography variant="caption" color="text.secondary">Total financiado</Typography><Typography fontWeight={700}>{money(preview.financedAmount)}</Typography></Box>
+        <Box><Typography variant="caption" color="text.secondary">Cuota aproximada</Typography><Typography fontWeight={700}>{money(preview.estimatedMonthlyPayment)}</Typography></Box>
+      </FieldGrid>
+      <Typography variant="caption" color="text.secondary">
+        Base: {money(totalToFinance)} · Total estimado a pagar: {money(preview.estimatedTotalPayment)} · Tipo: {preview.creditType} · Tasa usada: {preview.monthlyInterestRate.toFixed(3)}%
+        {preview.usedCompanyFinancialSettings ? ' · Tabla empresa activa' : ''}
+      </Typography>
+    </Stack>
+  </Paper>;
 }
 
 function QuotePdfPreviewDialog({ quote, onClose, onDownload }: { quote?: Quote; onClose: () => void; onDownload: (quote: Quote) => Promise<void> }) {

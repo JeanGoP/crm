@@ -1,7 +1,7 @@
 # Manual de usuario - CRM Comercial
 
 Ultima actualizacion: 2026-06-09  
-Version del manual: 5.2  
+Version del manual: 5.3
 Sistema: CRM para gestion comercial y ventas a credito  
 
 ## 1. Bienvenida
@@ -241,6 +241,13 @@ El simulador ayuda a estimar las condiciones de una venta a credito.
 - **Gastos administrativos:** cobros asociados al proceso.
 - **Total financiado:** valor que queda pendiente despues de la cuota inicial y cargos.
 - **Cuota aproximada:** valor estimado de la cuota mensual.
+- **Tipo de credito:** el sistema puede clasificar automaticamente entre consumo y bajo monto segun la configuracion financiera de la empresa.
+
+### Tabla financiera por empresa
+
+Cada empresa puede tener su propia configuracion financiera. Cuando la tabla de la empresa esta activa, la cotizacion calcula la cuota con los parametros configurados por el administrador: salario minimo vigente, tasas maximas legales, tasa de factores, plazo maximo y redondeo de cuota.
+
+En la empresa demo se usa la tabla Montelibano cargada desde el archivo de amortizacion: salario minimo de **$ 1.400.000**, consumo **29,72% EA**, bajo monto **56,33% EA**, factor mensual **4,5%**, plazo maximo **30 meses** y redondeo a miles.
 
 ### Recomendacion de uso
 
@@ -425,6 +432,18 @@ Configuracion permite administrar datos generales del sistema. Esta opcion norma
 - **Usuarios:** crear usuarios y asignarlos a una empresa.
 - **Roles:** administrar permisos segun el perfil del usuario.
 - **Etapas del pipeline:** configurar las columnas comerciales.
+- **Configuracion financiera:** definir tasas, salario minimo, plazo maximo, redondeo y uso de tabla por empresa para las cotizaciones.
+
+### Configuracion financiera
+
+1. Entre a **Configuracion**.
+2. Busque la tarjeta **Configuracion financiera**.
+3. Presione **Editar tabla**.
+4. Ajuste salario minimo vigente, tasa de consumo EA, tasa de bajo monto EA, factor mensual, plazo maximo y redondeo.
+5. Active o desactive **Usar tabla Montelibano en cotizaciones**.
+6. Guarde.
+
+Los cambios aplican a las nuevas cotizaciones de la empresa. Las cotizaciones ya creadas conservan los valores calculados al momento de generarse.
 
 ### Crear usuario
 
@@ -487,6 +506,7 @@ El sistema muestra mensajes cuando algo no puede completarse.
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-06-09 | 5.3 | Se agrega configuracion financiera por empresa para cotizaciones, basada en la tabla de amortizacion Montelibano, con tasas legales, factor mensual, plazo maximo y redondeo. |
 | 2026-06-09 | 5.2 | La cotizacion ya no descarga ni imprime automaticamente; primero abre vista previa del PDF y luego permite descargar o imprimir. |
 | 2026-06-09 | 5.1 | Se documenta la carga de varias fotos por producto, seleccion de foto principal compatible para PDF y mejora visual del PDF de cotizacion. |
 | 2026-06-09 | 5.0 | Se reconstruye el manual para usuario final, con explicaciones operativas, paso a paso y recomendaciones de uso. |

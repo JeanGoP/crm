@@ -116,6 +116,31 @@ export interface Product {
   photos: ProductPhoto[];
 }
 
+export interface FinancialSettings {
+  id: string;
+  minimumWage: number;
+  consumerAnnualRate: number;
+  lowAmountAnnualRate: number;
+  factorMonthlyRate: number;
+  maxTermMonths: number;
+  paymentRounding: number;
+  useMontelibanoTable: boolean;
+  active: boolean;
+}
+
+export interface QuoteSimulationResult {
+  downPayment: number;
+  insurance: number;
+  administrativeFees: number;
+  termMonths: number;
+  monthlyInterestRate: number;
+  financedAmount: number;
+  estimatedMonthlyPayment: number;
+  estimatedTotalPayment: number;
+  creditType: string;
+  usedCompanyFinancialSettings: boolean;
+}
+
 export interface Quote {
   id: string;
   number: string;
@@ -139,6 +164,8 @@ export interface Quote {
   financedAmount: number;
   estimatedMonthlyPayment: number;
   estimatedTotalPayment: number;
+  creditType?: string;
+  usedCompanyFinancialSettings: boolean;
   quoteDate: string;
   validUntil: string;
   notes?: string;

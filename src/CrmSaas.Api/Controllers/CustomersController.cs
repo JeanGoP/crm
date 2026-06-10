@@ -175,6 +175,8 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
             financedAmount,
             x.CuotaMensualEstimada,
             totalPayment,
+            x.TipoCredito,
+            x.UsoConfiguracionFinancieraEmpresa,
             x.FechaCotizacion,
             x.ValidaHasta,
             x.Observaciones);
