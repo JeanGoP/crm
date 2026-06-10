@@ -2316,16 +2316,23 @@ function ActivityDialog({ form, customers, deals, onClose, onSave }: DialogProps
 function RescheduleActivityDialog({ activity, onClose, onSave }: { activity?: Activity; onClose: () => void; onSave: (scheduledAt: string) => Promise<void> }) {
   const muiTheme = useTheme();
   const fullScreen = useMediaQuery(muiTheme.breakpoints.down('sm'));
-  const [scheduledAt, setScheduledAt] = useState('');
+  const [dateValue, setDateValue] = useState('');
+  const [timeValue, setTimeValue] = useState('09:00');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const scheduledAt = dateValue && timeValue ? `${dateValue}T${timeValue}` : '';
+  const timeOptions = useMemo(() => commonActivityTimes(timeValue), [timeValue]);
 
   useEffect(() => {
     if (activity) {
-      setScheduledAt(toInputDateTime(activity.scheduledAt));
+      const parts = splitInputDateTime(toInputDateTime(activity.scheduledAt));
+      setDateValue(parts.date);
+      setTimeValue(parts.time);
       setError('');
     }
   }, [activity]);
+
+  const setQuickDate = (days: number) => setDateValue(addDaysInputDate(days));
 
   const save = async () => {
     if (!scheduledAt) {
@@ -2356,15 +2363,30 @@ function RescheduleActivityDialog({ activity, onClose, onSave }: { activity?: Ac
           <Typography fontWeight={800}>{activity?.title}</Typography>
           <Typography color="text.secondary" fontSize={13}>{activity?.customerName ?? 'Sin cliente asociado'}</Typography>
         </Box>
-        <TextField
-          label="Nueva fecha y hora"
-          type="datetime-local"
-          value={scheduledAt}
-          onChange={(event) => setScheduledAt(event.target.value)}
-          InputLabelProps={{ shrink: true }}
-          fullWidth
-          required
-        />
+        <Stack direction="row" gap={1} flexWrap="wrap">
+          <Button size="small" variant={dateValue === addDaysInputDate(0) ? 'contained' : 'outlined'} onClick={() => setQuickDate(0)}>Hoy</Button>
+          <Button size="small" variant={dateValue === addDaysInputDate(1) ? 'contained' : 'outlined'} onClick={() => setQuickDate(1)}>Manana</Button>
+          <Button size="small" variant={dateValue === addDaysInputDate(2) ? 'contained' : 'outlined'} onClick={() => setQuickDate(2)}>En 2 dias</Button>
+          <Button size="small" variant={dateValue === addDaysInputDate(7) ? 'contained' : 'outlined'} onClick={() => setQuickDate(7)}>Proxima semana</Button>
+        </Stack>
+        <FieldGrid columns={2}>
+          <TextField
+            label="Fecha"
+            type="date"
+            value={dateValue}
+            onChange={(event) => setDateValue(event.target.value)}
+            InputLabelProps={{ shrink: true }}
+            fullWidth
+            required
+          />
+          <TextField select label="Hora" value={timeValue} onChange={(event) => setTimeValue(event.target.value)} fullWidth required>
+            {timeOptions.map((time) => <MenuItem key={time} value={time}>{formatTimeLabel(time)}</MenuItem>)}
+          </TextField>
+        </FieldGrid>
+        {scheduledAt && <Paper variant="outlined" sx={{ p: 1.5, bgcolor: '#f8fafc' }}>
+          <Typography variant="caption" color="text.secondary">Nueva programacion</Typography>
+          <Typography fontWeight={800}>{formatLocalDateTime(scheduledAt)}</Typography>
+        </Paper>}
         {activity?.reminderAt && <Alert severity="info">El recordatorio se conservara con la misma anticipacion.</Alert>}
       </Stack>
     </DialogContent>
@@ -2634,6 +2656,38 @@ function toInputDateTime(value: string) {
   const date = new Date(value);
   const offset = date.getTimezoneOffset() * 60000;
   return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+}
+
+function splitInputDateTime(value: string) {
+  const [date, time = '09:00'] = value.split('T');
+  return { date, time: time.slice(0, 5) };
+}
+
+function addDaysInputDate(days: number) {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  const offset = date.getTimezoneOffset() * 60000;
+  return new Date(date.getTime() - offset).toISOString().slice(0, 10);
+}
+
+function commonActivityTimes(selected?: string) {
+  const times = ['08:00', '09:00', '10:00', '11:00', '14:00', '15:00', '16:00', '17:00'];
+  return selected && !times.includes(selected) ? [...times, selected].sort() : times;
+}
+
+function formatTimeLabel(value: string) {
+  return new Date(`2000-01-01T${value}:00`).toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit' });
+}
+
+function formatLocalDateTime(value: string) {
+  return new Date(value).toLocaleString('es-CO', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit'
+  });
 }
 
 function toActivityPayload(payload: typeof emptyActivity | Activity) {
