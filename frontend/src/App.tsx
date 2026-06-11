@@ -1962,7 +1962,7 @@ function QuoteDialog({ form, products, onClose, onSave }: DialogProps<Quote, typ
                   display: 'grid',
                   gridTemplateColumns: {
                     xs: '1fr',
-                    md: 'minmax(260px, 1.55fr) 96px repeat(4, minmax(112px, 1fr)) minmax(170px, 1fr)'
+                    md: 'minmax(300px, 1.7fr) repeat(4, minmax(112px, 1fr)) minmax(170px, 1fr)'
                   },
                   gap: 1.5,
                   alignItems: 'stretch'
@@ -1970,9 +1970,6 @@ function QuoteDialog({ form, products, onClose, onSave }: DialogProps<Quote, typ
                   <TextField required select label="Producto" value={item.productId} onChange={(e) => updateItem(index, { productId: e.target.value })}>
                     {products.length ? products.map((product) => <MenuItem key={product.id} value={product.id}>{productName(product)} ({product.category}) - {money(product.price)}</MenuItem>) : <MenuItem value="">No hay productos activos</MenuItem>}
                   </TextField>
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: { xs: 'flex-start', md: 'center' } }}>
-                    <ProductPhotoThumb photo={(selectedProduct?.photos ?? []).find((photo) => photo.isQuoteDefault) ?? (selectedProduct?.photos ?? [])[0]} size={72} />
-                  </Box>
                   <TextField fullWidth label="Cuota inicial" type="number" value={item.downPayment} onChange={(e) => updateItem(index, { downPayment: Number(e.target.value) })} />
                   <TextField fullWidth label="Cuotas" type="number" value={item.termMonths} onChange={(e) => updateItem(index, { termMonths: Number(e.target.value) })} />
                   <TextField fullWidth label="Seguro" type="number" value={item.insurance} onChange={(e) => updateItem(index, { insurance: Number(e.target.value) })} />
