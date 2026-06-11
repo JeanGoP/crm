@@ -2167,86 +2167,110 @@ function CreditApplicationDialog({ form, customers, products, quotes, deals, onC
     status: form.item.status,
     notes: form.item.notes ?? ''
   } : { ...emptyCreditApplication, customerId: customers[0]?.id ?? '', productId: products[0]?.id ?? '', motorcycleValue: products[0]?.price ?? 0 };
-  return <FormDialog title={form.item ? 'Editar solicitud de credito' : 'Nueva solicitud de credito'} open={form.open} initial={initial} onClose={onClose} onSave={onSave}>
+  return <FormDialog title={form.item ? 'Editar solicitud de credito' : 'Nueva solicitud de credito'} open={form.open} initial={initial} onClose={onClose} onSave={onSave} maxWidth="lg">
     {(v, set) => {
       const selectedQuote = quotes.find((x) => x.id === v.quoteId);
       const selectedProduct = products.find((x) => x.id === v.productId);
       const selectedCustomer = customers.find((x) => x.id === v.customerId);
       return <>
-        <TextField select label="Cotizacion" value={v.quoteId} onChange={(e) => {
-          const selected = quotes.find((x) => x.id === e.target.value);
-          set({
-            quoteId: e.target.value,
-            customerId: selected?.customerId ?? v.customerId,
-            productId: selected?.productId ?? v.productId,
-            identificationType: selected?.identificationType ?? v.identificationType,
-            identificationNumber: selected?.identificationNumber ?? v.identificationNumber,
-            motorcycleValue: selected?.productPrice ?? v.motorcycleValue,
-            downPayment: selected?.downPayment ?? v.downPayment,
-            termMonths: selected?.termMonths ?? v.termMonths
-          });
-        }}>
-          <MenuItem value="">Sin cotizacion</MenuItem>
-          {quotes.map((x) => <MenuItem key={x.id} value={x.id}>{x.number} - {fullFirstNames(x.customerFirstName, x.customerMiddleName, x.customerFirstNames)} {fullLastNames(x.customerLastName, x.customerSecondLastName, x.customerLastNames)}</MenuItem>)}
-        </TextField>
-        <TextField required select label="Cliente" value={v.customerId} onChange={(e) => set({ customerId: e.target.value })}>{customers.map((x) => <MenuItem key={x.id} value={x.id}>{x.firstNames || x.name} {x.lastNames}</MenuItem>)}</TextField>
-        <TextField required select label="Producto principal" value={v.productId} onChange={(e) => {
-          const product = products.find((x) => x.id === e.target.value);
-          set({ productId: e.target.value, motorcycleValue: product?.price ?? v.motorcycleValue });
-        }}>{products.map((x) => <MenuItem key={x.id} value={x.id}>{productName(x)} ({x.category}) - {money(x.price)}</MenuItem>)}</TextField>
-        <FieldGrid>
-          <TextField fullWidth required select label="Tipo identificacion" value={v.identificationType} onChange={(e) => set({ identificationType: Number(e.target.value) })}>{identificationOptions.map((option) => <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>)}</TextField>
-          <TextField
-            fullWidth
-            required
-            label="Numero identificacion"
-            value={v.identificationNumber}
-            onChange={(e) => set({ identificationNumber: e.target.value })}
-            InputProps={{ endAdornment: <IdentificationLookupAdornment identification={v.identificationNumber} /> }}
-          />
-        </FieldGrid>
-        <FieldGrid>
-          <TextField fullWidth label="Fecha nacimiento" type="date" value={v.birthDate} onChange={(e) => set({ birthDate: e.target.value })} InputLabelProps={{ shrink: true }} />
-          <TextField fullWidth required label="Celular / WhatsApp" value={v.mobile} onChange={(e) => set({ mobile: e.target.value })} />
-        </FieldGrid>
-        <FieldGrid>
-          <TextField fullWidth label="Direccion" value={v.address} onChange={(e) => set({ address: e.target.value })} />
-          <TextField fullWidth label="Ciudad" value={v.city} onChange={(e) => set({ city: e.target.value })} />
-        </FieldGrid>
-        <TextField label="Ocupacion" value={v.occupation} onChange={(e) => set({ occupation: e.target.value })} />
-        <FieldGrid>
-          <TextField fullWidth label="Ingresos mensuales" type="number" value={v.monthlyIncome} onChange={(e) => set({ monthlyIncome: Number(e.target.value) })} />
-          <TextField fullWidth label="Cuota inicial" type="number" value={v.downPayment} onChange={(e) => set({ downPayment: Number(e.target.value) })} />
-        </FieldGrid>
-        <FieldGrid>
-          <TextField fullWidth label="Plazo meses" type="number" value={v.termMonths} onChange={(e) => set({ termMonths: Number(e.target.value) })} />
-          <TextField fullWidth label="Valor producto" type="number" value={v.motorcycleValue || selectedQuote?.productPrice || selectedProduct?.price || 0} onChange={(e) => set({ motorcycleValue: Number(e.target.value) })} />
-        </FieldGrid>
-        <SectionTitle title="Codeudor" />
-        <FieldGrid>
-          <TextField fullWidth label="Nombre codeudor" value={v.coDebtorName} onChange={(e) => set({ coDebtorName: e.target.value })} />
-          <TextField fullWidth label="Identificacion codeudor" value={v.coDebtorIdentification} onChange={(e) => set({ coDebtorIdentification: e.target.value })} />
-        </FieldGrid>
-        <FieldGrid>
-          <TextField fullWidth label="Celular codeudor" value={v.coDebtorMobile} onChange={(e) => set({ coDebtorMobile: e.target.value })} />
-          <TextField fullWidth label="Parentesco / relacion" value={v.coDebtorRelationship} onChange={(e) => set({ coDebtorRelationship: e.target.value })} />
-        </FieldGrid>
-        <TextField label="Ingresos mensuales codeudor" type="number" value={v.coDebtorMonthlyIncome} onChange={(e) => set({ coDebtorMonthlyIncome: Number(e.target.value) })} />
-        <SectionTitle title="Referencias personales" />
-        <FieldGrid columns={3}>
-          <TextField fullWidth label="Referencia 1" value={v.reference1Name} onChange={(e) => set({ reference1Name: e.target.value })} />
-          <TextField fullWidth label="Celular referencia 1" value={v.reference1Mobile} onChange={(e) => set({ reference1Mobile: e.target.value })} />
-          <TextField fullWidth label="Relacion referencia 1" value={v.reference1Relationship} onChange={(e) => set({ reference1Relationship: e.target.value })} />
-        </FieldGrid>
-        <FieldGrid columns={3}>
-          <TextField fullWidth label="Referencia 2" value={v.reference2Name} onChange={(e) => set({ reference2Name: e.target.value })} />
-          <TextField fullWidth label="Celular referencia 2" value={v.reference2Mobile} onChange={(e) => set({ reference2Mobile: e.target.value })} />
-          <TextField fullWidth label="Relacion referencia 2" value={v.reference2Relationship} onChange={(e) => set({ reference2Relationship: e.target.value })} />
-        </FieldGrid>
-        <TextField select label="Negocio pipeline" value={v.dealId} onChange={(e) => set({ dealId: e.target.value })}><MenuItem value="">Sin negocio</MenuItem>{deals.map((x) => <MenuItem key={x.id} value={x.id}>{x.title}</MenuItem>)}</TextField>
-        <TextField select label="Estado" value={v.status} onChange={(e) => set({ status: Number(e.target.value) })}>{creditStatusOptions.map((x) => <MenuItem key={x} value={x}>{creditStatus(x)}</MenuItem>)}</TextField>
-        <TextField label="Observaciones" value={v.notes} onChange={(e) => set({ notes: e.target.value })} multiline minRows={2} />
-        {selectedCustomer && <Alert severity="info">Cliente seleccionado: {selectedCustomer.firstNames || selectedCustomer.name} {selectedCustomer.lastNames}</Alert>}
+        <Paper variant="outlined" sx={{ p: 2, bgcolor: '#fbfdff' }}>
+          <Stack spacing={2}>
+            <Typography variant="subtitle1" fontWeight={900}>Origen y cliente</Typography>
+            <FieldGrid columns={3}>
+              <TextField select label="Cotizacion" value={v.quoteId} onChange={(e) => {
+                const selected = quotes.find((x) => x.id === e.target.value);
+                set({
+                  quoteId: e.target.value,
+                  customerId: selected?.customerId ?? v.customerId,
+                  productId: selected?.productId ?? v.productId,
+                  identificationType: selected?.identificationType ?? v.identificationType,
+                  identificationNumber: selected?.identificationNumber ?? v.identificationNumber,
+                  motorcycleValue: selected?.productPrice ?? v.motorcycleValue,
+                  downPayment: selected?.downPayment ?? v.downPayment,
+                  termMonths: selected?.termMonths ?? v.termMonths
+                });
+              }}>
+                <MenuItem value="">Sin cotizacion</MenuItem>
+                {quotes.map((x) => <MenuItem key={x.id} value={x.id}>{x.number} - {fullFirstNames(x.customerFirstName, x.customerMiddleName, x.customerFirstNames)} {fullLastNames(x.customerLastName, x.customerSecondLastName, x.customerLastNames)}</MenuItem>)}
+              </TextField>
+              <TextField required select label="Cliente" value={v.customerId} onChange={(e) => set({ customerId: e.target.value })}>{customers.map((x) => <MenuItem key={x.id} value={x.id}>{x.firstNames || x.name} {x.lastNames}</MenuItem>)}</TextField>
+              <TextField select label="Negocio pipeline" value={v.dealId} onChange={(e) => set({ dealId: e.target.value })}><MenuItem value="">Sin negocio</MenuItem>{deals.map((x) => <MenuItem key={x.id} value={x.id}>{x.title}</MenuItem>)}</TextField>
+            </FieldGrid>
+            <Box sx={{
+              display: 'grid',
+              gridTemplateColumns: { xs: '1fr', md: '260px minmax(260px, 1fr) auto' },
+              gap: 1.5,
+              alignItems: 'center'
+            }}>
+              <TextField fullWidth required select label="Tipo identificacion" value={v.identificationType} onChange={(e) => set({ identificationType: Number(e.target.value) })}>{identificationOptions.map((option) => <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>)}</TextField>
+              <TextField fullWidth required label="Numero identificacion" value={v.identificationNumber} onChange={(e) => set({ identificationNumber: e.target.value })} />
+              <IdentificationLookupAdornment identification={v.identificationNumber} inline />
+            </Box>
+            <FieldGrid columns={4}>
+              <TextField fullWidth label="Fecha nacimiento" type="date" value={v.birthDate} onChange={(e) => set({ birthDate: e.target.value })} InputLabelProps={{ shrink: true }} />
+              <TextField fullWidth required label="Celular / WhatsApp" value={v.mobile} onChange={(e) => set({ mobile: e.target.value })} />
+              <TextField fullWidth label="Direccion" value={v.address} onChange={(e) => set({ address: e.target.value })} />
+              <TextField fullWidth label="Ciudad" value={v.city} onChange={(e) => set({ city: e.target.value })} />
+            </FieldGrid>
+            {selectedCustomer && <Alert severity="info">Cliente seleccionado: {selectedCustomer.firstNames || selectedCustomer.name} {selectedCustomer.lastNames}</Alert>}
+          </Stack>
+        </Paper>
+
+        <Paper variant="outlined" sx={{ p: 2, bgcolor: '#f8fafc' }}>
+          <Stack spacing={2}>
+            <Typography variant="subtitle1" fontWeight={900}>Producto y credito</Typography>
+            <Box sx={{
+              display: 'grid',
+              gridTemplateColumns: { xs: '1fr', md: 'minmax(280px, 1.6fr) repeat(4, minmax(130px, 1fr))' },
+              gap: 1.5
+            }}>
+              <TextField required select label="Producto principal" value={v.productId} onChange={(e) => {
+                const product = products.find((x) => x.id === e.target.value);
+                set({ productId: e.target.value, motorcycleValue: product?.price ?? v.motorcycleValue });
+              }}>{products.map((x) => <MenuItem key={x.id} value={x.id}>{productName(x)} ({x.category}) - {money(x.price)}</MenuItem>)}</TextField>
+              <TextField fullWidth label="Ingresos" type="number" value={v.monthlyIncome} onChange={(e) => set({ monthlyIncome: Number(e.target.value) })} />
+              <TextField fullWidth label="Cuota inicial" type="number" value={v.downPayment} onChange={(e) => set({ downPayment: Number(e.target.value) })} />
+              <TextField fullWidth label="Plazo meses" type="number" value={v.termMonths} onChange={(e) => set({ termMonths: Number(e.target.value) })} />
+              <TextField fullWidth label="Valor producto" type="number" value={v.motorcycleValue || selectedQuote?.productPrice || selectedProduct?.price || 0} onChange={(e) => set({ motorcycleValue: Number(e.target.value) })} />
+            </Box>
+            <TextField label="Ocupacion" value={v.occupation} onChange={(e) => set({ occupation: e.target.value })} />
+          </Stack>
+        </Paper>
+
+        <Paper variant="outlined" sx={{ p: 2, bgcolor: '#fbfdff' }}>
+          <Stack spacing={2}>
+            <Typography variant="subtitle1" fontWeight={900}>Codeudor y referencias</Typography>
+            <FieldGrid columns={4}>
+              <TextField fullWidth label="Nombre codeudor" value={v.coDebtorName} onChange={(e) => set({ coDebtorName: e.target.value })} />
+              <TextField fullWidth label="Identificacion codeudor" value={v.coDebtorIdentification} onChange={(e) => set({ coDebtorIdentification: e.target.value })} />
+              <TextField fullWidth label="Celular codeudor" value={v.coDebtorMobile} onChange={(e) => set({ coDebtorMobile: e.target.value })} />
+              <TextField fullWidth label="Parentesco / relacion" value={v.coDebtorRelationship} onChange={(e) => set({ coDebtorRelationship: e.target.value })} />
+            </FieldGrid>
+            <Box sx={{ maxWidth: { md: 260 } }}>
+              <TextField fullWidth label="Ingresos codeudor" type="number" value={v.coDebtorMonthlyIncome} onChange={(e) => set({ coDebtorMonthlyIncome: Number(e.target.value) })} />
+            </Box>
+            <FieldGrid columns={3}>
+              <TextField fullWidth label="Referencia 1" value={v.reference1Name} onChange={(e) => set({ reference1Name: e.target.value })} />
+              <TextField fullWidth label="Celular referencia 1" value={v.reference1Mobile} onChange={(e) => set({ reference1Mobile: e.target.value })} />
+              <TextField fullWidth label="Relacion referencia 1" value={v.reference1Relationship} onChange={(e) => set({ reference1Relationship: e.target.value })} />
+            </FieldGrid>
+            <FieldGrid columns={3}>
+              <TextField fullWidth label="Referencia 2" value={v.reference2Name} onChange={(e) => set({ reference2Name: e.target.value })} />
+              <TextField fullWidth label="Celular referencia 2" value={v.reference2Mobile} onChange={(e) => set({ reference2Mobile: e.target.value })} />
+              <TextField fullWidth label="Relacion referencia 2" value={v.reference2Relationship} onChange={(e) => set({ reference2Relationship: e.target.value })} />
+            </FieldGrid>
+          </Stack>
+        </Paper>
+
+        <Paper variant="outlined" sx={{ p: 2, bgcolor: '#f8fafc' }}>
+          <Stack spacing={2}>
+            <Typography variant="subtitle1" fontWeight={900}>Gestion</Typography>
+            <FieldGrid>
+              <TextField select label="Estado" value={v.status} onChange={(e) => set({ status: Number(e.target.value) })}>{creditStatusOptions.map((x) => <MenuItem key={x} value={x}>{creditStatus(x)}</MenuItem>)}</TextField>
+              <TextField label="Observaciones" value={v.notes} onChange={(e) => set({ notes: e.target.value })} multiline minRows={2} />
+            </FieldGrid>
+          </Stack>
+        </Paper>
       </>;
     }}
   </FormDialog>;

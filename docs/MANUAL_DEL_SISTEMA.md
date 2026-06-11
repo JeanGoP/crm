@@ -1,7 +1,7 @@
 # Manual de usuario - CRM Comercial
 
 Ultima actualizacion: 2026-06-11  
-Version del manual: 6.2
+Version del manual: 6.3
 Sistema: CRM para gestion comercial y ventas a credito  
 
 ## 1. Bienvenida
@@ -283,6 +283,8 @@ Explique al cliente que la cuota es aproximada y puede cambiar segun la aprobaci
 
 Este modulo permite gestionar el proceso de credito del cliente despues de una cotizacion o negocio interesado.
 
+El formulario esta organizado por bloques: origen y cliente, producto y credito, codeudor y referencias, y gestion. Esto permite revisar la solicitud de forma mas rapida antes de guardarla.
+
 ### Crear o revisar una solicitud
 
 1. Entre a **Solicitudes de credito**.
@@ -538,6 +540,7 @@ El sistema muestra mensajes cuando algo no puede completarse.
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-06-11 | 6.3 | Se reorganiza la solicitud de credito en bloques horizontales para capturar cliente, producto, credito, codeudor, referencias y gestion con mayor orden. |
 | 2026-06-11 | 6.2 | Se reorganiza el formulario de cotizacion en una vista mas horizontal para capturar datos del cliente y varios articulos con mayor claridad. |
 | 2026-06-10 | 6.1 | Las cotizaciones permiten agregar varios articulos y el PDF muestra un comparativo cuando hay mas de un producto. |
 | 2026-06-10 | 6.0 | El PDF de cotizacion adopta un formato comercial con logo/nombre de empresa, datos del cliente, tabla de cuotas, desglose del credito, requisitos y autorizacion de datos. |
