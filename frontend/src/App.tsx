@@ -1901,15 +1901,15 @@ function QuoteDialog({ form, products, onClose, onSave }: DialogProps<Quote, typ
       };
       return <>
         <Paper variant="outlined" sx={{ p: 2, bgcolor: '#fbfdff' }}>
-          <Stack spacing={1.5}>
-            <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', sm: 'center' }} gap={1}>
-              <Typography variant="subtitle1" fontWeight={900}>Datos del cliente</Typography>
-              <Button variant="outlined" startIcon={<AutoAwesome />} disabled={identityLoading || !identificationDigits(v.identificationNumber)} onClick={() => void lookupIdentity(v, set)}>
-                {identityLoading ? 'Consultando...' : 'Consultar'}
-              </Button>
-            </Stack>
+          <Stack spacing={2}>
+            <Typography variant="subtitle1" fontWeight={900}>Datos del cliente</Typography>
             {identityNotice && <Alert severity={identityNotice.type === 'success' ? 'success' : identityNotice.type === 'info' ? 'info' : 'error'}>{identityNotice.text}</Alert>}
-            <FieldGrid columns={4}>
+            <Box sx={{
+              display: 'grid',
+              gridTemplateColumns: { xs: '1fr', md: '260px minmax(280px, 1fr) auto' },
+              gap: 1.5,
+              alignItems: 'center'
+            }}>
               <TextField required select label="Tipo identificacion" value={v.identificationType} onChange={(e) => set({ identificationType: Number(e.target.value) })}>
                 {identificationOptions.map((option) => <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>)}
               </TextField>
@@ -1917,17 +1917,29 @@ function QuoteDialog({ form, products, onClose, onSave }: DialogProps<Quote, typ
                 label="Numero identificacion"
                 value={v.identificationNumber}
                 onChange={(e) => set({ identificationNumber: e.target.value })}
-                InputProps={{ endAdornment: <IdentificationLookupAdornment identification={v.identificationNumber} /> }}
               />
+              <Stack direction="row" spacing={1} alignItems="center" justifyContent={{ xs: 'stretch', md: 'flex-end' }}>
+                <Button sx={{ flex: { xs: 1, md: '0 0 auto' } }} variant="contained" startIcon={<AutoAwesome />} disabled={identityLoading || !identificationDigits(v.identificationNumber)} onClick={() => void lookupIdentity(v, set)}>
+                  {identityLoading ? 'Consultando...' : 'Consultar'}
+                </Button>
+                <IdentificationLookupAdornment identification={v.identificationNumber} inline />
+              </Stack>
+            </Box>
+            <FieldGrid columns={4}>
               <TextField fullWidth required label="Primer nombre" value={v.customerFirstName} onChange={(e) => set({ customerFirstName: e.target.value, customerFirstNames: fullFirstNames(e.target.value, v.customerMiddleName) })} />
               <TextField fullWidth label="Segundo nombre" value={v.customerMiddleName} onChange={(e) => set({ customerMiddleName: e.target.value, customerFirstNames: fullFirstNames(v.customerFirstName, e.target.value) })} />
-            </FieldGrid>
-            <FieldGrid columns={4}>
               <TextField fullWidth required label="Primer apellido" value={v.customerLastName} onChange={(e) => set({ customerLastName: e.target.value, customerLastNames: fullLastNames(e.target.value, v.customerSecondLastName) })} />
               <TextField fullWidth label="Segundo apellido" value={v.customerSecondLastName} onChange={(e) => set({ customerSecondLastName: e.target.value, customerLastNames: fullLastNames(v.customerLastName, e.target.value) })} />
+            </FieldGrid>
+            <Box sx={{
+              display: 'grid',
+              gridTemplateColumns: { xs: '1fr', sm: '140px minmax(260px, 1fr)' },
+              gap: 1.5,
+              maxWidth: { md: 620 }
+            }}>
               <TextField fullWidth required label="Indicativo" value={v.phoneCountryCode} onChange={(e) => set({ phoneCountryCode: e.target.value })} />
               <TextField fullWidth required label="Telefono / WhatsApp" value={v.phoneNumber} onChange={(e) => set({ phoneNumber: e.target.value })} />
-            </FieldGrid>
+            </Box>
           </Stack>
         </Paper>
         <Stack spacing={1.5}>
@@ -2815,14 +2827,13 @@ async function normalizeCompanyLogo(file: File) {
   context.drawImage(image, x, y, width, height);
   return canvas.toDataURL('image/png');
 }
-function IdentificationLookupAdornment({ identification }: { identification?: string }) {
+function IdentificationLookupAdornment({ identification, inline = false }: { identification?: string; inline?: boolean }) {
   const digits = identificationDigits(identification);
-  return <InputAdornment position="end">
-    <Stack direction="row" spacing={.5}>
-      <Button size="small" variant="outlined" disabled={!digits} onClick={() => void openExternalLookup(simitUrl, digits)}>Simit</Button>
-      <Button size="small" variant="outlined" disabled={!digits} onClick={() => void openExternalLookup(runtUrl, digits)}>Runt</Button>
-    </Stack>
-  </InputAdornment>;
+  const buttons = <Stack direction="row" spacing={.5}>
+    <Button size="small" variant="outlined" disabled={!digits} onClick={() => void openExternalLookup(simitUrl, digits)}>Simit</Button>
+    <Button size="small" variant="outlined" disabled={!digits} onClick={() => void openExternalLookup(runtUrl, digits)}>Runt</Button>
+  </Stack>;
+  return inline ? buttons : <InputAdornment position="end">{buttons}</InputAdornment>;
 }
 function timelineColor(tone: CustomerTimelineItem['tone']) {
   if (tone === 'success') return '#15803d';
