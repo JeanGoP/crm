@@ -1,7 +1,7 @@
 # Manual de usuario - CRM Comercial
 
-Ultima actualizacion: 2026-06-10  
-Version del manual: 6.1
+Ultima actualizacion: 2026-06-11  
+Version del manual: 6.2
 Sistema: CRM para gestion comercial y ventas a credito  
 
 ## 1. Bienvenida
@@ -209,6 +209,8 @@ Mantenga precios, modelos y estados actualizados. Una cotizacion depende de que 
 ### Para que sirve
 
 Cotizaciones permite generar una propuesta comercial para un cliente. Es uno de los puntos principales del proceso de venta.
+
+El formulario esta organizado en una vista amplia: primero se capturan los datos del cliente y luego los articulos a cotizar, cada uno con producto, foto, cuota inicial, numero de cuotas, seguro, gastos y cuota aproximada.
 
 ### Crear una cotizacion
 
@@ -536,6 +538,7 @@ El sistema muestra mensajes cuando algo no puede completarse.
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-06-11 | 6.2 | Se reorganiza el formulario de cotizacion en una vista mas horizontal para capturar datos del cliente y varios articulos con mayor claridad. |
 | 2026-06-10 | 6.1 | Las cotizaciones permiten agregar varios articulos y el PDF muestra un comparativo cuando hay mas de un producto. |
 | 2026-06-10 | 6.0 | El PDF de cotizacion adopta un formato comercial con logo/nombre de empresa, datos del cliente, tabla de cuotas, desglose del credito, requisitos y autorizacion de datos. |
 | 2026-06-10 | 5.9 | El analisis comercial con IA permite enviar el mensaje sugerido por WhatsApp con el texto listo para el cliente. |

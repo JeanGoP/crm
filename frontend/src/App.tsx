@@ -1882,7 +1882,7 @@ function QuoteDialog({ form, products, onClose, onSave }: DialogProps<Quote, typ
     }
   };
 
-  return <FormDialog title="Nueva cotizacion" open={form.open} initial={initial} onClose={onClose} onSave={onSave}>
+  return <FormDialog title="Nueva cotizacion" open={form.open} initial={initial} onClose={onClose} onSave={onSave} maxWidth="lg">
     {(v, set) => {
       const quoteItems = v.items?.length ? v.items : [{ ...emptyQuoteItem, productId: v.productId }];
       const updateItem = (index: number, patch: Partial<typeof emptyQuoteItem>) => {
@@ -1900,34 +1900,36 @@ function QuoteDialog({ form, products, onClose, onSave }: DialogProps<Quote, typ
         set({ items: normalized, productId: normalized[0]?.productId ?? '' });
       };
       return <>
-        <TextField required select label="Tipo de identificacion" value={v.identificationType} onChange={(e) => set({ identificationType: Number(e.target.value) })}>
-          {identificationOptions.map((option) => <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>)}
-        </TextField>
-        <TextField
-          label="Numero de identificacion"
-          value={v.identificationNumber}
-          onChange={(e) => set({ identificationNumber: e.target.value })}
-          InputProps={{ endAdornment: <IdentificationLookupAdornment identification={v.identificationNumber} /> }}
-        />
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ xs: 'stretch', sm: 'center' }}>
-          <Button variant="outlined" startIcon={<AutoAwesome />} disabled={identityLoading || !identificationDigits(v.identificationNumber)} onClick={() => void lookupIdentity(v, set)}>
-            {identityLoading ? 'Consultando...' : 'Consultar'}
-          </Button>
-          <Typography variant="caption" color="text.secondary">Primero busca en el CRM; si no existe, consulta el proveedor externo.</Typography>
-        </Stack>
-        {identityNotice && <Alert severity={identityNotice.type === 'success' ? 'success' : identityNotice.type === 'info' ? 'info' : 'error'}>{identityNotice.text}</Alert>}
-        <FieldGrid>
-          <TextField fullWidth required label="Primer nombre" value={v.customerFirstName} onChange={(e) => set({ customerFirstName: e.target.value, customerFirstNames: fullFirstNames(e.target.value, v.customerMiddleName) })} />
-          <TextField fullWidth label="Segundo nombre" value={v.customerMiddleName} onChange={(e) => set({ customerMiddleName: e.target.value, customerFirstNames: fullFirstNames(v.customerFirstName, e.target.value) })} />
-        </FieldGrid>
-        <FieldGrid>
-          <TextField fullWidth required label="Primer apellido" value={v.customerLastName} onChange={(e) => set({ customerLastName: e.target.value, customerLastNames: fullLastNames(e.target.value, v.customerSecondLastName) })} />
-          <TextField fullWidth label="Segundo apellido" value={v.customerSecondLastName} onChange={(e) => set({ customerSecondLastName: e.target.value, customerLastNames: fullLastNames(v.customerLastName, e.target.value) })} />
-        </FieldGrid>
-        <FieldGrid columns={3}>
-          <TextField fullWidth required label="Indicativo" value={v.phoneCountryCode} onChange={(e) => set({ phoneCountryCode: e.target.value })} />
-          <TextField fullWidth required label="Telefono / WhatsApp" value={v.phoneNumber} onChange={(e) => set({ phoneNumber: e.target.value })} sx={{ gridColumn: { sm: 'span 2' } }} />
-        </FieldGrid>
+        <Paper variant="outlined" sx={{ p: 2, bgcolor: '#fbfdff' }}>
+          <Stack spacing={1.5}>
+            <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', sm: 'center' }} gap={1}>
+              <Typography variant="subtitle1" fontWeight={900}>Datos del cliente</Typography>
+              <Button variant="outlined" startIcon={<AutoAwesome />} disabled={identityLoading || !identificationDigits(v.identificationNumber)} onClick={() => void lookupIdentity(v, set)}>
+                {identityLoading ? 'Consultando...' : 'Consultar'}
+              </Button>
+            </Stack>
+            {identityNotice && <Alert severity={identityNotice.type === 'success' ? 'success' : identityNotice.type === 'info' ? 'info' : 'error'}>{identityNotice.text}</Alert>}
+            <FieldGrid columns={4}>
+              <TextField required select label="Tipo identificacion" value={v.identificationType} onChange={(e) => set({ identificationType: Number(e.target.value) })}>
+                {identificationOptions.map((option) => <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>)}
+              </TextField>
+              <TextField
+                label="Numero identificacion"
+                value={v.identificationNumber}
+                onChange={(e) => set({ identificationNumber: e.target.value })}
+                InputProps={{ endAdornment: <IdentificationLookupAdornment identification={v.identificationNumber} /> }}
+              />
+              <TextField fullWidth required label="Primer nombre" value={v.customerFirstName} onChange={(e) => set({ customerFirstName: e.target.value, customerFirstNames: fullFirstNames(e.target.value, v.customerMiddleName) })} />
+              <TextField fullWidth label="Segundo nombre" value={v.customerMiddleName} onChange={(e) => set({ customerMiddleName: e.target.value, customerFirstNames: fullFirstNames(v.customerFirstName, e.target.value) })} />
+            </FieldGrid>
+            <FieldGrid columns={4}>
+              <TextField fullWidth required label="Primer apellido" value={v.customerLastName} onChange={(e) => set({ customerLastName: e.target.value, customerLastNames: fullLastNames(e.target.value, v.customerSecondLastName) })} />
+              <TextField fullWidth label="Segundo apellido" value={v.customerSecondLastName} onChange={(e) => set({ customerSecondLastName: e.target.value, customerLastNames: fullLastNames(v.customerLastName, e.target.value) })} />
+              <TextField fullWidth required label="Indicativo" value={v.phoneCountryCode} onChange={(e) => set({ phoneCountryCode: e.target.value })} />
+              <TextField fullWidth required label="Telefono / WhatsApp" value={v.phoneNumber} onChange={(e) => set({ phoneNumber: e.target.value })} />
+            </FieldGrid>
+          </Stack>
+        </Paper>
         <Stack spacing={1.5}>
           <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', sm: 'center' }} gap={1}>
             <Box>
@@ -1944,26 +1946,27 @@ function QuoteDialog({ form, products, onClose, onSave }: DialogProps<Quote, typ
                   <Typography fontWeight={900}>Articulo {index + 1}</Typography>
                   {quoteItems.length > 1 && <Button color="error" size="small" startIcon={<Delete />} onClick={() => removeItem(index)}>Quitar</Button>}
                 </Stack>
-                <TextField required select label="Producto" value={item.productId} onChange={(e) => updateItem(index, { productId: e.target.value })}>
-                  {products.length ? products.map((product) => <MenuItem key={product.id} value={product.id}>{productName(product)} ({product.category}) - {money(product.price)}</MenuItem>) : <MenuItem value="">No hay productos activos</MenuItem>}
-                </TextField>
-                {selectedProduct && <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems={{ xs: 'stretch', sm: 'center' }}>
-                  <ProductPhotoThumb photo={(selectedProduct.photos ?? []).find((photo) => photo.isQuoteDefault) ?? (selectedProduct.photos ?? [])[0]} size={72} />
-                  <Typography variant="body2" color="text.secondary">
-                    {(selectedProduct.photos ?? []).some((photo) => photo.isQuoteDefault)
-                      ? 'Foto PDF configurada para este producto.'
-                      : 'Este producto no tiene foto principal configurada.'}
-                  </Typography>
-                </Stack>}
-                <FieldGrid columns={2}>
+                <Box sx={{
+                  display: 'grid',
+                  gridTemplateColumns: {
+                    xs: '1fr',
+                    md: 'minmax(260px, 1.55fr) 96px repeat(4, minmax(112px, 1fr)) minmax(170px, 1fr)'
+                  },
+                  gap: 1.5,
+                  alignItems: 'stretch'
+                }}>
+                  <TextField required select label="Producto" value={item.productId} onChange={(e) => updateItem(index, { productId: e.target.value })}>
+                    {products.length ? products.map((product) => <MenuItem key={product.id} value={product.id}>{productName(product)} ({product.category}) - {money(product.price)}</MenuItem>) : <MenuItem value="">No hay productos activos</MenuItem>}
+                  </TextField>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: { xs: 'flex-start', md: 'center' } }}>
+                    <ProductPhotoThumb photo={(selectedProduct?.photos ?? []).find((photo) => photo.isQuoteDefault) ?? (selectedProduct?.photos ?? [])[0]} size={72} />
+                  </Box>
                   <TextField fullWidth label="Cuota inicial" type="number" value={item.downPayment} onChange={(e) => updateItem(index, { downPayment: Number(e.target.value) })} />
-                  <TextField fullWidth label="Numero de cuotas" type="number" value={item.termMonths} onChange={(e) => updateItem(index, { termMonths: Number(e.target.value) })} />
-                </FieldGrid>
-                <FieldGrid columns={2}>
+                  <TextField fullWidth label="Cuotas" type="number" value={item.termMonths} onChange={(e) => updateItem(index, { termMonths: Number(e.target.value) })} />
                   <TextField fullWidth label="Seguro" type="number" value={item.insurance} onChange={(e) => updateItem(index, { insurance: Number(e.target.value) })} />
-                  <TextField fullWidth label="Gastos administrativos" type="number" value={item.administrativeFees} onChange={(e) => updateItem(index, { administrativeFees: Number(e.target.value) })} />
-                </FieldGrid>
-                <QuoteSimulationPreview value={item} selectedProduct={selectedProduct} />
+                  <TextField fullWidth label="Gastos adm." type="number" value={item.administrativeFees} onChange={(e) => updateItem(index, { administrativeFees: Number(e.target.value) })} />
+                  <QuoteSimulationPreview value={item} selectedProduct={selectedProduct} compact />
+                </Box>
               </Stack>
             </Paper>;
           })}
@@ -1974,7 +1977,7 @@ function QuoteDialog({ form, products, onClose, onSave }: DialogProps<Quote, typ
   </FormDialog>;
 }
 
-function QuoteSimulationPreview({ value, selectedProduct }: { value: typeof emptyQuoteItem; selectedProduct?: Product }) {
+function QuoteSimulationPreview({ value, selectedProduct, compact = false }: { value: typeof emptyQuoteItem; selectedProduct?: Product; compact?: boolean }) {
   const [simulation, setSimulation] = useState<QuoteSimulationResult>();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -2027,15 +2030,20 @@ function QuoteSimulationPreview({ value, selectedProduct }: { value: typeof empt
     usedCompanyFinancialSettings: false
   };
 
-  return <Paper variant="outlined" sx={{ p: 2, bgcolor: '#f8fafc' }}>
-    <Stack spacing={1.5}>
+  return <Paper variant="outlined" sx={{ p: compact ? 1.25 : 2, bgcolor: compact ? '#ffffff' : '#f8fafc', height: '100%' }}>
+    <Stack spacing={compact ? 0.75 : 1.5}>
       {loading && <LinearProgress />}
       {error && <Alert severity="warning">{error}</Alert>}
-      <FieldGrid columns={3}>
-        <Box><Typography variant="caption" color="text.secondary">Valor producto</Typography><Typography fontWeight={700}>{money(productPrice)}</Typography></Box>
-        <Box><Typography variant="caption" color="text.secondary">Total financiado</Typography><Typography fontWeight={700}>{money(preview.financedAmount)}</Typography></Box>
-        <Box><Typography variant="caption" color="text.secondary">Cuota aproximada</Typography><Typography fontWeight={700}>{money(preview.estimatedMonthlyPayment)}</Typography></Box>
-      </FieldGrid>
+      {compact
+        ? <Stack spacing={0.5}>
+          <Box><Typography variant="caption" color="text.secondary">Financiado</Typography><Typography fontWeight={800}>{money(preview.financedAmount)}</Typography></Box>
+          <Box><Typography variant="caption" color="text.secondary">Cuota aprox.</Typography><Typography fontWeight={800}>{money(preview.estimatedMonthlyPayment)}</Typography></Box>
+        </Stack>
+        : <FieldGrid columns={3}>
+          <Box><Typography variant="caption" color="text.secondary">Valor producto</Typography><Typography fontWeight={700}>{money(productPrice)}</Typography></Box>
+          <Box><Typography variant="caption" color="text.secondary">Total financiado</Typography><Typography fontWeight={700}>{money(preview.financedAmount)}</Typography></Box>
+          <Box><Typography variant="caption" color="text.secondary">Cuota aproximada</Typography><Typography fontWeight={700}>{money(preview.estimatedMonthlyPayment)}</Typography></Box>
+        </FieldGrid>}
     </Stack>
   </Paper>;
 }
@@ -2449,7 +2457,7 @@ function RescheduleActivityDialog({ activity, onClose, onSave }: { activity?: Ac
 
 type DialogProps<TItem, TPayload> = { form: FormMode<TItem>; onClose: () => void; onSave: (payload: TPayload) => Promise<void> };
 
-function FieldGrid({ children, columns = 2 }: { children: ReactNode; columns?: 2 | 3 }) {
+function FieldGrid({ children, columns = 2 }: { children: ReactNode; columns?: 2 | 3 | 4 }) {
   return <Box sx={{
     display: 'grid',
     gridTemplateColumns: { xs: '1fr', sm: `repeat(${columns}, minmax(0, 1fr))` },
@@ -2462,7 +2470,7 @@ function SectionTitle({ title }: { title: string }) {
   return <Typography variant="subtitle2" fontWeight={900} color="primary" sx={{ mt: 1 }}>{title}</Typography>;
 }
 
-function FormDialog<T extends Record<string, unknown>>({ title, open, initial, children, onClose, onSave }: { title: string; open: boolean; initial: T; children: (value: T, set: (patch: Partial<T>) => void) => ReactNode; onClose: () => void; onSave: (payload: T) => Promise<void> }) {
+function FormDialog<T extends Record<string, unknown>>({ title, open, initial, children, onClose, onSave, maxWidth = 'sm' }: { title: string; open: boolean; initial: T; children: (value: T, set: (patch: Partial<T>) => void) => ReactNode; onClose: () => void; onSave: (payload: T) => Promise<void>; maxWidth?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' }) {
   const muiTheme = useTheme();
   const fullScreen = useMediaQuery(muiTheme.breakpoints.down('sm'));
   const [value, setValue] = useState(initial);
@@ -2488,7 +2496,7 @@ function FormDialog<T extends Record<string, unknown>>({ title, open, initial, c
     }
   };
 
-  return <Dialog open={open} onClose={saving ? undefined : onClose} fullWidth maxWidth="sm" fullScreen={fullScreen}>
+  return <Dialog open={open} onClose={saving ? undefined : onClose} fullWidth maxWidth={maxWidth} fullScreen={fullScreen}>
     <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1 }}>{title}<IconButton onClick={onClose}><Close /></IconButton></DialogTitle>
     <DialogContent sx={{ px: { xs: 2, sm: 3 } }}><Stack spacing={2} sx={{ pt: 1 }}>{error && <Alert severity="error">{error}</Alert>}{children(value, (patch) => setValue((prev) => ({ ...prev, ...patch })))}</Stack></DialogContent>
     <DialogActions sx={{ px: { xs: 2, sm: 3 }, pb: { xs: 2, sm: 1 }, flexWrap: 'wrap' }}><Button onClick={onClose} disabled={saving}>Cancelar</Button><Button variant="contained" onClick={save} disabled={saving}>{saving ? 'Guardando...' : 'Guardar'}</Button></DialogActions>
