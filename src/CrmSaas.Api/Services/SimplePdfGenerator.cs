@@ -425,36 +425,44 @@ public static class SimplePdfGenerator
             commands.AppendLine("q 138 0 0 82 237 480 cm /Product Do Q");
         }
 
-        DrawPanel(commands, 46, 332, 250, 214, "CUOTAS APROXIMADAS");
-        KeyValue(commands, 62, 512, "Precio", Money(quote.ProductPrice), 82, 140);
-        KeyValue(commands, 62, 490, "Cuota inicial", Money(quote.DownPayment), 82, 140);
-        commands.AppendLine("0.90 0.94 0.96 rg 62 458 216 22 re f");
-        commands.AppendLine("0.09 0.11 0.15 rg BT /F2 8 Tf 76 466 Td (PLAZO) Tj ET");
-        commands.AppendLine("0.09 0.11 0.15 rg BT /F2 8 Tf 154 466 Td (CUOTA) Tj ET");
-        var terms = new[] { 1, 6, 12, 18, 24, 30, 36 };
-        var termY = 440;
-        foreach (var term in terms)
+        var quoteItems = quote.Items.Count > 0 ? quote.Items.OrderBy(x => x.Order).ToList() : [];
+        if (quoteItems.Count > 1)
         {
-            var payment = term == quote.TermMonths ? quote.EstimatedMonthlyPayment : EstimatePaymentForTerm(quote.FinancedAmount, term, quote.MonthlyInterestRate);
-            var isSelected = term == quote.TermMonths;
-            if (isSelected) commands.AppendLine($"0.90 0.97 0.94 rg 62 {termY - 5} 216 20 re f");
-            commands.AppendLine($"0.08 0.10 0.14 rg BT /F{(isSelected ? "2" : "1")} 10 Tf 80 {termY} Td ({term} meses) Tj ET");
-            commands.AppendLine($"0.08 0.10 0.14 rg BT /F{(isSelected ? "2" : "1")} 10 Tf 154 {termY} Td ({Escape(Money(payment))}) Tj ET");
-            termY -= 22;
+            DrawComparison(commands, 46, 332, quoteItems);
         }
+        else
+        {
+            DrawPanel(commands, 46, 332, 250, 214, "CUOTAS APROXIMADAS");
+            KeyValue(commands, 62, 512, "Precio", Money(quote.ProductPrice), 82, 140);
+            KeyValue(commands, 62, 490, "Cuota inicial", Money(quote.DownPayment), 82, 140);
+            commands.AppendLine("0.90 0.94 0.96 rg 62 458 216 22 re f");
+            commands.AppendLine("0.09 0.11 0.15 rg BT /F2 8 Tf 76 466 Td (PLAZO) Tj ET");
+            commands.AppendLine("0.09 0.11 0.15 rg BT /F2 8 Tf 154 466 Td (CUOTA) Tj ET");
+            var terms = new[] { 1, 6, 12, 18, 24, 30, 36 };
+            var termY = 440;
+            foreach (var term in terms)
+            {
+                var payment = term == quote.TermMonths ? quote.EstimatedMonthlyPayment : EstimatePaymentForTerm(quote.FinancedAmount, term, quote.MonthlyInterestRate);
+                var isSelected = term == quote.TermMonths;
+                if (isSelected) commands.AppendLine($"0.90 0.97 0.94 rg 62 {termY - 5} 216 20 re f");
+                commands.AppendLine($"0.08 0.10 0.14 rg BT /F{(isSelected ? "2" : "1")} 10 Tf 80 {termY} Td ({term} meses) Tj ET");
+                commands.AppendLine($"0.08 0.10 0.14 rg BT /F{(isSelected ? "2" : "1")} 10 Tf 154 {termY} Td ({Escape(Money(payment))}) Tj ET");
+                termY -= 22;
+            }
 
-        DrawPanel(commands, 316, 332, 250, 214, "RESUMEN DEL CREDITO");
-        var creditBase = Math.Max(quote.ProductPrice - quote.DownPayment, 0);
-        CreditRow(commands, 332, 512, "Valor a financiar", Money(creditBase));
-        CreditRow(commands, 332, 488, "SOAT / Seguro", Money(quote.Insurance));
-        CreditRow(commands, 332, 464, "Gastos / Matricula", Money(quote.AdministrativeFees));
-        CreditRow(commands, 332, 440, "Otros", Money(0));
-        commands.AppendLine("0.082 0.373 0.459 rg 332 396 218 38 re f");
-        commands.AppendLine($"1 1 1 rg BT /F2 10 Tf 346 419 Td (Total credito) Tj ET");
-        commands.AppendLine($"1 1 1 rg BT /F2 12 Tf 446 419 Td ({Escape(Money(quote.FinancedAmount))}) Tj ET");
-        commands.AppendLine($"1 1 1 rg BT /F1 9 Tf 346 404 Td (Cuota seleccionada: {quote.TermMonths} meses - {Escape(Money(quote.EstimatedMonthlyPayment))}) Tj ET");
-        KeyValue(commands, 332, 370, "Total estimado", Money(quote.EstimatedTotalPayment), 88, 130);
-        KeyValue(commands, 332, 350, "Tasa mensual", $"{quote.MonthlyInterestRate:N3}%", 88, 130);
+            DrawPanel(commands, 316, 332, 250, 214, "RESUMEN DEL CREDITO");
+            var creditBase = Math.Max(quote.ProductPrice - quote.DownPayment, 0);
+            CreditRow(commands, 332, 512, "Valor a financiar", Money(creditBase));
+            CreditRow(commands, 332, 488, "SOAT / Seguro", Money(quote.Insurance));
+            CreditRow(commands, 332, 464, "Gastos / Matricula", Money(quote.AdministrativeFees));
+            CreditRow(commands, 332, 440, "Otros", Money(0));
+            commands.AppendLine("0.082 0.373 0.459 rg 332 396 218 38 re f");
+            commands.AppendLine($"1 1 1 rg BT /F2 10 Tf 346 419 Td (Total credito) Tj ET");
+            commands.AppendLine($"1 1 1 rg BT /F2 12 Tf 446 419 Td ({Escape(Money(quote.FinancedAmount))}) Tj ET");
+            commands.AppendLine($"1 1 1 rg BT /F1 9 Tf 346 404 Td (Cuota seleccionada: {quote.TermMonths} meses - {Escape(Money(quote.EstimatedMonthlyPayment))}) Tj ET");
+            KeyValue(commands, 332, 370, "Total estimado", Money(quote.EstimatedTotalPayment), 88, 130);
+            KeyValue(commands, 332, 350, "Tasa mensual", $"{quote.MonthlyInterestRate:N3}%", 88, 130);
+        }
 
         DrawPanel(commands, 46, 190, 520, 112, "REQUISITOS GENERALES");
         RequirementColumn(commands, 62, 266, "Empleados", new[] { "Fotocopia Cedula", "Carta laboral o dos ultimas colillas", "Recibo de servicio publico" });
@@ -484,6 +492,37 @@ public static class SimplePdfGenerator
         commands.AppendLine($"1 1 1 rg {x} {y} {width} {height} re f");
         commands.AppendLine($"0.84 0.88 0.92 RG 0.8 w {x} {y} {width} {height} re S");
         commands.AppendLine($"0.082 0.373 0.459 rg BT /F2 10 Tf {x + 14} {y + height - 20} Td ({Escape(title)}) Tj ET");
+    }
+
+    private static void DrawComparison(StringBuilder commands, int x, int y, IReadOnlyCollection<QuoteItemDto> items)
+    {
+        DrawPanel(commands, x, y, 520, 214, "COMPARATIVO DE ARTICULOS");
+        commands.AppendLine($"0.90 0.94 0.96 rg {x + 16} {y + 158} 488 24 re f");
+        var headers = new[] { "Producto", "Precio", "Inicial", "Financiado", "Plazo", "Cuota" };
+        var columns = new[] { x + 24, x + 160, x + 232, x + 304, x + 386, x + 438 };
+        for (var i = 0; i < headers.Length; i++)
+        {
+            commands.AppendLine($"0.09 0.11 0.15 rg BT /F2 7 Tf {columns[i]} {y + 168} Td ({headers[i]}) Tj ET");
+        }
+
+        var rowY = y + 138;
+        foreach (var item in items.Take(4))
+        {
+            commands.AppendLine($"0.84 0.88 0.92 RG 0.4 w {x + 16} {rowY - 8} 488 24 re S");
+            commands.AppendLine($"0.08 0.10 0.14 rg BT /F2 8 Tf {columns[0]} {rowY} Td ({Escape(Shorten(item.ProductName, 26))}) Tj ET");
+            commands.AppendLine($"0.08 0.10 0.14 rg BT /F1 8 Tf {columns[1]} {rowY} Td ({Escape(Money(item.ProductPrice))}) Tj ET");
+            commands.AppendLine($"0.08 0.10 0.14 rg BT /F1 8 Tf {columns[2]} {rowY} Td ({Escape(Money(item.DownPayment))}) Tj ET");
+            commands.AppendLine($"0.08 0.10 0.14 rg BT /F1 8 Tf {columns[3]} {rowY} Td ({Escape(Money(item.FinancedAmount))}) Tj ET");
+            commands.AppendLine($"0.08 0.10 0.14 rg BT /F1 8 Tf {columns[4]} {rowY} Td ({item.TermMonths}) Tj ET");
+            commands.AppendLine($"0.08 0.10 0.14 rg BT /F2 8 Tf {columns[5]} {rowY} Td ({Escape(Money(item.EstimatedMonthlyPayment))}) Tj ET");
+            rowY -= 30;
+        }
+
+        var bestPayment = items.OrderBy(x => x.EstimatedMonthlyPayment).First();
+        var bestPrice = items.OrderBy(x => x.ProductPrice).First();
+        commands.AppendLine("0.082 0.373 0.459 rg " + (x + 16) + " " + (y + 18) + " 488 34 re f");
+        commands.AppendLine($"1 1 1 rg BT /F2 9 Tf {x + 30} {y + 38} Td (Menor cuota: {Escape(Shorten(bestPayment.ProductName, 28))} - {Escape(Money(bestPayment.EstimatedMonthlyPayment))}) Tj ET");
+        commands.AppendLine($"1 1 1 rg BT /F1 8 Tf {x + 30} {y + 24} Td (Menor precio: {Escape(Shorten(bestPrice.ProductName, 28))} - {Escape(Money(bestPrice.ProductPrice))}) Tj ET");
     }
 
     private static void KeyValue(StringBuilder commands, int x, int y, string label, string value, int labelWidth, int valueMaxChars)

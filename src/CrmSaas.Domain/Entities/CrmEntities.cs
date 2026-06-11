@@ -171,6 +171,27 @@ public sealed class Cotizacion : AuditableTenantEntity
     public DateTime FechaCotizacion { get; set; } = ColombiaTime.Now;
     public DateTime ValidaHasta { get; set; } = ColombiaTime.Now.AddDays(7);
     public string? Observaciones { get; set; }
+    public ICollection<CotizacionItem> Items { get; set; } = [];
+}
+
+public sealed class CotizacionItem : AuditableTenantEntity
+{
+    public Guid CotizacionId { get; set; }
+    public Cotizacion? Cotizacion { get; set; }
+    public Guid ProductoId { get; set; }
+    public Producto? Producto { get; set; }
+    public int Orden { get; set; }
+    public decimal PrecioProducto { get; set; }
+    public decimal CuotaInicial { get; set; }
+    public decimal Seguro { get; set; }
+    public decimal GastosAdministrativos { get; set; }
+    public int PlazoMeses { get; set; } = 24;
+    public decimal TasaInteresMensual { get; set; }
+    public decimal ValorFinanciado { get; set; }
+    public decimal CuotaMensualEstimada { get; set; }
+    public decimal TotalPagarEstimado { get; set; }
+    public string? TipoCredito { get; set; }
+    public bool UsoConfiguracionFinancieraEmpresa { get; set; }
 }
 
 public sealed class SolicitudCredito : AuditableTenantEntity

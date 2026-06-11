@@ -105,7 +105,8 @@ const emptyCompany = { name: '', subdomain: '', customDomain: '', logoDataUrl: '
 const emptyUser = { fullName: '', email: '', password: '', companyId: '', roles: ['Vendedor'] };
 const emptyProduct = { name: '', category: 'Moto', brand: '', model: '', reference: '', description: '', engineCc: '', year: '', color: '', price: 0, active: true };
 const emptyFinancialSettings = { minimumWage: 1400000, consumerAnnualRate: 29.72, lowAmountAnnualRate: 56.33, factorMonthlyRate: 4.5, maxTermMonths: 30, paymentRounding: 1000, useMontelibanoTable: true, active: true };
-const emptyQuote = { identificationType: 1, identificationNumber: '', customerFirstNames: '', customerLastNames: '', customerFirstName: '', customerMiddleName: '', customerLastName: '', customerSecondLastName: '', phoneCountryCode: '+57', phoneNumber: '', productId: '', downPayment: 0, insurance: 0, administrativeFees: 0, termMonths: 24, monthlyInterestRate: 2.2, notes: '' };
+const emptyQuoteItem = { productId: '', downPayment: 0, insurance: 0, administrativeFees: 0, termMonths: 24, monthlyInterestRate: 2.2 };
+const emptyQuote = { identificationType: 1, identificationNumber: '', customerFirstNames: '', customerLastNames: '', customerFirstName: '', customerMiddleName: '', customerLastName: '', customerSecondLastName: '', phoneCountryCode: '+57', phoneNumber: '', productId: '', downPayment: 0, insurance: 0, administrativeFees: 0, termMonths: 24, monthlyInterestRate: 2.2, items: [emptyQuoteItem], notes: '' };
 const emptyCreditApplication = {
   customerId: '', productId: '', quoteId: '', dealId: '', identificationType: 1, identificationNumber: '', birthDate: '', mobile: '', address: '', city: '', occupation: '',
   monthlyIncome: 0, downPayment: 0, termMonths: 24, motorcycleValue: 0,
@@ -591,6 +592,18 @@ function QuotesPage() {
   };
 
   const save = async (payload: typeof emptyQuote) => {
+    const quoteItems = (payload.items?.length ? payload.items : [{ ...emptyQuoteItem, productId: payload.productId, downPayment: payload.downPayment, insurance: payload.insurance, administrativeFees: payload.administrativeFees, termMonths: payload.termMonths, monthlyInterestRate: payload.monthlyInterestRate }])
+      .filter((item) => item.productId)
+      .map((item) => ({
+        productId: item.productId,
+        downPayment: Number(item.downPayment),
+        insurance: Number(item.insurance),
+        administrativeFees: Number(item.administrativeFees),
+        termMonths: Number(item.termMonths),
+        monthlyInterestRate: Number(item.monthlyInterestRate)
+      }));
+    if (!quoteItems.length) throw new Error('Debe agregar al menos un producto.');
+    const firstItem = quoteItems[0];
     const body = {
       ...payload,
       customerFirstNames: fullFirstNames(payload.customerFirstName, payload.customerMiddleName, payload.customerFirstNames),
@@ -599,11 +612,13 @@ function QuotesPage() {
       identificationNumber: payload.identificationNumber || null,
       phoneCountryCode: payload.phoneCountryCode || '+57',
       phoneNumber: payload.phoneNumber || null,
-      downPayment: Number(payload.downPayment),
-      insurance: Number(payload.insurance),
-      administrativeFees: Number(payload.administrativeFees),
-      termMonths: Number(payload.termMonths),
-      monthlyInterestRate: Number(payload.monthlyInterestRate),
+      productId: firstItem.productId,
+      items: quoteItems,
+      downPayment: firstItem.downPayment,
+      insurance: firstItem.insurance,
+      administrativeFees: firstItem.administrativeFees,
+      termMonths: firstItem.termMonths,
+      monthlyInterestRate: firstItem.monthlyInterestRate,
       notes: payload.notes || null
     };
     const { data } = await api.post<Quote>('/api/quotes', body);
@@ -627,13 +642,13 @@ function QuotesPage() {
     <Header title="Cotizaciones" action="Nueva cotizacion" onAction={() => setForm({ open: true })} onRefresh={reload} />
     <StatusBar loading={loading} error={error} />
     <EntityTable
-      headers={['Numero', 'Cliente', 'Identificacion', 'Producto', 'Total financiado', 'Cuota aprox.', 'Valida hasta', 'Acciones']}
+      headers={['Numero', 'Cliente', 'Identificacion', 'Productos', 'Total financiado', 'Cuota aprox.', 'Valida hasta', 'Acciones']}
       empty="No hay cotizaciones registradas"
       rows={rows.map((r) => [
         r.number,
         `${fullFirstNames(r.customerFirstName, r.customerMiddleName, r.customerFirstNames)} ${fullLastNames(r.customerLastName, r.customerSecondLastName, r.customerLastNames)}`.trim(),
         `${identificationLabel(r.identificationType)} ${r.identificationNumber ?? ''}`.trim(),
-        r.productName,
+        (r.items?.length ?? 0) > 1 ? `${r.items.length} productos` : r.productName,
         money(r.financedAmount),
         r.estimatedMonthlyPayment > 0 ? `${money(r.estimatedMonthlyPayment)} x ${r.termMonths}` : 'Sin simulacion',
         new Date(r.validUntil).toLocaleDateString(),
@@ -1817,7 +1832,8 @@ function ProductPhotosManager({ product, onChanged }: { product: Product; onChan
 }
 
 function QuoteDialog({ form, products, onClose, onSave }: DialogProps<Quote, typeof emptyQuote> & { products: Product[] }) {
-  const initial = { ...emptyQuote, productId: products[0]?.id ?? '' };
+  const initialItem = { ...emptyQuoteItem, productId: products[0]?.id ?? '' };
+  const initial = { ...emptyQuote, productId: initialItem.productId, items: [initialItem] };
   const [identityLoading, setIdentityLoading] = useState(false);
   const [identityNotice, setIdentityNotice] = useState<Notice>();
 
@@ -1868,7 +1884,21 @@ function QuoteDialog({ form, products, onClose, onSave }: DialogProps<Quote, typ
 
   return <FormDialog title="Nueva cotizacion" open={form.open} initial={initial} onClose={onClose} onSave={onSave}>
     {(v, set) => {
-      const selectedProduct = products.find((product) => product.id === v.productId);
+      const quoteItems = v.items?.length ? v.items : [{ ...emptyQuoteItem, productId: v.productId }];
+      const updateItem = (index: number, patch: Partial<typeof emptyQuoteItem>) => {
+        const items = quoteItems.map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item);
+        set({ items, productId: items[0]?.productId ?? '', downPayment: Number(items[0]?.downPayment ?? 0), insurance: Number(items[0]?.insurance ?? 0), administrativeFees: Number(items[0]?.administrativeFees ?? 0), termMonths: Number(items[0]?.termMonths ?? 24), monthlyInterestRate: Number(items[0]?.monthlyInterestRate ?? 2.2) });
+      };
+      const addItem = () => {
+        if (quoteItems.length >= 4) return;
+        const items = [...quoteItems, { ...emptyQuoteItem, productId: products[0]?.id ?? '' }];
+        set({ items });
+      };
+      const removeItem = (index: number) => {
+        const items = quoteItems.filter((_, itemIndex) => itemIndex !== index);
+        const normalized = items.length ? items : [{ ...emptyQuoteItem, productId: products[0]?.id ?? '' }];
+        set({ items: normalized, productId: normalized[0]?.productId ?? '' });
+      };
       return <>
         <TextField required select label="Tipo de identificacion" value={v.identificationType} onChange={(e) => set({ identificationType: Number(e.target.value) })}>
           {identificationOptions.map((option) => <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>)}
@@ -1898,38 +1928,53 @@ function QuoteDialog({ form, products, onClose, onSave }: DialogProps<Quote, typ
           <TextField fullWidth required label="Indicativo" value={v.phoneCountryCode} onChange={(e) => set({ phoneCountryCode: e.target.value })} />
           <TextField fullWidth required label="Telefono / WhatsApp" value={v.phoneNumber} onChange={(e) => set({ phoneNumber: e.target.value })} sx={{ gridColumn: { sm: 'span 2' } }} />
         </FieldGrid>
-        <TextField required select label="Producto" value={v.productId} onChange={(e) => set({ productId: e.target.value })}>
-          {products.length ? products.map((product) => <MenuItem key={product.id} value={product.id}>{productName(product)} ({product.category}) - {money(product.price)}</MenuItem>) : <MenuItem value="">No hay productos activos</MenuItem>}
-        </TextField>
-        {selectedProduct && <Paper variant="outlined" sx={{ p: 2, bgcolor: '#f8fafc' }}>
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems={{ xs: 'stretch', sm: 'center' }}>
-            <ProductPhotoThumb photo={(selectedProduct.photos ?? []).find((photo) => photo.isQuoteDefault) ?? (selectedProduct.photos ?? [])[0]} size={88} />
+        <Stack spacing={1.5}>
+          <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', sm: 'center' }} gap={1}>
             <Box>
-              <Typography fontWeight={800}>Foto que saldra en el PDF</Typography>
-              <Typography variant="body2" color="text.secondary">
-                {(selectedProduct.photos ?? []).some((photo) => photo.isQuoteDefault)
-                  ? 'Se usara la foto marcada como Foto PDF en el producto.'
-                  : 'Este producto no tiene foto principal. Puede configurarla en Productos.'}
-              </Typography>
+              <Typography variant="subtitle1" fontWeight={900}>Articulos a cotizar</Typography>
+              <Typography variant="body2" color="text.secondary">Agregue varios productos para imprimir la cotizacion como comparativo.</Typography>
             </Box>
+            <Button variant="outlined" startIcon={<Add />} disabled={quoteItems.length >= 4 || !products.length} onClick={addItem}>Agregar articulo</Button>
           </Stack>
-        </Paper>}
-        <FieldGrid columns={2}>
-          <TextField fullWidth label="Cuota inicial" type="number" value={v.downPayment} onChange={(e) => set({ downPayment: Number(e.target.value) })} />
-          <TextField fullWidth label="Numero de cuotas" type="number" value={v.termMonths} onChange={(e) => set({ termMonths: Number(e.target.value) })} />
-        </FieldGrid>
-        <FieldGrid columns={2}>
-          <TextField fullWidth label="Seguro" type="number" value={v.insurance} onChange={(e) => set({ insurance: Number(e.target.value) })} />
-          <TextField fullWidth label="Gastos administrativos" type="number" value={v.administrativeFees} onChange={(e) => set({ administrativeFees: Number(e.target.value) })} />
-        </FieldGrid>
-        <QuoteSimulationPreview value={v} selectedProduct={selectedProduct} />
+          {quoteItems.map((item, index) => {
+            const selectedProduct = products.find((product) => product.id === item.productId);
+            return <Paper key={index} variant="outlined" sx={{ p: 2, bgcolor: '#f8fafc' }}>
+              <Stack spacing={1.5}>
+                <Stack direction="row" justifyContent="space-between" alignItems="center" gap={1}>
+                  <Typography fontWeight={900}>Articulo {index + 1}</Typography>
+                  {quoteItems.length > 1 && <Button color="error" size="small" startIcon={<Delete />} onClick={() => removeItem(index)}>Quitar</Button>}
+                </Stack>
+                <TextField required select label="Producto" value={item.productId} onChange={(e) => updateItem(index, { productId: e.target.value })}>
+                  {products.length ? products.map((product) => <MenuItem key={product.id} value={product.id}>{productName(product)} ({product.category}) - {money(product.price)}</MenuItem>) : <MenuItem value="">No hay productos activos</MenuItem>}
+                </TextField>
+                {selectedProduct && <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems={{ xs: 'stretch', sm: 'center' }}>
+                  <ProductPhotoThumb photo={(selectedProduct.photos ?? []).find((photo) => photo.isQuoteDefault) ?? (selectedProduct.photos ?? [])[0]} size={72} />
+                  <Typography variant="body2" color="text.secondary">
+                    {(selectedProduct.photos ?? []).some((photo) => photo.isQuoteDefault)
+                      ? 'Foto PDF configurada para este producto.'
+                      : 'Este producto no tiene foto principal configurada.'}
+                  </Typography>
+                </Stack>}
+                <FieldGrid columns={2}>
+                  <TextField fullWidth label="Cuota inicial" type="number" value={item.downPayment} onChange={(e) => updateItem(index, { downPayment: Number(e.target.value) })} />
+                  <TextField fullWidth label="Numero de cuotas" type="number" value={item.termMonths} onChange={(e) => updateItem(index, { termMonths: Number(e.target.value) })} />
+                </FieldGrid>
+                <FieldGrid columns={2}>
+                  <TextField fullWidth label="Seguro" type="number" value={item.insurance} onChange={(e) => updateItem(index, { insurance: Number(e.target.value) })} />
+                  <TextField fullWidth label="Gastos administrativos" type="number" value={item.administrativeFees} onChange={(e) => updateItem(index, { administrativeFees: Number(e.target.value) })} />
+                </FieldGrid>
+                <QuoteSimulationPreview value={item} selectedProduct={selectedProduct} />
+              </Stack>
+            </Paper>;
+          })}
+        </Stack>
         <TextField label="Observaciones" value={v.notes} onChange={(e) => set({ notes: e.target.value })} multiline minRows={2} />
       </>;
     }}
   </FormDialog>;
 }
 
-function QuoteSimulationPreview({ value, selectedProduct }: { value: typeof emptyQuote; selectedProduct?: Product }) {
+function QuoteSimulationPreview({ value, selectedProduct }: { value: typeof emptyQuoteItem; selectedProduct?: Product }) {
   const [simulation, setSimulation] = useState<QuoteSimulationResult>();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');

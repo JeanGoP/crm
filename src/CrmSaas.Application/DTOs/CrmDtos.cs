@@ -113,6 +113,31 @@ public sealed record QuoteSimulationResultDto(
     string CreditType,
     bool UsedCompanyFinancialSettings);
 
+public sealed record QuoteItemDto(
+    Guid Id,
+    Guid ProductId,
+    string ProductName,
+    decimal ProductPrice,
+    decimal DownPayment,
+    decimal Insurance,
+    decimal AdministrativeFees,
+    int TermMonths,
+    decimal MonthlyInterestRate,
+    decimal FinancedAmount,
+    decimal EstimatedMonthlyPayment,
+    decimal EstimatedTotalPayment,
+    string? CreditType,
+    bool UsedCompanyFinancialSettings,
+    int Order);
+
+public sealed record CreateQuoteItemDto(
+    Guid ProductId,
+    decimal DownPayment,
+    decimal Insurance,
+    decimal AdministrativeFees,
+    int TermMonths,
+    decimal MonthlyInterestRate);
+
 public sealed record QuoteDto(
     Guid Id,
     string Number,
@@ -140,7 +165,8 @@ public sealed record QuoteDto(
     bool UsedCompanyFinancialSettings,
     DateTime QuoteDate,
     DateTime ValidUntil,
-    string? Notes);
+    string? Notes,
+    IReadOnlyCollection<QuoteItemDto> Items);
 public sealed record CreateQuoteDto(
     TipoIdentificacionColombia IdentificationType,
     string? IdentificationNumber,
@@ -153,6 +179,7 @@ public sealed record CreateQuoteDto(
     string? PhoneCountryCode,
     string? PhoneNumber,
     Guid ProductId,
+    IReadOnlyCollection<CreateQuoteItemDto>? Items,
     decimal DownPayment,
     decimal Insurance,
     decimal AdministrativeFees,

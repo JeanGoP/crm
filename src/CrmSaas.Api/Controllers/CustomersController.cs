@@ -27,6 +27,8 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
 
         var quotes = await db.Cotizaciones
             .Include(x => x.Producto)
+            .Include(x => x.Items)
+            .ThenInclude(x => x.Producto)
             .Where(x => x.ClienteId == id)
             .OrderByDescending(x => x.FechaCotizacion)
             .ToListAsync(cancellationToken);
@@ -73,6 +75,8 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
 
         var quotes = await db.Cotizaciones
             .Include(x => x.Producto)
+            .Include(x => x.Items)
+            .ThenInclude(x => x.Producto)
             .Where(x => x.ClienteId == id)
             .OrderByDescending(x => x.FechaCotizacion)
             .ToListAsync(cancellationToken);
@@ -179,7 +183,60 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
             x.UsoConfiguracionFinancieraEmpresa,
             x.FechaCotizacion,
             x.ValidaHasta,
-            x.Observaciones);
+            x.Observaciones,
+            QuoteItems(x).ToList());
+    }
+
+    private static IEnumerable<QuoteItemDto> QuoteItems(Cotizacion quote)
+    {
+        if (quote.Items.Count > 0)
+        {
+            return quote.Items.OrderBy(x => x.Orden).Select(ToItemDto);
+        }
+
+        return
+        [
+            new QuoteItemDto(
+                quote.Id,
+                quote.ProductoId,
+                quote.Producto is null ? "Producto" : ProductName(quote.Producto),
+                quote.PrecioProducto,
+                quote.CuotaInicial,
+                quote.Seguro,
+                quote.GastosAdministrativos,
+                quote.PlazoMeses <= 0 ? 24 : quote.PlazoMeses,
+                quote.TasaInteresMensual,
+                quote.ValorFinanciado,
+                quote.CuotaMensualEstimada,
+                quote.TotalPagarEstimado,
+                quote.TipoCredito,
+                quote.UsoConfiguracionFinancieraEmpresa,
+                1)
+        ];
+    }
+
+    private static QuoteItemDto ToItemDto(CotizacionItem item)
+    {
+        var financedAmount = item.ValorFinanciado <= 0 && item.CuotaMensualEstimada <= 0
+            ? Math.Max(item.PrecioProducto + item.Seguro + item.GastosAdministrativos - item.CuotaInicial, 0)
+            : item.ValorFinanciado;
+        var totalPayment = item.TotalPagarEstimado <= 0 ? item.CuotaInicial + financedAmount : item.TotalPagarEstimado;
+        return new QuoteItemDto(
+            item.Id,
+            item.ProductoId,
+            item.Producto is null ? "Producto" : ProductName(item.Producto),
+            item.PrecioProducto,
+            item.CuotaInicial,
+            item.Seguro,
+            item.GastosAdministrativos,
+            item.PlazoMeses <= 0 ? 24 : item.PlazoMeses,
+            item.TasaInteresMensual,
+            financedAmount,
+            item.CuotaMensualEstimada,
+            totalPayment,
+            item.TipoCredito,
+            item.UsoConfiguracionFinancieraEmpresa,
+            item.Orden);
     }
 
     private static CreditApplicationDto ToCreditApplicationDto(SolicitudCredito x)

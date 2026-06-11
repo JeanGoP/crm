@@ -23,6 +23,7 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
     public DbSet<ProductoFoto> ProductoFotos => Set<ProductoFoto>();
     public DbSet<ConfiguracionFinancieraEmpresa> ConfiguracionesFinancierasEmpresa => Set<ConfiguracionFinancieraEmpresa>();
     public DbSet<Cotizacion> Cotizaciones => Set<Cotizacion>();
+    public DbSet<CotizacionItem> CotizacionItems => Set<CotizacionItem>();
     public DbSet<SolicitudCredito> SolicitudesCredito => Set<SolicitudCredito>();
     public DbSet<DocumentoSolicitudCredito> DocumentosSolicitudCredito => Set<DocumentoSolicitudCredito>();
     public DbSet<EntregaMoto> EntregasMoto => Set<EntregaMoto>();
@@ -45,6 +46,7 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
         modelBuilder.Entity<ProductoFoto>().ToTable("ProductoFotos");
         modelBuilder.Entity<ConfiguracionFinancieraEmpresa>().ToTable("ConfiguracionesFinancierasEmpresa");
         modelBuilder.Entity<Cotizacion>().ToTable("Cotizaciones");
+        modelBuilder.Entity<CotizacionItem>().ToTable("CotizacionItems");
         modelBuilder.Entity<SolicitudCredito>().ToTable("SolicitudesCredito");
         modelBuilder.Entity<DocumentoSolicitudCredito>().ToTable("DocumentosSolicitudCredito");
         modelBuilder.Entity<EntregaMoto>().ToTable("EntregasMoto");
@@ -90,6 +92,19 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
         modelBuilder.Entity<Cotizacion>().Property(x => x.TotalPagarEstimado).HasPrecision(18, 2);
         modelBuilder.Entity<Cotizacion>().Property(x => x.TipoCredito).HasMaxLength(40);
         modelBuilder.Entity<Cotizacion>().HasIndex(x => new { x.EmpresaId, x.Numero }).IsUnique();
+        modelBuilder.Entity<Cotizacion>().HasOne(x => x.Producto).WithMany().HasForeignKey(x => x.ProductoId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<CotizacionItem>().Property(x => x.PrecioProducto).HasPrecision(18, 2);
+        modelBuilder.Entity<CotizacionItem>().Property(x => x.CuotaInicial).HasPrecision(18, 2);
+        modelBuilder.Entity<CotizacionItem>().Property(x => x.Seguro).HasPrecision(18, 2);
+        modelBuilder.Entity<CotizacionItem>().Property(x => x.GastosAdministrativos).HasPrecision(18, 2);
+        modelBuilder.Entity<CotizacionItem>().Property(x => x.TasaInteresMensual).HasPrecision(6, 3);
+        modelBuilder.Entity<CotizacionItem>().Property(x => x.ValorFinanciado).HasPrecision(18, 2);
+        modelBuilder.Entity<CotizacionItem>().Property(x => x.CuotaMensualEstimada).HasPrecision(18, 2);
+        modelBuilder.Entity<CotizacionItem>().Property(x => x.TotalPagarEstimado).HasPrecision(18, 2);
+        modelBuilder.Entity<CotizacionItem>().Property(x => x.TipoCredito).HasMaxLength(40);
+        modelBuilder.Entity<CotizacionItem>().HasIndex(x => new { x.EmpresaId, x.CotizacionId });
+        modelBuilder.Entity<CotizacionItem>().HasOne(x => x.Cotizacion).WithMany(x => x.Items).HasForeignKey(x => x.CotizacionId).OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<CotizacionItem>().HasOne(x => x.Producto).WithMany().HasForeignKey(x => x.ProductoId).OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<SolicitudCredito>().Property(x => x.IngresosMensuales).HasPrecision(18, 2);
         modelBuilder.Entity<SolicitudCredito>().Property(x => x.CuotaInicial).HasPrecision(18, 2);
         modelBuilder.Entity<SolicitudCredito>().Property(x => x.ValorMoto).HasPrecision(18, 2);
@@ -125,6 +140,7 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
         modelBuilder.Entity<ProductoFoto>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<ConfiguracionFinancieraEmpresa>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<Cotizacion>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
+        modelBuilder.Entity<CotizacionItem>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<SolicitudCredito>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<DocumentoSolicitudCredito>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<EntregaMoto>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);

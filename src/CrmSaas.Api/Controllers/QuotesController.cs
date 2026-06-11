@@ -24,6 +24,8 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
     {
         var quotes = await db.Cotizaciones
             .Include(x => x.Producto)
+            .Include(x => x.Items)
+            .ThenInclude(x => x.Producto)
             .OrderByDescending(x => x.FechaCotizacion)
             .Select(x => ToDto(x))
             .ToListAsync(cancellationToken);
@@ -43,16 +45,31 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
         if (string.IsNullOrWhiteSpace(firstName)) throw new ValidationException("El primer nombre del cliente es obligatorio.");
         if (string.IsNullOrWhiteSpace(lastName)) throw new ValidationException("El primer apellido del cliente es obligatorio.");
         if (string.IsNullOrWhiteSpace(dto.PhoneNumber)) throw new ValidationException("El telefono del cliente es obligatorio.");
-        if (dto.ProductId == Guid.Empty) throw new ValidationException("Debe seleccionar un producto para cotizar.");
-        if (dto.DownPayment < 0) throw new ValidationException("La cuota inicial no puede ser negativa.");
-        if (dto.Insurance < 0) throw new ValidationException("El seguro no puede ser negativo.");
-        if (dto.AdministrativeFees < 0) throw new ValidationException("Los gastos administrativos no pueden ser negativos.");
-        if (dto.TermMonths <= 0) throw new ValidationException("El plazo debe ser mayor a cero.");
-        if (dto.MonthlyInterestRate < 0) throw new ValidationException("La tasa mensual no puede ser negativa.");
-
-        var product = await db.Productos.FirstOrDefaultAsync(x => x.Id == dto.ProductId && x.Activo, cancellationToken)
-            ?? throw new KeyNotFoundException("Producto no encontrado o inactivo.");
         var financialSettings = await GetFinancialSettingsAsync(cancellationToken);
+        var requestedItems = NormalizeQuoteItems(dto);
+        if (requestedItems.Count == 0) throw new ValidationException("Debe seleccionar al menos un producto para cotizar.");
+        if (requestedItems.Count > 4) throw new ValidationException("Puede comparar maximo 4 productos por cotizacion.");
+
+        var productIds = requestedItems.Select(x => x.ProductId).Distinct().ToArray();
+        var products = await db.Productos
+            .Where(x => productIds.Contains(x.Id) && x.Activo)
+            .ToDictionaryAsync(x => x.Id, cancellationToken);
+        if (products.Count != productIds.Length) throw new KeyNotFoundException("Uno de los productos no existe o esta inactivo.");
+
+        var calculatedItems = requestedItems.Select((item, index) =>
+        {
+            if (item.DownPayment < 0) throw new ValidationException("La cuota inicial no puede ser negativa.");
+            if (item.Insurance < 0) throw new ValidationException("El seguro no puede ser negativo.");
+            if (item.AdministrativeFees < 0) throw new ValidationException("Los gastos administrativos no pueden ser negativos.");
+            if (item.TermMonths <= 0) throw new ValidationException("El plazo debe ser mayor a cero.");
+            if (item.MonthlyInterestRate < 0) throw new ValidationException("La tasa mensual no puede ser negativa.");
+            var product = products[item.ProductId];
+            var simulation = CalculateSimulation(product.Precio, item.DownPayment, item.Insurance, item.AdministrativeFees, item.TermMonths, item.MonthlyInterestRate, financialSettings);
+            return new { Product = product, Simulation = simulation, Order = index + 1 };
+        }).ToList();
+        var primary = calculatedItems[0];
+        var product = primary.Product;
+        var simulation = primary.Simulation;
         var initialStage = await db.EtapasNegocio
             .Where(x => x.Activa)
             .OrderBy(x => x.Orden)
@@ -62,7 +79,6 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
         var fullName = $"{firstNames} {lastNames}".Trim();
         var phone = FormatPhone(dto.PhoneCountryCode, dto.PhoneNumber);
         var productName = ProductName(product);
-        var simulation = CalculateSimulation(product.Precio, dto.DownPayment, dto.Insurance, dto.AdministrativeFees, dto.TermMonths, dto.MonthlyInterestRate, financialSettings);
         var normalizedIdentification = NormalizeIdentification(dto.IdentificationNumber);
         var customer = string.IsNullOrWhiteSpace(normalizedIdentification)
             ? null
@@ -141,12 +157,31 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             ValidaHasta = now.AddDays(7),
             Observaciones = dto.Notes
         };
+        foreach (var item in calculatedItems)
+        {
+            quote.Items.Add(new CotizacionItem
+            {
+                ProductoId = item.Product.Id,
+                Orden = item.Order,
+                PrecioProducto = item.Product.Precio,
+                CuotaInicial = item.Simulation.DownPayment,
+                Seguro = item.Simulation.Insurance,
+                GastosAdministrativos = item.Simulation.AdministrativeFees,
+                PlazoMeses = item.Simulation.TermMonths,
+                TasaInteresMensual = item.Simulation.MonthlyInterestRate,
+                ValorFinanciado = item.Simulation.FinancedAmount,
+                CuotaMensualEstimada = item.Simulation.MonthlyPayment,
+                TotalPagarEstimado = item.Simulation.TotalPayment,
+                TipoCredito = item.Simulation.CreditType,
+                UsoConfiguracionFinancieraEmpresa = item.Simulation.UsedCompanyFinancialSettings
+            });
+        }
         var deal = new Negocio
         {
-            Titulo = $"{fullName} - {productName}",
+            Titulo = calculatedItems.Count > 1 ? $"{fullName} - Comparativo {calculatedItems.Count} productos" : $"{fullName} - {productName}",
             ClienteId = customer.Id,
             EtapaNegocioId = initialStage.Id,
-            Valor = product.Precio,
+            Valor = calculatedItems.Max(x => x.Product.Precio),
             ProbabilidadCierre = initialStage.ProbabilidadPredeterminada,
             FechaEstimadaCierre = now.AddDays(15),
             Estado = EstadoNegocio.Abierto
@@ -168,6 +203,10 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
         db.Actividades.Add(followUp);
         await db.SaveChangesAsync(cancellationToken);
         quote.Producto = product;
+        foreach (var item in quote.Items)
+        {
+            item.Producto = products[item.ProductoId];
+        }
 
         return Ok(ToDto(quote));
     }
@@ -206,11 +245,14 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             .Include(x => x.Cliente)
             .Include(x => x.Producto)
             .ThenInclude(x => x!.Fotos)
+            .Include(x => x.Items)
+            .ThenInclude(x => x.Producto)
+            .ThenInclude(x => x!.Fotos)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
             ?? throw new KeyNotFoundException("Cotizacion no encontrada.");
         var company = await db.Empresas.IgnoreQueryFilters().FirstOrDefaultAsync(x => x.Id == tenantContext.EmpresaId, cancellationToken);
         var dto = ToDto(quote);
-        var quotePhoto = quote.Producto?.Fotos
+        var quotePhoto = (quote.Items.OrderBy(x => x.Orden).FirstOrDefault()?.Producto ?? quote.Producto)?.Fotos
             .OrderByDescending(x => x.EsPrincipalCotizacion)
             .ThenBy(x => x.Orden)
             .FirstOrDefault();
@@ -285,7 +327,74 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             x.UsoConfiguracionFinancieraEmpresa,
             x.FechaCotizacion,
             x.ValidaHasta,
-            x.Observaciones);
+            x.Observaciones,
+            QuoteItems(x).ToList());
+    }
+
+    private static IReadOnlyCollection<CreateQuoteItemDto> NormalizeQuoteItems(CreateQuoteDto dto)
+    {
+        if (dto.Items is { Count: > 0 })
+        {
+            return dto.Items.Where(x => x.ProductId != Guid.Empty).ToList();
+        }
+
+        return dto.ProductId == Guid.Empty
+            ? []
+            : [new CreateQuoteItemDto(dto.ProductId, dto.DownPayment, dto.Insurance, dto.AdministrativeFees, dto.TermMonths, dto.MonthlyInterestRate)];
+    }
+
+    private static IEnumerable<QuoteItemDto> QuoteItems(Cotizacion quote)
+    {
+        if (quote.Items.Count > 0)
+        {
+            return quote.Items.OrderBy(x => x.Orden).Select(x => ToItemDto(x));
+        }
+
+        return
+        [
+            new QuoteItemDto(
+                quote.Id,
+                quote.ProductoId,
+                quote.Producto is null ? "Producto" : ProductName(quote.Producto),
+                quote.PrecioProducto,
+                quote.CuotaInicial,
+                quote.Seguro,
+                quote.GastosAdministrativos,
+                quote.PlazoMeses <= 0 ? 24 : quote.PlazoMeses,
+                quote.TasaInteresMensual,
+                quote.ValorFinanciado,
+                quote.CuotaMensualEstimada,
+                quote.TotalPagarEstimado,
+                quote.TipoCredito,
+                quote.UsoConfiguracionFinancieraEmpresa,
+                1)
+        ];
+    }
+
+    private static QuoteItemDto ToItemDto(CotizacionItem item)
+    {
+        var productName = item.Producto is null ? "Producto" : ProductName(item.Producto);
+        var termMonths = item.PlazoMeses <= 0 ? 24 : item.PlazoMeses;
+        var financedAmount = item.ValorFinanciado <= 0 && item.CuotaMensualEstimada <= 0
+            ? Math.Max(item.PrecioProducto + item.Seguro + item.GastosAdministrativos - item.CuotaInicial, 0)
+            : item.ValorFinanciado;
+        var totalPayment = item.TotalPagarEstimado <= 0 ? item.CuotaInicial + financedAmount : item.TotalPagarEstimado;
+        return new QuoteItemDto(
+            item.Id,
+            item.ProductoId,
+            productName,
+            item.PrecioProducto,
+            item.CuotaInicial,
+            item.Seguro,
+            item.GastosAdministrativos,
+            termMonths,
+            item.TasaInteresMensual,
+            financedAmount,
+            item.CuotaMensualEstimada,
+            totalPayment,
+            item.TipoCredito,
+            item.UsoConfiguracionFinancieraEmpresa,
+            item.Orden);
     }
 
     private async Task<ConfiguracionFinancieraEmpresa?> GetFinancialSettingsAsync(CancellationToken cancellationToken) =>

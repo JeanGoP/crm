@@ -1,7 +1,7 @@
 # Manual de usuario - CRM Comercial
 
 Ultima actualizacion: 2026-06-10  
-Version del manual: 6.0
+Version del manual: 6.1
 Sistema: CRM para gestion comercial y ventas a credito  
 
 ## 1. Bienvenida
@@ -221,7 +221,9 @@ Cotizaciones permite generar una propuesta comercial para un cliente. Es uno de 
 7. Ingrese indicativo y telefono. Por defecto se usa el indicativo de Colombia **+57**.
 8. Seleccione el producto que desea cotizar.
 9. Digite la cuota inicial y el numero de cuotas.
-10. Guarde la cotizacion.
+10. Si desea comparar varias opciones, presione **Agregar articulo** y seleccione otro producto.
+11. Revise la cuota aproximada de cada articulo.
+12. Guarde la cotizacion.
 
 ### Que ocurre al guardar
 
@@ -238,6 +240,8 @@ Cotizaciones permite generar una propuesta comercial para un cliente. Es uno de 
 Despues de guardar una cotizacion, el sistema no imprime ni descarga automaticamente. Primero muestra el PDF en pantalla para que el usuario revise datos del cliente, producto, valores, foto y condiciones. Si todo esta correcto, puede usar **Descargar PDF** o **Imprimir**.
 
 El PDF toma automaticamente el nombre y logo configurados en la empresa. El formato muestra datos del cliente, producto, precio, cuota inicial, alternativas de cuotas, desglose del credito, requisitos generales y texto de autorizacion de datos.
+
+Cuando la cotizacion tiene dos o mas articulos, el PDF muestra un **comparativo** para que el cliente pueda revisar precio, cuota inicial, valor financiado, plazo y cuota aproximada de cada opcion.
 
 ## 11. Simulador financiero
 
@@ -532,6 +536,7 @@ El sistema muestra mensajes cuando algo no puede completarse.
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-06-10 | 6.1 | Las cotizaciones permiten agregar varios articulos y el PDF muestra un comparativo cuando hay mas de un producto. |
 | 2026-06-10 | 6.0 | El PDF de cotizacion adopta un formato comercial con logo/nombre de empresa, datos del cliente, tabla de cuotas, desglose del credito, requisitos y autorizacion de datos. |
 | 2026-06-10 | 5.9 | El analisis comercial con IA permite enviar el mensaje sugerido por WhatsApp con el texto listo para el cliente. |
 | 2026-06-09 | 5.8 | Se actualizan los pantallazos del manual desde el CRM publicado con una vista mas amplia de las pantallas principales. |

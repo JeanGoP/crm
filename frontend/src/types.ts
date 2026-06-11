@@ -141,6 +141,24 @@ export interface QuoteSimulationResult {
   usedCompanyFinancialSettings: boolean;
 }
 
+export interface QuoteItem {
+  id: string;
+  productId: string;
+  productName: string;
+  productPrice: number;
+  downPayment: number;
+  insurance: number;
+  administrativeFees: number;
+  termMonths: number;
+  monthlyInterestRate: number;
+  financedAmount: number;
+  estimatedMonthlyPayment: number;
+  estimatedTotalPayment: number;
+  creditType?: string;
+  usedCompanyFinancialSettings: boolean;
+  order: number;
+}
+
 export interface Quote {
   id: string;
   number: string;
@@ -169,6 +187,7 @@ export interface Quote {
   quoteDate: string;
   validUntil: string;
   notes?: string;
+  items: QuoteItem[];
 }
 
 export interface ColombianIdentityLookup {
