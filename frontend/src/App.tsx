@@ -31,6 +31,7 @@ import AddTask from '@mui/icons-material/AddTask';
 import WhatsApp from '@mui/icons-material/WhatsApp';
 import Assessment from '@mui/icons-material/Assessment';
 import AutoAwesome from '@mui/icons-material/AutoAwesome';
+import Search from '@mui/icons-material/Search';
 import { AxiosError } from 'axios';
 import { api } from './api';
 import { useAuthStore } from './store';
@@ -141,6 +142,10 @@ function fullFirstNames(firstName?: string, middleName?: string, fallback?: stri
 function fullLastNames(lastName?: string, secondLastName?: string, fallback?: string) {
   const value = [lastName, secondLastName].filter(Boolean).join(' ').trim();
   return value || fallback || '';
+}
+
+function normalizeSearch(value?: string | null) {
+  return (value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
 }
 
 function Layout() {
@@ -322,8 +327,30 @@ function CustomersPage() {
   const [form, setForm] = useState<FormMode<Customer>>({ open: false });
   const [confirm, setConfirm] = useState<Customer>();
   const [notice, setNotice] = useState<Notice>();
+  const [search, setSearch] = useState('');
   const canDelete = useCanManage();
   const navigate = useNavigate();
+  const filteredRows = useMemo(() => {
+    const term = normalizeSearch(search);
+    if (!term) return rows;
+    return rows.filter((customer) => {
+      const searchable = [
+        customer.firstName,
+        customer.middleName,
+        customer.lastName,
+        customer.secondLastName,
+        customer.firstNames,
+        customer.lastNames,
+        customer.name,
+        `${customer.firstName ?? ''} ${customer.middleName ?? ''} ${customer.lastName ?? ''} ${customer.secondLastName ?? ''}`,
+        `${customer.firstNames ?? ''} ${customer.lastNames ?? ''}`,
+        customer.phone,
+        customer.phoneCountryCode,
+        `${customer.phoneCountryCode ?? ''}${customer.phone ?? ''}`
+      ].map(normalizeSearch).join(' ');
+      return searchable.includes(term);
+    });
+  }, [rows, search]);
 
   const save = async (payload: typeof emptyCustomer) => {
     const body = {
@@ -363,10 +390,30 @@ function CustomersPage() {
   return <Stack spacing={3}>
     <Header title="Clientes" action="Nuevo cliente" onAction={() => setForm({ open: true })} onRefresh={reload} />
     <StatusBar loading={loading} error={error} />
+    <Paper variant="outlined" sx={{ p: 2 }}>
+      <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} alignItems={{ xs: 'stretch', md: 'center' }} justifyContent="space-between">
+        <TextField
+          fullWidth
+          label="Buscar cliente"
+          placeholder="Nombre, apellido o telefono"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          InputProps={{
+            startAdornment: <InputAdornment position="start"><Search fontSize="small" /></InputAdornment>,
+            endAdornment: search ? <InputAdornment position="end"><IconButton size="small" onClick={() => setSearch('')}><Close fontSize="small" /></IconButton></InputAdornment> : undefined
+          }}
+        />
+        <Chip
+          variant="outlined"
+          label={search ? `${filteredRows.length} de ${rows.length} clientes` : `${rows.length} clientes`}
+          sx={{ alignSelf: { xs: 'flex-start', md: 'center' }, flexShrink: 0 }}
+        />
+      </Stack>
+    </Paper>
     <EntityTable
       headers={['Identificacion', 'Primer nombre', 'Segundo nombre', 'Primer apellido', 'Segundo apellido', 'Telefono', 'Ciudad', 'Estado', 'Etiquetas', 'Acciones']}
-      empty="No hay clientes registrados"
-      rows={rows.map((r) => [
+      empty={search ? 'No hay clientes que coincidan con la busqueda' : 'No hay clientes registrados'}
+      rows={filteredRows.map((r) => [
         r.identificationNumber || '-',
         r.firstName || r.firstNames || r.name,
         r.middleName || '-',
