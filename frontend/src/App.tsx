@@ -328,12 +328,27 @@ function CustomersPage() {
   const [confirm, setConfirm] = useState<Customer>();
   const [notice, setNotice] = useState<Notice>();
   const [search, setSearch] = useState('');
+  const [customerView, setCustomerView] = useState('all');
   const canDelete = useCanManage();
   const navigate = useNavigate();
+  const customerViewOptions = useMemo(() => [
+    { key: 'all', label: 'Todos', count: rows.length },
+    { key: 'active', label: 'Activos', count: rows.filter((customer) => customer.status === 1).length },
+    { key: 'inactive', label: 'Inactivos', count: rows.filter((customer) => customer.status === 2).length },
+    { key: 'suspended', label: 'Suspendidos', count: rows.filter((customer) => customer.status === 3).length },
+    { key: 'missingPhone', label: 'Sin telefono', count: rows.filter((customer) => !normalizeSearch(customer.phone)).length }
+  ], [rows]);
   const filteredRows = useMemo(() => {
     const term = normalizeSearch(search);
-    if (!term) return rows;
     return rows.filter((customer) => {
+      const matchesView =
+        customerView === 'all'
+        || (customerView === 'active' && customer.status === 1)
+        || (customerView === 'inactive' && customer.status === 2)
+        || (customerView === 'suspended' && customer.status === 3)
+        || (customerView === 'missingPhone' && !normalizeSearch(customer.phone));
+      if (!matchesView) return false;
+      if (!term) return true;
       const searchable = [
         customer.firstName,
         customer.middleName,
@@ -350,7 +365,7 @@ function CustomersPage() {
       ].map(normalizeSearch).join(' ');
       return searchable.includes(term);
     });
-  }, [rows, search]);
+  }, [rows, search, customerView]);
 
   const save = async (payload: typeof emptyCustomer) => {
     const body = {
@@ -391,23 +406,36 @@ function CustomersPage() {
     <Header title="Clientes" action="Nuevo cliente" onAction={() => setForm({ open: true })} onRefresh={reload} />
     <StatusBar loading={loading} error={error} />
     <Paper variant="outlined" sx={{ p: 2 }}>
-      <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} alignItems={{ xs: 'stretch', md: 'center' }} justifyContent="space-between">
-        <TextField
-          fullWidth
-          label="Buscar cliente"
-          placeholder="Nombre, apellido o telefono"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          InputProps={{
-            startAdornment: <InputAdornment position="start"><Search fontSize="small" /></InputAdornment>,
-            endAdornment: search ? <InputAdornment position="end"><IconButton size="small" onClick={() => setSearch('')}><Close fontSize="small" /></IconButton></InputAdornment> : undefined
-          }}
-        />
-        <Chip
-          variant="outlined"
-          label={search ? `${filteredRows.length} de ${rows.length} clientes` : `${rows.length} clientes`}
-          sx={{ alignSelf: { xs: 'flex-start', md: 'center' }, flexShrink: 0 }}
-        />
+      <Stack spacing={1.5}>
+        <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} alignItems={{ xs: 'stretch', md: 'center' }} justifyContent="space-between">
+          <TextField
+            fullWidth
+            label="Buscar cliente"
+            placeholder="Nombre, apellido o telefono"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            InputProps={{
+              startAdornment: <InputAdornment position="start"><Search fontSize="small" /></InputAdornment>,
+              endAdornment: search ? <InputAdornment position="end"><IconButton size="small" onClick={() => setSearch('')}><Close fontSize="small" /></IconButton></InputAdornment> : undefined
+            }}
+          />
+          <Chip
+            variant="outlined"
+            label={`${filteredRows.length} de ${rows.length} clientes`}
+            sx={{ alignSelf: { xs: 'flex-start', md: 'center' }, flexShrink: 0 }}
+          />
+        </Stack>
+        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+          <Typography variant="body2" color="text.secondary" fontWeight={800}>Vistas rapidas</Typography>
+          {customerViewOptions.map((option) => <Chip
+            key={option.key}
+            clickable
+            color={customerView === option.key ? 'primary' : 'default'}
+            variant={customerView === option.key ? 'filled' : 'outlined'}
+            label={`${option.label} (${option.count})`}
+            onClick={() => setCustomerView(option.key)}
+          />)}
+        </Stack>
       </Stack>
     </Paper>
     <EntityTable

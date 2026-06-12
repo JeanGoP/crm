@@ -1,7 +1,7 @@
 # Manual de usuario - CRM Comercial
 
 Ultima actualizacion: 2026-06-12  
-Version del manual: 6.4
+Version del manual: 6.5
 Sistema: CRM para gestion comercial y ventas a credito  
 
 ## 1. Bienvenida
@@ -128,6 +128,8 @@ El modulo Clientes guarda la informacion principal de las personas o empresas co
 ### Buscar un cliente
 
 En la parte superior de Clientes use el campo **Buscar cliente**. Puede escribir nombre, apellido o telefono. La lista se filtra automaticamente mientras escribe y muestra solo los clientes que coinciden.
+
+Tambien puede usar las **Vistas rapidas** para filtrar clientes por estado, como activos, inactivos, suspendidos o clientes sin telefono registrado.
 
 ### Cliente creado desde cotizacion
 
@@ -544,6 +546,7 @@ El sistema muestra mensajes cuando algo no puede completarse.
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-06-12 | 6.5 | Se agregan vistas rapidas en Clientes para filtrar la base por estado y clientes sin telefono. |
 | 2026-06-12 | 6.4 | Se agrega busqueda interactiva en Clientes por nombre, apellido o telefono. |
 | 2026-06-11 | 6.3 | Se reorganiza la solicitud de credito en bloques horizontales para capturar cliente, producto, credito, codeudor, referencias y gestion con mayor orden. |
 | 2026-06-11 | 6.2 | Se reorganiza el formulario de cotizacion en una vista mas horizontal para capturar datos del cliente y varios articulos con mayor claridad. |
