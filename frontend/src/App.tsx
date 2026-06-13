@@ -496,8 +496,6 @@ function Customer360Page() {
   return <Stack spacing={3}>
     <Header
       title={customer ? customerName : 'Cliente 360'}
-      action={customer ? 'Nuevo seguimiento' : undefined}
-      onAction={() => customer && setActivityForm({ open: true, item: { ...emptyActivity, title: `Seguimiento: ${customer.name}`, customerId: customer.id } as Activity })}
       onRefresh={reload}
       secondaryAction={{ label: 'Volver', onClick: () => navigate('/clientes') }}
     />
