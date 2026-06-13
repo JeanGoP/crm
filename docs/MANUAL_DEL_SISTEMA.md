@@ -1,7 +1,7 @@
 # Manual de usuario - CRM Comercial
 
-Ultima actualizacion: 2026-06-12  
-Version del manual: 6.5
+Ultima actualizacion: 2026-06-13  
+Version del manual: 6.6
 Sistema: CRM para gestion comercial y ventas a credito  
 
 ## 1. Bienvenida
@@ -149,7 +149,11 @@ Cliente 360 muestra toda la informacion importante de un cliente en una sola pan
 
 ### Que puede revisar
 
+- Encabezado con estado, identificacion y acciones rapidas.
+- Indicadores de cotizaciones, valor cotizado, solicitudes, pipeline y pendientes.
 - Datos personales y de contacto.
+- Resumen comercial del cliente.
+- Siguiente seguimiento programado.
 - Cotizaciones asociadas.
 - Solicitudes de credito.
 - Negocios en pipeline.
@@ -160,20 +164,6 @@ Cliente 360 muestra toda la informacion importante de un cliente en una sola pan
 ### Recomendacion de uso
 
 Antes de llamar o escribir a un cliente, abra Cliente 360. Asi puede ver que se ha hablado, que documentos faltan y cual es el siguiente paso.
-
-### Asistente comercial con IA
-
-El boton **Analizar con IA** resume el caso del cliente, muestra pendientes, prioridad, riesgo, siguiente mejor accion y un mensaje sugerido para WhatsApp.
-
-Para usar el mensaje:
-
-1. Abra el analisis con **Analizar con IA**.
-2. Revise el mensaje sugerido.
-3. Presione **Enviar por WhatsApp**.
-4. El sistema abre WhatsApp con el cliente y deja el mensaje listo para enviar.
-5. Revise el texto y envie el mensaje cuando este correcto.
-
-Si el cliente no tiene telefono registrado, el sistema permite copiar el mensaje para usarlo manualmente.
 
 ## 9. Productos
 
@@ -546,6 +536,7 @@ El sistema muestra mensajes cuando algo no puede completarse.
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-06-13 | 6.6 | Se mejora Cliente 360 como ficha completa del cliente con encabezado, acciones rapidas, indicadores, resumen comercial, siguiente paso, timeline y paneles de proceso. |
 | 2026-06-12 | 6.5 | Se agregan vistas rapidas en Clientes para filtrar la base por estado y clientes sin telefono. |
 | 2026-06-12 | 6.4 | Se agrega busqueda interactiva en Clientes por nombre, apellido o telefono. |
 | 2026-06-11 | 6.3 | Se reorganiza la solicitud de credito en bloques horizontales para capturar cliente, producto, credito, codeudor, referencias y gestion con mayor orden. |
