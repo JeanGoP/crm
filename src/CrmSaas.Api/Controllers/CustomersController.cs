@@ -56,7 +56,16 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
             .Where(x => x.ClienteId == id)
             .OrderByDescending(x => x.FechaCreacion)
             .ToListAsync(cancellationToken);
-        var timeline = BuildTimeline(quotes, creditApplications, dealTimelineItems, activities, notes);
+        var files = await db.Archivos
+            .Where(x => x.ClienteId == id)
+            .OrderByDescending(x => x.FechaCreacion)
+            .ToListAsync(cancellationToken);
+        var deliveries = await db.EntregasMoto
+            .Include(x => x.Producto)
+            .Where(x => x.ClienteId == id)
+            .OrderByDescending(x => x.FechaEntrega)
+            .ToListAsync(cancellationToken);
+        var timeline = BuildTimeline(quotes, creditApplications, dealTimelineItems, activities, notes, files, deliveries);
 
         return Ok(new Customer360Dto(
             ToCustomerDto(customer),
@@ -303,7 +312,9 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
         IReadOnlyCollection<SolicitudCredito> creditApplications,
         IReadOnlyCollection<DealTimelineEntry> deals,
         IReadOnlyCollection<ActivityDto> activities,
-        IReadOnlyCollection<Nota> notes)
+        IReadOnlyCollection<Nota> notes,
+        IReadOnlyCollection<Archivo> files,
+        IReadOnlyCollection<EntregaMoto> deliveries)
     {
         var items = new List<CustomerTimelineItemDto>();
 
@@ -366,9 +377,25 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
             "default",
             x.Id)));
 
+        items.AddRange(files.Select(x => new CustomerTimelineItemDto(
+            x.FechaCreacion,
+            "Archivo",
+            x.Nombre,
+            $"Archivo adjunto al cliente ({x.ContentType}, {ReadableBytes(x.TamanoBytes)}).",
+            "default",
+            x.Id)));
+
+        items.AddRange(deliveries.Select(x => new CustomerTimelineItemDto(
+            x.FechaEntrega,
+            "Entrega",
+            $"Entrega {x.Numero}",
+            $"{(x.Producto is null ? "Producto" : ProductName(x.Producto))} - {DeliveryStatus(x.Estado)}{(string.IsNullOrWhiteSpace(x.Placa) ? string.Empty : $" - placa {x.Placa}")}.",
+            x.Estado is EstadoEntregaMoto.Entregada ? "success" : x.Estado is EstadoEntregaMoto.Cancelada ? "error" : "warning",
+            x.Id)));
+
         return items
             .OrderByDescending(x => x.OccurredAt)
-            .Take(80)
+            .Take(120)
             .ToList();
     }
 
@@ -498,6 +525,13 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
 
     private static string Money(decimal value) => "$" + value.ToString("N0");
 
+    private static string ReadableBytes(long bytes)
+    {
+        if (bytes >= 1024 * 1024) return $"{bytes / 1024m / 1024m:N1} MB";
+        if (bytes >= 1024) return $"{bytes / 1024m:N1} KB";
+        return $"{bytes:N0} bytes";
+    }
+
     private sealed record DealTimelineEntry(DealDto Deal, DateTime OccurredAt);
 
     private static string CreditStatus(EstadoSolicitudCredito status) => status switch
@@ -511,6 +545,14 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
         EstadoSolicitudCredito.Desembolsada => "Entregado",
         EstadoSolicitudCredito.Interesado => "Interesado",
         EstadoSolicitudCredito.Desistida => "Desistido",
+        _ => status.ToString()
+    };
+
+    private static string DeliveryStatus(EstadoEntregaMoto status) => status switch
+    {
+        EstadoEntregaMoto.Programada => "Programada",
+        EstadoEntregaMoto.Entregada => "Entregada",
+        EstadoEntregaMoto.Cancelada => "Cancelada",
         _ => status.ToString()
     };
 

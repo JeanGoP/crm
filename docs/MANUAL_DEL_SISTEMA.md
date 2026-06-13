@@ -1,7 +1,7 @@
 # Manual de usuario - CRM Comercial
 
 Ultima actualizacion: 2026-06-13  
-Version del manual: 6.6
+Version del manual: 6.7
 Sistema: CRM para gestion comercial y ventas a credito  
 
 ## 1. Bienvenida
@@ -159,7 +159,7 @@ Cliente 360 muestra toda la informacion importante de un cliente en una sola pan
 - Negocios en pipeline.
 - Actividades y seguimientos.
 - Historial de interacciones.
-- Documentos y notas relacionados.
+- Documentos, archivos, notas y entregas relacionados.
 
 ### Recomendacion de uso
 
@@ -536,6 +536,7 @@ El sistema muestra mensajes cuando algo no puede completarse.
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-06-13 | 6.7 | El timeline de Cliente 360 incorpora mas eventos del ciclo comercial, incluyendo archivos generales y entregas. |
 | 2026-06-13 | 6.6 | Se mejora Cliente 360 como ficha completa del cliente con encabezado, acciones rapidas, indicadores, resumen comercial, siguiente paso, timeline y paneles de proceso. |
 | 2026-06-12 | 6.5 | Se agregan vistas rapidas en Clientes para filtrar la base por estado y clientes sin telefono. |
 | 2026-06-12 | 6.4 | Se agrega busqueda interactiva en Clientes por nombre, apellido o telefono. |
