@@ -157,7 +157,7 @@ function Layout() {
   const closeMobileNav = () => setMobileOpen(false);
   const drawerContent = <>
     <Toolbar sx={{ px: 3 }}>
-      <Typography variant="h6" fontWeight={800}>CRM SaaS</Typography>
+      <Typography variant="h6" fontWeight={800}>EnMarcha CRM</Typography>
     </Toolbar>
     <Divider />
     <Stack sx={{ p: 1 }}>
@@ -261,7 +261,7 @@ function LoginPage() {
   return (
     <Box className="loginShell">
       <Paper className="loginPanel">
-        <Typography variant="h4" fontWeight={900}>CRM SaaS</Typography>
+        <Typography variant="h4" fontWeight={900}>EnMarcha CRM</Typography>
         <Typography color="text.secondary" sx={{ mb: 3 }}>Gestion comercial multiempresa</Typography>
         <Stack spacing={2}>
           <TextField label="Empresa" value={tenant} onChange={(e) => setTenant(e.target.value)} />

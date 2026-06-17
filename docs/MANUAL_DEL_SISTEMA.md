@@ -1,8 +1,8 @@
-# Manual de usuario - CRM Comercial
+# Manual de usuario - EnMarcha CRM
 
-Ultima actualizacion: 2026-06-13  
-Version del manual: 6.7
-Sistema: CRM para gestion comercial y ventas a credito  
+Ultima actualizacion: 2026-06-17  
+Version del manual: 6.8
+Sistema: EnMarcha CRM para gestion comercial y ventas a credito  
 
 ## 1. Bienvenida
 
@@ -536,6 +536,7 @@ El sistema muestra mensajes cuando algo no puede completarse.
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-06-17 | 6.8 | Se actualiza el nombre visible del sistema a EnMarcha CRM en el frontend y en el manual. |
 | 2026-06-13 | 6.7 | El timeline de Cliente 360 incorpora mas eventos del ciclo comercial, incluyendo archivos generales y entregas. |
 | 2026-06-13 | 6.6 | Se mejora Cliente 360 como ficha completa del cliente con encabezado, acciones rapidas, indicadores, resumen comercial, siguiente paso, timeline y paneles de proceso. |
 | 2026-06-12 | 6.5 | Se agregan vistas rapidas en Clientes para filtrar la base por estado y clientes sin telefono. |
