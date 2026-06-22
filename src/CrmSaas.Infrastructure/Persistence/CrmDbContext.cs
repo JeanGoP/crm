@@ -74,7 +74,13 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
         modelBuilder.Entity<EtapaNegocio>().Property(x => x.ProbabilidadPredeterminada).HasPrecision(5, 2);
         modelBuilder.Entity<Producto>().Property(x => x.Nombre).HasMaxLength(180);
         modelBuilder.Entity<Producto>().Property(x => x.Categoria).HasMaxLength(80);
+        modelBuilder.Entity<Producto>().Property(x => x.Linea).HasMaxLength(100);
+        modelBuilder.Entity<Producto>().Property(x => x.Version).HasMaxLength(100);
         modelBuilder.Entity<Producto>().Property(x => x.Precio).HasPrecision(18, 2);
+        modelBuilder.Entity<Producto>().Property(x => x.Soat).HasPrecision(18, 2);
+        modelBuilder.Entity<Producto>().Property(x => x.Matricula).HasPrecision(18, 2);
+        modelBuilder.Entity<Producto>().Property(x => x.Impuestos).HasPrecision(18, 2);
+        modelBuilder.Entity<Producto>().Property(x => x.FichaTecnica).HasMaxLength(1600);
         modelBuilder.Entity<Producto>().HasIndex(x => new { x.EmpresaId, x.Categoria });
         modelBuilder.Entity<Producto>().HasIndex(x => new { x.EmpresaId, x.Referencia });
         modelBuilder.Entity<ProductoFoto>().Property(x => x.NombreArchivo).HasMaxLength(220);

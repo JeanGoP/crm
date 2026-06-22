@@ -1,7 +1,7 @@
 # Manual de usuario - EnMarcha CRM
 
 Ultima actualizacion: 2026-06-22  
-Version del manual: 7.1
+Version del manual: 7.2
 Sistema: EnMarcha CRM para gestion comercial y ventas a credito  
 
 ## 1. Bienvenida
@@ -173,14 +173,23 @@ Antes de llamar o escribir a un cliente, abra Cliente 360. Asi puede ver que se 
 
 El modulo Productos permite administrar lo que la empresa vende o cotiza. Aunque el sistema inicio enfocado en motos, tambien puede manejar otros productos.
 
+En este maestro se define la informacion comercial del articulo, su ficha tecnica, el precio vigente y los cargos que normalmente acompanian la cotizacion.
+
 ### Crear un producto
 
 1. Entre a **Productos**.
 2. Presione **Nuevo producto**.
-3. Escriba nombre, referencia, marca y categoria.
-4. Complete las caracteristicas principales, como cilindraje, modelo, color u otros datos necesarios.
-5. Ingrese precio y estado.
-6. Guarde.
+3. En **Datos comerciales**, escriba nombre, categoria, marca, modelo, linea, version, referencia y color.
+4. En **Ficha tecnica**, complete cilindraje, ano, vigencia del precio y las caracteristicas estructuradas del producto.
+5. En **Precio y cargos**, ingrese el precio base, SOAT, matricula e impuestos cuando apliquen.
+6. Defina el estado del producto.
+7. Guarde.
+
+### Precio y cargos del producto
+
+El **precio base** es el valor comercial del articulo. Los campos **SOAT**, **matricula** e **impuestos** son cargos adicionales que el sistema puede usar automaticamente al crear una cotizacion.
+
+Si esos cargos estan configurados en el producto, al seleccionarlo en una cotizacion se cargan como valores sugeridos para el calculo. El asesor puede ajustarlos antes de guardar si el caso comercial lo requiere.
 
 ### Adjuntar fotos al producto
 
@@ -196,7 +205,7 @@ La foto marcada como **Foto PDF** sera la imagen comercial que aparecera en el P
 
 ### Recomendacion de uso
 
-Mantenga precios, modelos y estados actualizados. Una cotizacion depende de que el producto tenga informacion correcta.
+Mantenga precios, modelos, cargos, vigencias y estados actualizados. Una cotizacion depende de que el producto tenga informacion correcta.
 
 ## 10. Cotizaciones
 
@@ -206,7 +215,7 @@ Mantenga precios, modelos y estados actualizados. Una cotizacion depende de que 
 
 Cotizaciones permite generar una propuesta comercial para un cliente. Es uno de los puntos principales del proceso de venta.
 
-El formulario esta organizado en una vista amplia: primero se capturan los datos del cliente y luego los articulos a cotizar, cada uno con producto, foto, cuota inicial, numero de cuotas, seguro, gastos y cuota aproximada.
+El formulario esta organizado en una vista amplia: primero se capturan los datos del cliente y luego los articulos a cotizar, cada uno con producto, cuota inicial, numero de cuotas, seguro, gastos y cuota aproximada.
 
 La cotizacion usa automaticamente la sede principal del asesor conectado. Esa sede define logo de marca, tasa factor mensual, plazo maximo, vigencia y condiciones comerciales impresas en el PDF.
 
@@ -256,7 +265,7 @@ El simulador ayuda a estimar rapidamente el valor de la cuota cuando el cliente 
 1. Seleccione el producto que el cliente desea cotizar.
 2. Digite la cuota inicial que el cliente va a entregar.
 3. Indique el numero de cuotas.
-4. Agregue seguro o gastos adicionales si aplican.
+4. Revise seguro y gastos. Si el producto tiene SOAT, matricula o impuestos configurados, el sistema los trae como valores sugeridos.
 5. Revise el total financiado y la cuota aproximada.
 
 ### Campos principales
@@ -264,8 +273,8 @@ El simulador ayuda a estimar rapidamente el valor de la cuota cuando el cliente 
 - **Precio del producto:** valor base del producto.
 - **Cuota inicial:** dinero que entrega el cliente al inicio.
 - **Numero de cuotas:** cantidad de pagos que tendra la financiacion.
-- **Seguro:** valor adicional del seguro, si aplica.
-- **Gastos administrativos:** cobros asociados al proceso.
+- **Seguro:** valor adicional del seguro o SOAT, si aplica.
+- **Gastos administrativos:** cobros asociados al proceso, como matricula o impuestos cuando correspondan.
 - **Total financiado:** valor que queda pendiente despues de la cuota inicial y cargos.
 - **Cuota aproximada:** valor estimado de la cuota mensual.
 
@@ -555,6 +564,7 @@ El sistema muestra mensajes cuando algo no puede completarse.
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-06-22 | 7.2 | Se amplia el maestro de productos con linea, version, ficha tecnica, vigencia de precio, SOAT, matricula e impuestos; la cotizacion puede usar esos cargos automaticamente. |
 | 2026-06-22 | 7.1 | Las cotizaciones quedan conectadas a la sede del asesor y usan logo de marca, tasa, plazo, vigencia y condiciones comerciales por sede. |
 | 2026-06-22 | 7.0 | Los usuarios pueden quedar asociados a una sede principal para preparar cotizaciones, reportes y tramites por punto de venta. |
 | 2026-06-22 | 6.9 | Se agrega el maestro de sedes / puntos de venta en Configuracion y se documenta su uso para condiciones comerciales por sede. |

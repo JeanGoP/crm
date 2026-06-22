@@ -104,7 +104,7 @@ const emptyDeal = { title: '', customerId: '', stageId: '', value: 0, closeProba
 const emptyActivity = { title: '', description: '', type: 1, status: 1, scheduledAt: `${today}T09:00`, reminderAt: '', customerId: '', dealId: '', assignedUserId: '' };
 const emptyCompany = { name: '', subdomain: '', customDomain: '', logoDataUrl: '', active: true };
 const emptyUser = { fullName: '', email: '', password: '', companyId: '', salesPointId: '', roles: ['Vendedor'] };
-const emptyProduct = { name: '', category: 'Moto', brand: '', model: '', reference: '', description: '', engineCc: '', year: '', color: '', price: 0, active: true };
+const emptyProduct = { name: '', category: 'Moto', brand: '', model: '', line: '', version: '', reference: '', description: '', engineCc: '', year: '', color: '', price: 0, soat: 0, registrationFee: 0, taxes: 0, technicalSheet: '', priceValidFrom: today, active: true };
 const emptyFinancialSettings = { minimumWage: 1400000, consumerAnnualRate: 29.72, lowAmountAnnualRate: 56.33, factorMonthlyRate: 4.5, maxTermMonths: 30, paymentRounding: 1000, useMontelibanoTable: true, active: true };
 const emptySalesPoint = { name: '', code: '', city: '', address: '', phone: '', mainBrand: 'Honda', brandLogoDataUrl: '', factorMonthlyRate: 4.5, maxTermMonths: 30, quoteValidityDays: 7, deliveryMode: 'ConSoat', soatDays: 14, registrationDays: 20, soatProvider: '', registrationAgent: '', commercialTerms: 'Cotizacion sujeta a disponibilidad del producto, validacion comercial y aprobacion final.', active: true };
 const emptyQuoteItem = { productId: '', downPayment: 0, insurance: 0, administrativeFees: 0, termMonths: 24, monthlyInterestRate: 2.2 };
@@ -644,9 +644,17 @@ function ProductsPage() {
     const body = {
       ...payload,
       description: payload.description || null,
+      line: payload.line || null,
+      version: payload.version || null,
       engineCc: payload.engineCc === '' ? null : Number(payload.engineCc),
       year: payload.year === '' ? null : Number(payload.year),
+      color: payload.color || null,
       price: Number(payload.price),
+      soat: Number(payload.soat),
+      registrationFee: Number(payload.registrationFee),
+      taxes: Number(payload.taxes),
+      technicalSheet: payload.technicalSheet || null,
+      priceValidFrom: payload.priceValidFrom || null,
       active: Boolean(payload.active)
     };
     const { data } = form.item
@@ -669,7 +677,7 @@ function ProductsPage() {
     <Header title="Productos" action={canManage ? 'Nuevo producto' : undefined} onAction={() => setForm({ open: true })} onRefresh={reload} />
     <StatusBar loading={loading} error={error} />
     <EntityTable
-      headers={['Producto', 'Fotos', 'Categoria', 'Marca', 'Referencia', 'Caracteristicas', 'Precio', 'Estado', 'Acciones']}
+      headers={['Producto', 'Fotos', 'Categoria', 'Marca', 'Referencia', 'Caracteristicas', 'Cargos', 'Precio', 'Estado', 'Acciones']}
       empty="No hay productos registrados"
       rows={rows.map((r) => [
         <Stack direction="row" spacing={1.5} alignItems="center">
@@ -686,7 +694,11 @@ function ProductsPage() {
         r.category,
         r.brand,
         r.reference,
-        [r.model, r.engineCc ? `${r.engineCc} cc` : undefined, r.year, r.color].filter(Boolean).join(' / ') || r.description,
+        [r.model, r.line, r.version, r.engineCc ? `${r.engineCc} cc` : undefined, r.year, r.color].filter(Boolean).join(' / ') || r.description,
+        <Stack spacing={0.25}>
+          <Typography variant="body2">{money((r.soat ?? 0) + (r.registrationFee ?? 0) + (r.taxes ?? 0))}</Typography>
+          <Typography variant="caption" color="text.secondary">SOAT {money(r.soat ?? 0)} · Mat. {money(r.registrationFee ?? 0)}</Typography>
+        </Stack>,
         money(r.price),
         <StatusChip label={r.active ? 'Activa' : 'Inactiva'} tone={r.active ? 'success' : 'default'} />,
         <Actions onEdit={canManage ? () => setForm({ open: true, item: r }) : undefined} onDelete={canManage && r.active ? () => setConfirm(r) : undefined} />
@@ -1944,30 +1956,55 @@ function ProductDialog({ form, onClose, onSave, onChanged }: DialogProps<Product
     category: form.item.category,
     brand: form.item.brand,
     model: form.item.model,
+    line: form.item.line ?? '',
+    version: form.item.version ?? '',
     reference: form.item.reference,
     description: form.item.description ?? '',
     engineCc: form.item.engineCc?.toString() ?? '',
     year: form.item.year?.toString() ?? '',
     color: form.item.color ?? '',
     price: form.item.price,
+    soat: form.item.soat ?? 0,
+    registrationFee: form.item.registrationFee ?? 0,
+    taxes: form.item.taxes ?? 0,
+    technicalSheet: form.item.technicalSheet ?? '',
+    priceValidFrom: form.item.priceValidFrom?.slice(0, 10) ?? today,
     active: form.item.active
   } : emptyProduct;
   return <FormDialog title={form.item ? 'Editar producto' : 'Nuevo producto'} open={form.open} initial={initial} onClose={onClose} onSave={onSave}>
     {(v, set) => <>
-      <TextField required label="Nombre del producto" value={v.name} onChange={(e) => set({ name: e.target.value })} />
-      <TextField required select label="Categoria" value={v.category} onChange={(e) => set({ category: e.target.value })}>
-        {['Moto', 'Accesorio', 'Seguro', 'Tramite', 'Repuesto', 'Servicio', 'Garantia', 'Otro'].map((category) => <MenuItem key={category} value={category}>{category}</MenuItem>)}
-      </TextField>
-      <TextField label="Marca" value={v.brand} onChange={(e) => set({ brand: e.target.value })} />
-      <TextField label="Modelo" value={v.model} onChange={(e) => set({ model: e.target.value })} />
-      <TextField required label="Referencia" value={v.reference} onChange={(e) => set({ reference: e.target.value })} />
-      <TextField label="Descripcion" value={v.description} onChange={(e) => set({ description: e.target.value })} multiline minRows={2} />
-      <FieldGrid>
+      <SectionTitle title="Datos comerciales" />
+      <FieldGrid columns={2}>
+        <TextField fullWidth required label="Nombre del producto" value={v.name} onChange={(e) => set({ name: e.target.value })} />
+        <TextField fullWidth required select label="Categoria" value={v.category} onChange={(e) => set({ category: e.target.value })}>
+          {['Moto', 'Accesorio', 'Seguro', 'Tramite', 'Repuesto', 'Servicio', 'Garantia', 'Otro'].map((category) => <MenuItem key={category} value={category}>{category}</MenuItem>)}
+        </TextField>
+      </FieldGrid>
+      <FieldGrid columns={3}>
+        <TextField fullWidth label="Marca" value={v.brand} onChange={(e) => set({ brand: e.target.value })} />
+        <TextField fullWidth label="Modelo" value={v.model} onChange={(e) => set({ model: e.target.value })} />
+        <TextField fullWidth label="Linea" value={v.line} onChange={(e) => set({ line: e.target.value })} />
+      </FieldGrid>
+      <FieldGrid columns={3}>
+        <TextField fullWidth label="Version" value={v.version} onChange={(e) => set({ version: e.target.value })} />
+        <TextField fullWidth required label="Referencia" value={v.reference} onChange={(e) => set({ reference: e.target.value })} />
+        <TextField fullWidth label="Color" value={v.color} onChange={(e) => set({ color: e.target.value })} />
+      </FieldGrid>
+      <TextField label="Descripcion comercial" value={v.description} onChange={(e) => set({ description: e.target.value })} multiline minRows={2} />
+      <SectionTitle title="Ficha tecnica" />
+      <FieldGrid columns={3}>
         <TextField fullWidth label="Cilindraje" type="number" value={v.engineCc} onChange={(e) => set({ engineCc: e.target.value })} />
         <TextField fullWidth label="Ano" type="number" value={v.year} onChange={(e) => set({ year: e.target.value })} />
+        <TextField fullWidth label="Vigente desde" type="date" value={v.priceValidFrom} onChange={(e) => set({ priceValidFrom: e.target.value })} InputLabelProps={{ shrink: true }} />
       </FieldGrid>
-      <TextField label="Color" value={v.color} onChange={(e) => set({ color: e.target.value })} />
-      <TextField required label="Precio" type="number" value={v.price} onChange={(e) => set({ price: Number(e.target.value) })} />
+      <TextField label="Ficha tecnica estructurada" value={v.technicalSheet} onChange={(e) => set({ technicalSheet: e.target.value })} multiline minRows={3} placeholder="Ej: Motor: 125 cc&#10;Transmision: 5 velocidades&#10;Freno delantero: Disco" />
+      <SectionTitle title="Precio y cargos" />
+      <FieldGrid columns={4}>
+        <TextField fullWidth required label="Precio base" type="number" value={v.price} onChange={(e) => set({ price: Number(e.target.value) })} />
+        <TextField fullWidth label="SOAT" type="number" value={v.soat} onChange={(e) => set({ soat: Number(e.target.value) })} />
+        <TextField fullWidth label="Matricula" type="number" value={v.registrationFee} onChange={(e) => set({ registrationFee: Number(e.target.value) })} />
+        <TextField fullWidth label="Impuestos" type="number" value={v.taxes} onChange={(e) => set({ taxes: Number(e.target.value) })} />
+      </FieldGrid>
       <TextField select label="Estado" value={String(v.active)} onChange={(e) => set({ active: e.target.value === 'true' })}><MenuItem value="true">Activa</MenuItem><MenuItem value="false">Inactiva</MenuItem></TextField>
       {form.item && <ProductPhotosManager product={form.item} onChanged={onChanged} />}
       {!form.item && <Alert severity="info">Guarde el producto primero. Luego podra editarlo para adjuntar una o varias fotos y elegir la foto principal del PDF.</Alert>}
@@ -2085,7 +2122,13 @@ function ProductPhotosManager({ product, onChanged }: { product: Product; onChan
 }
 
 function QuoteDialog({ form, products, onClose, onSave }: DialogProps<Quote, typeof emptyQuote> & { products: Product[] }) {
-  const initialItem = { ...emptyQuoteItem, productId: products[0]?.id ?? '' };
+  const firstProduct = products[0];
+  const initialItem = {
+    ...emptyQuoteItem,
+    productId: firstProduct?.id ?? '',
+    insurance: firstProduct?.soat ?? 0,
+    administrativeFees: (firstProduct?.registrationFee ?? 0) + (firstProduct?.taxes ?? 0)
+  };
   const initial = { ...emptyQuote, productId: initialItem.productId, items: [initialItem] };
   const [identityLoading, setIdentityLoading] = useState(false);
   const [identityNotice, setIdentityNotice] = useState<Notice>();
@@ -2142,9 +2185,23 @@ function QuoteDialog({ form, products, onClose, onSave }: DialogProps<Quote, typ
         const items = quoteItems.map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item);
         set({ items, productId: items[0]?.productId ?? '', downPayment: Number(items[0]?.downPayment ?? 0), insurance: Number(items[0]?.insurance ?? 0), administrativeFees: Number(items[0]?.administrativeFees ?? 0), termMonths: Number(items[0]?.termMonths ?? 24), monthlyInterestRate: Number(items[0]?.monthlyInterestRate ?? 2.2) });
       };
+      const updateItemProduct = (index: number, productId: string) => {
+        const selected = products.find((product) => product.id === productId);
+        updateItem(index, {
+          productId,
+          insurance: selected?.soat ?? 0,
+          administrativeFees: (selected?.registrationFee ?? 0) + (selected?.taxes ?? 0)
+        });
+      };
       const addItem = () => {
         if (quoteItems.length >= 4) return;
-        const items = [...quoteItems, { ...emptyQuoteItem, productId: products[0]?.id ?? '' }];
+        const selected = products[0];
+        const items = [...quoteItems, {
+          ...emptyQuoteItem,
+          productId: selected?.id ?? '',
+          insurance: selected?.soat ?? 0,
+          administrativeFees: (selected?.registrationFee ?? 0) + (selected?.taxes ?? 0)
+        }];
         set({ items });
       };
       const removeItem = (index: number) => {
@@ -2220,7 +2277,7 @@ function QuoteDialog({ form, products, onClose, onSave }: DialogProps<Quote, typ
                   gap: 1.5,
                   alignItems: 'stretch'
                 }}>
-                  <TextField required select label="Producto" value={item.productId} onChange={(e) => updateItem(index, { productId: e.target.value })}>
+                  <TextField required select label="Producto" value={item.productId} onChange={(e) => updateItemProduct(index, e.target.value)}>
                     {products.length ? products.map((product) => <MenuItem key={product.id} value={product.id}>{productName(product)} ({product.category}) - {money(product.price)}</MenuItem>) : <MenuItem value="">No hay productos activos</MenuItem>}
                   </TextField>
                   <TextField fullWidth label="Cuota inicial" type="number" value={item.downPayment} onChange={(e) => updateItem(index, { downPayment: Number(e.target.value) })} />
@@ -3172,7 +3229,7 @@ function alertSeverityTone(severity?: string): 'success' | 'warning' | 'error' |
   return 'default';
 }
 function productName(product: Product) {
-  return product.name?.trim() || [product.brand, product.model, product.reference].filter(Boolean).join(' ').trim() || 'Producto';
+  return product.name?.trim() || [product.brand, product.model, product.line, product.version, product.reference].filter(Boolean).join(' ').trim() || 'Producto';
 }
 function readableFileSize(bytes: number) {
   if (!Number.isFinite(bytes) || bytes <= 0) return '0 KB';

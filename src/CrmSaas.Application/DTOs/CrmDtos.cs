@@ -71,8 +71,8 @@ public sealed record ActivityDto(
 public sealed record UpsertActivityDto(string Title, string? Description, TipoActividad Type, EstadoActividad Status, DateTime ScheduledAt, DateTime? ReminderAt, Guid? CustomerId, Guid? DealId, Guid? AssignedUserId);
 
 public sealed record ProductPhotoDto(Guid Id, string FileName, string ContentType, long SizeBytes, bool IsQuoteDefault, string DataUrl);
-public sealed record ProductDto(Guid Id, string Name, string Category, string Brand, string Model, string Reference, string? Description, int? EngineCc, int? Year, string? Color, decimal Price, bool Active, IReadOnlyCollection<ProductPhotoDto> Photos);
-public sealed record UpsertProductDto(string Name, string Category, string Brand, string Model, string Reference, string? Description, int? EngineCc, int? Year, string? Color, decimal Price, bool Active);
+public sealed record ProductDto(Guid Id, string Name, string Category, string Brand, string Model, string? Line, string? Version, string Reference, string? Description, int? EngineCc, int? Year, string? Color, decimal Price, decimal Soat, decimal RegistrationFee, decimal Taxes, string? TechnicalSheet, DateTime? PriceValidFrom, bool Active, IReadOnlyCollection<ProductPhotoDto> Photos);
+public sealed record UpsertProductDto(string Name, string Category, string Brand, string Model, string? Line, string? Version, string Reference, string? Description, int? EngineCc, int? Year, string? Color, decimal Price, decimal Soat, decimal RegistrationFee, decimal Taxes, string? TechnicalSheet, DateTime? PriceValidFrom, bool Active);
 
 public sealed record FinancialSettingsDto(
     Guid Id,

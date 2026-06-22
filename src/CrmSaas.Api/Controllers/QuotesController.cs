@@ -65,7 +65,9 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             if (item.TermMonths <= 0) throw new ValidationException("El plazo debe ser mayor a cero.");
             if (item.MonthlyInterestRate < 0) throw new ValidationException("La tasa mensual no puede ser negativa.");
             var product = products[item.ProductId];
-            var simulation = CalculateSimulation(product.Precio, item.DownPayment, item.Insurance, item.AdministrativeFees, item.TermMonths, item.MonthlyInterestRate, financialSettings, salesPoint);
+            var insurance = item.Insurance > 0 ? item.Insurance : product.Soat;
+            var administrativeFees = item.AdministrativeFees > 0 ? item.AdministrativeFees : product.Matricula + product.Impuestos;
+            var simulation = CalculateSimulation(product.Precio, item.DownPayment, insurance, administrativeFees, item.TermMonths, item.MonthlyInterestRate, financialSettings, salesPoint);
             return new { Product = product, Simulation = simulation, Order = index + 1 };
         }).ToList();
         var primary = calculatedItems[0];
@@ -233,7 +235,9 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             ?? throw new KeyNotFoundException("Producto no encontrado o inactivo.");
         var financialSettings = await GetFinancialSettingsAsync(cancellationToken);
         var salesPoint = await GetCurrentSalesPointAsync(cancellationToken);
-        var simulation = CalculateSimulation(product.Precio, dto.DownPayment, dto.Insurance, dto.AdministrativeFees, dto.TermMonths, dto.MonthlyInterestRate, financialSettings, salesPoint);
+        var insurance = dto.Insurance > 0 ? dto.Insurance : product.Soat;
+        var administrativeFees = dto.AdministrativeFees > 0 ? dto.AdministrativeFees : product.Matricula + product.Impuestos;
+        var simulation = CalculateSimulation(product.Precio, dto.DownPayment, insurance, administrativeFees, dto.TermMonths, dto.MonthlyInterestRate, financialSettings, salesPoint);
 
         return Ok(new QuoteSimulationResultDto(
             simulation.DownPayment,

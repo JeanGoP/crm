@@ -108,12 +108,19 @@ export interface Product {
   category: string;
   brand: string;
   model: string;
+  line?: string;
+  version?: string;
   reference: string;
   description?: string;
   engineCc?: number;
   year?: number;
   color?: string;
   price: number;
+  soat: number;
+  registrationFee: number;
+  taxes: number;
+  technicalSheet?: string;
+  priceValidFrom?: string;
   active: boolean;
   photos: ProductPhoto[];
 }

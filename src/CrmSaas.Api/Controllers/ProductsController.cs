@@ -34,12 +34,19 @@ public sealed class ProductsController(CrmDbContext db) : ControllerBase
             Categoria = NormalizeCategory(dto.Category),
             Marca = dto.Brand.Trim(),
             Modelo = dto.Model.Trim(),
+            Linea = NormalizeOptional(dto.Line),
+            Version = NormalizeOptional(dto.Version),
             Referencia = dto.Reference.Trim(),
-            Descripcion = dto.Description,
+            Descripcion = NormalizeOptional(dto.Description),
             Cilindraje = dto.EngineCc,
             Anio = dto.Year,
-            Color = dto.Color,
+            Color = NormalizeOptional(dto.Color),
             Precio = dto.Price,
+            Soat = dto.Soat,
+            Matricula = dto.RegistrationFee,
+            Impuestos = dto.Taxes,
+            FichaTecnica = NormalizeOptional(dto.TechnicalSheet),
+            VigenteDesde = dto.PriceValidFrom,
             Activo = dto.Active
         };
         db.Productos.Add(product);
@@ -60,12 +67,19 @@ public sealed class ProductsController(CrmDbContext db) : ControllerBase
         product.Categoria = NormalizeCategory(dto.Category);
         product.Marca = dto.Brand.Trim();
         product.Modelo = dto.Model.Trim();
+        product.Linea = NormalizeOptional(dto.Line);
+        product.Version = NormalizeOptional(dto.Version);
         product.Referencia = dto.Reference.Trim();
-        product.Descripcion = dto.Description;
+        product.Descripcion = NormalizeOptional(dto.Description);
         product.Cilindraje = dto.EngineCc;
         product.Anio = dto.Year;
-        product.Color = dto.Color;
+        product.Color = NormalizeOptional(dto.Color);
         product.Precio = dto.Price;
+        product.Soat = dto.Soat;
+        product.Matricula = dto.RegistrationFee;
+        product.Impuestos = dto.Taxes;
+        product.FichaTecnica = NormalizeOptional(dto.TechnicalSheet);
+        product.VigenteDesde = dto.PriceValidFrom;
         product.Activo = dto.Active;
         await db.SaveChangesAsync(cancellationToken);
         return Ok(ToDto(product));
@@ -166,12 +180,19 @@ public sealed class ProductsController(CrmDbContext db) : ControllerBase
         x.Categoria,
         x.Marca,
         x.Modelo,
+        x.Linea,
+        x.Version,
         x.Referencia,
         x.Descripcion,
         x.Cilindraje,
         x.Anio,
         x.Color,
         x.Precio,
+        x.Soat,
+        x.Matricula,
+        x.Impuestos,
+        x.FichaTecnica,
+        x.VigenteDesde,
         x.Activo,
         x.Fotos
             .OrderByDescending(photo => photo.EsPrincipalCotizacion)
@@ -191,6 +212,9 @@ public sealed class ProductsController(CrmDbContext db) : ControllerBase
         if (string.IsNullOrWhiteSpace(dto.Category)) throw new ValidationException("La categoria es obligatoria.");
         if (string.IsNullOrWhiteSpace(dto.Reference)) throw new ValidationException("La referencia es obligatoria.");
         if (dto.Price <= 0) throw new ValidationException("El precio debe ser mayor a cero.");
+        if (dto.Soat < 0) throw new ValidationException("El SOAT no puede ser negativo.");
+        if (dto.RegistrationFee < 0) throw new ValidationException("La matricula no puede ser negativa.");
+        if (dto.Taxes < 0) throw new ValidationException("Los impuestos no pueden ser negativos.");
     }
 
     private static void ValidatePhoto(IFormFile file)
@@ -205,4 +229,6 @@ public sealed class ProductsController(CrmDbContext db) : ControllerBase
     }
 
     private static string NormalizeCategory(string category) => string.IsNullOrWhiteSpace(category) ? "General" : category.Trim();
+
+    private static string? NormalizeOptional(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

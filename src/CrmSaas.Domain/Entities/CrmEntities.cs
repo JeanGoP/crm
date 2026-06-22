@@ -108,12 +108,19 @@ public sealed class Producto : AuditableTenantEntity
     public string Categoria { get; set; } = "Moto";
     public string Marca { get; set; } = string.Empty;
     public string Modelo { get; set; } = string.Empty;
+    public string? Linea { get; set; }
+    public string? Version { get; set; }
     public string Referencia { get; set; } = string.Empty;
     public string? Descripcion { get; set; }
     public int? Cilindraje { get; set; }
     public int? Anio { get; set; }
     public string? Color { get; set; }
     public decimal Precio { get; set; }
+    public decimal Soat { get; set; }
+    public decimal Matricula { get; set; }
+    public decimal Impuestos { get; set; }
+    public string? FichaTecnica { get; set; }
+    public DateTime? VigenteDesde { get; set; }
     public bool Activo { get; set; } = true;
     public ICollection<ProductoFoto> Fotos { get; set; } = [];
 }

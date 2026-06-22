@@ -24,8 +24,8 @@ Incluye:
 2. Conectar sedes con cotizaciones. Implementado.
    La cotizacion usa logo de marca, tasa, plazo, vigencia y condiciones de la sede del asesor.
 
-3. Ampliar maestro de productos.
-   Agregar SOAT, matricula, impuestos, ficha tecnica estructurada, vigencia de precio y marca/modelo/color mas precisos.
+3. Ampliar maestro de productos. Implementado.
+   Agrega SOAT, matricula, impuestos, ficha tecnica estructurada, vigencia de precio y marca/modelo/linea/version/color mas precisos. La cotizacion toma esos cargos como valores sugeridos del producto.
 
 4. Crear perfiles de requisitos.
    Empleado, independiente, pensionado, contado y perfiles configurables por empresa. El perfil elegido en la cotizacion debe generar el checklist de documentos.
