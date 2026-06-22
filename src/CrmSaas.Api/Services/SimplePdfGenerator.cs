@@ -418,7 +418,7 @@ public static class SimplePdfGenerator
         KeyValue(commands, 332, 653, "Producto", quote.ProductName, 74, 156);
         KeyValue(commands, 332, 631, "Precio", Money(quote.ProductPrice), 74, 156);
         KeyValue(commands, 332, 609, "Valida hasta", Date(quote.ValidUntil), 74, 156);
-        KeyValue(commands, 332, 587, "Tipo credito", Value(quote.CreditType, "Credito"), 74, 156);
+        KeyValue(commands, 332, 587, "Sede", Value(quote.SalesPointName, "Sede no registrada"), 74, 156);
 
         if (includeProductImage)
         {
@@ -461,7 +461,7 @@ public static class SimplePdfGenerator
             commands.AppendLine($"1 1 1 rg BT /F2 12 Tf 446 419 Td ({Escape(Money(quote.FinancedAmount))}) Tj ET");
             commands.AppendLine($"1 1 1 rg BT /F1 9 Tf 346 404 Td (Cuota seleccionada: {quote.TermMonths} meses - {Escape(Money(quote.EstimatedMonthlyPayment))}) Tj ET");
             KeyValue(commands, 332, 370, "Total estimado", Money(quote.EstimatedTotalPayment), 88, 130);
-            KeyValue(commands, 332, 350, "Tasa mensual", $"{quote.MonthlyInterestRate:N3}%", 88, 130);
+            KeyValue(commands, 332, 350, "Marca / tasa", $"{Value(quote.SalesPointBrand, "Marca")} - {quote.MonthlyInterestRate:N3}%", 88, 130);
         }
 
         DrawPanel(commands, 46, 190, 520, 112, "REQUISITOS GENERALES");
@@ -474,7 +474,7 @@ public static class SimplePdfGenerator
         KeyValue(commands, 62, 112, "Contacto", Value(customerPhone), 52, 166);
 
         DrawPanel(commands, 316, 98, 250, 64, "OBSERVACIONES");
-        Paragraph(commands, 332, 134, Value(quote.Notes, "Cotizacion sujeta a aprobacion final y disponibilidad del producto."), 46, 8, 3);
+        Paragraph(commands, 332, 134, Value(quote.Notes, Value(quote.SalesPointCommercialTerms, "Cotizacion sujeta a aprobacion final y disponibilidad del producto.")), 46, 8, 3);
 
         var legal = "Autorizacion de tratamiento de datos: con la firma o aceptacion de esta cotizacion, el cliente autoriza el uso de sus datos para gestion comercial, estudio de credito, seguimiento, cobranza e informacion relacionada con productos y servicios.";
         Paragraph(commands, 46, 72, legal, 116, 7, 2);

@@ -106,7 +106,7 @@ const emptyCompany = { name: '', subdomain: '', customDomain: '', logoDataUrl: '
 const emptyUser = { fullName: '', email: '', password: '', companyId: '', salesPointId: '', roles: ['Vendedor'] };
 const emptyProduct = { name: '', category: 'Moto', brand: '', model: '', reference: '', description: '', engineCc: '', year: '', color: '', price: 0, active: true };
 const emptyFinancialSettings = { minimumWage: 1400000, consumerAnnualRate: 29.72, lowAmountAnnualRate: 56.33, factorMonthlyRate: 4.5, maxTermMonths: 30, paymentRounding: 1000, useMontelibanoTable: true, active: true };
-const emptySalesPoint = { name: '', code: '', city: '', address: '', phone: '', mainBrand: 'Honda', brandLogoDataUrl: '', factorMonthlyRate: 4.5, maxTermMonths: 30, deliveryMode: 'ConSoat', soatDays: 14, registrationDays: 20, soatProvider: '', registrationAgent: '', active: true };
+const emptySalesPoint = { name: '', code: '', city: '', address: '', phone: '', mainBrand: 'Honda', brandLogoDataUrl: '', factorMonthlyRate: 4.5, maxTermMonths: 30, quoteValidityDays: 7, deliveryMode: 'ConSoat', soatDays: 14, registrationDays: 20, soatProvider: '', registrationAgent: '', commercialTerms: 'Cotizacion sujeta a disponibilidad del producto, validacion comercial y aprobacion final.', active: true };
 const emptyQuoteItem = { productId: '', downPayment: 0, insurance: 0, administrativeFees: 0, termMonths: 24, monthlyInterestRate: 2.2 };
 const emptyQuote = { identificationType: 1, identificationNumber: '', customerFirstNames: '', customerLastNames: '', customerFirstName: '', customerMiddleName: '', customerLastName: '', customerSecondLastName: '', phoneCountryCode: '+57', phoneNumber: '', productId: '', downPayment: 0, insurance: 0, administrativeFees: 0, termMonths: 24, monthlyInterestRate: 2.2, items: [emptyQuoteItem], notes: '' };
 const emptyCreditApplication = {
@@ -771,12 +771,12 @@ function QuotesPage() {
     <Header title="Cotizaciones" action="Nueva cotizacion" onAction={() => setForm({ open: true })} onRefresh={reload} />
     <StatusBar loading={loading} error={error} />
     <EntityTable
-      headers={['Numero', 'Cliente', 'Identificacion', 'Productos', 'Total financiado', 'Cuota aprox.', 'Valida hasta', 'Acciones']}
+      headers={['Numero', 'Cliente', 'Sede', 'Productos', 'Total financiado', 'Cuota aprox.', 'Valida hasta', 'Acciones']}
       empty="No hay cotizaciones registradas"
       rows={rows.map((r) => [
         r.number,
         `${fullFirstNames(r.customerFirstName, r.customerMiddleName, r.customerFirstNames)} ${fullLastNames(r.customerLastName, r.customerSecondLastName, r.customerLastNames)}`.trim(),
-        `${identificationLabel(r.identificationType)} ${r.identificationNumber ?? ''}`.trim(),
+        r.salesPointName || '-',
         (r.items?.length ?? 0) > 1 ? `${r.items.length} productos` : r.productName,
         money(r.financedAmount),
         r.estimatedMonthlyPayment > 0 ? `${money(r.estimatedMonthlyPayment)} x ${r.termMonths}` : 'Sin simulacion',
@@ -1596,11 +1596,13 @@ function SettingsPage() {
       brandLogoDataUrl: payload.brandLogoDataUrl || null,
       factorMonthlyRate: Number(payload.factorMonthlyRate),
       maxTermMonths: Number(payload.maxTermMonths),
+      quoteValidityDays: Number(payload.quoteValidityDays),
       deliveryMode: payload.deliveryMode,
       soatDays: Number(payload.soatDays),
       registrationDays: Number(payload.registrationDays),
       soatProvider: payload.soatProvider || null,
       registrationAgent: payload.registrationAgent || null,
+      commercialTerms: payload.commercialTerms || null,
       active: Boolean(payload.active)
     };
     const { data } = salesPointForm.item
@@ -1736,11 +1738,13 @@ function SalesPointDialog({ form, onClose, onSave }: DialogProps<SalesPoint, typ
     brandLogoDataUrl: form.item.brandLogoDataUrl ?? '',
     factorMonthlyRate: form.item.factorMonthlyRate,
     maxTermMonths: form.item.maxTermMonths,
+    quoteValidityDays: form.item.quoteValidityDays,
     deliveryMode: form.item.deliveryMode,
     soatDays: form.item.soatDays,
     registrationDays: form.item.registrationDays,
     soatProvider: form.item.soatProvider ?? '',
     registrationAgent: form.item.registrationAgent ?? '',
+    commercialTerms: form.item.commercialTerms ?? '',
     active: form.item.active
   } : emptySalesPoint;
 
@@ -1766,10 +1770,12 @@ function SalesPointDialog({ form, onClose, onSave }: DialogProps<SalesPoint, typ
             <MenuItem value="Completa">Entrega completa</MenuItem>
           </TextField>
         </Grid>
-        <Grid item xs={12} md={4}><TextField fullWidth required type="number" label="Dias SOAT" value={v.soatDays} onChange={(e) => set({ soatDays: Number(e.target.value) })} /></Grid>
-        <Grid item xs={12} md={4}><TextField fullWidth required type="number" label="Dias matricula" value={v.registrationDays} onChange={(e) => set({ registrationDays: Number(e.target.value) })} /></Grid>
+        <Grid item xs={12} md={4}><TextField fullWidth required type="number" label="Vigencia cotizacion" value={v.quoteValidityDays} onChange={(e) => set({ quoteValidityDays: Number(e.target.value) })} /></Grid>
+        <Grid item xs={12} md={2}><TextField fullWidth required type="number" label="Dias SOAT" value={v.soatDays} onChange={(e) => set({ soatDays: Number(e.target.value) })} /></Grid>
+        <Grid item xs={12} md={2}><TextField fullWidth required type="number" label="Dias matricula" value={v.registrationDays} onChange={(e) => set({ registrationDays: Number(e.target.value) })} /></Grid>
         <Grid item xs={12} md={6}><TextField fullWidth label="Proveedor SOAT" value={v.soatProvider} onChange={(e) => set({ soatProvider: e.target.value })} /></Grid>
         <Grid item xs={12} md={6}><TextField fullWidth label="Tramitador matricula" value={v.registrationAgent} onChange={(e) => set({ registrationAgent: e.target.value })} /></Grid>
+        <Grid item xs={12}><TextField fullWidth multiline minRows={2} label="Condiciones comerciales para cotizacion" value={v.commercialTerms} onChange={(e) => set({ commercialTerms: e.target.value })} /></Grid>
       </Grid>
       <FormControlLabel control={<Checkbox checked={v.active} onChange={(e) => set({ active: e.target.checked })} />} label="Sede activa" />
     </>}

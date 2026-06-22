@@ -153,11 +153,13 @@ public sealed class PuntoVenta : AuditableTenantEntity
     public string? LogoMarcaDataUrl { get; set; }
     public decimal TasaFactorMensual { get; set; } = 4.5m;
     public int PlazoMaximoMeses { get; set; } = 30;
+    public int VigenciaCotizacionDias { get; set; } = 7;
     public string ModalidadEntrega { get; set; } = "ConSoat";
     public int TiempoSoatDias { get; set; } = 14;
     public int TiempoMatriculaDias { get; set; } = 20;
     public string? ProveedorSoat { get; set; }
     public string? TramitadorMatricula { get; set; }
+    public string? CondicionesComerciales { get; set; }
     public bool Activa { get; set; } = true;
 }
 
@@ -176,6 +178,15 @@ public sealed class Cotizacion : AuditableTenantEntity
     public Cliente? Cliente { get; set; }
     public Guid ProductoId { get; set; }
     public Producto? Producto { get; set; }
+    public Guid? PuntoVentaId { get; set; }
+    public PuntoVenta? PuntoVenta { get; set; }
+    public string? NombreSede { get; set; }
+    public string? MarcaSede { get; set; }
+    public string? ModalidadEntregaSede { get; set; }
+    public decimal? TasaFactorMensualSede { get; set; }
+    public int? PlazoMaximoMesesSede { get; set; }
+    public int? VigenciaCotizacionDiasSede { get; set; }
+    public string? CondicionesSede { get; set; }
     public decimal PrecioProducto { get; set; }
     public decimal CuotaInicial { get; set; }
     public decimal Seguro { get; set; }

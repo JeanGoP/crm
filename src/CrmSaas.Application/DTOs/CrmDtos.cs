@@ -105,11 +105,13 @@ public sealed record SalesPointDto(
     string? BrandLogoDataUrl,
     decimal FactorMonthlyRate,
     int MaxTermMonths,
+    int QuoteValidityDays,
     string DeliveryMode,
     int SoatDays,
     int RegistrationDays,
     string? SoatProvider,
     string? RegistrationAgent,
+    string? CommercialTerms,
     bool Active);
 
 public sealed record UpsertSalesPointDto(
@@ -122,11 +124,13 @@ public sealed record UpsertSalesPointDto(
     string? BrandLogoDataUrl,
     decimal FactorMonthlyRate,
     int MaxTermMonths,
+    int QuoteValidityDays,
     string DeliveryMode,
     int SoatDays,
     int RegistrationDays,
     string? SoatProvider,
     string? RegistrationAgent,
+    string? CommercialTerms,
     bool Active);
 
 public sealed record QuoteSimulationDto(
@@ -188,6 +192,11 @@ public sealed record QuoteDto(
     Guid CustomerId,
     Guid ProductId,
     string ProductName,
+    Guid? SalesPointId,
+    string? SalesPointName,
+    string? SalesPointBrand,
+    string? SalesPointDeliveryMode,
+    string? SalesPointCommercialTerms,
     decimal ProductPrice,
     decimal DownPayment,
     decimal Insurance,

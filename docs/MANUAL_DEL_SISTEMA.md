@@ -1,7 +1,7 @@
 # Manual de usuario - EnMarcha CRM
 
 Ultima actualizacion: 2026-06-22  
-Version del manual: 7.0
+Version del manual: 7.1
 Sistema: EnMarcha CRM para gestion comercial y ventas a credito  
 
 ## 1. Bienvenida
@@ -207,6 +207,8 @@ Mantenga precios, modelos y estados actualizados. Una cotizacion depende de que 
 Cotizaciones permite generar una propuesta comercial para un cliente. Es uno de los puntos principales del proceso de venta.
 
 El formulario esta organizado en una vista amplia: primero se capturan los datos del cliente y luego los articulos a cotizar, cada uno con producto, foto, cuota inicial, numero de cuotas, seguro, gastos y cuota aproximada.
+
+La cotizacion usa automaticamente la sede principal del asesor conectado. Esa sede define logo de marca, tasa factor mensual, plazo maximo, vigencia y condiciones comerciales impresas en el PDF.
 
 ### Crear una cotizacion
 
@@ -553,6 +555,7 @@ El sistema muestra mensajes cuando algo no puede completarse.
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-06-22 | 7.1 | Las cotizaciones quedan conectadas a la sede del asesor y usan logo de marca, tasa, plazo, vigencia y condiciones comerciales por sede. |
 | 2026-06-22 | 7.0 | Los usuarios pueden quedar asociados a una sede principal para preparar cotizaciones, reportes y tramites por punto de venta. |
 | 2026-06-22 | 6.9 | Se agrega el maestro de sedes / puntos de venta en Configuracion y se documenta su uso para condiciones comerciales por sede. |
 | 2026-06-17 | 6.8 | Se actualiza el nombre visible del sistema a EnMarcha CRM en el frontend y en el manual. |

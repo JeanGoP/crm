@@ -21,8 +21,8 @@ Incluye:
 1. Conectar sedes con usuarios. Implementado.
    Cada asesor tiene una sede principal para que cotizaciones, tareas y reportes puedan segmentarse correctamente.
 
-2. Conectar sedes con cotizaciones.
-   La cotizacion debe usar logo de marca, tasa, plazo, vigencia y condiciones de la sede del asesor.
+2. Conectar sedes con cotizaciones. Implementado.
+   La cotizacion usa logo de marca, tasa, plazo, vigencia y condiciones de la sede del asesor.
 
 3. Ampliar maestro de productos.
    Agregar SOAT, matricula, impuestos, ficha tecnica estructurada, vigencia de precio y marca/modelo/color mas precisos.

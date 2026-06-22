@@ -141,11 +141,13 @@ export interface SalesPoint {
   brandLogoDataUrl?: string;
   factorMonthlyRate: number;
   maxTermMonths: number;
+  quoteValidityDays: number;
   deliveryMode: string;
   soatDays: number;
   registrationDays: number;
   soatProvider?: string;
   registrationAgent?: string;
+  commercialTerms?: string;
   active: boolean;
 }
 
@@ -194,6 +196,11 @@ export interface Quote {
   customerId: string;
   productId: string;
   productName: string;
+  salesPointId?: string;
+  salesPointName?: string;
+  salesPointBrand?: string;
+  salesPointDeliveryMode?: string;
+  salesPointCommercialTerms?: string;
   productPrice: number;
   downPayment: number;
   insurance: number;

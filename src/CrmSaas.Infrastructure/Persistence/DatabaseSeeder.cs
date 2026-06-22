@@ -114,9 +114,11 @@ public static class DatabaseSeeder
                 MarcaPrincipal = "Honda",
                 TasaFactorMensual = 4.5m,
                 PlazoMaximoMeses = 30,
+                VigenciaCotizacionDias = 7,
                 ModalidadEntrega = "ConSoat",
                 TiempoSoatDias = 14,
                 TiempoMatriculaDias = 20,
+                CondicionesComerciales = "Cotizacion sujeta a disponibilidad del producto, validacion comercial y aprobacion final.",
                 Activa = true
             });
         }

@@ -38,11 +38,13 @@ public sealed class SalesPointsController(CrmDbContext db) : ControllerBase
                 x.LogoMarcaDataUrl,
                 x.TasaFactorMensual,
                 x.PlazoMaximoMeses,
+                x.VigenciaCotizacionDias,
                 x.ModalidadEntrega,
                 x.TiempoSoatDias,
                 x.TiempoMatriculaDias,
                 x.ProveedorSoat,
                 x.TramitadorMatricula,
+                x.CondicionesComerciales,
                 x.Activa))
             .ToListAsync(cancellationToken);
 
@@ -98,11 +100,13 @@ public sealed class SalesPointsController(CrmDbContext db) : ControllerBase
         entity.LogoMarcaDataUrl = NormalizeLogo(dto.BrandLogoDataUrl);
         entity.TasaFactorMensual = dto.FactorMonthlyRate;
         entity.PlazoMaximoMeses = dto.MaxTermMonths;
+        entity.VigenciaCotizacionDias = dto.QuoteValidityDays;
         entity.ModalidadEntrega = NormalizeDeliveryMode(dto.DeliveryMode);
         entity.TiempoSoatDias = dto.SoatDays;
         entity.TiempoMatriculaDias = dto.RegistrationDays;
         entity.ProveedorSoat = Normalize(dto.SoatProvider);
         entity.TramitadorMatricula = Normalize(dto.RegistrationAgent);
+        entity.CondicionesComerciales = Normalize(dto.CommercialTerms);
         entity.Activa = dto.Active;
     }
 
@@ -114,6 +118,7 @@ public sealed class SalesPointsController(CrmDbContext db) : ControllerBase
         if (string.IsNullOrWhiteSpace(dto.MainBrand)) throw new InvalidOperationException("La marca principal es obligatoria.");
         if (dto.FactorMonthlyRate < 0) throw new InvalidOperationException("La tasa mensual no puede ser negativa.");
         if (dto.MaxTermMonths <= 0) throw new InvalidOperationException("El plazo maximo debe ser mayor a cero.");
+        if (dto.QuoteValidityDays <= 0) throw new InvalidOperationException("La vigencia de cotizacion debe ser mayor a cero.");
         if (dto.SoatDays < 0 || dto.RegistrationDays < 0) throw new InvalidOperationException("Los tiempos de tramite no pueden ser negativos.");
     }
 
@@ -128,11 +133,13 @@ public sealed class SalesPointsController(CrmDbContext db) : ControllerBase
         x.LogoMarcaDataUrl,
         x.TasaFactorMensual,
         x.PlazoMaximoMeses,
+        x.VigenciaCotizacionDias,
         x.ModalidadEntrega,
         x.TiempoSoatDias,
         x.TiempoMatriculaDias,
         x.ProveedorSoat,
         x.TramitadorMatricula,
+        x.CondicionesComerciales,
         x.Activa);
 
     private static string NormalizeCode(string value) => value.Trim().ToUpperInvariant().Replace(" ", "-");

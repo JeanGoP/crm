@@ -93,6 +93,7 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
         modelBuilder.Entity<PuntoVenta>().Property(x => x.ModalidadEntrega).HasMaxLength(40);
         modelBuilder.Entity<PuntoVenta>().Property(x => x.LogoMarcaDataUrl).HasMaxLength(300000);
         modelBuilder.Entity<PuntoVenta>().Property(x => x.TasaFactorMensual).HasPrecision(6, 3);
+        modelBuilder.Entity<PuntoVenta>().Property(x => x.CondicionesComerciales).HasMaxLength(1200);
         modelBuilder.Entity<PuntoVenta>().HasIndex(x => new { x.EmpresaId, x.Codigo }).IsUnique();
         modelBuilder.Entity<PuntoVenta>().HasIndex(x => new { x.EmpresaId, x.Ciudad });
         modelBuilder.Entity<Cotizacion>().Property(x => x.PrecioProducto).HasPrecision(18, 2);
@@ -100,12 +101,19 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
         modelBuilder.Entity<Cotizacion>().Property(x => x.Seguro).HasPrecision(18, 2);
         modelBuilder.Entity<Cotizacion>().Property(x => x.GastosAdministrativos).HasPrecision(18, 2);
         modelBuilder.Entity<Cotizacion>().Property(x => x.TasaInteresMensual).HasPrecision(6, 3);
+        modelBuilder.Entity<Cotizacion>().Property(x => x.TasaFactorMensualSede).HasPrecision(6, 3);
+        modelBuilder.Entity<Cotizacion>().Property(x => x.NombreSede).HasMaxLength(160);
+        modelBuilder.Entity<Cotizacion>().Property(x => x.MarcaSede).HasMaxLength(80);
+        modelBuilder.Entity<Cotizacion>().Property(x => x.ModalidadEntregaSede).HasMaxLength(40);
+        modelBuilder.Entity<Cotizacion>().Property(x => x.CondicionesSede).HasMaxLength(1200);
         modelBuilder.Entity<Cotizacion>().Property(x => x.ValorFinanciado).HasPrecision(18, 2);
         modelBuilder.Entity<Cotizacion>().Property(x => x.CuotaMensualEstimada).HasPrecision(18, 2);
         modelBuilder.Entity<Cotizacion>().Property(x => x.TotalPagarEstimado).HasPrecision(18, 2);
         modelBuilder.Entity<Cotizacion>().Property(x => x.TipoCredito).HasMaxLength(40);
         modelBuilder.Entity<Cotizacion>().HasIndex(x => new { x.EmpresaId, x.Numero }).IsUnique();
+        modelBuilder.Entity<Cotizacion>().HasIndex(x => new { x.EmpresaId, x.PuntoVentaId });
         modelBuilder.Entity<Cotizacion>().HasOne(x => x.Producto).WithMany().HasForeignKey(x => x.ProductoId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<Cotizacion>().HasOne(x => x.PuntoVenta).WithMany().HasForeignKey(x => x.PuntoVentaId).OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<CotizacionItem>().Property(x => x.PrecioProducto).HasPrecision(18, 2);
         modelBuilder.Entity<CotizacionItem>().Property(x => x.CuotaInicial).HasPrecision(18, 2);
         modelBuilder.Entity<CotizacionItem>().Property(x => x.Seguro).HasPrecision(18, 2);
