@@ -158,6 +158,25 @@ export interface SalesPoint {
   active: boolean;
 }
 
+export interface RequirementDocument {
+  id: string;
+  type: number;
+  name: string;
+  description?: string;
+  required: boolean;
+  order: number;
+}
+
+export interface RequirementProfile {
+  id: string;
+  name: string;
+  code: string;
+  description?: string;
+  isCash: boolean;
+  active: boolean;
+  documents: RequirementDocument[];
+}
+
 export interface QuoteSimulationResult {
   downPayment: number;
   insurance: number;
@@ -208,6 +227,8 @@ export interface Quote {
   salesPointBrand?: string;
   salesPointDeliveryMode?: string;
   salesPointCommercialTerms?: string;
+  requirementProfileId?: string;
+  requirementProfileName?: string;
   productPrice: number;
   downPayment: number;
   insurance: number;
@@ -265,6 +286,8 @@ export interface CreditApplication {
   productName: string;
   quoteId?: string;
   dealId?: string;
+  requirementProfileId?: string;
+  requirementProfileName?: string;
   identificationType: number;
   identificationNumber: string;
   birthDate?: string;

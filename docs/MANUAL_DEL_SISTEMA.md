@@ -1,7 +1,7 @@
 # Manual de usuario - EnMarcha CRM
 
 Ultima actualizacion: 2026-06-22  
-Version del manual: 7.2
+Version del manual: 7.3
 Sistema: EnMarcha CRM para gestion comercial y ventas a credito  
 
 ## 1. Bienvenida
@@ -219,6 +219,8 @@ El formulario esta organizado en una vista amplia: primero se capturan los datos
 
 La cotizacion usa automaticamente la sede principal del asesor conectado. Esa sede define logo de marca, tasa factor mensual, plazo maximo, vigencia y condiciones comerciales impresas en el PDF.
 
+Tambien permite seleccionar un **perfil de requisitos**, por ejemplo Empleado, Independiente, Pensionado o Contado. Ese perfil indica que documentos se deben pedir si el cliente continua hacia solicitud de credito.
+
 ### Crear una cotizacion
 
 1. Entre a **Cotizaciones**.
@@ -228,11 +230,12 @@ La cotizacion usa automaticamente la sede principal del asesor conectado. Esa se
 5. Presione **Consultar** si desea buscar datos existentes o consultar la integracion disponible.
 6. Complete primer nombre, segundo nombre, primer apellido y segundo apellido.
 7. Ingrese indicativo y telefono. Por defecto se usa el indicativo de Colombia **+57**.
-8. Seleccione el producto que desea cotizar.
-9. Digite la cuota inicial y el numero de cuotas.
-10. Si desea comparar varias opciones, presione **Agregar articulo** y seleccione otro producto.
-11. Revise la cuota aproximada de cada articulo.
-12. Guarde la cotizacion.
+8. Seleccione el **perfil de requisitos** que corresponda al cliente o a la forma de pago.
+9. Seleccione el producto que desea cotizar.
+10. Digite la cuota inicial y el numero de cuotas.
+11. Si desea comparar varias opciones, presione **Agregar articulo** y seleccione otro producto.
+12. Revise la cuota aproximada de cada articulo.
+13. Guarde la cotizacion.
 
 ### Que ocurre al guardar
 
@@ -241,6 +244,7 @@ La cotizacion usa automaticamente la sede principal del asesor conectado. Esa se
 - Se abre una vista previa del PDF en pantalla.
 - Desde la vista previa se decide si se descarga o se imprime.
 - Si el producto tiene una foto principal compatible, se incluye en el PDF.
+- El perfil de requisitos queda guardado para generar el checklist si se crea una solicitud de credito.
 - Se puede crear seguimiento automatico para llamar al cliente.
 - El negocio puede reflejarse en el pipeline comercial.
 
@@ -292,16 +296,20 @@ Este modulo permite gestionar el proceso de credito del cliente despues de una c
 
 El formulario esta organizado por bloques: origen y cliente, producto y credito, codeudor y referencias, y gestion. Esto permite revisar la solicitud de forma mas rapida antes de guardarla.
 
+Cuando la solicitud viene desde una cotizacion, el sistema puede traer el perfil de requisitos seleccionado en esa cotizacion y crear automaticamente la lista de documentos pendientes.
+
 ### Crear o revisar una solicitud
 
 1. Entre a **Solicitudes de credito**.
 2. Seleccione o cree la solicitud del cliente.
-3. Revise los datos del cliente.
-4. Complete informacion laboral, financiera o comercial cuando aplique.
-5. Registre codeudor y referencias si son requeridos.
-6. Adjunte documentos.
-7. Actualice el estado de aprobacion.
-8. Guarde los cambios.
+3. Si viene desde una cotizacion, seleccionela en el campo correspondiente.
+4. Revise el **perfil de requisitos**. Puede mantener el que viene de la cotizacion o escoger otro si el caso cambio.
+5. Revise los datos del cliente.
+6. Complete informacion laboral, financiera o comercial cuando aplique.
+7. Registre codeudor y referencias si son requeridos.
+8. Adjunte documentos.
+9. Actualice el estado de aprobacion.
+10. Guarde los cambios.
 
 ### Estados comunes
 
@@ -475,6 +483,7 @@ Configuracion permite administrar datos generales del sistema. Esta opcion norma
 - **Roles:** administrar permisos segun el perfil del usuario.
 - **Etapas del pipeline:** configurar las columnas comerciales.
 - **Configuracion financiera:** definir las condiciones usadas por la empresa para calcular cuotas en las cotizaciones.
+- **Perfiles de requisitos:** definir listas de documentos para empleado, independiente, pensionado, contado u otros perfiles propios de la empresa.
 
 ### Sedes / puntos de venta
 
@@ -488,6 +497,19 @@ Configuracion permite administrar datos generales del sistema. Esta opcion norma
 8. Marque la sede como activa y guarde.
 
 Esta configuracion servira para que proximas funciones puedan usar condiciones por sede en cotizaciones, tramites, promociones, entregas y reportes.
+
+### Perfiles de requisitos
+
+1. Entre a **Configuracion**.
+2. Busque la tarjeta **Perfiles de requisitos**.
+3. Presione **Nuevo perfil** o edite uno existente.
+4. Escriba nombre, codigo y descripcion del perfil.
+5. Marque si corresponde a una venta de contado.
+6. Agregue los documentos que se deben pedir al cliente.
+7. Defina el tipo de documento, nombre, orden y si es obligatorio.
+8. Guarde.
+
+Estos perfiles se usan en **Cotizaciones** y **Solicitudes de credito**. Al crear la solicitud, el sistema toma el perfil elegido y genera automaticamente el checklist de documentos pendientes.
 
 ### Configuracion financiera
 
@@ -564,6 +586,7 @@ El sistema muestra mensajes cuando algo no puede completarse.
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-06-22 | 7.3 | Se agregan perfiles de requisitos por empresa y generacion automatica del checklist documental desde la cotizacion hacia la solicitud de credito. |
 | 2026-06-22 | 7.2 | Se amplia el maestro de productos con linea, version, ficha tecnica, vigencia de precio, SOAT, matricula e impuestos; la cotizacion puede usar esos cargos automaticamente. |
 | 2026-06-22 | 7.1 | Las cotizaciones quedan conectadas a la sede del asesor y usan logo de marca, tasa, plazo, vigencia y condiciones comerciales por sede. |
 | 2026-06-22 | 7.0 | Los usuarios pueden quedar asociados a una sede principal para preparar cotizaciones, reportes y tramites por punto de venta. |

@@ -197,6 +197,8 @@ public sealed record QuoteDto(
     string? SalesPointBrand,
     string? SalesPointDeliveryMode,
     string? SalesPointCommercialTerms,
+    Guid? RequirementProfileId,
+    string? RequirementProfileName,
     decimal ProductPrice,
     decimal DownPayment,
     decimal Insurance,
@@ -223,6 +225,7 @@ public sealed record CreateQuoteDto(
     string? CustomerSecondLastName,
     string? PhoneCountryCode,
     string? PhoneNumber,
+    Guid? RequirementProfileId,
     Guid ProductId,
     IReadOnlyCollection<CreateQuoteItemDto>? Items,
     decimal DownPayment,
@@ -257,6 +260,8 @@ public sealed record CreditApplicationDto(
     string ProductName,
     Guid? QuoteId,
     Guid? DealId,
+    Guid? RequirementProfileId,
+    string? RequirementProfileName,
     TipoIdentificacionColombia IdentificationType,
     string IdentificationNumber,
     DateTime? BirthDate,
@@ -295,6 +300,7 @@ public sealed record UpsertCreditApplicationDto(
     Guid ProductId,
     Guid? QuoteId,
     Guid? DealId,
+    Guid? RequirementProfileId,
     TipoIdentificacionColombia IdentificationType,
     string IdentificationNumber,
     DateTime? BirthDate,
@@ -335,6 +341,38 @@ public sealed record CreditDocumentDto(
 public sealed record UpsertCreditDocumentDto(TipoDocumentoCredito Type, string Name, EstadoDocumentoCredito Status, DateTime? ReceivedAt, string? Notes);
 public sealed record ChangeCreditApplicationStatusDto(EstadoSolicitudCredito Status);
 public sealed record CreditApplicationDecisionDto(EstadoSolicitudCredito Status, string? Notes);
+
+public sealed record RequirementDocumentDto(
+    Guid Id,
+    TipoDocumentoCredito Type,
+    string Name,
+    string? Description,
+    bool Required,
+    int Order);
+
+public sealed record UpsertRequirementDocumentDto(
+    TipoDocumentoCredito Type,
+    string Name,
+    string? Description,
+    bool Required,
+    int Order);
+
+public sealed record RequirementProfileDto(
+    Guid Id,
+    string Name,
+    string Code,
+    string? Description,
+    bool IsCash,
+    bool Active,
+    IReadOnlyCollection<RequirementDocumentDto> Documents);
+
+public sealed record UpsertRequirementProfileDto(
+    string Name,
+    string Code,
+    string? Description,
+    bool IsCash,
+    bool Active,
+    IReadOnlyCollection<UpsertRequirementDocumentDto> Documents);
 
 public sealed record MotorcycleDeliveryDto(
     Guid Id,

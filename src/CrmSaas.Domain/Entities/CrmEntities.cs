@@ -187,6 +187,8 @@ public sealed class Cotizacion : AuditableTenantEntity
     public Producto? Producto { get; set; }
     public Guid? PuntoVentaId { get; set; }
     public PuntoVenta? PuntoVenta { get; set; }
+    public Guid? PerfilRequisitoId { get; set; }
+    public PerfilRequisito? PerfilRequisito { get; set; }
     public string? NombreSede { get; set; }
     public string? MarcaSede { get; set; }
     public string? ModalidadEntregaSede { get; set; }
@@ -209,6 +211,27 @@ public sealed class Cotizacion : AuditableTenantEntity
     public DateTime ValidaHasta { get; set; } = ColombiaTime.Now.AddDays(7);
     public string? Observaciones { get; set; }
     public ICollection<CotizacionItem> Items { get; set; } = [];
+}
+
+public sealed class PerfilRequisito : AuditableTenantEntity
+{
+    public string Nombre { get; set; } = string.Empty;
+    public string Codigo { get; set; } = string.Empty;
+    public string? Descripcion { get; set; }
+    public bool EsContado { get; set; }
+    public bool Activo { get; set; } = true;
+    public ICollection<DocumentoPerfilRequisito> Documentos { get; set; } = [];
+}
+
+public sealed class DocumentoPerfilRequisito : AuditableTenantEntity
+{
+    public Guid PerfilRequisitoId { get; set; }
+    public PerfilRequisito? PerfilRequisito { get; set; }
+    public TipoDocumentoCredito Tipo { get; set; } = TipoDocumentoCredito.Otro;
+    public string Nombre { get; set; } = string.Empty;
+    public string? Descripcion { get; set; }
+    public bool Obligatorio { get; set; } = true;
+    public int Orden { get; set; }
 }
 
 public sealed class CotizacionItem : AuditableTenantEntity
@@ -240,6 +263,8 @@ public sealed class SolicitudCredito : AuditableTenantEntity
     public Producto? Producto { get; set; }
     public Guid? CotizacionId { get; set; }
     public Cotizacion? Cotizacion { get; set; }
+    public Guid? PerfilRequisitoId { get; set; }
+    public PerfilRequisito? PerfilRequisito { get; set; }
     public Guid? NegocioId { get; set; }
     public Negocio? Negocio { get; set; }
     public TipoIdentificacionColombia TipoIdentificacion { get; set; }

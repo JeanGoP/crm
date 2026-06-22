@@ -1,4 +1,5 @@
 using CrmSaas.Domain.Entities;
+using CrmSaas.Domain.Enums;
 using CrmSaas.Infrastructure.Auth;
 using Microsoft.EntityFrameworkCore;
 
@@ -125,6 +126,8 @@ public static class DatabaseSeeder
 
         await db.SaveChangesAsync(cancellationToken);
 
+        await SeedRequirementProfilesAsync(db, empresaId, cancellationToken);
+
         if (!await db.EtapasNegocio.IgnoreQueryFilters().AnyAsync(x => x.EmpresaId == empresaId, cancellationToken))
         {
             db.EtapasNegocio.AddRange(
@@ -140,4 +143,74 @@ public static class DatabaseSeeder
 
         await db.SaveChangesAsync(cancellationToken);
     }
+
+    private static async Task SeedRequirementProfilesAsync(CrmDbContext db, Guid empresaId, CancellationToken cancellationToken)
+    {
+        var existingCodes = await db.PerfilesRequisito.IgnoreQueryFilters()
+            .Where(x => x.EmpresaId == empresaId)
+            .Select(x => x.Codigo)
+            .ToListAsync(cancellationToken);
+
+        var existing = existingCodes.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var profiles = new[]
+        {
+            CreateProfile(empresaId, "Empleado", "EMPLEADO", false, "Cliente asalariado con soporte laboral e ingresos.", [
+                Doc(TipoDocumentoCredito.Cedula, "Fotocopia de cedula", 1),
+                Doc(TipoDocumentoCredito.SoporteIngresos, "Carta laboral o dos ultimas colillas de pago", 2),
+                Doc(TipoDocumentoCredito.ReciboServicio, "Recibo de servicio publico", 3),
+                Doc(TipoDocumentoCredito.Referencias, "Referencias personales", 4)
+            ]),
+            CreateProfile(empresaId, "Independiente", "INDEPENDIENTE", false, "Cliente independiente o comerciante.", [
+                Doc(TipoDocumentoCredito.Cedula, "Fotocopia de cedula", 1),
+                Doc(TipoDocumentoCredito.SoporteIngresos, "Certificado de ingresos o camara de comercio", 2),
+                Doc(TipoDocumentoCredito.SoporteIngresos, "Extractos bancarios", 3),
+                Doc(TipoDocumentoCredito.ReciboServicio, "Recibo de servicio publico", 4),
+                Doc(TipoDocumentoCredito.Referencias, "Referencias comerciales o personales", 5)
+            ]),
+            CreateProfile(empresaId, "Pensionado", "PENSIONADO", false, "Cliente pensionado.", [
+                Doc(TipoDocumentoCredito.Cedula, "Fotocopia de cedula", 1),
+                Doc(TipoDocumentoCredito.SoporteIngresos, "Dos ultimas colillas de pension", 2),
+                Doc(TipoDocumentoCredito.ReciboServicio, "Recibo de servicio publico", 3),
+                Doc(TipoDocumentoCredito.Referencias, "Referencias personales", 4)
+            ]),
+            CreateProfile(empresaId, "Contado", "CONTADO", true, "Compra de contado con documentos minimos.", [
+                Doc(TipoDocumentoCredito.Cedula, "Fotocopia de cedula", 1),
+                Doc(TipoDocumentoCredito.Otro, "Soporte de pago", 2)
+            ])
+        };
+
+        foreach (var profile in profiles.Where(x => !existing.Contains(x.Codigo)))
+        {
+            db.PerfilesRequisito.Add(profile);
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private static PerfilRequisito CreateProfile(Guid empresaId, string name, string code, bool isCash, string description, IReadOnlyCollection<DocumentoPerfilRequisito> documents)
+    {
+        var profile = new PerfilRequisito
+        {
+            EmpresaId = empresaId,
+            Nombre = name,
+            Codigo = code,
+            Descripcion = description,
+            EsContado = isCash,
+            Activo = true
+        };
+        foreach (var document in documents)
+        {
+            document.EmpresaId = empresaId;
+            profile.Documentos.Add(document);
+        }
+        return profile;
+    }
+
+    private static DocumentoPerfilRequisito Doc(TipoDocumentoCredito type, string name, int order) => new()
+    {
+        Tipo = type,
+        Nombre = name,
+        Obligatorio = true,
+        Orden = order
+    };
 }

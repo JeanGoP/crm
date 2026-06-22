@@ -27,8 +27,8 @@ Incluye:
 3. Ampliar maestro de productos. Implementado.
    Agrega SOAT, matricula, impuestos, ficha tecnica estructurada, vigencia de precio y marca/modelo/linea/version/color mas precisos. La cotizacion toma esos cargos como valores sugeridos del producto.
 
-4. Crear perfiles de requisitos.
-   Empleado, independiente, pensionado, contado y perfiles configurables por empresa. El perfil elegido en la cotizacion debe generar el checklist de documentos.
+4. Crear perfiles de requisitos. Implementado.
+   Empleado, independiente, pensionado, contado y perfiles configurables por empresa. El perfil elegido en la cotizacion genera el checklist de documentos al crear la solicitud de credito.
 
 5. Crear promociones / planes tacticos.
    Descuentos por producto, marca, color, sede y vigencia. La cotizacion debe aplicar la promocion automaticamente.

@@ -24,6 +24,7 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
     {
         var quotes = await db.Cotizaciones
             .Include(x => x.Producto)
+            .Include(x => x.PerfilRequisito)
             .Include(x => x.Items)
             .ThenInclude(x => x.Producto)
             .OrderByDescending(x => x.FechaCotizacion)
@@ -47,6 +48,10 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
         if (string.IsNullOrWhiteSpace(dto.PhoneNumber)) throw new ValidationException("El telefono del cliente es obligatorio.");
         var financialSettings = await GetFinancialSettingsAsync(cancellationToken);
         var salesPoint = await GetCurrentSalesPointAsync(cancellationToken);
+        var requirementProfile = dto.RequirementProfileId.HasValue
+            ? await db.PerfilesRequisito.FirstOrDefaultAsync(x => x.Id == dto.RequirementProfileId.Value && x.Activo, cancellationToken)
+                ?? throw new KeyNotFoundException("Perfil de requisitos no encontrado o inactivo.")
+            : await GetDefaultRequirementProfileAsync(cancellationToken);
         var requestedItems = NormalizeQuoteItems(dto);
         if (requestedItems.Count == 0) throw new ValidationException("Debe seleccionar al menos un producto para cotizar.");
         if (requestedItems.Count > 4) throw new ValidationException("Puede comparar maximo 4 productos por cotizacion.");
@@ -146,6 +151,8 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             ClienteId = customer.Id,
             ProductoId = product.Id,
             PuntoVentaId = salesPoint?.Id,
+            PerfilRequisitoId = requirementProfile?.Id,
+            PerfilRequisito = requirementProfile,
             NombreSede = salesPoint?.Nombre,
             MarcaSede = salesPoint?.MarcaPrincipal,
             ModalidadEntregaSede = salesPoint?.ModalidadEntrega,
@@ -260,6 +267,7 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             .Include(x => x.Producto)
             .ThenInclude(x => x!.Fotos)
             .Include(x => x.PuntoVenta)
+            .Include(x => x.PerfilRequisito)
             .Include(x => x.Items)
             .ThenInclude(x => x.Producto)
             .ThenInclude(x => x!.Fotos)
@@ -335,6 +343,8 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             x.MarcaSede,
             x.ModalidadEntregaSede,
             x.CondicionesSede,
+            x.PerfilRequisitoId,
+            x.PerfilRequisito?.Nombre,
             x.PrecioProducto,
             x.CuotaInicial,
             x.Seguro,
@@ -437,6 +447,13 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             .ThenBy(x => x.Nombre)
             .FirstOrDefaultAsync(cancellationToken);
     }
+
+    private async Task<PerfilRequisito?> GetDefaultRequirementProfileAsync(CancellationToken cancellationToken) =>
+        await db.PerfilesRequisito
+            .Where(x => x.Activo)
+            .OrderByDescending(x => x.Codigo == "EMPLEADO")
+            .ThenBy(x => x.Nombre)
+            .FirstOrDefaultAsync(cancellationToken);
 
     private static CreditSimulation CalculateSimulation(decimal productPrice, decimal downPayment, decimal insurance, decimal administrativeFees, int termMonths, decimal monthlyInterestRate, ConfiguracionFinancieraEmpresa? financialSettings, PuntoVenta? salesPoint)
     {

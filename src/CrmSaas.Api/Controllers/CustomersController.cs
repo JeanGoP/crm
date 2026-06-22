@@ -27,6 +27,7 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
 
         var quotes = await db.Cotizaciones
             .Include(x => x.Producto)
+            .Include(x => x.PerfilRequisito)
             .Include(x => x.Items)
             .ThenInclude(x => x.Producto)
             .Where(x => x.ClienteId == id)
@@ -35,6 +36,7 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
         var creditApplications = await db.SolicitudesCredito
             .Include(x => x.Cliente)
             .Include(x => x.Producto)
+            .Include(x => x.PerfilRequisito)
             .Include(x => x.Documentos)
             .Where(x => x.ClienteId == id)
             .OrderByDescending(x => x.FechaCreacion)
@@ -84,6 +86,7 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
 
         var quotes = await db.Cotizaciones
             .Include(x => x.Producto)
+            .Include(x => x.PerfilRequisito)
             .Include(x => x.Items)
             .ThenInclude(x => x.Producto)
             .Where(x => x.ClienteId == id)
@@ -91,6 +94,7 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
             .ToListAsync(cancellationToken);
         var creditApplications = await db.SolicitudesCredito
             .Include(x => x.Producto)
+            .Include(x => x.PerfilRequisito)
             .Include(x => x.Documentos)
             .Where(x => x.ClienteId == id)
             .OrderByDescending(x => x.FechaCreacion)
@@ -184,6 +188,8 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
             x.MarcaSede,
             x.ModalidadEntregaSede,
             x.CondicionesSede,
+            x.PerfilRequisitoId,
+            x.PerfilRequisito?.Nombre,
             x.PrecioProducto,
             x.CuotaInicial,
             x.Seguro,
@@ -267,6 +273,8 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
             productName,
             x.CotizacionId,
             x.NegocioId,
+            x.PerfilRequisitoId,
+            x.PerfilRequisito?.Nombre,
             x.TipoIdentificacion,
             x.NumeroIdentificacion,
             x.FechaNacimiento,

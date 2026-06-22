@@ -1,7 +1,7 @@
 <!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Manual de usuario - EnMarcha CRM</title><style>:root{color-scheme:light;--ink:#111827;--muted:#526071;--line:#d8e0e8;--brand:#155e75;--paper:#fff;--bg:#f5f7fb}body{margin:0;font-family:Inter,Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--ink);line-height:1.65}main{max-width:1040px;margin:0 auto;padding:42px 24px 72px}h1{font-size:38px;line-height:1.1;margin:0 0 18px;color:#0f172a}h2{font-size:26px;margin:44px 0 12px;padding-top:18px;border-top:1px solid var(--line);color:#0f172a}h3{font-size:18px;margin:24px 0 8px;color:var(--brand)}p,li{font-size:15px;color:var(--ink)}p{margin:8px 0}ul{margin:8px 0 14px 24px;padding:0}code{background:#eef5f8;color:#0f4f63;padding:2px 5px;border-radius:4px}figure{margin:18px 0 28px;border:1px solid var(--line);background:var(--paper);border-radius:10px;overflow:hidden;box-shadow:0 8px 22px rgba(15,23,42,.08)}figure img{display:block;width:100%;height:auto}figcaption{font-size:13px;color:var(--muted);padding:10px 14px;background:#fbfdff;border-top:1px solid var(--line)}table{width:100%;border-collapse:collapse;margin:14px 0 24px;background:var(--paper);border:1px solid var(--line)}th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);font-size:14px;vertical-align:top}th{background:#eef5f8;color:#0f4f63}.cover{background:#fff;border:1px solid var(--line);border-radius:10px;padding:24px 28px;margin-bottom:28px;box-shadow:0 8px 22px rgba(15,23,42,.06)}@media print{body{background:white}main{max-width:none;padding:0}figure{break-inside:avoid;box-shadow:none}h2{break-after:avoid}.cover{box-shadow:none}}</style></head><body><main>
 <div class="cover"><h1>Manual de usuario - EnMarcha CRM</h1>
 <p><strong>Ultima actualizacion:</strong> 2026-06-22</p>
-<p><strong>Version del manual:</strong> 7.2</p>
+<p><strong>Version del manual:</strong> 7.3</p>
 <p><strong>Sistema:</strong> EnMarcha CRM para gestion comercial y ventas a credito</p></div>
 <h2>1. Bienvenida</h2>
 <p>Este manual explica como usar el CRM en la operacion diaria. Esta dirigido a vendedores, supervisores y administradores que necesitan registrar clientes, crear cotizaciones, hacer seguimiento comercial, gestionar solicitudes de credito, controlar entregas y revisar reportes.</p>
@@ -147,6 +147,7 @@
 <p>Cotizaciones permite generar una propuesta comercial para un cliente. Es uno de los puntos principales del proceso de venta.</p>
 <p>El formulario esta organizado en una vista amplia: primero se capturan los datos del cliente y luego los articulos a cotizar, cada uno con producto, cuota inicial, numero de cuotas, seguro, gastos y cuota aproximada.</p>
 <p>La cotizacion usa automaticamente la sede principal del asesor conectado. Esa sede define logo de marca, tasa factor mensual, plazo maximo, vigencia y condiciones comerciales impresas en el PDF.</p>
+<p>Tambien permite seleccionar un <strong>perfil de requisitos</strong>, por ejemplo Empleado, Independiente, Pensionado o Contado. Ese perfil indica que documentos se deben pedir si el cliente continua hacia solicitud de credito.</p>
 <h3>Crear una cotizacion</h3>
 <p>1. Entre a <strong>Cotizaciones</strong>.</p>
 <p>2. Presione <strong>Nueva cotizacion</strong>.</p>
@@ -155,11 +156,12 @@
 <p>5. Presione <strong>Consultar</strong> si desea buscar datos existentes o consultar la integracion disponible.</p>
 <p>6. Complete primer nombre, segundo nombre, primer apellido y segundo apellido.</p>
 <p>7. Ingrese indicativo y telefono. Por defecto se usa el indicativo de Colombia <strong>+57</strong>.</p>
-<p>8. Seleccione el producto que desea cotizar.</p>
-<p>9. Digite la cuota inicial y el numero de cuotas.</p>
-<p>10. Si desea comparar varias opciones, presione <strong>Agregar articulo</strong> y seleccione otro producto.</p>
-<p>11. Revise la cuota aproximada de cada articulo.</p>
-<p>12. Guarde la cotizacion.</p>
+<p>8. Seleccione el <strong>perfil de requisitos</strong> que corresponda al cliente o a la forma de pago.</p>
+<p>9. Seleccione el producto que desea cotizar.</p>
+<p>10. Digite la cuota inicial y el numero de cuotas.</p>
+<p>11. Si desea comparar varias opciones, presione <strong>Agregar articulo</strong> y seleccione otro producto.</p>
+<p>12. Revise la cuota aproximada de cada articulo.</p>
+<p>13. Guarde la cotizacion.</p>
 <h3>Que ocurre al guardar</h3>
 <ul>
 <li>Se crea o actualiza el cliente con los datos correctos.</li>
@@ -167,6 +169,7 @@
 <li>Se abre una vista previa del PDF en pantalla.</li>
 <li>Desde la vista previa se decide si se descarga o se imprime.</li>
 <li>Si el producto tiene una foto principal compatible, se incluye en el PDF.</li>
+<li>El perfil de requisitos queda guardado para generar el checklist si se crea una solicitud de credito.</li>
 <li>Se puede crear seguimiento automatico para llamar al cliente.</li>
 <li>El negocio puede reflejarse en el pipeline comercial.</li>
 </ul>
@@ -201,15 +204,18 @@
 <h3>Para que sirve</h3>
 <p>Este modulo permite gestionar el proceso de credito del cliente despues de una cotizacion o negocio interesado.</p>
 <p>El formulario esta organizado por bloques: origen y cliente, producto y credito, codeudor y referencias, y gestion. Esto permite revisar la solicitud de forma mas rapida antes de guardarla.</p>
+<p>Cuando la solicitud viene desde una cotizacion, el sistema puede traer el perfil de requisitos seleccionado en esa cotizacion y crear automaticamente la lista de documentos pendientes.</p>
 <h3>Crear o revisar una solicitud</h3>
 <p>1. Entre a <strong>Solicitudes de credito</strong>.</p>
 <p>2. Seleccione o cree la solicitud del cliente.</p>
-<p>3. Revise los datos del cliente.</p>
-<p>4. Complete informacion laboral, financiera o comercial cuando aplique.</p>
-<p>5. Registre codeudor y referencias si son requeridos.</p>
-<p>6. Adjunte documentos.</p>
-<p>7. Actualice el estado de aprobacion.</p>
-<p>8. Guarde los cambios.</p>
+<p>3. Si viene desde una cotizacion, seleccionela en el campo correspondiente.</p>
+<p>4. Revise el <strong>perfil de requisitos</strong>. Puede mantener el que viene de la cotizacion o escoger otro si el caso cambio.</p>
+<p>5. Revise los datos del cliente.</p>
+<p>6. Complete informacion laboral, financiera o comercial cuando aplique.</p>
+<p>7. Registre codeudor y referencias si son requeridos.</p>
+<p>8. Adjunte documentos.</p>
+<p>9. Actualice el estado de aprobacion.</p>
+<p>10. Guarde los cambios.</p>
 <h3>Estados comunes</h3>
 <ul>
 <li><strong>Pendiente:</strong> aun falta informacion o revision.</li>
@@ -330,6 +336,7 @@
 <li><strong>Roles:</strong> administrar permisos segun el perfil del usuario.</li>
 <li><strong>Etapas del pipeline:</strong> configurar las columnas comerciales.</li>
 <li><strong>Configuracion financiera:</strong> definir las condiciones usadas por la empresa para calcular cuotas en las cotizaciones.</li>
+<li><strong>Perfiles de requisitos:</strong> definir listas de documentos para empleado, independiente, pensionado, contado u otros perfiles propios de la empresa.</li>
 </ul>
 <h3>Sedes / puntos de venta</h3>
 <p>1. Entre a <strong>Configuracion</strong>.</p>
@@ -341,6 +348,16 @@
 <p>7. Registre proveedor SOAT y tramitador de matricula cuando la empresa ya tenga esos responsables definidos.</p>
 <p>8. Marque la sede como activa y guarde.</p>
 <p>Esta configuracion servira para que proximas funciones puedan usar condiciones por sede en cotizaciones, tramites, promociones, entregas y reportes.</p>
+<h3>Perfiles de requisitos</h3>
+<p>1. Entre a <strong>Configuracion</strong>.</p>
+<p>2. Busque la tarjeta <strong>Perfiles de requisitos</strong>.</p>
+<p>3. Presione <strong>Nuevo perfil</strong> o edite uno existente.</p>
+<p>4. Escriba nombre, codigo y descripcion del perfil.</p>
+<p>5. Marque si corresponde a una venta de contado.</p>
+<p>6. Agregue los documentos que se deben pedir al cliente.</p>
+<p>7. Defina el tipo de documento, nombre, orden y si es obligatorio.</p>
+<p>8. Guarde.</p>
+<p>Estos perfiles se usan en <strong>Cotizaciones</strong> y <strong>Solicitudes de credito</strong>. Al crear la solicitud, el sistema toma el perfil elegido y genera automaticamente el checklist de documentos pendientes.</p>
 <h3>Configuracion financiera</h3>
 <p>1. Entre a <strong>Configuracion</strong>.</p>
 <p>2. Busque la tarjeta <strong>Configuracion financiera</strong>.</p>
@@ -403,6 +420,7 @@
 <h2>23. Historial del manual</h2>
 <table>
 <thead><tr><th>Fecha</th><th>Version</th><th>Cambio</th></tr></thead><tbody>
+<tr><td>2026-06-22</td><td>7.3</td><td>Se agregan perfiles de requisitos por empresa y generacion automatica del checklist documental desde la cotizacion hacia la solicitud de credito.</td></tr>
 <tr><td>2026-06-22</td><td>7.2</td><td>Se amplia el maestro de productos con linea, version, ficha tecnica, vigencia de precio, SOAT, matricula e impuestos; la cotizacion puede usar esos cargos automaticamente.</td></tr>
 <tr><td>2026-06-22</td><td>7.1</td><td>Las cotizaciones quedan conectadas a la sede del asesor y usan logo de marca, tasa, plazo, vigencia y condiciones comerciales por sede.</td></tr>
 <tr><td>2026-06-22</td><td>7.0</td><td>Los usuarios pueden quedar asociados a una sede principal para preparar cotizaciones, reportes y tramites por punto de venta.</td></tr>
