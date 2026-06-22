@@ -196,6 +196,10 @@ public sealed class Cotizacion : AuditableTenantEntity
     public int? PlazoMaximoMesesSede { get; set; }
     public int? VigenciaCotizacionDiasSede { get; set; }
     public string? CondicionesSede { get; set; }
+    public Guid? PromocionId { get; set; }
+    public Promocion? Promocion { get; set; }
+    public string? NombrePromocion { get; set; }
+    public decimal DescuentoPromocion { get; set; }
     public decimal PrecioProducto { get; set; }
     public decimal CuotaInicial { get; set; }
     public decimal Seguro { get; set; }
@@ -234,6 +238,23 @@ public sealed class DocumentoPerfilRequisito : AuditableTenantEntity
     public int Orden { get; set; }
 }
 
+public sealed class Promocion : AuditableTenantEntity
+{
+    public string Nombre { get; set; } = string.Empty;
+    public string Codigo { get; set; } = string.Empty;
+    public string TipoDescuento { get; set; } = "Valor";
+    public decimal ValorDescuento { get; set; }
+    public Guid? ProductoId { get; set; }
+    public Producto? Producto { get; set; }
+    public string? Marca { get; set; }
+    public string? Color { get; set; }
+    public Guid? PuntoVentaId { get; set; }
+    public PuntoVenta? PuntoVenta { get; set; }
+    public DateTime VigenteDesde { get; set; } = ColombiaTime.Now.Date;
+    public DateTime VigenteHasta { get; set; } = ColombiaTime.Now.Date.AddDays(30);
+    public bool Activa { get; set; } = true;
+}
+
 public sealed class CotizacionItem : AuditableTenantEntity
 {
     public Guid CotizacionId { get; set; }
@@ -242,6 +263,10 @@ public sealed class CotizacionItem : AuditableTenantEntity
     public Producto? Producto { get; set; }
     public int Orden { get; set; }
     public decimal PrecioProducto { get; set; }
+    public Guid? PromocionId { get; set; }
+    public Promocion? Promocion { get; set; }
+    public string? NombrePromocion { get; set; }
+    public decimal DescuentoPromocion { get; set; }
     public decimal CuotaInicial { get; set; }
     public decimal Seguro { get; set; }
     public decimal GastosAdministrativos { get; set; }

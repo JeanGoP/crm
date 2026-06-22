@@ -30,8 +30,8 @@ Incluye:
 4. Crear perfiles de requisitos. Implementado.
    Empleado, independiente, pensionado, contado y perfiles configurables por empresa. El perfil elegido en la cotizacion genera el checklist de documentos al crear la solicitud de credito.
 
-5. Crear promociones / planes tacticos.
-   Descuentos por producto, marca, color, sede y vigencia. La cotizacion debe aplicar la promocion automaticamente.
+5. Crear promociones / planes tacticos. Implementado.
+   Descuentos por producto, marca, color, sede y vigencia. La cotizacion aplica automaticamente la promocion vigente mas especifica.
 
 6. Fortalecer gestor de documentos.
    Documentos ligados al cliente, vigencia por tipo, rechazo con motivo, permiso de validacion y alerta al analista cuando el checklist este completo.

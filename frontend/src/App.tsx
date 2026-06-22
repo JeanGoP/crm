@@ -35,7 +35,7 @@ import Search from '@mui/icons-material/Search';
 import { AxiosError } from 'axios';
 import { api } from './api';
 import { useAuthStore } from './store';
-import { Activity, ColombianIdentityLookup, CommercialReports, Company, CreditApplication, CreditDocument, Customer, Customer360, CustomerAiAnalysis, CustomerTimelineItem, Dashboard, Deal, DealStage, FinancialSettings, Lead, MotorcycleDelivery, Product, ProductPhoto, Quote, QuoteSimulationResult, RequirementProfile, SalesPoint, User } from './types';
+import { Activity, ColombianIdentityLookup, CommercialReports, Company, CreditApplication, CreditDocument, Customer, Customer360, CustomerAiAnalysis, CustomerTimelineItem, Dashboard, Deal, DealStage, FinancialSettings, Lead, MotorcycleDelivery, Product, ProductPhoto, Promotion, Quote, QuoteSimulationResult, RequirementProfile, SalesPoint, User } from './types';
 
 const drawerWidth = 248;
 const today = new Date().toISOString().slice(0, 10);
@@ -109,6 +109,7 @@ const emptyFinancialSettings = { minimumWage: 1400000, consumerAnnualRate: 29.72
 const emptySalesPoint = { name: '', code: '', city: '', address: '', phone: '', mainBrand: 'Honda', brandLogoDataUrl: '', factorMonthlyRate: 4.5, maxTermMonths: 30, quoteValidityDays: 7, deliveryMode: 'ConSoat', soatDays: 14, registrationDays: 20, soatProvider: '', registrationAgent: '', commercialTerms: 'Cotizacion sujeta a disponibilidad del producto, validacion comercial y aprobacion final.', active: true };
 const emptyRequirementDocument = { type: 5, name: '', description: '', required: true, order: 1 };
 const emptyRequirementProfile = { name: '', code: '', description: '', isCash: false, active: true, documents: [emptyRequirementDocument] };
+const emptyPromotion = { name: '', code: '', discountType: 'Valor', discountValue: 0, productId: '', brand: '', color: '', salesPointId: '', validFrom: today, validUntil: today, active: true };
 const emptyQuoteItem = { productId: '', downPayment: 0, insurance: 0, administrativeFees: 0, termMonths: 24, monthlyInterestRate: 2.2 };
 const emptyQuote = { identificationType: 1, identificationNumber: '', customerFirstNames: '', customerLastNames: '', customerFirstName: '', customerMiddleName: '', customerLastName: '', customerSecondLastName: '', phoneCountryCode: '+57', phoneNumber: '', requirementProfileId: '', productId: '', downPayment: 0, insurance: 0, administrativeFees: 0, termMonths: 24, monthlyInterestRate: 2.2, items: [emptyQuoteItem], notes: '' };
 const emptyCreditApplication = {
@@ -787,13 +788,14 @@ function QuotesPage() {
     <Header title="Cotizaciones" action="Nueva cotizacion" onAction={() => setForm({ open: true })} onRefresh={reload} />
     <StatusBar loading={loading} error={error} />
     <EntityTable
-      headers={['Numero', 'Cliente', 'Sede', 'Perfil', 'Productos', 'Total financiado', 'Cuota aprox.', 'Valida hasta', 'Acciones']}
+      headers={['Numero', 'Cliente', 'Sede', 'Perfil', 'Promocion', 'Productos', 'Total financiado', 'Cuota aprox.', 'Valida hasta', 'Acciones']}
       empty="No hay cotizaciones registradas"
       rows={rows.map((r) => [
         r.number,
         `${fullFirstNames(r.customerFirstName, r.customerMiddleName, r.customerFirstNames)} ${fullLastNames(r.customerLastName, r.customerSecondLastName, r.customerLastNames)}`.trim(),
         r.salesPointName || '-',
         r.requirementProfileName || '-',
+        r.promotionDiscount > 0 ? <Row primary={r.promotionName ?? 'Promocion'} secondary={`-${money(r.promotionDiscount)}`} /> : '-',
         (r.items?.length ?? 0) > 1 ? `${r.items.length} productos` : r.productName,
         money(r.financedAmount),
         r.estimatedMonthlyPayment > 0 ? `${money(r.estimatedMonthlyPayment)} x ${r.termMonths}` : 'Sin simulacion',
@@ -1557,14 +1559,17 @@ function SettingsPage() {
   const canManage = useCanManage();
   const { data: companies = [], loading: loadingCompanies, error: companiesError, reload: reloadCompanies, setData: setCompanies } = useResource<Company[]>('/api/companies', []);
   const { data: users = [], loading: loadingUsers, error: usersError, reload: reloadUsers, setData: setUsers } = useResource<User[]>('/api/users', []);
+  const { data: products = [] } = useResource<Product[]>('/api/products', []);
   const { data: financialSettings, loading: loadingFinancialSettings, error: financialSettingsError, reload: reloadFinancialSettings, setData: setFinancialSettings } = useResource<FinancialSettings>('/api/financial-settings');
   const { data: salesPoints = [], loading: loadingSalesPoints, error: salesPointsError, reload: reloadSalesPoints, setData: setSalesPoints } = useResource<SalesPoint[]>('/api/sales-points', []);
   const { data: requirementProfiles = [], loading: loadingRequirementProfiles, error: requirementProfilesError, reload: reloadRequirementProfiles, setData: setRequirementProfiles } = useResource<RequirementProfile[]>('/api/requirement-profiles', []);
+  const { data: promotions = [], loading: loadingPromotions, error: promotionsError, reload: reloadPromotions, setData: setPromotions } = useResource<Promotion[]>('/api/promotions', []);
   const [companyForm, setCompanyForm] = useState<FormMode<Company>>({ open: false });
   const [userForm, setUserForm] = useState<FormMode<User>>({ open: false });
   const [financialForm, setFinancialForm] = useState<FormMode<FinancialSettings>>({ open: false });
   const [salesPointForm, setSalesPointForm] = useState<FormMode<SalesPoint>>({ open: false });
   const [requirementProfileForm, setRequirementProfileForm] = useState<FormMode<RequirementProfile>>({ open: false });
+  const [promotionForm, setPromotionForm] = useState<FormMode<Promotion>>({ open: false });
   const [notice, setNotice] = useState<Notice>();
 
   const saveCompany = async (payload: typeof emptyCompany) => {
@@ -1661,8 +1666,30 @@ function SettingsPage() {
     setRequirementProfileForm({ open: false });
   };
 
+  const savePromotion = async (payload: typeof emptyPromotion) => {
+    const body = {
+      name: payload.name,
+      code: payload.code,
+      discountType: payload.discountType,
+      discountValue: Number(payload.discountValue),
+      productId: payload.productId || null,
+      brand: payload.brand || null,
+      color: payload.color || null,
+      salesPointId: payload.salesPointId || null,
+      validFrom: payload.validFrom,
+      validUntil: payload.validUntil,
+      active: Boolean(payload.active)
+    };
+    const { data } = promotionForm.item
+      ? await api.put<Promotion>(`/api/promotions/${promotionForm.item.id}`, body)
+      : await api.post<Promotion>('/api/promotions', body);
+    setPromotions(promotionForm.item ? promotions.map((x) => x.id === data.id ? data : x) : [data, ...promotions]);
+    setNotice({ type: 'success', text: promotionForm.item ? 'Promocion actualizada.' : 'Promocion creada.' });
+    setPromotionForm({ open: false });
+  };
+
   return <Stack spacing={3}>
-    <Header title="Configuracion" onRefresh={() => { reloadCompanies(); reloadUsers(); reloadFinancialSettings(); reloadSalesPoints(); reloadRequirementProfiles(); }} />
+    <Header title="Configuracion" onRefresh={() => { reloadCompanies(); reloadUsers(); reloadFinancialSettings(); reloadSalesPoints(); reloadRequirementProfiles(); reloadPromotions(); }} />
     <Card><CardContent><Grid container spacing={2}>
       <Grid item xs={12} md={6}><TextField fullWidth label="API URL" value={import.meta.env.VITE_API_URL ?? ''} InputProps={{ readOnly: true }} /></Grid>
       <Grid item xs={12} md={6}><TextField fullWidth label="Tenant" value={import.meta.env.VITE_TENANT ?? 'demo'} InputProps={{ readOnly: true }} /></Grid>
@@ -1742,6 +1769,30 @@ function SettingsPage() {
         />
       </Stack>
     </CardContent></Card>
+    <Card><CardContent>
+      <Stack spacing={2}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', sm: 'center' }} gap={1}>
+          <Box>
+            <Typography variant="h5" fontWeight={900}>Promociones / planes tacticos</Typography>
+            <Typography color="text.secondary" fontSize={14}>Descuentos automaticos por producto, marca, color, sede y vigencia.</Typography>
+          </Box>
+          {canManage && <Button variant="contained" startIcon={<Add />} onClick={() => setPromotionForm({ open: true })}>Nueva promocion</Button>}
+        </Stack>
+        <StatusBar loading={loadingPromotions} error={promotionsError} />
+        <EntityTable
+          headers={['Promocion', 'Descuento', 'Alcance', 'Vigencia', 'Estado', 'Acciones']}
+          empty="No hay promociones registradas"
+          rows={promotions.map((promotion) => [
+            <Box><Typography fontWeight={800}>{promotion.name}</Typography><Typography color="text.secondary" fontSize={12}>{promotion.code}</Typography></Box>,
+            promotion.discountType === 'Porcentaje' ? `${promotion.discountValue}%` : money(promotion.discountValue),
+            [promotion.productName, promotion.brand, promotion.color, promotion.salesPointName].filter(Boolean).join(' / ') || 'General',
+            `${new Date(promotion.validFrom).toLocaleDateString()} - ${new Date(promotion.validUntil).toLocaleDateString()}`,
+            <StatusChip label={promotion.active ? 'Activa' : 'Inactiva'} tone={promotion.active ? 'success' : 'default'} />,
+            <Actions onEdit={canManage ? () => setPromotionForm({ open: true, item: promotion }) : undefined} />
+          ])}
+        />
+      </Stack>
+    </CardContent></Card>
     {canManage && <>
       <Stack direction="row" justifyContent="space-between" alignItems="center">
         <Typography variant="h5" fontWeight={900}>Empresas</Typography>
@@ -1780,6 +1831,7 @@ function SettingsPage() {
     <CompanyDialog form={companyForm} onClose={() => setCompanyForm({ open: false })} onSave={saveCompany} />
     <SalesPointDialog form={salesPointForm} onClose={() => setSalesPointForm({ open: false })} onSave={saveSalesPoint} />
     <RequirementProfileDialog form={requirementProfileForm} onClose={() => setRequirementProfileForm({ open: false })} onSave={saveRequirementProfile} />
+    <PromotionDialog form={promotionForm} products={products.filter((x) => x.active)} salesPoints={salesPoints.filter((x) => x.active)} onClose={() => setPromotionForm({ open: false })} onSave={savePromotion} />
     <UserDialog form={userForm} companies={companies.filter((x) => x.active)} salesPoints={salesPoints.filter((x) => x.active)} onClose={() => setUserForm({ open: false })} onSave={saveUser} />
     <FinancialSettingsDialog form={financialForm} onClose={() => setFinancialForm({ open: false })} onSave={saveFinancialSettings} />
     <Notice notice={notice} onClose={() => setNotice(undefined)} />
@@ -1959,6 +2011,61 @@ function RequirementProfileDialog({ form, onClose, onSave }: DialogProps<Require
         </Stack>
       </>;
     }}
+  </FormDialog>;
+}
+
+function PromotionDialog({ form, products, salesPoints, onClose, onSave }: DialogProps<Promotion, typeof emptyPromotion> & { products: Product[]; salesPoints: SalesPoint[] }) {
+  const initial = form.item ? {
+    name: form.item.name,
+    code: form.item.code,
+    discountType: form.item.discountType,
+    discountValue: form.item.discountValue,
+    productId: form.item.productId ?? '',
+    brand: form.item.brand ?? '',
+    color: form.item.color ?? '',
+    salesPointId: form.item.salesPointId ?? '',
+    validFrom: form.item.validFrom?.slice(0, 10) ?? today,
+    validUntil: form.item.validUntil?.slice(0, 10) ?? today,
+    active: form.item.active
+  } : emptyPromotion;
+
+  return <FormDialog title={form.item ? 'Editar promocion' : 'Nueva promocion'} open={form.open} initial={initial} onClose={onClose} onSave={onSave} maxWidth="md">
+    {(v, set) => <>
+      <SectionTitle title="Datos de la promocion" />
+      <FieldGrid columns={2}>
+        <TextField fullWidth required label="Nombre" value={v.name} onChange={(e) => set({ name: e.target.value })} />
+        <TextField fullWidth required label="Codigo" value={v.code} onChange={(e) => set({ code: e.target.value.toUpperCase().replace(/[^A-Z0-9_ -]/g, '').replace(/\s+/g, '_') })} />
+      </FieldGrid>
+      <FieldGrid columns={3}>
+        <TextField fullWidth select label="Tipo descuento" value={v.discountType} onChange={(e) => set({ discountType: e.target.value })}>
+          <MenuItem value="Valor">Valor fijo</MenuItem>
+          <MenuItem value="Porcentaje">Porcentaje</MenuItem>
+        </TextField>
+        <TextField fullWidth required type="number" label={v.discountType === 'Porcentaje' ? 'Porcentaje' : 'Valor descuento'} value={v.discountValue} onChange={(e) => set({ discountValue: Number(e.target.value) })} />
+        <FormControlLabel control={<Checkbox checked={v.active} onChange={(e) => set({ active: e.target.checked })} />} label="Promocion activa" />
+      </FieldGrid>
+      <SectionTitle title="Alcance" />
+      <FieldGrid columns={2}>
+        <TextField fullWidth select label="Producto especifico" value={v.productId} onChange={(e) => set({ productId: e.target.value })}>
+          <MenuItem value="">Cualquier producto</MenuItem>
+          {products.map((product) => <MenuItem key={product.id} value={product.id}>{productName(product)} - {money(product.price)}</MenuItem>)}
+        </TextField>
+        <TextField fullWidth select label="Sede" value={v.salesPointId} onChange={(e) => set({ salesPointId: e.target.value })}>
+          <MenuItem value="">Todas las sedes</MenuItem>
+          {salesPoints.map((point) => <MenuItem key={point.id} value={point.id}>{point.name} - {point.city}</MenuItem>)}
+        </TextField>
+      </FieldGrid>
+      <FieldGrid columns={2}>
+        <TextField fullWidth label="Marca" value={v.brand} onChange={(e) => set({ brand: e.target.value })} helperText="Opcional. Si se llena, solo aplica a esa marca." />
+        <TextField fullWidth label="Color" value={v.color} onChange={(e) => set({ color: e.target.value })} helperText="Opcional. Si se llena, solo aplica a ese color." />
+      </FieldGrid>
+      <SectionTitle title="Vigencia" />
+      <FieldGrid columns={2}>
+        <TextField fullWidth required type="date" label="Desde" value={v.validFrom} onChange={(e) => set({ validFrom: e.target.value })} InputLabelProps={{ shrink: true }} />
+        <TextField fullWidth required type="date" label="Hasta" value={v.validUntil} onChange={(e) => set({ validUntil: e.target.value })} InputLabelProps={{ shrink: true }} />
+      </FieldGrid>
+      <Alert severity="info">La cotizacion aplicara automaticamente la promocion vigente mas especifica para producto, marca, color y sede.</Alert>
+    </>}
   </FormDialog>;
 }
 
@@ -2472,6 +2579,10 @@ function QuoteSimulationPreview({ value, selectedProduct, compact = false }: { v
     administrativeFees,
     termMonths: fallbackTermMonths,
     monthlyInterestRate: Number(value.monthlyInterestRate) || 0,
+    promotionId: undefined,
+    promotionName: undefined,
+    promotionDiscount: 0,
+    discountedProductPrice: productPrice,
     financedAmount: fallbackFinanced,
     estimatedMonthlyPayment: fallbackPayment,
     estimatedTotalPayment: fallbackDownPayment + fallbackPayment * fallbackTermMonths,
@@ -2485,11 +2596,12 @@ function QuoteSimulationPreview({ value, selectedProduct, compact = false }: { v
       {error && <Alert severity="warning">{error}</Alert>}
       {compact
         ? <Stack spacing={0.5}>
+          {preview.promotionDiscount > 0 && <Typography variant="caption" color="success.main" fontWeight={800}>{preview.promotionName ?? 'Promocion'}: -{money(preview.promotionDiscount)}</Typography>}
           <Box><Typography variant="caption" color="text.secondary">Financiado</Typography><Typography fontWeight={800}>{money(preview.financedAmount)}</Typography></Box>
           <Box><Typography variant="caption" color="text.secondary">Cuota aprox.</Typography><Typography fontWeight={800}>{money(preview.estimatedMonthlyPayment)}</Typography></Box>
         </Stack>
         : <FieldGrid columns={3}>
-          <Box><Typography variant="caption" color="text.secondary">Valor producto</Typography><Typography fontWeight={700}>{money(productPrice)}</Typography></Box>
+          <Box><Typography variant="caption" color="text.secondary">Valor producto</Typography><Typography fontWeight={700}>{money(preview.discountedProductPrice)}</Typography>{preview.promotionDiscount > 0 && <Typography variant="caption" color="success.main">Descuento {money(preview.promotionDiscount)}</Typography>}</Box>
           <Box><Typography variant="caption" color="text.secondary">Total financiado</Typography><Typography fontWeight={700}>{money(preview.financedAmount)}</Typography></Box>
           <Box><Typography variant="caption" color="text.secondary">Cuota aproximada</Typography><Typography fontWeight={700}>{money(preview.estimatedMonthlyPayment)}</Typography></Box>
         </FieldGrid>}

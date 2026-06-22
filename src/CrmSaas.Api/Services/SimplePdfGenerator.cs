@@ -416,9 +416,9 @@ public static class SimplePdfGenerator
 
         DrawPanel(commands, 316, 575, 250, 110, "PRODUCTO");
         KeyValue(commands, 332, 653, "Producto", quote.ProductName, 74, 156);
-        KeyValue(commands, 332, 631, "Precio", Money(quote.ProductPrice), 74, 156);
-        KeyValue(commands, 332, 609, "Valida hasta", Date(quote.ValidUntil), 74, 156);
-        KeyValue(commands, 332, 587, "Sede", Value(quote.SalesPointName, "Sede no registrada"), 74, 156);
+        KeyValue(commands, 332, 631, "Precio base", Money(quote.ProductPrice), 74, 156);
+        KeyValue(commands, 332, 609, "Descuento", quote.PromotionDiscount > 0 ? Money(quote.PromotionDiscount) : "N/A", 74, 156);
+        KeyValue(commands, 332, 587, "Precio final", Money(quote.DiscountedProductPrice), 74, 156);
 
         if (includeProductImage)
         {
@@ -433,8 +433,12 @@ public static class SimplePdfGenerator
         else
         {
             DrawPanel(commands, 46, 332, 250, 214, "CUOTAS APROXIMADAS");
-            KeyValue(commands, 62, 512, "Precio", Money(quote.ProductPrice), 82, 140);
+            KeyValue(commands, 62, 512, "Precio final", Money(quote.DiscountedProductPrice), 82, 140);
             KeyValue(commands, 62, 490, "Cuota inicial", Money(quote.DownPayment), 82, 140);
+            if (quote.PromotionDiscount > 0)
+            {
+                KeyValue(commands, 62, 468, "Promocion", Shorten(Value(quote.PromotionName), 22), 82, 140);
+            }
             commands.AppendLine("0.90 0.94 0.96 rg 62 458 216 22 re f");
             commands.AppendLine("0.09 0.11 0.15 rg BT /F2 8 Tf 76 466 Td (PLAZO) Tj ET");
             commands.AppendLine("0.09 0.11 0.15 rg BT /F2 8 Tf 154 466 Td (CUOTA) Tj ET");
@@ -451,7 +455,7 @@ public static class SimplePdfGenerator
             }
 
             DrawPanel(commands, 316, 332, 250, 214, "RESUMEN DEL CREDITO");
-            var creditBase = Math.Max(quote.ProductPrice - quote.DownPayment, 0);
+            var creditBase = Math.Max(quote.DiscountedProductPrice - quote.DownPayment, 0);
             CreditRow(commands, 332, 512, "Valor a financiar", Money(creditBase));
             CreditRow(commands, 332, 488, "SOAT / Seguro", Money(quote.Insurance));
             CreditRow(commands, 332, 464, "Gastos / Matricula", Money(quote.AdministrativeFees));
@@ -510,7 +514,7 @@ public static class SimplePdfGenerator
         {
             commands.AppendLine($"0.84 0.88 0.92 RG 0.4 w {x + 16} {rowY - 8} 488 24 re S");
             commands.AppendLine($"0.08 0.10 0.14 rg BT /F2 8 Tf {columns[0]} {rowY} Td ({Escape(Shorten(item.ProductName, 26))}) Tj ET");
-            commands.AppendLine($"0.08 0.10 0.14 rg BT /F1 8 Tf {columns[1]} {rowY} Td ({Escape(Money(item.ProductPrice))}) Tj ET");
+            commands.AppendLine($"0.08 0.10 0.14 rg BT /F1 8 Tf {columns[1]} {rowY} Td ({Escape(Money(item.DiscountedProductPrice))}) Tj ET");
             commands.AppendLine($"0.08 0.10 0.14 rg BT /F1 8 Tf {columns[2]} {rowY} Td ({Escape(Money(item.DownPayment))}) Tj ET");
             commands.AppendLine($"0.08 0.10 0.14 rg BT /F1 8 Tf {columns[3]} {rowY} Td ({Escape(Money(item.FinancedAmount))}) Tj ET");
             commands.AppendLine($"0.08 0.10 0.14 rg BT /F1 8 Tf {columns[4]} {rowY} Td ({item.TermMonths}) Tj ET");
@@ -519,10 +523,10 @@ public static class SimplePdfGenerator
         }
 
         var bestPayment = items.OrderBy(x => x.EstimatedMonthlyPayment).First();
-        var bestPrice = items.OrderBy(x => x.ProductPrice).First();
+        var bestPrice = items.OrderBy(x => x.DiscountedProductPrice).First();
         commands.AppendLine("0.082 0.373 0.459 rg " + (x + 16) + " " + (y + 18) + " 488 34 re f");
         commands.AppendLine($"1 1 1 rg BT /F2 9 Tf {x + 30} {y + 38} Td (Menor cuota: {Escape(Shorten(bestPayment.ProductName, 28))} - {Escape(Money(bestPayment.EstimatedMonthlyPayment))}) Tj ET");
-        commands.AppendLine($"1 1 1 rg BT /F1 8 Tf {x + 30} {y + 24} Td (Menor precio: {Escape(Shorten(bestPrice.ProductName, 28))} - {Escape(Money(bestPrice.ProductPrice))}) Tj ET");
+        commands.AppendLine($"1 1 1 rg BT /F1 8 Tf {x + 30} {y + 24} Td (Menor precio: {Escape(Shorten(bestPrice.ProductName, 28))} - {Escape(Money(bestPrice.DiscountedProductPrice))}) Tj ET");
     }
 
     private static void KeyValue(StringBuilder commands, int x, int y, string label, string value, int labelWidth, int valueMaxChars)

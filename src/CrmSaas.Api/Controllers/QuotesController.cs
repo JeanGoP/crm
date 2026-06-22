@@ -61,6 +61,8 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             .Where(x => productIds.Contains(x.Id) && x.Activo)
             .ToDictionaryAsync(x => x.Id, cancellationToken);
         if (products.Count != productIds.Length) throw new KeyNotFoundException("Uno de los productos no existe o esta inactivo.");
+        var now = ColombiaTime.Now;
+        var promotions = await GetActivePromotionsAsync(now, cancellationToken);
 
         var calculatedItems = requestedItems.Select((item, index) =>
         {
@@ -72,8 +74,9 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             var product = products[item.ProductId];
             var insurance = item.Insurance > 0 ? item.Insurance : product.Soat;
             var administrativeFees = item.AdministrativeFees > 0 ? item.AdministrativeFees : product.Matricula + product.Impuestos;
-            var simulation = CalculateSimulation(product.Precio, item.DownPayment, insurance, administrativeFees, item.TermMonths, item.MonthlyInterestRate, financialSettings, salesPoint);
-            return new { Product = product, Simulation = simulation, Order = index + 1 };
+            var promotion = ResolvePromotion(product, salesPoint, promotions);
+            var simulation = CalculateSimulation(promotion.DiscountedProductPrice, item.DownPayment, insurance, administrativeFees, item.TermMonths, item.MonthlyInterestRate, financialSettings, salesPoint);
+            return new { Product = product, Promotion = promotion, Simulation = simulation, Order = index + 1 };
         }).ToList();
         var primary = calculatedItems[0];
         var product = primary.Product;
@@ -135,7 +138,6 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             customer.Etiquetas = MergeTags(customer.Etiquetas, "cotizacion");
         }
 
-        var now = ColombiaTime.Now;
         var number = $"COT-{now:yyyyMMddHHmmss}";
         var quote = new Cotizacion
         {
@@ -160,6 +162,10 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             PlazoMaximoMesesSede = salesPoint?.PlazoMaximoMeses,
             VigenciaCotizacionDiasSede = salesPoint?.VigenciaCotizacionDias,
             CondicionesSede = salesPoint?.CondicionesComerciales,
+            PromocionId = primary.Promotion.Promotion?.Id,
+            Promocion = primary.Promotion.Promotion,
+            NombrePromocion = primary.Promotion.Promotion?.Nombre,
+            DescuentoPromocion = primary.Promotion.DiscountAmount,
             PrecioProducto = product.Precio,
             CuotaInicial = simulation.DownPayment,
             Seguro = simulation.Insurance,
@@ -182,6 +188,10 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
                 ProductoId = item.Product.Id,
                 Orden = item.Order,
                 PrecioProducto = item.Product.Precio,
+                PromocionId = item.Promotion.Promotion?.Id,
+                Promocion = item.Promotion.Promotion,
+                NombrePromocion = item.Promotion.Promotion?.Nombre,
+                DescuentoPromocion = item.Promotion.DiscountAmount,
                 CuotaInicial = item.Simulation.DownPayment,
                 Seguro = item.Simulation.Insurance,
                 GastosAdministrativos = item.Simulation.AdministrativeFees,
@@ -242,9 +252,10 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             ?? throw new KeyNotFoundException("Producto no encontrado o inactivo.");
         var financialSettings = await GetFinancialSettingsAsync(cancellationToken);
         var salesPoint = await GetCurrentSalesPointAsync(cancellationToken);
+        var promotion = ResolvePromotion(product, salesPoint, await GetActivePromotionsAsync(ColombiaTime.Now, cancellationToken));
         var insurance = dto.Insurance > 0 ? dto.Insurance : product.Soat;
         var administrativeFees = dto.AdministrativeFees > 0 ? dto.AdministrativeFees : product.Matricula + product.Impuestos;
-        var simulation = CalculateSimulation(product.Precio, dto.DownPayment, insurance, administrativeFees, dto.TermMonths, dto.MonthlyInterestRate, financialSettings, salesPoint);
+        var simulation = CalculateSimulation(promotion.DiscountedProductPrice, dto.DownPayment, insurance, administrativeFees, dto.TermMonths, dto.MonthlyInterestRate, financialSettings, salesPoint);
 
         return Ok(new QuoteSimulationResultDto(
             simulation.DownPayment,
@@ -252,6 +263,10 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             simulation.AdministrativeFees,
             simulation.TermMonths,
             simulation.MonthlyInterestRate,
+            promotion.Promotion?.Id,
+            promotion.Promotion?.Nombre,
+            promotion.DiscountAmount,
+            promotion.DiscountedProductPrice,
             simulation.FinancedAmount,
             simulation.MonthlyPayment,
             simulation.TotalPayment,
@@ -268,6 +283,7 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             .ThenInclude(x => x!.Fotos)
             .Include(x => x.PuntoVenta)
             .Include(x => x.PerfilRequisito)
+            .Include(x => x.Promocion)
             .Include(x => x.Items)
             .ThenInclude(x => x.Producto)
             .ThenInclude(x => x!.Fotos)
@@ -321,7 +337,7 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             : ProductName(x.Producto);
         var termMonths = x.PlazoMeses <= 0 ? 24 : x.PlazoMeses;
         var financedAmount = x.ValorFinanciado <= 0 && x.CuotaMensualEstimada <= 0
-            ? Math.Max(x.PrecioProducto + x.Seguro + x.GastosAdministrativos - x.CuotaInicial, 0)
+            ? Math.Max(DiscountedPrice(x.PrecioProducto, x.DescuentoPromocion) + x.Seguro + x.GastosAdministrativos - x.CuotaInicial, 0)
             : x.ValorFinanciado;
         var totalPayment = x.TotalPagarEstimado <= 0 ? x.CuotaInicial + financedAmount : x.TotalPagarEstimado;
         return new QuoteDto(
@@ -345,6 +361,10 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             x.CondicionesSede,
             x.PerfilRequisitoId,
             x.PerfilRequisito?.Nombre,
+            x.PromocionId,
+            x.NombrePromocion,
+            x.DescuentoPromocion,
+            DiscountedPrice(x.PrecioProducto, x.DescuentoPromocion),
             x.PrecioProducto,
             x.CuotaInicial,
             x.Seguro,
@@ -388,6 +408,10 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
                 quote.ProductoId,
                 quote.Producto is null ? "Producto" : ProductName(quote.Producto),
                 quote.PrecioProducto,
+                quote.PromocionId,
+                quote.NombrePromocion,
+                quote.DescuentoPromocion,
+                DiscountedPrice(quote.PrecioProducto, quote.DescuentoPromocion),
                 quote.CuotaInicial,
                 quote.Seguro,
                 quote.GastosAdministrativos,
@@ -407,7 +431,7 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
         var productName = item.Producto is null ? "Producto" : ProductName(item.Producto);
         var termMonths = item.PlazoMeses <= 0 ? 24 : item.PlazoMeses;
         var financedAmount = item.ValorFinanciado <= 0 && item.CuotaMensualEstimada <= 0
-            ? Math.Max(item.PrecioProducto + item.Seguro + item.GastosAdministrativos - item.CuotaInicial, 0)
+            ? Math.Max(DiscountedPrice(item.PrecioProducto, item.DescuentoPromocion) + item.Seguro + item.GastosAdministrativos - item.CuotaInicial, 0)
             : item.ValorFinanciado;
         var totalPayment = item.TotalPagarEstimado <= 0 ? item.CuotaInicial + financedAmount : item.TotalPagarEstimado;
         return new QuoteItemDto(
@@ -415,6 +439,10 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             item.ProductoId,
             productName,
             item.PrecioProducto,
+            item.PromocionId,
+            item.NombrePromocion,
+            item.DescuentoPromocion,
+            DiscountedPrice(item.PrecioProducto, item.DescuentoPromocion),
             item.CuotaInicial,
             item.Seguro,
             item.GastosAdministrativos,
@@ -454,6 +482,56 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             .OrderByDescending(x => x.Codigo == "EMPLEADO")
             .ThenBy(x => x.Nombre)
             .FirstOrDefaultAsync(cancellationToken);
+
+    private async Task<IReadOnlyCollection<Promocion>> GetActivePromotionsAsync(DateTime now, CancellationToken cancellationToken) =>
+        await db.Promociones
+            .Where(x => x.Activa && x.VigenteDesde.Date <= now.Date && x.VigenteHasta.Date >= now.Date)
+            .ToListAsync(cancellationToken);
+
+    private static PromotionApplication ResolvePromotion(Producto product, PuntoVenta? salesPoint, IReadOnlyCollection<Promocion> promotions)
+    {
+        var candidates = promotions
+            .Where(x => AppliesToProduct(x, product) && AppliesToSalesPoint(x, salesPoint))
+            .Select(x =>
+            {
+                var discount = PromotionDiscount(product.Precio, x);
+                var specificity = (x.ProductoId.HasValue ? 8 : 0)
+                    + (!string.IsNullOrWhiteSpace(x.Marca) ? 4 : 0)
+                    + (!string.IsNullOrWhiteSpace(x.Color) ? 2 : 0)
+                    + (x.PuntoVentaId.HasValue ? 1 : 0);
+                return new { Promotion = x, Discount = discount, Specificity = specificity };
+            })
+            .Where(x => x.Discount > 0)
+            .OrderByDescending(x => x.Specificity)
+            .ThenByDescending(x => x.Discount)
+            .ThenBy(x => x.Promotion.Nombre)
+            .FirstOrDefault();
+
+        return candidates is null
+            ? new PromotionApplication(null, 0, product.Precio)
+            : new PromotionApplication(candidates.Promotion, candidates.Discount, DiscountedPrice(product.Precio, candidates.Discount));
+    }
+
+    private static bool AppliesToProduct(Promocion promotion, Producto product)
+    {
+        if (promotion.ProductoId.HasValue && promotion.ProductoId.Value != product.Id) return false;
+        if (!string.IsNullOrWhiteSpace(promotion.Marca) && !promotion.Marca.Trim().Equals(product.Marca?.Trim(), StringComparison.OrdinalIgnoreCase)) return false;
+        if (!string.IsNullOrWhiteSpace(promotion.Color) && !promotion.Color.Trim().Equals(product.Color?.Trim(), StringComparison.OrdinalIgnoreCase)) return false;
+        return true;
+    }
+
+    private static bool AppliesToSalesPoint(Promocion promotion, PuntoVenta? salesPoint) =>
+        !promotion.PuntoVentaId.HasValue || (salesPoint is not null && promotion.PuntoVentaId.Value == salesPoint.Id);
+
+    private static decimal PromotionDiscount(decimal productPrice, Promocion promotion)
+    {
+        var discount = promotion.TipoDescuento.Equals("Porcentaje", StringComparison.OrdinalIgnoreCase)
+            ? productPrice * (promotion.ValorDescuento / 100)
+            : promotion.ValorDescuento;
+        return Math.Min(Math.Max(Math.Round(discount, 0, MidpointRounding.AwayFromZero), 0), productPrice);
+    }
+
+    private static decimal DiscountedPrice(decimal productPrice, decimal discount) => Math.Max(productPrice - Math.Max(discount, 0), 0);
 
     private static CreditSimulation CalculateSimulation(decimal productPrice, decimal downPayment, decimal insurance, decimal administrativeFees, int termMonths, decimal monthlyInterestRate, ConfiguracionFinancieraEmpresa? financialSettings, PuntoVenta? salesPoint)
     {
@@ -524,6 +602,8 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
         decimal TotalPayment,
         string CreditType,
         bool UsedCompanyFinancialSettings);
+
+    private sealed record PromotionApplication(Promocion? Promotion, decimal DiscountAmount, decimal DiscountedProductPrice);
 
     private static string ProductName(Producto product)
     {

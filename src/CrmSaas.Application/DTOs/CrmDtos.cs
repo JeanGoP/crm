@@ -147,6 +147,10 @@ public sealed record QuoteSimulationResultDto(
     decimal AdministrativeFees,
     int TermMonths,
     decimal MonthlyInterestRate,
+    Guid? PromotionId,
+    string? PromotionName,
+    decimal PromotionDiscount,
+    decimal DiscountedProductPrice,
     decimal FinancedAmount,
     decimal EstimatedMonthlyPayment,
     decimal EstimatedTotalPayment,
@@ -158,6 +162,10 @@ public sealed record QuoteItemDto(
     Guid ProductId,
     string ProductName,
     decimal ProductPrice,
+    Guid? PromotionId,
+    string? PromotionName,
+    decimal PromotionDiscount,
+    decimal DiscountedProductPrice,
     decimal DownPayment,
     decimal Insurance,
     decimal AdministrativeFees,
@@ -199,6 +207,10 @@ public sealed record QuoteDto(
     string? SalesPointCommercialTerms,
     Guid? RequirementProfileId,
     string? RequirementProfileName,
+    Guid? PromotionId,
+    string? PromotionName,
+    decimal PromotionDiscount,
+    decimal DiscountedProductPrice,
     decimal ProductPrice,
     decimal DownPayment,
     decimal Insurance,
@@ -373,6 +385,35 @@ public sealed record UpsertRequirementProfileDto(
     bool IsCash,
     bool Active,
     IReadOnlyCollection<UpsertRequirementDocumentDto> Documents);
+
+public sealed record PromotionDto(
+    Guid Id,
+    string Name,
+    string Code,
+    string DiscountType,
+    decimal DiscountValue,
+    Guid? ProductId,
+    string? ProductName,
+    string? Brand,
+    string? Color,
+    Guid? SalesPointId,
+    string? SalesPointName,
+    DateTime ValidFrom,
+    DateTime ValidUntil,
+    bool Active);
+
+public sealed record UpsertPromotionDto(
+    string Name,
+    string Code,
+    string DiscountType,
+    decimal DiscountValue,
+    Guid? ProductId,
+    string? Brand,
+    string? Color,
+    Guid? SalesPointId,
+    DateTime ValidFrom,
+    DateTime ValidUntil,
+    bool Active);
 
 public sealed record MotorcycleDeliveryDto(
     Guid Id,

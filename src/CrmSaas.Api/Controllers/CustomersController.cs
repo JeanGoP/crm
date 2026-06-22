@@ -166,7 +166,7 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
         var productName = x.Producto is null ? "Producto" : ProductName(x.Producto);
         var termMonths = x.PlazoMeses <= 0 ? 24 : x.PlazoMeses;
         var financedAmount = x.ValorFinanciado <= 0 && x.CuotaMensualEstimada <= 0
-            ? Math.Max(x.PrecioProducto + x.Seguro + x.GastosAdministrativos - x.CuotaInicial, 0)
+            ? Math.Max(DiscountedPrice(x.PrecioProducto, x.DescuentoPromocion) + x.Seguro + x.GastosAdministrativos - x.CuotaInicial, 0)
             : x.ValorFinanciado;
         var totalPayment = x.TotalPagarEstimado <= 0 ? x.CuotaInicial + financedAmount : x.TotalPagarEstimado;
         return new QuoteDto(
@@ -190,6 +190,10 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
             x.CondicionesSede,
             x.PerfilRequisitoId,
             x.PerfilRequisito?.Nombre,
+            x.PromocionId,
+            x.NombrePromocion,
+            x.DescuentoPromocion,
+            DiscountedPrice(x.PrecioProducto, x.DescuentoPromocion),
             x.PrecioProducto,
             x.CuotaInicial,
             x.Seguro,
@@ -221,6 +225,10 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
                 quote.ProductoId,
                 quote.Producto is null ? "Producto" : ProductName(quote.Producto),
                 quote.PrecioProducto,
+                quote.PromocionId,
+                quote.NombrePromocion,
+                quote.DescuentoPromocion,
+                DiscountedPrice(quote.PrecioProducto, quote.DescuentoPromocion),
                 quote.CuotaInicial,
                 quote.Seguro,
                 quote.GastosAdministrativos,
@@ -238,7 +246,7 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
     private static QuoteItemDto ToItemDto(CotizacionItem item)
     {
         var financedAmount = item.ValorFinanciado <= 0 && item.CuotaMensualEstimada <= 0
-            ? Math.Max(item.PrecioProducto + item.Seguro + item.GastosAdministrativos - item.CuotaInicial, 0)
+            ? Math.Max(DiscountedPrice(item.PrecioProducto, item.DescuentoPromocion) + item.Seguro + item.GastosAdministrativos - item.CuotaInicial, 0)
             : item.ValorFinanciado;
         var totalPayment = item.TotalPagarEstimado <= 0 ? item.CuotaInicial + financedAmount : item.TotalPagarEstimado;
         return new QuoteItemDto(
@@ -246,6 +254,10 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
             item.ProductoId,
             item.Producto is null ? "Producto" : ProductName(item.Producto),
             item.PrecioProducto,
+            item.PromocionId,
+            item.NombrePromocion,
+            item.DescuentoPromocion,
+            DiscountedPrice(item.PrecioProducto, item.DescuentoPromocion),
             item.CuotaInicial,
             item.Seguro,
             item.GastosAdministrativos,
@@ -574,4 +586,6 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
         if (!string.IsNullOrWhiteSpace(product.Nombre)) return product.Nombre.Trim();
         return $"{product.Marca} {product.Modelo} {product.Referencia}".Trim();
     }
+
+    private static decimal DiscountedPrice(decimal productPrice, decimal discount) => Math.Max(productPrice - Math.Max(discount, 0), 0);
 }

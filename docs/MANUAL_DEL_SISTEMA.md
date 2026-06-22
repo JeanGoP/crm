@@ -1,7 +1,7 @@
 # Manual de usuario - EnMarcha CRM
 
 Ultima actualizacion: 2026-06-22  
-Version del manual: 7.3
+Version del manual: 7.4
 Sistema: EnMarcha CRM para gestion comercial y ventas a credito  
 
 ## 1. Bienvenida
@@ -221,6 +221,8 @@ La cotizacion usa automaticamente la sede principal del asesor conectado. Esa se
 
 Tambien permite seleccionar un **perfil de requisitos**, por ejemplo Empleado, Independiente, Pensionado o Contado. Ese perfil indica que documentos se deben pedir si el cliente continua hacia solicitud de credito.
 
+Si existe una promocion vigente para el producto, marca, color o sede, la cotizacion aplica el descuento automaticamente antes de calcular el valor financiado y la cuota aproximada.
+
 ### Crear una cotizacion
 
 1. Entre a **Cotizaciones**.
@@ -245,6 +247,7 @@ Tambien permite seleccionar un **perfil de requisitos**, por ejemplo Empleado, I
 - Desde la vista previa se decide si se descarga o se imprime.
 - Si el producto tiene una foto principal compatible, se incluye en el PDF.
 - El perfil de requisitos queda guardado para generar el checklist si se crea una solicitud de credito.
+- Si aplica una promocion vigente, el descuento queda guardado en la cotizacion y se refleja en el calculo financiero.
 - Se puede crear seguimiento automatico para llamar al cliente.
 - El negocio puede reflejarse en el pipeline comercial.
 
@@ -484,6 +487,7 @@ Configuracion permite administrar datos generales del sistema. Esta opcion norma
 - **Etapas del pipeline:** configurar las columnas comerciales.
 - **Configuracion financiera:** definir las condiciones usadas por la empresa para calcular cuotas en las cotizaciones.
 - **Perfiles de requisitos:** definir listas de documentos para empleado, independiente, pensionado, contado u otros perfiles propios de la empresa.
+- **Promociones / planes tacticos:** configurar descuentos automaticos por producto, marca, color, sede y vigencia.
 
 ### Sedes / puntos de venta
 
@@ -510,6 +514,19 @@ Esta configuracion servira para que proximas funciones puedan usar condiciones p
 8. Guarde.
 
 Estos perfiles se usan en **Cotizaciones** y **Solicitudes de credito**. Al crear la solicitud, el sistema toma el perfil elegido y genera automaticamente el checklist de documentos pendientes.
+
+### Promociones / planes tacticos
+
+1. Entre a **Configuracion**.
+2. Busque la tarjeta **Promociones / planes tacticos**.
+3. Presione **Nueva promocion**.
+4. Escriba nombre y codigo.
+5. Defina si el descuento es por valor fijo o por porcentaje.
+6. Configure el alcance: producto especifico, marca, color y sede si aplica.
+7. Defina fecha inicial y fecha final de vigencia.
+8. Guarde.
+
+Cuando una cotizacion coincide con una promocion activa y vigente, el sistema descuenta automaticamente el valor antes de calcular la financiacion. Si varias promociones coinciden, se aplica la mas especifica.
 
 ### Configuracion financiera
 
@@ -586,6 +603,7 @@ El sistema muestra mensajes cuando algo no puede completarse.
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-06-22 | 7.4 | Se agregan promociones y planes tacticos con descuentos automaticos por producto, marca, color, sede y vigencia en cotizaciones. |
 | 2026-06-22 | 7.3 | Se agregan perfiles de requisitos por empresa y generacion automatica del checklist documental desde la cotizacion hacia la solicitud de credito. |
 | 2026-06-22 | 7.2 | Se amplia el maestro de productos con linea, version, ficha tecnica, vigencia de precio, SOAT, matricula e impuestos; la cotizacion puede usar esos cargos automaticamente. |
 | 2026-06-22 | 7.1 | Las cotizaciones quedan conectadas a la sede del asesor y usan logo de marca, tasa, plazo, vigencia y condiciones comerciales por sede. |

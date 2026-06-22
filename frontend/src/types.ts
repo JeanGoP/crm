@@ -177,12 +177,33 @@ export interface RequirementProfile {
   documents: RequirementDocument[];
 }
 
+export interface Promotion {
+  id: string;
+  name: string;
+  code: string;
+  discountType: string;
+  discountValue: number;
+  productId?: string;
+  productName?: string;
+  brand?: string;
+  color?: string;
+  salesPointId?: string;
+  salesPointName?: string;
+  validFrom: string;
+  validUntil: string;
+  active: boolean;
+}
+
 export interface QuoteSimulationResult {
   downPayment: number;
   insurance: number;
   administrativeFees: number;
   termMonths: number;
   monthlyInterestRate: number;
+  promotionId?: string;
+  promotionName?: string;
+  promotionDiscount: number;
+  discountedProductPrice: number;
   financedAmount: number;
   estimatedMonthlyPayment: number;
   estimatedTotalPayment: number;
@@ -195,6 +216,10 @@ export interface QuoteItem {
   productId: string;
   productName: string;
   productPrice: number;
+  promotionId?: string;
+  promotionName?: string;
+  promotionDiscount: number;
+  discountedProductPrice: number;
   downPayment: number;
   insurance: number;
   administrativeFees: number;
@@ -229,6 +254,10 @@ export interface Quote {
   salesPointCommercialTerms?: string;
   requirementProfileId?: string;
   requirementProfileName?: string;
+  promotionId?: string;
+  promotionName?: string;
+  promotionDiscount: number;
+  discountedProductPrice: number;
   productPrice: number;
   downPayment: number;
   insurance: number;
