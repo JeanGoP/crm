@@ -93,6 +93,42 @@ public sealed record UpsertFinancialSettingsDto(
     int PaymentRounding,
     bool UseMontelibanoTable,
     bool Active);
+
+public sealed record SalesPointDto(
+    Guid Id,
+    string Name,
+    string Code,
+    string City,
+    string? Address,
+    string? Phone,
+    string MainBrand,
+    string? BrandLogoDataUrl,
+    decimal FactorMonthlyRate,
+    int MaxTermMonths,
+    string DeliveryMode,
+    int SoatDays,
+    int RegistrationDays,
+    string? SoatProvider,
+    string? RegistrationAgent,
+    bool Active);
+
+public sealed record UpsertSalesPointDto(
+    string Name,
+    string Code,
+    string City,
+    string? Address,
+    string? Phone,
+    string MainBrand,
+    string? BrandLogoDataUrl,
+    decimal FactorMonthlyRate,
+    int MaxTermMonths,
+    string DeliveryMode,
+    int SoatDays,
+    int RegistrationDays,
+    string? SoatProvider,
+    string? RegistrationAgent,
+    bool Active);
+
 public sealed record QuoteSimulationDto(
     Guid ProductId,
     decimal ProductPrice,

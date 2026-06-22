@@ -128,6 +128,25 @@ export interface FinancialSettings {
   active: boolean;
 }
 
+export interface SalesPoint {
+  id: string;
+  name: string;
+  code: string;
+  city: string;
+  address?: string;
+  phone?: string;
+  mainBrand: string;
+  brandLogoDataUrl?: string;
+  factorMonthlyRate: number;
+  maxTermMonths: number;
+  deliveryMode: string;
+  soatDays: number;
+  registrationDays: number;
+  soatProvider?: string;
+  registrationAgent?: string;
+  active: boolean;
+}
+
 export interface QuoteSimulationResult {
   downPayment: number;
   insurance: number;

@@ -1,7 +1,7 @@
 # Manual de usuario - EnMarcha CRM
 
-Ultima actualizacion: 2026-06-17  
-Version del manual: 6.8
+Ultima actualizacion: 2026-06-22  
+Version del manual: 6.9
 Sistema: EnMarcha CRM para gestion comercial y ventas a credito  
 
 ## 1. Bienvenida
@@ -71,7 +71,7 @@ El menu lateral permite moverse por las opciones principales:
 - **Productos:** catalogo de productos disponibles para cotizar.
 - **Prospectos:** interesados que pueden convertirse en clientes.
 - **Reportes:** indicadores comerciales.
-- **Configuracion:** empresas, usuarios, roles y parametros generales.
+- **Configuracion:** empresas, sedes, usuarios, roles y parametros generales.
 
 En la parte superior se muestra el usuario conectado y la opcion **Salir** para cerrar sesion.
 
@@ -459,10 +459,24 @@ Configuracion permite administrar datos generales del sistema. Esta opcion norma
 ### Opciones principales
 
 - **Empresas:** crear y actualizar empresas. Al crear una empresa se puede cargar su logo.
+- **Sedes / puntos de venta:** registrar puntos de venta, ciudad, marca principal, logo de marca, modalidad de entrega, tasa y tiempos de tramite.
 - **Usuarios:** crear usuarios y asignarlos a una empresa.
 - **Roles:** administrar permisos segun el perfil del usuario.
 - **Etapas del pipeline:** configurar las columnas comerciales.
 - **Configuracion financiera:** definir las condiciones usadas por la empresa para calcular cuotas en las cotizaciones.
+
+### Sedes / puntos de venta
+
+1. Entre a **Configuracion**.
+2. Busque la tarjeta **Sedes / puntos de venta**.
+3. Presione **Nueva sede**.
+4. Complete nombre, codigo, ciudad, direccion y telefono.
+5. Indique la marca principal y, si aplica, cargue el logo de marca.
+6. Defina tasa factor mensual, plazo maximo, modalidad de entrega y tiempos estimados de SOAT y matricula.
+7. Registre proveedor SOAT y tramitador de matricula cuando la empresa ya tenga esos responsables definidos.
+8. Marque la sede como activa y guarde.
+
+Esta configuracion servira para que proximas funciones puedan usar condiciones por sede en cotizaciones, tramites, promociones, entregas y reportes.
 
 ### Configuracion financiera
 
@@ -536,6 +550,7 @@ El sistema muestra mensajes cuando algo no puede completarse.
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-06-22 | 6.9 | Se agrega el maestro de sedes / puntos de venta en Configuracion y se documenta su uso para condiciones comerciales por sede. |
 | 2026-06-17 | 6.8 | Se actualiza el nombre visible del sistema a EnMarcha CRM en el frontend y en el manual. |
 | 2026-06-13 | 6.7 | El timeline de Cliente 360 incorpora mas eventos del ciclo comercial, incluyendo archivos generales y entregas. |
 | 2026-06-13 | 6.6 | Se mejora Cliente 360 como ficha completa del cliente con encabezado, acciones rapidas, indicadores, resumen comercial, siguiente paso, timeline y paneles de proceso. |

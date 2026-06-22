@@ -91,6 +91,26 @@ public static class DatabaseSeeder
 
         await db.SaveChangesAsync(cancellationToken);
 
+        if (!await db.PuntosVenta.IgnoreQueryFilters().AnyAsync(x => x.EmpresaId == empresaId, cancellationToken))
+        {
+            db.PuntosVenta.Add(new PuntoVenta
+            {
+                EmpresaId = empresaId,
+                Nombre = "Sede principal",
+                Codigo = "PRINCIPAL",
+                Ciudad = "Montelibano",
+                MarcaPrincipal = "Honda",
+                TasaFactorMensual = 4.5m,
+                PlazoMaximoMeses = 30,
+                ModalidadEntrega = "ConSoat",
+                TiempoSoatDias = 14,
+                TiempoMatriculaDias = 20,
+                Activa = true
+            });
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+
         if (!await db.EtapasNegocio.IgnoreQueryFilters().AnyAsync(x => x.EmpresaId == empresaId, cancellationToken))
         {
             db.EtapasNegocio.AddRange(

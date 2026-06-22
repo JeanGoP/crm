@@ -35,7 +35,7 @@ import Search from '@mui/icons-material/Search';
 import { AxiosError } from 'axios';
 import { api } from './api';
 import { useAuthStore } from './store';
-import { Activity, ColombianIdentityLookup, CommercialReports, Company, CreditApplication, CreditDocument, Customer, Customer360, CustomerAiAnalysis, CustomerTimelineItem, Dashboard, Deal, DealStage, FinancialSettings, Lead, MotorcycleDelivery, Product, ProductPhoto, Quote, QuoteSimulationResult, User } from './types';
+import { Activity, ColombianIdentityLookup, CommercialReports, Company, CreditApplication, CreditDocument, Customer, Customer360, CustomerAiAnalysis, CustomerTimelineItem, Dashboard, Deal, DealStage, FinancialSettings, Lead, MotorcycleDelivery, Product, ProductPhoto, Quote, QuoteSimulationResult, SalesPoint, User } from './types';
 
 const drawerWidth = 248;
 const today = new Date().toISOString().slice(0, 10);
@@ -106,6 +106,7 @@ const emptyCompany = { name: '', subdomain: '', customDomain: '', logoDataUrl: '
 const emptyUser = { fullName: '', email: '', password: '', companyId: '', roles: ['Vendedor'] };
 const emptyProduct = { name: '', category: 'Moto', brand: '', model: '', reference: '', description: '', engineCc: '', year: '', color: '', price: 0, active: true };
 const emptyFinancialSettings = { minimumWage: 1400000, consumerAnnualRate: 29.72, lowAmountAnnualRate: 56.33, factorMonthlyRate: 4.5, maxTermMonths: 30, paymentRounding: 1000, useMontelibanoTable: true, active: true };
+const emptySalesPoint = { name: '', code: '', city: '', address: '', phone: '', mainBrand: 'Honda', brandLogoDataUrl: '', factorMonthlyRate: 4.5, maxTermMonths: 30, deliveryMode: 'ConSoat', soatDays: 14, registrationDays: 20, soatProvider: '', registrationAgent: '', active: true };
 const emptyQuoteItem = { productId: '', downPayment: 0, insurance: 0, administrativeFees: 0, termMonths: 24, monthlyInterestRate: 2.2 };
 const emptyQuote = { identificationType: 1, identificationNumber: '', customerFirstNames: '', customerLastNames: '', customerFirstName: '', customerMiddleName: '', customerLastName: '', customerSecondLastName: '', phoneCountryCode: '+57', phoneNumber: '', productId: '', downPayment: 0, insurance: 0, administrativeFees: 0, termMonths: 24, monthlyInterestRate: 2.2, items: [emptyQuoteItem], notes: '' };
 const emptyCreditApplication = {
@@ -1537,9 +1538,11 @@ function SettingsPage() {
   const { data: companies = [], loading: loadingCompanies, error: companiesError, reload: reloadCompanies, setData: setCompanies } = useResource<Company[]>('/api/companies', []);
   const { data: users = [], loading: loadingUsers, error: usersError, reload: reloadUsers, setData: setUsers } = useResource<User[]>('/api/users', []);
   const { data: financialSettings, loading: loadingFinancialSettings, error: financialSettingsError, reload: reloadFinancialSettings, setData: setFinancialSettings } = useResource<FinancialSettings>('/api/financial-settings');
+  const { data: salesPoints = [], loading: loadingSalesPoints, error: salesPointsError, reload: reloadSalesPoints, setData: setSalesPoints } = useResource<SalesPoint[]>('/api/sales-points', []);
   const [companyForm, setCompanyForm] = useState<FormMode<Company>>({ open: false });
   const [userForm, setUserForm] = useState<FormMode<User>>({ open: false });
   const [financialForm, setFinancialForm] = useState<FormMode<FinancialSettings>>({ open: false });
+  const [salesPointForm, setSalesPointForm] = useState<FormMode<SalesPoint>>({ open: false });
   const [notice, setNotice] = useState<Notice>();
 
   const saveCompany = async (payload: typeof emptyCompany) => {
@@ -1582,8 +1585,34 @@ function SettingsPage() {
     setFinancialForm({ open: false });
   };
 
+  const saveSalesPoint = async (payload: typeof emptySalesPoint) => {
+    const body = {
+      name: payload.name,
+      code: payload.code,
+      city: payload.city,
+      address: payload.address || null,
+      phone: payload.phone || null,
+      mainBrand: payload.mainBrand,
+      brandLogoDataUrl: payload.brandLogoDataUrl || null,
+      factorMonthlyRate: Number(payload.factorMonthlyRate),
+      maxTermMonths: Number(payload.maxTermMonths),
+      deliveryMode: payload.deliveryMode,
+      soatDays: Number(payload.soatDays),
+      registrationDays: Number(payload.registrationDays),
+      soatProvider: payload.soatProvider || null,
+      registrationAgent: payload.registrationAgent || null,
+      active: Boolean(payload.active)
+    };
+    const { data } = salesPointForm.item
+      ? await api.put<SalesPoint>(`/api/sales-points/${salesPointForm.item.id}`, body)
+      : await api.post<SalesPoint>('/api/sales-points', body);
+    setSalesPoints(salesPointForm.item ? salesPoints.map((x) => x.id === data.id ? data : x) : [...salesPoints, data].sort((a, b) => a.city.localeCompare(b.city) || a.name.localeCompare(b.name)));
+    setNotice({ type: 'success', text: salesPointForm.item ? 'Sede actualizada.' : 'Sede creada.' });
+    setSalesPointForm({ open: false });
+  };
+
   return <Stack spacing={3}>
-    <Header title="Configuracion" onRefresh={() => { reloadCompanies(); reloadUsers(); reloadFinancialSettings(); }} />
+    <Header title="Configuracion" onRefresh={() => { reloadCompanies(); reloadUsers(); reloadFinancialSettings(); reloadSalesPoints(); }} />
     <Card><CardContent><Grid container spacing={2}>
       <Grid item xs={12} md={6}><TextField fullWidth label="API URL" value={import.meta.env.VITE_API_URL ?? ''} InputProps={{ readOnly: true }} /></Grid>
       <Grid item xs={12} md={6}><TextField fullWidth label="Tenant" value={import.meta.env.VITE_TENANT ?? 'demo'} InputProps={{ readOnly: true }} /></Grid>
@@ -1609,6 +1638,35 @@ function SettingsPage() {
           <Grid item xs={6} md={3}><Metric label="Tabla financiera" value={financialSettings.useMontelibanoTable ? 'Activa' : 'Manual'} /></Grid>
           <Grid item xs={6} md={3}><Metric label="Estado" value={financialSettings.active ? 'Activa' : 'Inactiva'} /></Grid>
         </Grid>}
+      </Stack>
+    </CardContent></Card>
+    <Card><CardContent>
+      <Stack spacing={2}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', sm: 'center' }} gap={1}>
+          <Box>
+            <Typography variant="h5" fontWeight={900}>Sedes / puntos de venta</Typography>
+            <Typography color="text.secondary" fontSize={14}>Base para tasas por sede, logos de marca, tramites, promociones y entregas.</Typography>
+          </Box>
+          {canManage && <Button variant="contained" startIcon={<Add />} onClick={() => setSalesPointForm({ open: true })}>Nueva sede</Button>}
+        </Stack>
+        <StatusBar loading={loadingSalesPoints} error={salesPointsError} />
+        <EntityTable
+          headers={['Marca', 'Sede', 'Ciudad', 'Entrega', 'Tasa', 'Tramites', 'Estado', 'Acciones']}
+          empty="No hay sedes registradas"
+          rows={salesPoints.map((point) => [
+            <Stack direction="row" spacing={1} alignItems="center">
+              {point.brandLogoDataUrl && <Box component="img" src={point.brandLogoDataUrl} alt={point.mainBrand} sx={{ width: 42, height: 28, objectFit: 'contain' }} />}
+              <Typography fontWeight={800}>{point.mainBrand}</Typography>
+            </Stack>,
+            <Box><Typography fontWeight={800}>{point.name}</Typography><Typography color="text.secondary" fontSize={12}>{point.code}</Typography></Box>,
+            point.city,
+            point.deliveryMode === 'Completa' ? 'Completa' : 'Con SOAT',
+            `${point.factorMonthlyRate}% / ${point.maxTermMonths} meses`,
+            `SOAT ${point.soatDays}d · Matricula ${point.registrationDays}d`,
+            <StatusChip label={point.active ? 'Activa' : 'Inactiva'} tone={point.active ? 'success' : 'default'} />,
+            <Actions onEdit={canManage ? () => setSalesPointForm({ open: true, item: point }) : undefined} />
+          ])}
+        />
       </Stack>
     </CardContent></Card>
     {canManage && <>
@@ -1646,6 +1704,7 @@ function SettingsPage() {
       />
     </>}
     <CompanyDialog form={companyForm} onClose={() => setCompanyForm({ open: false })} onSave={saveCompany} />
+    <SalesPointDialog form={salesPointForm} onClose={() => setSalesPointForm({ open: false })} onSave={saveSalesPoint} />
     <UserDialog form={userForm} companies={companies.filter((x) => x.active)} onClose={() => setUserForm({ open: false })} onSave={saveUser} />
     <FinancialSettingsDialog form={financialForm} onClose={() => setFinancialForm({ open: false })} onSave={saveFinancialSettings} />
     <Notice notice={notice} onClose={() => setNotice(undefined)} />
@@ -1665,7 +1724,58 @@ function CompanyDialog({ form, onClose, onSave }: DialogProps<Company, typeof em
   </FormDialog>;
 }
 
-function CompanyLogoPicker({ value, onChange }: { value?: string; onChange: (value: string) => void }) {
+function SalesPointDialog({ form, onClose, onSave }: DialogProps<SalesPoint, typeof emptySalesPoint>) {
+  const initial = form.item ? {
+    name: form.item.name,
+    code: form.item.code,
+    city: form.item.city,
+    address: form.item.address ?? '',
+    phone: form.item.phone ?? '',
+    mainBrand: form.item.mainBrand,
+    brandLogoDataUrl: form.item.brandLogoDataUrl ?? '',
+    factorMonthlyRate: form.item.factorMonthlyRate,
+    maxTermMonths: form.item.maxTermMonths,
+    deliveryMode: form.item.deliveryMode,
+    soatDays: form.item.soatDays,
+    registrationDays: form.item.registrationDays,
+    soatProvider: form.item.soatProvider ?? '',
+    registrationAgent: form.item.registrationAgent ?? '',
+    active: form.item.active
+  } : emptySalesPoint;
+
+  return <FormDialog title={form.item ? 'Editar sede' : 'Nueva sede'} open={form.open} initial={initial} onClose={onClose} onSave={onSave} maxWidth="md">
+    {(v, set) => <>
+      <CompanyLogoPicker title="Logo de marca" helper="PNG, JPG o WebP. Se usara luego en cotizaciones y documentos por sede." value={v.brandLogoDataUrl} onChange={(brandLogoDataUrl) => set({ brandLogoDataUrl })} />
+      <Grid container spacing={1.5}>
+        <Grid item xs={12} md={6}><TextField fullWidth required label="Nombre de la sede" value={v.name} onChange={(e) => set({ name: e.target.value })} /></Grid>
+        <Grid item xs={12} md={3}><TextField fullWidth required label="Codigo" value={v.code} onChange={(e) => set({ code: e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '') })} /></Grid>
+        <Grid item xs={12} md={3}><TextField fullWidth required label="Ciudad" value={v.city} onChange={(e) => set({ city: e.target.value })} /></Grid>
+        <Grid item xs={12} md={8}><TextField fullWidth label="Direccion" value={v.address} onChange={(e) => set({ address: e.target.value })} /></Grid>
+        <Grid item xs={12} md={4}><TextField fullWidth label="Telefono" value={v.phone} onChange={(e) => set({ phone: e.target.value })} /></Grid>
+      </Grid>
+      <Grid container spacing={1.5}>
+        <Grid item xs={12} md={4}><TextField fullWidth required label="Marca principal" value={v.mainBrand} onChange={(e) => set({ mainBrand: e.target.value })} /></Grid>
+        <Grid item xs={12} md={4}><TextField fullWidth required type="number" label="Tasa factor mensual (%)" value={v.factorMonthlyRate} onChange={(e) => set({ factorMonthlyRate: Number(e.target.value) })} /></Grid>
+        <Grid item xs={12} md={4}><TextField fullWidth required type="number" label="Plazo maximo" value={v.maxTermMonths} onChange={(e) => set({ maxTermMonths: Number(e.target.value) })} /></Grid>
+      </Grid>
+      <Grid container spacing={1.5}>
+        <Grid item xs={12} md={4}>
+          <TextField fullWidth select label="Modalidad de entrega" value={v.deliveryMode} onChange={(e) => set({ deliveryMode: e.target.value })}>
+            <MenuItem value="ConSoat">Entrega con SOAT</MenuItem>
+            <MenuItem value="Completa">Entrega completa</MenuItem>
+          </TextField>
+        </Grid>
+        <Grid item xs={12} md={4}><TextField fullWidth required type="number" label="Dias SOAT" value={v.soatDays} onChange={(e) => set({ soatDays: Number(e.target.value) })} /></Grid>
+        <Grid item xs={12} md={4}><TextField fullWidth required type="number" label="Dias matricula" value={v.registrationDays} onChange={(e) => set({ registrationDays: Number(e.target.value) })} /></Grid>
+        <Grid item xs={12} md={6}><TextField fullWidth label="Proveedor SOAT" value={v.soatProvider} onChange={(e) => set({ soatProvider: e.target.value })} /></Grid>
+        <Grid item xs={12} md={6}><TextField fullWidth label="Tramitador matricula" value={v.registrationAgent} onChange={(e) => set({ registrationAgent: e.target.value })} /></Grid>
+      </Grid>
+      <FormControlLabel control={<Checkbox checked={v.active} onChange={(e) => set({ active: e.target.checked })} />} label="Sede activa" />
+    </>}
+  </FormDialog>;
+}
+
+function CompanyLogoPicker({ value, onChange, title = 'Logo de la empresa', helper = 'PNG, JPG o WebP. Se ajusta automaticamente a 320 x 160 px.' }: { value?: string; onChange: (value: string) => void; title?: string; helper?: string }) {
   const [error, setError] = useState('');
   const handleLogo = async (file?: File) => {
     if (!file) return;
@@ -1678,7 +1788,7 @@ function CompanyLogoPicker({ value, onChange }: { value?: string; onChange: (val
   };
 
   return <Stack spacing={1}>
-    <Typography variant="subtitle2" fontWeight={900} color="primary">Logo de la empresa</Typography>
+    <Typography variant="subtitle2" fontWeight={900} color="primary">{title}</Typography>
     <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ xs: 'stretch', sm: 'center' }}>
       <Box sx={{
         width: 160,
@@ -1702,7 +1812,7 @@ function CompanyLogoPicker({ value, onChange }: { value?: string; onChange: (val
           </Button>
           {value && <Button color="inherit" onClick={() => onChange('')}>Quitar</Button>}
         </Stack>
-        <Typography variant="caption" color="text.secondary">PNG, JPG o WebP. Se ajusta automaticamente a 320 x 160 px.</Typography>
+        <Typography variant="caption" color="text.secondary">{helper}</Typography>
       </Stack>
     </Stack>
     {error && <Alert severity="error">{error}</Alert>}

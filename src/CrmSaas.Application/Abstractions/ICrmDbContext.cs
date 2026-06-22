@@ -20,6 +20,7 @@ public interface ICrmDbContext
     DbSet<Producto> Productos { get; }
     DbSet<ProductoFoto> ProductoFotos { get; }
     DbSet<ConfiguracionFinancieraEmpresa> ConfiguracionesFinancierasEmpresa { get; }
+    DbSet<PuntoVenta> PuntosVenta { get; }
     DbSet<Cotizacion> Cotizaciones { get; }
     DbSet<CotizacionItem> CotizacionItems { get; }
     DbSet<SolicitudCredito> SolicitudesCredito { get; }

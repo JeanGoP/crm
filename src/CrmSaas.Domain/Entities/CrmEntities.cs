@@ -142,6 +142,25 @@ public sealed class ConfiguracionFinancieraEmpresa : AuditableTenantEntity
     public bool Activa { get; set; } = true;
 }
 
+public sealed class PuntoVenta : AuditableTenantEntity
+{
+    public string Nombre { get; set; } = string.Empty;
+    public string Codigo { get; set; } = string.Empty;
+    public string Ciudad { get; set; } = string.Empty;
+    public string? Direccion { get; set; }
+    public string? Telefono { get; set; }
+    public string MarcaPrincipal { get; set; } = string.Empty;
+    public string? LogoMarcaDataUrl { get; set; }
+    public decimal TasaFactorMensual { get; set; } = 4.5m;
+    public int PlazoMaximoMeses { get; set; } = 30;
+    public string ModalidadEntrega { get; set; } = "ConSoat";
+    public int TiempoSoatDias { get; set; } = 14;
+    public int TiempoMatriculaDias { get; set; } = 20;
+    public string? ProveedorSoat { get; set; }
+    public string? TramitadorMatricula { get; set; }
+    public bool Activa { get; set; } = true;
+}
+
 public sealed class Cotizacion : AuditableTenantEntity
 {
     public string Numero { get; set; } = string.Empty;
