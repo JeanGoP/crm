@@ -1,7 +1,7 @@
 # Manual de usuario - EnMarcha CRM
 
 Ultima actualizacion: 2026-06-22  
-Version del manual: 6.9
+Version del manual: 7.0
 Sistema: EnMarcha CRM para gestion comercial y ventas a credito  
 
 ## 1. Bienvenida
@@ -496,8 +496,11 @@ Los cambios aplican a las nuevas cotizaciones de la empresa. Las cotizaciones ya
 3. Presione **Nuevo usuario**.
 4. Complete nombres, correo y datos requeridos.
 5. Seleccione la empresa a la que pertenece.
-6. Asigne el rol.
-7. Guarde.
+6. Seleccione la sede principal del usuario.
+7. Asigne el rol.
+8. Guarde.
+
+La sede principal permite que el sistema pueda separar la informacion comercial por punto de venta. Esta configuracion se usara en cotizaciones, reportes, tramites y entregas.
 
 ## 20. Manejo de errores
 
@@ -550,6 +553,7 @@ El sistema muestra mensajes cuando algo no puede completarse.
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-06-22 | 7.0 | Los usuarios pueden quedar asociados a una sede principal para preparar cotizaciones, reportes y tramites por punto de venta. |
 | 2026-06-22 | 6.9 | Se agrega el maestro de sedes / puntos de venta en Configuracion y se documenta su uso para condiciones comerciales por sede. |
 | 2026-06-17 | 6.8 | Se actualiza el nombre visible del sistema a EnMarcha CRM en el frontend y en el manual. |
 | 2026-06-13 | 6.7 | El timeline de Cliente 360 incorpora mas eventos del ciclo comercial, incluyendo archivos generales y entregas. |

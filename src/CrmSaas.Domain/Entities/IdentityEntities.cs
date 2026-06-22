@@ -7,6 +7,8 @@ public sealed class Usuario : AuditableTenantEntity
     public string NombreCompleto { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;
     public string PasswordHash { get; set; } = string.Empty;
+    public Guid? PuntoVentaId { get; set; }
+    public PuntoVenta? PuntoVenta { get; set; }
     public bool Activo { get; set; } = true;
     public ICollection<UsuarioRol> UsuarioRoles { get; set; } = new List<UsuarioRol>();
     public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();

@@ -25,6 +25,7 @@ public sealed class AuthService(CrmSaas.Infrastructure.Persistence.CrmDbContext 
 
         var user = await db.Usuarios
             .Include(x => x.UsuarioRoles).ThenInclude(x => x.Rol)
+            .Include(x => x.PuntoVenta)
             .FirstOrDefaultAsync(x => x.Email == request.Email && x.Activo, cancellationToken)
             ?? throw new UnauthorizedAccessException("Credenciales invalidas.");
 
@@ -41,6 +42,7 @@ public sealed class AuthService(CrmSaas.Infrastructure.Persistence.CrmDbContext 
         var tokenHash = HashToken(request.RefreshToken);
         var refreshToken = await db.RefreshTokens
             .Include(x => x.Usuario).ThenInclude(x => x!.UsuarioRoles).ThenInclude(x => x.Rol)
+            .Include(x => x.Usuario).ThenInclude(x => x!.PuntoVenta)
             .FirstOrDefaultAsync(x => x.TokenHash == tokenHash && x.Activo, cancellationToken)
             ?? throw new UnauthorizedAccessException("Refresh token invalido.");
 
@@ -77,7 +79,7 @@ public sealed class AuthService(CrmSaas.Infrastructure.Persistence.CrmDbContext 
         });
         await db.SaveChangesAsync(cancellationToken);
 
-        return new AuthResponseDto(accessToken, refreshToken, expires, new UserDto(user.Id, user.NombreCompleto, user.Email, roles, user.EmpresaId));
+        return new AuthResponseDto(accessToken, refreshToken, expires, new UserDto(user.Id, user.NombreCompleto, user.Email, roles, user.EmpresaId, user.PuntoVentaId, user.PuntoVenta?.Nombre));
     }
 
     private static string HashToken(string token)

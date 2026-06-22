@@ -103,7 +103,7 @@ const emptyLead = { firstNames: '', lastNames: '', firstName: '', middleName: ''
 const emptyDeal = { title: '', customerId: '', stageId: '', value: 0, closeProbability: 10, estimatedCloseDate: today, status: 1 };
 const emptyActivity = { title: '', description: '', type: 1, status: 1, scheduledAt: `${today}T09:00`, reminderAt: '', customerId: '', dealId: '', assignedUserId: '' };
 const emptyCompany = { name: '', subdomain: '', customDomain: '', logoDataUrl: '', active: true };
-const emptyUser = { fullName: '', email: '', password: '', companyId: '', roles: ['Vendedor'] };
+const emptyUser = { fullName: '', email: '', password: '', companyId: '', salesPointId: '', roles: ['Vendedor'] };
 const emptyProduct = { name: '', category: 'Moto', brand: '', model: '', reference: '', description: '', engineCc: '', year: '', color: '', price: 0, active: true };
 const emptyFinancialSettings = { minimumWage: 1400000, consumerAnnualRate: 29.72, lowAmountAnnualRate: 56.33, factorMonthlyRate: 4.5, maxTermMonths: 30, paymentRounding: 1000, useMontelibanoTable: true, active: true };
 const emptySalesPoint = { name: '', code: '', city: '', address: '', phone: '', mainBrand: 'Honda', brandLogoDataUrl: '', factorMonthlyRate: 4.5, maxTermMonths: 30, deliveryMode: 'ConSoat', soatDays: 14, registrationDays: 20, soatProvider: '', registrationAgent: '', active: true };
@@ -1562,7 +1562,7 @@ function SettingsPage() {
   };
 
   const saveUser = async (payload: typeof emptyUser) => {
-    const { data } = await api.post<User>('/api/users', payload);
+    const { data } = await api.post<User>('/api/users', { ...payload, salesPointId: payload.salesPointId || null });
     setUsers([...users, data].sort((a, b) => a.fullName.localeCompare(b.fullName)));
     setNotice({ type: 'success', text: 'Usuario creado.' });
     setUserForm({ open: false });
@@ -1693,19 +1693,20 @@ function SettingsPage() {
       </Stack>
       <StatusBar loading={loadingUsers} error={usersError} />
       <EntityTable
-        headers={['Nombre', 'Email', 'Empresa', 'Roles']}
+        headers={['Nombre', 'Email', 'Empresa', 'Sede', 'Roles']}
         empty="No hay usuarios registrados"
         rows={users.map((u) => [
           u.fullName,
           u.email,
           companies.find((c) => c.id === u.companyId)?.name ?? u.companyId,
+          u.salesPointName ?? salesPoints.find((p) => p.id === u.salesPointId)?.name ?? '-',
           u.roles.join(', ')
         ])}
       />
     </>}
     <CompanyDialog form={companyForm} onClose={() => setCompanyForm({ open: false })} onSave={saveCompany} />
     <SalesPointDialog form={salesPointForm} onClose={() => setSalesPointForm({ open: false })} onSave={saveSalesPoint} />
-    <UserDialog form={userForm} companies={companies.filter((x) => x.active)} onClose={() => setUserForm({ open: false })} onSave={saveUser} />
+    <UserDialog form={userForm} companies={companies.filter((x) => x.active)} salesPoints={salesPoints.filter((x) => x.active)} onClose={() => setUserForm({ open: false })} onSave={saveUser} />
     <FinancialSettingsDialog form={financialForm} onClose={() => setFinancialForm({ open: false })} onSave={saveFinancialSettings} />
     <Notice notice={notice} onClose={() => setNotice(undefined)} />
   </Stack>;
@@ -1819,16 +1820,24 @@ function CompanyLogoPicker({ value, onChange, title = 'Logo de la empresa', help
   </Stack>;
 }
 
-function UserDialog({ form, companies, onClose, onSave }: DialogProps<User, typeof emptyUser> & { companies: Company[] }) {
-  const initial = { ...emptyUser, companyId: companies[0]?.id ?? '' };
+function UserDialog({ form, companies, salesPoints, onClose, onSave }: DialogProps<User, typeof emptyUser> & { companies: Company[]; salesPoints: SalesPoint[] }) {
+  const initialCompanyId = companies[0]?.id ?? '';
+  const initial = { ...emptyUser, companyId: initialCompanyId, salesPointId: salesPoints[0]?.id ?? '' };
   return <FormDialog title="Nuevo usuario" open={form.open} initial={initial} onClose={onClose} onSave={onSave}>
-    {(v, set) => <>
+    {(v, set) => {
+      const currentSalesPoints = salesPoints;
+      return <>
       <TextField required label="Nombre completo" value={v.fullName} onChange={(e) => set({ fullName: e.target.value })} />
       <TextField required label="Email" value={v.email} onChange={(e) => set({ email: e.target.value })} />
       <TextField required label="Contrasena temporal" type="password" value={v.password} onChange={(e) => set({ password: e.target.value })} />
-      <TextField required select label="Empresa" value={v.companyId} onChange={(e) => set({ companyId: e.target.value })}>{companies.map((c) => <MenuItem key={c.id} value={c.id}>{c.name} ({c.subdomain})</MenuItem>)}</TextField>
+      <TextField required select label="Empresa" value={v.companyId} onChange={(e) => set({ companyId: e.target.value, salesPointId: currentSalesPoints[0]?.id ?? '' })}>{companies.map((c) => <MenuItem key={c.id} value={c.id}>{c.name} ({c.subdomain})</MenuItem>)}</TextField>
+      <TextField select label="Sede principal" value={v.salesPointId} onChange={(e) => set({ salesPointId: e.target.value })} helperText="Se usara en cotizaciones, reportes y tramites por sede.">
+        <MenuItem value="">Sin sede asignada</MenuItem>
+        {currentSalesPoints.map((point) => <MenuItem key={point.id} value={point.id}>{point.name} - {point.city}</MenuItem>)}
+      </TextField>
       <TextField select label="Rol" value={v.roles[0] ?? 'Vendedor'} onChange={(e) => set({ roles: [e.target.value] })}>{['Administrador', 'Supervisor', 'Vendedor'].map((role) => <MenuItem key={role} value={role}>{role}</MenuItem>)}</TextField>
-    </>}
+    </>;
+    }}
   </FormDialog>;
 }
 

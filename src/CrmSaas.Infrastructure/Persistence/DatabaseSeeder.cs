@@ -33,6 +33,12 @@ public static class DatabaseSeeder
             .FirstOrDefaultAsync(x => x.EmpresaId == empresa.Id && x.Email == "admin@demo.com", cancellationToken);
         var adminRole = await db.Roles.IgnoreQueryFilters()
             .FirstAsync(x => x.EmpresaId == empresa.Id && x.Nombre == "Administrador", cancellationToken);
+        var defaultSalesPointId = await db.PuntosVenta.IgnoreQueryFilters()
+            .Where(x => x.EmpresaId == empresa.Id && x.Activa)
+            .OrderByDescending(x => x.Codigo == "PRINCIPAL")
+            .ThenBy(x => x.Nombre)
+            .Select(x => (Guid?)x.Id)
+            .FirstOrDefaultAsync(cancellationToken);
 
         if (admin is null)
         {
@@ -42,6 +48,7 @@ public static class DatabaseSeeder
                 NombreCompleto = "Administrador Demo",
                 Email = "admin@demo.com",
                 PasswordHash = passwordHasher.Hash(adminPassword),
+                PuntoVentaId = defaultSalesPointId,
                 Activo = true
             };
             admin.UsuarioRoles.Add(new UsuarioRol { EmpresaId = empresa.Id, RolId = adminRole.Id });
@@ -50,6 +57,11 @@ public static class DatabaseSeeder
         else if (!admin.UsuarioRoles.Any(x => x.RolId == adminRole.Id))
         {
             admin.UsuarioRoles.Add(new UsuarioRol { EmpresaId = empresa.Id, UsuarioId = admin.Id, RolId = adminRole.Id });
+        }
+
+        if (admin.PuntoVentaId is null)
+        {
+            admin.PuntoVentaId = defaultSalesPointId;
         }
 
         await db.SaveChangesAsync(cancellationToken);

@@ -18,8 +18,9 @@ public sealed class UsersController(CrmDbContext db, IPasswordHasher passwordHas
     {
         var users = await db.Usuarios.IgnoreQueryFilters()
             .Include(x => x.UsuarioRoles).ThenInclude(x => x.Rol)
+            .Include(x => x.PuntoVenta)
             .OrderBy(x => x.NombreCompleto)
-            .Select(x => new UserDto(x.Id, x.NombreCompleto, x.Email, x.UsuarioRoles.Select(ur => ur.Rol!.Nombre).ToArray(), x.EmpresaId))
+            .Select(x => new UserDto(x.Id, x.NombreCompleto, x.Email, x.UsuarioRoles.Select(ur => ur.Rol!.Nombre).ToArray(), x.EmpresaId, x.PuntoVentaId, x.PuntoVenta == null ? null : x.PuntoVenta.Nombre))
             .ToListAsync(cancellationToken);
         return Ok(users);
     }
@@ -41,12 +42,36 @@ public sealed class UsersController(CrmDbContext db, IPasswordHasher passwordHas
             return BadRequest(new { detail = "Selecciona al menos un rol valido para la empresa." });
         }
 
+        Guid? salesPointId = null;
+        if (dto.SalesPointId.HasValue)
+        {
+            salesPointId = await db.PuntosVenta.IgnoreQueryFilters()
+                .Where(x => x.EmpresaId == dto.CompanyId && x.Id == dto.SalesPointId.Value && x.Activa)
+                .Select(x => (Guid?)x.Id)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (!salesPointId.HasValue)
+            {
+                return BadRequest(new { detail = "Sede no encontrada o inactiva para la empresa seleccionada." });
+            }
+        }
+        else
+        {
+            salesPointId = await db.PuntosVenta.IgnoreQueryFilters()
+                .Where(x => x.EmpresaId == dto.CompanyId && x.Activa)
+                .OrderByDescending(x => x.Codigo == "PRINCIPAL")
+                .ThenBy(x => x.Nombre)
+                .Select(x => (Guid?)x.Id)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
         var user = new Usuario
         {
             EmpresaId = dto.CompanyId,
             NombreCompleto = dto.FullName,
             Email = dto.Email,
             PasswordHash = passwordHasher.Hash(dto.Password),
+            PuntoVentaId = salesPointId,
             Activo = true
         };
         foreach (var role in roles)
@@ -56,7 +81,10 @@ public sealed class UsersController(CrmDbContext db, IPasswordHasher passwordHas
 
         db.Usuarios.Add(user);
         await db.SaveChangesAsync(cancellationToken);
-        return Ok(new UserDto(user.Id, user.NombreCompleto, user.Email, roles.Select(x => x.Nombre).ToArray(), user.EmpresaId));
+        var salesPointName = salesPointId.HasValue
+            ? await db.PuntosVenta.IgnoreQueryFilters().Where(x => x.Id == salesPointId.Value).Select(x => x.Nombre).FirstOrDefaultAsync(cancellationToken)
+            : null;
+        return Ok(new UserDto(user.Id, user.NombreCompleto, user.Email, roles.Select(x => x.Nombre).ToArray(), user.EmpresaId, salesPointId, salesPointName));
     }
 }
 

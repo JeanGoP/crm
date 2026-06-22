@@ -6,6 +6,8 @@ export interface User {
   email: string;
   roles: string[];
   companyId: string;
+  salesPointId?: string;
+  salesPointName?: string;
 }
 
 export interface Company {
