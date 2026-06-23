@@ -294,11 +294,19 @@ export interface ColombianIdentityLookup {
 
 export interface CreditDocument {
   id: string;
+  customerId?: string;
   type: number;
   name: string;
   status: number;
   receivedAt?: string;
+  expiresAt?: string;
   notes?: string;
+  rejectedAt?: string;
+  rejectionReason?: string;
+  validatedAt?: string;
+  validatedBy?: string;
+  isExpired: boolean;
+  daysToExpire?: number;
   hasFile: boolean;
   fileName?: string;
   contentType?: string;

@@ -1,7 +1,7 @@
 # Manual de usuario - EnMarcha CRM
 
 Ultima actualizacion: 2026-06-22  
-Version del manual: 7.4
+Version del manual: 7.5
 Sistema: EnMarcha CRM para gestion comercial y ventas a credito  
 
 ## 1. Bienvenida
@@ -323,13 +323,19 @@ Cuando la solicitud viene desde una cotizacion, el sistema puede traer el perfil
 
 ### Documentos
 
-Desde la solicitud se pueden manejar documentos como:
+Cada solicitud tiene un checklist de documentos ligado al cliente. La lista se genera segun el perfil de requisitos elegido, por ejemplo Empleado, Independiente, Pensionado, Contado u otro perfil definido por la empresa.
 
-- Cotizacion.
-- Solicitud de credito.
-- Autorizacion de tratamiento de datos.
-- Carta de aprobacion.
-- Orden de entrega.
+Desde la solicitud se puede:
+
+- Adjuntar archivos PDF o imagenes.
+- Marcar documentos como pendientes o recibidos.
+- Ver la fecha de vigencia de cada documento.
+- Identificar documentos vencidos o proximos a vencer.
+- Descargar el archivo cargado.
+
+Los usuarios con permiso de supervision pueden validar o rechazar documentos. Si un documento se rechaza, el sistema solicita el motivo para que el asesor sepa que debe corregir o pedir nuevamente.
+
+Cuando todos los documentos quedan recibidos o validados, la solicitud pasa a **Documentos recibidos** y el sistema muestra una alerta para revision del analista. Desde ahi se puede enviar formalmente a estudio, aprobar, rechazar o continuar el flujo correspondiente.
 
 ## 13. Codeudor y referencias
 
@@ -603,6 +609,7 @@ El sistema muestra mensajes cuando algo no puede completarse.
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-06-22 | 7.5 | Se fortalece el gestor de documentos con vigencia, rechazo con motivo, validacion por permisos y alerta cuando el checklist queda completo. |
 | 2026-06-22 | 7.4 | Se agregan promociones y planes tacticos con descuentos automaticos por producto, marca, color, sede y vigencia en cotizaciones. |
 | 2026-06-22 | 7.3 | Se agregan perfiles de requisitos por empresa y generacion automatica del checklist documental desde la cotizacion hacia la solicitud de credito. |
 | 2026-06-22 | 7.2 | Se amplia el maestro de productos con linea, version, ficha tecnica, vigencia de precio, SOAT, matricula e impuestos; la cotizacion puede usar esos cargos automaticamente. |

@@ -340,17 +340,25 @@ public sealed record UpsertCreditApplicationDto(
 
 public sealed record CreditDocumentDto(
     Guid Id,
+    Guid? CustomerId,
     TipoDocumentoCredito Type,
     string Name,
     EstadoDocumentoCredito Status,
     DateTime? ReceivedAt,
+    DateTime? ExpiresAt,
     string? Notes,
+    DateTime? RejectedAt,
+    string? RejectionReason,
+    DateTime? ValidatedAt,
+    string? ValidatedBy,
+    bool IsExpired,
+    int? DaysToExpire,
     bool HasFile,
     string? FileName,
     string? ContentType,
     long? SizeBytes,
     DateTime? UploadedAt);
-public sealed record UpsertCreditDocumentDto(TipoDocumentoCredito Type, string Name, EstadoDocumentoCredito Status, DateTime? ReceivedAt, string? Notes);
+public sealed record UpsertCreditDocumentDto(TipoDocumentoCredito Type, string Name, EstadoDocumentoCredito Status, DateTime? ReceivedAt, DateTime? ExpiresAt, string? Notes, string? RejectionReason);
 public sealed record ChangeCreditApplicationStatusDto(EstadoSolicitudCredito Status);
 public sealed record CreditApplicationDecisionDto(EstadoSolicitudCredito Status, string? Notes);
 

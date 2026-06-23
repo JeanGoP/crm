@@ -402,6 +402,29 @@ public sealed class DashboardService(ICrmDbContext db) : IDashboardService
                 "/solicitudes-credito");
         }));
 
+        var completeChecklistRequests = await db.SolicitudesCredito
+            .Where(x => x.Documentos.Count > 0
+                && x.Documentos.All(d => d.Estado == EstadoDocumentoCredito.Recibido || d.Estado == EstadoDocumentoCredito.Validado)
+                && x.Estado == EstadoSolicitudCredito.DocumentosRecibidos)
+            .OrderBy(x => x.FechaActualizacion ?? x.FechaCreacion)
+            .Take(5)
+            .Select(x => new
+            {
+                x.Numero,
+                x.FechaActualizacion,
+                x.FechaCreacion,
+                DocumentCount = x.Documentos.Count
+            })
+            .ToListAsync(cancellationToken);
+
+        alerts.AddRange(completeChecklistRequests.Select(x => new CommercialAlertDto(
+            "Credito",
+            "info",
+            "Checklist completo",
+            x.Numero + " tiene " + x.DocumentCount + " documento(s) listo(s) para validacion del analista.",
+            x.FechaActualizacion ?? x.FechaCreacion,
+            "/solicitudes-credito")));
+
         var studyLimit = today.AddDays(-2);
         var creditApplicationsInStudy = await db.SolicitudesCredito
             .Where(x => x.Estado == EstadoSolicitudCredito.EnEstudio && (x.FechaInicioEstudio ?? x.FechaActualizacion ?? x.FechaCreacion) <= studyLimit)

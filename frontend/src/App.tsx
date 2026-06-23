@@ -872,15 +872,22 @@ function CreditApplicationsPage() {
     }
   };
 
-  const updateDocument = async (application: CreditApplication, document: CreditDocument, status: number) => {
-    const { data } = await api.put<CreditApplication>(`/api/credit-applications/${application.id}/documents/${document.id}`, {
-      type: document.type,
-      name: document.name,
-      status,
-      receivedAt: status === 2 || status === 3 ? new Date().toISOString() : document.receivedAt ?? null,
-      notes: document.notes ?? null
-    });
-    setData(rows.map((x) => x.id === data.id ? data : x));
+  const updateDocument = async (application: CreditApplication, document: CreditDocument, status: number, patch?: Partial<Pick<CreditDocument, 'expiresAt' | 'notes' | 'rejectionReason'>>) => {
+    try {
+      const { data } = await api.put<CreditApplication>(`/api/credit-applications/${application.id}/documents/${document.id}`, {
+        type: document.type,
+        name: document.name,
+        status,
+        receivedAt: status === 2 || status === 3 ? new Date().toISOString() : document.receivedAt ?? null,
+        expiresAt: patch?.expiresAt ?? document.expiresAt ?? null,
+        notes: patch?.notes ?? document.notes ?? null,
+        rejectionReason: patch?.rejectionReason ?? document.rejectionReason ?? null
+      });
+      setData(rows.map((x) => x.id === data.id ? data : x));
+      setNotice({ type: 'success', text: `${document.name} actualizado.` });
+    } catch (err) {
+      setNotice({ type: 'error', text: apiError(err) });
+    }
   };
 
   const uploadDocument = async (application: CreditApplication, document: CreditDocument, file: File) => {
@@ -2838,37 +2845,70 @@ function CreditApplicationDialog({ form, customers, products, quotes, deals, req
 
 function DocumentSummary({ application, onUpdate, onUpload, onDownload }: {
   application: CreditApplication;
-  onUpdate: (application: CreditApplication, document: CreditDocument, status: number) => Promise<void>;
+  onUpdate: (application: CreditApplication, document: CreditDocument, status: number, patch?: Partial<Pick<CreditDocument, 'expiresAt' | 'notes' | 'rejectionReason'>>) => Promise<void>;
   onUpload: (application: CreditApplication, document: CreditDocument, file: File) => Promise<void>;
   onDownload: (application: CreditApplication, document: CreditDocument) => Promise<void>;
 }) {
-  return <Stack spacing={.75} sx={{ minWidth: 360, maxWidth: 390 }}>
-    {application.documents.map((document) => <Stack key={document.id} direction="row" alignItems="center" justifyContent="space-between" gap={1} sx={{ width: '100%' }}>
-      <Stack spacing={.25} sx={{ minWidth: 170, maxWidth: 190 }}>
-        <Chip size="small" label={`${document.name}: ${documentStatus(document.status)}`} color={document.status === 3 ? 'success' : document.status === 4 ? 'error' : undefined} variant={document.status === 1 ? 'outlined' : 'filled'} />
-        {document.hasFile && <Typography variant="caption" color="text.secondary" noWrap>{document.fileName}</Typography>}
+  const canValidate = useCanManage();
+  const statusOptions = canValidate ? [1, 2, 3, 4] : [1, 2];
+
+  const handleStatus = (document: CreditDocument, status: number) => {
+    if (status === 4) {
+      const reason = window.prompt('Motivo de rechazo del documento');
+      if (!reason?.trim()) return;
+      onUpdate(application, document, status, { rejectionReason: reason.trim() });
+      return;
+    }
+
+    onUpdate(application, document, status);
+  };
+
+  return <Stack spacing={1} sx={{ minWidth: 430, maxWidth: 520 }}>
+    {application.documents.map((document) => {
+      const documentStatusOptions = statusOptions.includes(document.status) ? statusOptions : [...statusOptions, document.status];
+      return <Stack key={document.id} spacing={.75} sx={{ p: 1, border: '1px solid #e2e8f0', borderRadius: 1, bgcolor: '#fff' }}>
+      <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1}>
+        <Stack spacing={.4} sx={{ minWidth: 0 }}>
+          <Stack direction="row" gap={.5} flexWrap="wrap">
+            <Chip size="small" label={`${document.name}: ${documentStatus(document.status)}`} color={document.status === 3 ? 'success' : document.status === 4 ? 'error' : undefined} variant={document.status === 1 ? 'outlined' : 'filled'} />
+            {document.isExpired && <Chip size="small" color="error" variant="outlined" label="Vencido" />}
+            {!document.isExpired && document.daysToExpire !== undefined && document.daysToExpire !== null && document.daysToExpire <= 7 && <Chip size="small" color="warning" variant="outlined" label={`Vence en ${document.daysToExpire} dia(s)`} />}
+          </Stack>
+          {document.hasFile && <Typography variant="caption" color="text.secondary" noWrap>{document.fileName}</Typography>}
+          {document.rejectionReason && <Typography variant="caption" color="error">Motivo: {document.rejectionReason}</Typography>}
+          {document.validatedBy && <Typography variant="caption" color="success.main">Validado por {document.validatedBy}</Typography>}
+        </Stack>
+        <Stack direction="row" alignItems="center" gap={.5} sx={{ flexShrink: 0 }}>
+          <Tooltip title="Subir documento">
+            <IconButton component="label" size="small" color={document.hasFile ? 'success' : 'primary'}>
+              <UploadFile fontSize="small" />
+              <input hidden type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,image/*" onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) onUpload(application, document, file);
+                e.currentTarget.value = '';
+              }} />
+            </IconButton>
+          </Tooltip>
+          {document.hasFile && <Tooltip title="Descargar documento">
+            <IconButton size="small" onClick={() => onDownload(application, document)}>
+              <Download fontSize="small" />
+            </IconButton>
+          </Tooltip>}
+          <TextField select size="small" value={document.status} onChange={(e) => handleStatus(document, Number(e.target.value))} sx={{ width: 126 }} helperText={!canValidate ? 'Sin validar' : undefined}>
+            {documentStatusOptions.map((status) => <MenuItem key={status} value={status}>{documentStatus(status)}</MenuItem>)}
+          </TextField>
+        </Stack>
       </Stack>
-      <Stack direction="row" alignItems="center" gap={.5} sx={{ flexShrink: 0 }}>
-        <Tooltip title="Subir documento">
-          <IconButton component="label" size="small" color={document.hasFile ? 'success' : 'primary'}>
-            <UploadFile fontSize="small" />
-            <input hidden type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,image/*" onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) onUpload(application, document, file);
-              e.currentTarget.value = '';
-            }} />
-          </IconButton>
-        </Tooltip>
-        {document.hasFile && <Tooltip title="Descargar documento">
-          <IconButton size="small" onClick={() => onDownload(application, document)}>
-            <Download fontSize="small" />
-          </IconButton>
-        </Tooltip>}
-        <TextField select size="small" value={document.status} onChange={(e) => onUpdate(application, document, Number(e.target.value))} sx={{ width: 126 }}>
-          {[1, 2, 3, 4].map((status) => <MenuItem key={status} value={status}>{documentStatus(status)}</MenuItem>)}
-        </TextField>
-      </Stack>
-    </Stack>)}
+      <TextField
+        size="small"
+        type="date"
+        label="Vigencia"
+        value={document.expiresAt?.slice(0, 10) ?? ''}
+        onChange={(e) => onUpdate(application, document, document.status, { expiresAt: e.target.value ? new Date(`${e.target.value}T00:00:00`).toISOString() : undefined })}
+        InputLabelProps={{ shrink: true }}
+      />
+    </Stack>;
+    })}
   </Stack>;
 }
 

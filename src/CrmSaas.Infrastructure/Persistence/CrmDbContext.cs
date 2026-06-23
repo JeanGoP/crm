@@ -173,7 +173,11 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
         modelBuilder.Entity<SolicitudCredito>().HasIndex(x => new { x.EmpresaId, x.Numero }).IsUnique();
         modelBuilder.Entity<SolicitudCredito>().HasIndex(x => new { x.EmpresaId, x.PerfilRequisitoId });
         modelBuilder.Entity<SolicitudCredito>().HasOne(x => x.PerfilRequisito).WithMany().HasForeignKey(x => x.PerfilRequisitoId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<DocumentoSolicitudCredito>().Property(x => x.MotivoRechazo).HasMaxLength(500);
+        modelBuilder.Entity<DocumentoSolicitudCredito>().Property(x => x.UsuarioValidacion).HasMaxLength(180);
         modelBuilder.Entity<DocumentoSolicitudCredito>().HasIndex(x => new { x.EmpresaId, x.SolicitudCreditoId, x.Tipo });
+        modelBuilder.Entity<DocumentoSolicitudCredito>().HasIndex(x => new { x.EmpresaId, x.ClienteId, x.Tipo });
+        modelBuilder.Entity<DocumentoSolicitudCredito>().HasOne(x => x.Cliente).WithMany().HasForeignKey(x => x.ClienteId).OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<EntregaMoto>().Property(x => x.Numero).HasMaxLength(40);
         modelBuilder.Entity<EntregaMoto>().Property(x => x.AsesorResponsable).HasMaxLength(180);
         modelBuilder.Entity<EntregaMoto>().Property(x => x.Vin).HasMaxLength(80);

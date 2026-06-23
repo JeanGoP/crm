@@ -330,11 +330,18 @@ public sealed class DocumentoSolicitudCredito : AuditableTenantEntity
 {
     public Guid SolicitudCreditoId { get; set; }
     public SolicitudCredito? SolicitudCredito { get; set; }
+    public Guid? ClienteId { get; set; }
+    public Cliente? Cliente { get; set; }
     public TipoDocumentoCredito Tipo { get; set; }
     public string Nombre { get; set; } = string.Empty;
     public EstadoDocumentoCredito Estado { get; set; } = EstadoDocumentoCredito.Pendiente;
     public DateTime? FechaRecepcion { get; set; }
+    public DateTime? FechaVencimiento { get; set; }
     public string? Observaciones { get; set; }
+    public DateTime? FechaRechazo { get; set; }
+    public string? MotivoRechazo { get; set; }
+    public DateTime? FechaValidacion { get; set; }
+    public string? UsuarioValidacion { get; set; }
     public string? NombreArchivo { get; set; }
     public string? RutaArchivo { get; set; }
     public string? ContentType { get; set; }

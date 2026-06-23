@@ -214,11 +214,24 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
 
         document.Tipo = dto.Type;
         document.Nombre = string.IsNullOrWhiteSpace(dto.Name) ? document.Nombre : dto.Name.Trim();
+        document.ClienteId = entity.ClienteId;
+        document.FechaVencimiento = dto.ExpiresAt;
+        if (dto.Status is EstadoDocumentoCredito.Validado or EstadoDocumentoCredito.Rechazado && !CanValidateDocuments())
+        {
+            return Forbid();
+        }
+
+        if (dto.Status == EstadoDocumentoCredito.Rechazado && string.IsNullOrWhiteSpace(dto.RejectionReason))
+        {
+            throw new ValidationException("Debe registrar el motivo de rechazo del documento.");
+        }
+
         document.Estado = dto.Status;
         document.FechaRecepcion = dto.Status is EstadoDocumentoCredito.Recibido or EstadoDocumentoCredito.Validado
             ? dto.ReceivedAt ?? ColombiaTime.Now
             : dto.ReceivedAt;
         document.Observaciones = dto.Notes;
+        ApplyDocumentAudit(document, dto.Status, dto.RejectionReason);
 
         MarkReadyIfDocumentsComplete(entity);
 
@@ -270,6 +283,9 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         document.FechaCarga = ColombiaTime.Now;
         document.Estado = EstadoDocumentoCredito.Recibido;
         document.FechaRecepcion = ColombiaTime.Now;
+        document.ClienteId = entity.ClienteId;
+        document.FechaVencimiento ??= DefaultExpiration(document.Tipo, ColombiaTime.Now);
+        ApplyDocumentAudit(document, EstadoDocumentoCredito.Recibido, null);
 
         MarkReadyIfDocumentsComplete(entity);
         await SyncPipelineAsync(entity, cancellationToken);
@@ -363,6 +379,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
 
         foreach (var document in documents)
         {
+            PrepareDocument(entity, document);
             entity.Documentos.Add(document);
         }
     }
@@ -374,7 +391,9 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         foreach (var document in profile.Documentos.OrderBy(x => x.Orden))
         {
             if (existingNames.Contains(document.Nombre.Trim())) continue;
-            entity.Documentos.Add(ToApplicationDocument(document));
+            var applicationDocument = ToApplicationDocument(document);
+            PrepareDocument(entity, applicationDocument);
+            entity.Documentos.Add(applicationDocument);
         }
     }
 
@@ -393,13 +412,66 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         new() { Tipo = TipoDocumentoCredito.Referencias, Nombre = "Referencias" }
     ];
 
+    private static void PrepareDocument(SolicitudCredito entity, DocumentoSolicitudCredito document)
+    {
+        document.ClienteId = entity.ClienteId;
+        document.FechaVencimiento ??= DefaultExpiration(document.Tipo, ColombiaTime.Now);
+    }
+
     private static void MarkReadyIfDocumentsComplete(SolicitudCredito entity)
     {
         if (entity.Documentos.Count > 0 && entity.Documentos.All(x => x.Estado is EstadoDocumentoCredito.Recibido or EstadoDocumentoCredito.Validado))
         {
-            entity.Estado = EstadoSolicitudCredito.EnEstudio;
+            if (entity.Estado is EstadoSolicitudCredito.Borrador or EstadoSolicitudCredito.Cotizado or EstadoSolicitudCredito.Interesado or EstadoSolicitudCredito.DocumentosPendientes)
+            {
+                entity.Estado = EstadoSolicitudCredito.DocumentosRecibidos;
+            }
         }
     }
+
+    private bool CanValidateDocuments() =>
+        User.IsInRole("Administrador") || User.IsInRole("Supervisor");
+
+    private void ApplyDocumentAudit(DocumentoSolicitudCredito document, EstadoDocumentoCredito status, string? rejectionReason)
+    {
+        var now = ColombiaTime.Now;
+        if (status == EstadoDocumentoCredito.Validado)
+        {
+            document.FechaValidacion = now;
+            document.UsuarioValidacion = tenantContext.UsuarioActual;
+            document.FechaRechazo = null;
+            document.MotivoRechazo = null;
+            document.FechaRecepcion ??= now;
+            return;
+        }
+
+        if (status == EstadoDocumentoCredito.Rechazado)
+        {
+            document.FechaRechazo = now;
+            document.MotivoRechazo = rejectionReason?.Trim();
+            document.FechaValidacion = null;
+            document.UsuarioValidacion = null;
+            return;
+        }
+
+        if (status == EstadoDocumentoCredito.Pendiente)
+        {
+            document.FechaRecepcion = null;
+        }
+
+        document.FechaRechazo = null;
+        document.MotivoRechazo = null;
+        document.FechaValidacion = null;
+        document.UsuarioValidacion = null;
+    }
+
+    private static DateTime? DefaultExpiration(TipoDocumentoCredito type, DateTime baseDate) => type switch
+    {
+        TipoDocumentoCredito.Cedula => baseDate.Date.AddYears(1),
+        TipoDocumentoCredito.SoporteIngresos => baseDate.Date.AddDays(30),
+        TipoDocumentoCredito.ReciboServicio => baseDate.Date.AddDays(60),
+        _ => null
+    };
 
     private static void ValidateDecision(SolicitudCredito entity, EstadoSolicitudCredito status)
     {
@@ -567,11 +639,19 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
     private static CreditDocumentDto ToDocumentDto(DocumentoSolicitudCredito d) =>
         new(
             d.Id,
+            d.ClienteId,
             d.Tipo,
             d.Nombre,
             d.Estado,
             d.FechaRecepcion,
+            d.FechaVencimiento,
             d.Observaciones,
+            d.FechaRechazo,
+            d.MotivoRechazo,
+            d.FechaValidacion,
+            d.UsuarioValidacion,
+            d.FechaVencimiento.HasValue && d.FechaVencimiento.Value.Date < ColombiaTime.Now.Date,
+            d.FechaVencimiento.HasValue ? (int)(d.FechaVencimiento.Value.Date - ColombiaTime.Now.Date).TotalDays : null,
             !string.IsNullOrWhiteSpace(d.RutaArchivo),
             d.NombreArchivo,
             d.ContentType,
