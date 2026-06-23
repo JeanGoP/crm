@@ -412,3 +412,26 @@ public sealed class DetalleOrdenRecaudo : AuditableTenantEntity
     public string Concepto { get; set; } = string.Empty;
     public decimal Valor { get; set; }
 }
+
+public sealed class Tramite : AuditableTenantEntity
+{
+    public string Numero { get; set; } = string.Empty;
+    public Guid SolicitudCreditoId { get; set; }
+    public SolicitudCredito? SolicitudCredito { get; set; }
+    public Guid ClienteId { get; set; }
+    public Cliente? Cliente { get; set; }
+    public Guid ProductoId { get; set; }
+    public Producto? Producto { get; set; }
+    public Guid? PuntoVentaId { get; set; }
+    public PuntoVenta? PuntoVenta { get; set; }
+    public TipoTramite Tipo { get; set; }
+    public EstadoTramite Estado { get; set; } = EstadoTramite.Pendiente;
+    public DateTime FechaInicio { get; set; } = ColombiaTime.Now;
+    public DateTime FechaEstimada { get; set; } = ColombiaTime.Now.Date.AddDays(8);
+    public DateTime? FechaFinalizacion { get; set; }
+    public string? Responsable { get; set; }
+    public string? Tercero { get; set; }
+    public bool NotificarCliente { get; set; } = true;
+    public DateTime? FechaNotificacionCliente { get; set; }
+    public string? Observaciones { get; set; }
+}

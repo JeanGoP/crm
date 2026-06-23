@@ -425,6 +425,32 @@ export interface CollectionOrder {
   details: CollectionOrderDetail[];
 }
 
+export interface Procedure {
+  id: string;
+  number: string;
+  creditApplicationId: string;
+  creditApplicationNumber: string;
+  customerId: string;
+  customerName: string;
+  customerMobile: string;
+  productId: string;
+  productName: string;
+  salesPointId?: string;
+  salesPointName?: string;
+  type: number;
+  status: number;
+  startDate: string;
+  estimatedDate: string;
+  completedAt?: string;
+  responsible?: string;
+  thirdParty?: string;
+  notifyCustomer: boolean;
+  customerNotifiedAt?: string;
+  isOverdue: boolean;
+  whatsappMessage: string;
+  notes?: string;
+}
+
 export interface Customer360 {
   customer: Customer;
   quotes: Quote[];

@@ -35,7 +35,7 @@ import Search from '@mui/icons-material/Search';
 import { AxiosError } from 'axios';
 import { api } from './api';
 import { useAuthStore } from './store';
-import { Activity, ColombianIdentityLookup, CollectionOrder, CommercialReports, Company, CreditApplication, CreditDocument, Customer, Customer360, CustomerAiAnalysis, CustomerTimelineItem, Dashboard, Deal, DealStage, FinancialSettings, Lead, MotorcycleDelivery, Product, ProductPhoto, Promotion, Quote, QuoteSimulationResult, RequirementProfile, SalesPoint, User } from './types';
+import { Activity, ColombianIdentityLookup, CollectionOrder, CommercialReports, Company, CreditApplication, CreditDocument, Customer, Customer360, CustomerAiAnalysis, CustomerTimelineItem, Dashboard, Deal, DealStage, FinancialSettings, Lead, MotorcycleDelivery, Procedure, Product, ProductPhoto, Promotion, Quote, QuoteSimulationResult, RequirementProfile, SalesPoint, User } from './types';
 
 const drawerWidth = 248;
 const today = new Date().toISOString().slice(0, 10);
@@ -67,6 +67,7 @@ const nav: NavItem[] = [
   { to: '/clientes', label: 'Clientes', icon: <Groups /> },
   { to: '/solicitudes-credito', label: 'Solicitudes credito', icon: <Assignment /> },
   { to: '/ordenes-recaudo', label: 'Ordenes recaudo', icon: <ReceiptLong /> },
+  { to: '/tramites', label: 'Tramites', icon: <Assignment /> },
   { to: '/entregas', label: 'Entregas', icon: <LocalShipping /> },
   { to: '/pipeline', label: 'Pipeline', icon: <ViewKanban /> },
   { to: '/actividades', label: 'Actividades', icon: <EventNote /> },
@@ -145,6 +146,20 @@ const emptyCollectionOrder = {
   advanceAmount: 0,
   paidAmount: 0,
   status: 1,
+  notes: ''
+};
+const emptyProcedure = {
+  creditApplicationId: '',
+  salesPointId: '',
+  type: 1,
+  status: 1,
+  startDate: today,
+  estimatedDate: '',
+  completedAt: '',
+  responsible: '',
+  thirdParty: '',
+  notifyCustomer: true,
+  customerNotifiedAt: '',
   notes: ''
 };
 const creditStatusOptions = [1, 8, 2, 4, 5, 6, 7, 9];
@@ -226,6 +241,7 @@ function Layout() {
             <Route path="/cotizaciones" element={<QuotesPage />} />
             <Route path="/solicitudes-credito" element={<CreditApplicationsPage />} />
             <Route path="/ordenes-recaudo" element={<CollectionOrdersPage />} />
+            <Route path="/tramites" element={<ProceduresPage />} />
             <Route path="/entregas" element={<MotorcycleDeliveriesPage />} />
             <Route path="/prospectos" element={<LeadsPage />} />
             <Route path="/pipeline" element={<PipelinePage />} />
@@ -1232,6 +1248,127 @@ function CollectionOrderDialog({ form, applications, onClose, onSave }: DialogPr
             {[1, 2, 3, 4, 5].map((x) => <MenuItem key={x} value={x}>{collectionOrderStatus(x)}</MenuItem>)}
           </TextField>
         </FieldGrid>
+        <TextField label="Observaciones" value={v.notes} onChange={(e) => set({ notes: e.target.value })} multiline minRows={2} />
+      </Stack>;
+    }}
+  </FormDialog>;
+}
+
+function ProceduresPage() {
+  const { data: rows = [], loading, error, reload, setData } = useResource<Procedure[]>('/api/procedures', []);
+  const { data: applications = [] } = useResource<CreditApplication[]>('/api/credit-applications', []);
+  const { data: salesPoints = [] } = useResource<SalesPoint[]>('/api/sales-points', []);
+  const [form, setForm] = useState<FormMode<Procedure>>({ open: false });
+  const [notice, setNotice] = useState<Notice>();
+  const eligibleApplications = applications.filter((x) => ![6, 9].includes(x.status));
+
+  const save = async (payload: typeof emptyProcedure) => {
+    try {
+      const body = {
+        creditApplicationId: payload.creditApplicationId,
+        salesPointId: payload.salesPointId || null,
+        type: Number(payload.type),
+        status: Number(payload.status),
+        startDate: new Date(`${payload.startDate}T00:00:00`).toISOString(),
+        estimatedDate: payload.estimatedDate ? new Date(`${payload.estimatedDate}T00:00:00`).toISOString() : null,
+        completedAt: payload.completedAt ? new Date(`${payload.completedAt}T00:00:00`).toISOString() : null,
+        responsible: payload.responsible || null,
+        thirdParty: payload.thirdParty || null,
+        notifyCustomer: !!payload.notifyCustomer,
+        customerNotifiedAt: payload.customerNotifiedAt ? new Date(`${payload.customerNotifiedAt}T00:00:00`).toISOString() : null,
+        notes: payload.notes || null
+      };
+      const { data } = form.item
+        ? await api.put<Procedure>(`/api/procedures/${form.item.id}`, body)
+        : await api.post<Procedure>('/api/procedures', body);
+      setData(form.item ? rows.map((x) => x.id === data.id ? data : x) : [data, ...rows]);
+      setNotice({ type: 'success', text: form.item ? 'Tramite actualizado.' : 'Tramite creado.' });
+      setForm({ open: false });
+    } catch (err) {
+      setNotice({ type: 'error', text: apiError(err) });
+    }
+  };
+
+  const notify = (row: Procedure) => {
+    window.open(whatsappUrl(row.customerMobile, row.whatsappMessage), '_blank', 'noopener,noreferrer');
+  };
+
+  return <Stack spacing={3}>
+    <Header title="Tramites" action="Nuevo tramite" onAction={() => setForm({ open: true })} onRefresh={reload} />
+    <StatusBar loading={loading} error={error} />
+    <EntityTable
+      headers={['Numero', 'Cliente', 'Solicitud', 'Tipo', 'Sede', 'Fechas', 'Responsable', 'Estado', 'Notificacion', 'Acciones']}
+      empty="No hay tramites registrados"
+      rows={rows.map((r) => [
+        r.number,
+        <Row primary={r.customerName} secondary={r.productName} />,
+        r.creditApplicationNumber,
+        procedureType(r.type),
+        r.salesPointName ?? '-',
+        <Stack spacing={.25}>
+          <Typography variant="body2">Inicio: {new Date(r.startDate).toLocaleDateString()}</Typography>
+          <Typography variant="body2" color={r.isOverdue ? 'error' : 'text.secondary'}>Estimada: {new Date(r.estimatedDate).toLocaleDateString()}</Typography>
+        </Stack>,
+        <Row primary={r.responsible ?? 'Sin responsable'} secondary={r.thirdParty ?? 'Sin tercero'} />,
+        <StatusChip label={procedureStatus(r.status)} tone={procedureTone(r.status)} />,
+        r.notifyCustomer ? <Button size="small" startIcon={<WhatsApp />} onClick={() => notify(r)}>WhatsApp</Button> : 'No notificar',
+        <Actions onEdit={() => setForm({ open: true, item: r })} />
+      ])}
+    />
+    <ProcedureDialog form={form} applications={eligibleApplications} salesPoints={salesPoints.filter((x) => x.active)} onClose={() => setForm({ open: false })} onSave={save} />
+    <Notice notice={notice} onClose={() => setNotice(undefined)} />
+  </Stack>;
+}
+
+function ProcedureDialog({ form, applications, salesPoints, onClose, onSave }: DialogProps<Procedure, typeof emptyProcedure> & { applications: CreditApplication[]; salesPoints: SalesPoint[] }) {
+  const initial = form.item ? {
+    creditApplicationId: form.item.creditApplicationId,
+    salesPointId: form.item.salesPointId ?? '',
+    type: form.item.type,
+    status: form.item.status,
+    startDate: form.item.startDate.slice(0, 10),
+    estimatedDate: form.item.estimatedDate.slice(0, 10),
+    completedAt: form.item.completedAt?.slice(0, 10) ?? '',
+    responsible: form.item.responsible ?? '',
+    thirdParty: form.item.thirdParty ?? '',
+    notifyCustomer: form.item.notifyCustomer,
+    customerNotifiedAt: form.item.customerNotifiedAt?.slice(0, 10) ?? '',
+    notes: form.item.notes ?? ''
+  } : { ...emptyProcedure, creditApplicationId: applications[0]?.id ?? '', salesPointId: salesPoints[0]?.id ?? '' };
+
+  return <FormDialog title={form.item ? 'Editar tramite' : 'Nuevo tramite'} open={form.open} initial={initial} onClose={onClose} onSave={onSave} maxWidth="md">
+    {(v, set) => {
+      const selectedSalesPoint = salesPoints.find((x) => x.id === v.salesPointId);
+      return <Stack spacing={2}>
+        <FieldGrid>
+          <TextField required select label="Solicitud" value={v.creditApplicationId} onChange={(e) => set({ creditApplicationId: e.target.value })}>
+            {applications.map((x) => <MenuItem key={x.id} value={x.id}>{x.number} - {x.customerName}</MenuItem>)}
+          </TextField>
+          <TextField select label="Sede / punto de venta" value={v.salesPointId} onChange={(e) => set({ salesPointId: e.target.value })}>
+            <MenuItem value="">Sede por defecto</MenuItem>
+            {salesPoints.map((x) => <MenuItem key={x.id} value={x.id}>{x.name} - {x.city}</MenuItem>)}
+          </TextField>
+        </FieldGrid>
+        {selectedSalesPoint && <Alert severity="info">Tiempos de sede: SOAT {selectedSalesPoint.soatDays} dia(s), matricula {selectedSalesPoint.registrationDays} dia(s).</Alert>}
+        <FieldGrid columns={3}>
+          <TextField select label="Tipo" value={v.type} onChange={(e) => set({ type: Number(e.target.value) })}>
+            {[1, 2, 3, 4].map((x) => <MenuItem key={x} value={x}>{procedureType(x)}</MenuItem>)}
+          </TextField>
+          <TextField select label="Estado" value={v.status} onChange={(e) => set({ status: Number(e.target.value) })}>
+            {[1, 2, 3, 4, 5].map((x) => <MenuItem key={x} value={x}>{procedureStatus(x)}</MenuItem>)}
+          </TextField>
+          <TextField label="Responsable interno" value={v.responsible} onChange={(e) => set({ responsible: e.target.value })} />
+        </FieldGrid>
+        <FieldGrid columns={3}>
+          <TextField label="Fecha inicio" type="date" value={v.startDate} onChange={(e) => set({ startDate: e.target.value })} InputLabelProps={{ shrink: true }} />
+          <TextField label="Fecha estimada" type="date" value={v.estimatedDate} onChange={(e) => set({ estimatedDate: e.target.value })} helperText="Dejalo vacio para calcular por sede." InputLabelProps={{ shrink: true }} />
+          <TextField label="Fecha finalizacion" type="date" value={v.completedAt} onChange={(e) => set({ completedAt: e.target.value })} InputLabelProps={{ shrink: true }} />
+        </FieldGrid>
+        <FieldGrid>
+          <TextField label="Tercero / proveedor" value={v.thirdParty} onChange={(e) => set({ thirdParty: e.target.value })} />
+          <TextField label="Fecha notificacion cliente" type="date" value={v.customerNotifiedAt} onChange={(e) => set({ customerNotifiedAt: e.target.value })} InputLabelProps={{ shrink: true }} />
+        </FieldGrid>
+        <FormControlLabel control={<Checkbox checked={v.notifyCustomer} onChange={(e) => set({ notifyCustomer: e.target.checked })} />} label="Notificar cliente por WhatsApp" />
         <TextField label="Observaciones" value={v.notes} onChange={(e) => set({ notes: e.target.value })} multiline minRows={2} />
       </Stack>;
     }}
@@ -3809,6 +3946,14 @@ function collectionOrderTone(value: number): 'success' | 'warning' | 'error' | '
   if (value === 2) return 'success';
   if (value === 3 || value === 1) return 'warning';
   if (value === 4 || value === 5) return 'error';
+  return 'default';
+}
+function procedureType(value: number) { return ['-', 'SOAT', 'Matricula', 'Placas', 'Terceros'][value] ?? 'Tramite'; }
+function procedureStatus(value: number) { return ['-', 'Pendiente', 'En proceso', 'Completado', 'Atrasado', 'Cancelado'][value] ?? 'Pendiente'; }
+function procedureTone(value: number): 'success' | 'warning' | 'error' | 'default' {
+  if (value === 3) return 'success';
+  if (value === 4 || value === 5) return 'error';
+  if (value === 1 || value === 2) return 'warning';
   return 'default';
 }
 const identificationOptions = [

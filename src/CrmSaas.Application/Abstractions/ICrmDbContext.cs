@@ -31,5 +31,6 @@ public interface ICrmDbContext
     DbSet<EntregaMoto> EntregasMoto { get; }
     DbSet<OrdenRecaudo> OrdenesRecaudo { get; }
     DbSet<DetalleOrdenRecaudo> DetallesOrdenRecaudo { get; }
+    DbSet<Tramite> Tramites { get; }
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

@@ -524,6 +524,45 @@ public sealed record UpsertCollectionOrderDto(
     EstadoOrdenRecaudo Status,
     string? Notes);
 
+public sealed record ProcedureDto(
+    Guid Id,
+    string Number,
+    Guid CreditApplicationId,
+    string CreditApplicationNumber,
+    Guid CustomerId,
+    string CustomerName,
+    string CustomerMobile,
+    Guid ProductId,
+    string ProductName,
+    Guid? SalesPointId,
+    string? SalesPointName,
+    TipoTramite Type,
+    EstadoTramite Status,
+    DateTime StartDate,
+    DateTime EstimatedDate,
+    DateTime? CompletedAt,
+    string? Responsible,
+    string? ThirdParty,
+    bool NotifyCustomer,
+    DateTime? CustomerNotifiedAt,
+    bool IsOverdue,
+    string WhatsappMessage,
+    string? Notes);
+
+public sealed record UpsertProcedureDto(
+    Guid CreditApplicationId,
+    Guid? SalesPointId,
+    TipoTramite Type,
+    EstadoTramite Status,
+    DateTime StartDate,
+    DateTime? EstimatedDate,
+    DateTime? CompletedAt,
+    string? Responsible,
+    string? ThirdParty,
+    bool NotifyCustomer,
+    DateTime? CustomerNotifiedAt,
+    string? Notes);
+
 public sealed record Customer360Dto(
     CustomerDto Customer,
     IReadOnlyCollection<QuoteDto> Quotes,

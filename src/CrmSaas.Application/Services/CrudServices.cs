@@ -514,6 +514,21 @@ public sealed class DashboardService(ICrmDbContext db) : IDashboardService
                 x.ClienteId == null ? "/pipeline" : "/clientes/" + x.ClienteId))
             .ToListAsync(cancellationToken));
 
+        var overdueProcedures = await db.Tramites
+            .Where(x => x.Estado == EstadoTramite.Atrasado || (x.Estado != EstadoTramite.Completado && x.Estado != EstadoTramite.Cancelado && x.FechaEstimada < today))
+            .OrderBy(x => x.FechaEstimada)
+            .Take(5)
+            .Select(x => new { x.Numero, x.FechaEstimada })
+            .ToListAsync(cancellationToken);
+
+        alerts.AddRange(overdueProcedures.Select(x => new CommercialAlertDto(
+                "Tramite",
+                "error",
+                "Tramite atrasado",
+                x.Numero + " vencio el " + x.FechaEstimada.ToString("yyyy-MM-dd") + ". Revisar SOAT, matricula, placas o tercero.",
+                x.FechaEstimada,
+                "/tramites")));
+
         return alerts
             .OrderBy(x => x.Severity == "error" ? 0 : x.Severity == "warning" ? 1 : 2)
             .ThenBy(x => x.CreatedAt)

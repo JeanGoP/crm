@@ -1,7 +1,7 @@
 # Manual de usuario - EnMarcha CRM
 
 Ultima actualizacion: 2026-06-23  
-Version del manual: 7.7
+Version del manual: 7.8
 Sistema: EnMarcha CRM para gestion comercial y ventas a credito  
 
 ## 1. Bienvenida
@@ -66,6 +66,7 @@ El menu lateral permite moverse por las opciones principales:
 - **Clientes:** maestro de clientes y vista Cliente 360.
 - **Solicitudes de credito:** gestion de documentos, codeudor, referencias y decision.
 - **Ordenes de recaudo:** emision y seguimiento de cobros por vehiculo, documentos y anticipo.
+- **Tramites:** seguimiento de SOAT, matricula, placas y terceros.
 - **Entregas:** control de entrega del producto al cliente.
 - **Pipeline:** seguimiento visual de negocios por etapa.
 - **Actividades:** agenda de tareas, llamadas y reuniones.
@@ -397,7 +398,41 @@ Ordenes de recaudo permite emitir cobros asociados a una solicitud de credito. L
 
 Use la orden de recaudo antes de la entrega para controlar cuota inicial, documentos o anticipos. Si el cliente paga parcialmente, actualice el valor pagado para conservar el saldo real.
 
-## 15. Entregas
+## 15. Tramites
+
+### Para que sirve
+
+Tramites permite controlar procesos posteriores o paralelos a la venta, como **SOAT**, **matricula**, **placas** y gestiones con **terceros**. Cada tramite queda ligado a una solicitud, cliente, producto y sede.
+
+### Crear un tramite
+
+1. Entre a **Tramites**.
+2. Presione **Nuevo tramite**.
+3. Seleccione la solicitud.
+4. Seleccione la sede o punto de venta.
+5. Escoja el tipo de tramite: SOAT, matricula, placas o terceros.
+6. Revise la fecha de inicio y la fecha estimada. Si deja vacia la fecha estimada, el sistema la calcula con los tiempos de la sede.
+7. Asigne responsable interno y tercero/proveedor si aplica.
+8. Indique si se debe notificar al cliente por WhatsApp.
+9. Guarde.
+
+### Estados
+
+- **Pendiente:** aun no inicia o falta gestion.
+- **En proceso:** el tramite esta en curso.
+- **Completado:** el tramite finalizo.
+- **Atrasado:** la fecha estimada ya paso.
+- **Cancelado:** el tramite ya no se realizara.
+
+### Notificaciones al cliente
+
+Cuando el tramite tiene marcada la opcion de notificar, la tabla muestra un boton de **WhatsApp**. Ese boton abre WhatsApp con un mensaje sugerido para informar al cliente el estado y la fecha estimada.
+
+### Recomendacion de uso
+
+Revise la lista de atrasados al iniciar el dia. Los tramites atrasados tambien aparecen como alerta interna en el Dashboard.
+
+## 16. Entregas
 
 ### Para que sirve
 
@@ -416,7 +451,7 @@ Entregas permite registrar la entrega final del producto cuando el proceso comer
 
 Use esta opcion solo cuando el producto realmente vaya a entregarse o ya haya sido entregado. Asi los reportes reflejan ventas cerradas correctamente.
 
-## 16. Prospectos
+## 17. Prospectos
 
 ![Prospectos](./assets/manual/07-prospectos.png)
 
@@ -436,7 +471,7 @@ Prospectos permite registrar personas interesadas que todavia no son clientes co
 
 Cuando un prospecto muestra interes real, use la opcion de convertir o llevar a cliente. El sistema permite continuar con la creacion del cliente y completar los datos faltantes.
 
-## 17. Pipeline
+## 18. Pipeline
 
 ![Pipeline](./assets/manual/08-pipeline.png)
 
@@ -463,7 +498,7 @@ Puede mover una tarjeta arrastrandola de una columna a otra. Al hacerlo, el sist
 
 Mantenga el pipeline actualizado todos los dias. Esto permite que el Dashboard y los reportes muestren informacion real.
 
-## 18. Actividades
+## 19. Actividades
 
 ![Actividades](./assets/manual/09-actividades.png)
 
@@ -502,7 +537,7 @@ Si la actividad tenia recordatorio, el sistema conserva la misma anticipacion fr
 
 Al crear una cotizacion, el sistema puede generar una actividad automatica como **Llamar al cliente manana**. Si no se actualiza, puede aparecer como alerta de seguimiento vencido.
 
-## 19. Reportes comerciales
+## 20. Reportes comerciales
 
 ![Reportes comerciales](./assets/manual/11-reportes.png)
 
@@ -522,7 +557,7 @@ Reportes permite revisar resultados comerciales y tomar decisiones con informaci
 
 El supervisor debe revisar reportes con frecuencia para detectar vendedores con oportunidades vencidas, productos mas consultados y cuellos de botella en credito.
 
-## 20. Configuracion
+## 21. Configuracion
 
 ![Configuracion](./assets/manual/10-configuracion.png)
 
@@ -604,7 +639,7 @@ Los cambios aplican a las nuevas cotizaciones de la empresa. Las cotizaciones ya
 
 La sede principal permite que el sistema pueda separar la informacion comercial por punto de venta. Esta configuracion se usara en cotizaciones, reportes, tramites y entregas.
 
-## 21. Manejo de errores
+## 22. Manejo de errores
 
 El sistema muestra mensajes cuando algo no puede completarse.
 
@@ -624,7 +659,7 @@ El sistema muestra mensajes cuando algo no puede completarse.
 - No hay conexion con el servidor.
 - La integracion externa no esta configurada o no respondio.
 
-## 22. Buenas practicas
+## 23. Buenas practicas
 
 - Registre clientes con identificacion correcta.
 - No cree clientes duplicados.
@@ -637,7 +672,7 @@ El sistema muestra mensajes cuando algo no puede completarse.
 - Mantenga productos y precios actualizados.
 - Cierre sesion al terminar si usa un equipo compartido.
 
-## 23. Flujo recomendado de trabajo
+## 24. Flujo recomendado de trabajo
 
 1. Ingresar al CRM.
 2. Revisar Dashboard y alertas.
@@ -649,14 +684,16 @@ El sistema muestra mensajes cuando algo no puede completarse.
 8. Registrar estudio de credito y decision.
 9. Emitir orden de recaudo si corresponde.
 10. Registrar pagos parciales o totales de la orden.
-11. Actualizar pipeline segun avance.
-12. Si se concreta la venta, registrar entrega.
-13. Revisar reportes para seguimiento.
+11. Crear y dar seguimiento a tramites de SOAT, matricula, placas o terceros.
+12. Actualizar pipeline segun avance.
+13. Si se concreta la venta, registrar entrega.
+14. Revisar reportes para seguimiento.
 
-## 24. Historial del manual
+## 25. Historial del manual
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-06-23 | 7.8 | Se agrega el modulo de tramites para SOAT, matricula, placas y terceros, con tiempos por sede, atrasados y notificacion por WhatsApp. |
 | 2026-06-23 | 7.7 | Se agrega el modulo de ordenes de recaudo con conceptos separados de vehiculo, documentos y anticipo, estados de pago y control de saldo. |
 | 2026-06-22 | 7.6 | Se formaliza el estudio de credito con Paso 0 RUNT/SIMIT, validacion de identidad, recalculo del analista, aprobacion con ajuste o codeudor, negacion y carta de condiciones finales. |
 | 2026-06-22 | 7.5 | Se fortalece el gestor de documentos con vigencia, rechazo con motivo, validacion por permisos y alerta cuando el checklist queda completo. |

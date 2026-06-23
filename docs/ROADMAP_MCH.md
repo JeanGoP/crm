@@ -42,7 +42,7 @@ Incluye:
 8. Crear orden de recaudo. Implementado.
    Conceptos separados: vehiculo, documentos y anticipo. Estados: emitida, pagada, parcial, vencida y anulada.
 
-9. Crear modulo de tramites.
+9. Crear modulo de tramites. Implementado.
    SOAT, matricula, placas, terceros, tiempos por sede, listas de atrasados y notificaciones al cliente.
 
 10. Fortalecer entrega.

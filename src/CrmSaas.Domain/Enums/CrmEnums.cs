@@ -12,3 +12,5 @@ public enum EstadoDocumentoCredito { Pendiente = 1, Recibido = 2, Validado = 3, 
 public enum EstadoEntregaMoto { Programada = 1, Entregada = 2, Cancelada = 3 }
 public enum EstadoOrdenRecaudo { Emitida = 1, Pagada = 2, Parcial = 3, Vencida = 4, Anulada = 5 }
 public enum TipoConceptoRecaudo { Vehiculo = 1, Documentos = 2, Anticipo = 3 }
+public enum TipoTramite { Soat = 1, Matricula = 2, Placas = 3, Terceros = 4 }
+public enum EstadoTramite { Pendiente = 1, EnProceso = 2, Completado = 3, Atrasado = 4, Cancelado = 5 }

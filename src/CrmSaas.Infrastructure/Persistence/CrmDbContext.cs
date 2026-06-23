@@ -33,6 +33,7 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
     public DbSet<EntregaMoto> EntregasMoto => Set<EntregaMoto>();
     public DbSet<OrdenRecaudo> OrdenesRecaudo => Set<OrdenRecaudo>();
     public DbSet<DetalleOrdenRecaudo> DetallesOrdenRecaudo => Set<DetalleOrdenRecaudo>();
+    public DbSet<Tramite> Tramites => Set<Tramite>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -62,6 +63,7 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
         modelBuilder.Entity<EntregaMoto>().ToTable("EntregasMoto");
         modelBuilder.Entity<OrdenRecaudo>().ToTable("OrdenesRecaudo");
         modelBuilder.Entity<DetalleOrdenRecaudo>().ToTable("DetallesOrdenRecaudo");
+        modelBuilder.Entity<Tramite>().ToTable("Tramites");
 
         foreach (var entityType in modelBuilder.Model.GetEntityTypes().Where(t => typeof(AuditableTenantEntity).IsAssignableFrom(t.ClrType)))
         {
@@ -210,6 +212,16 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
         modelBuilder.Entity<DetalleOrdenRecaudo>().Property(x => x.Valor).HasPrecision(18, 2);
         modelBuilder.Entity<DetalleOrdenRecaudo>().HasIndex(x => new { x.EmpresaId, x.OrdenRecaudoId, x.Tipo });
         modelBuilder.Entity<DetalleOrdenRecaudo>().HasOne(x => x.OrdenRecaudo).WithMany(x => x.Detalles).HasForeignKey(x => x.OrdenRecaudoId).OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<Tramite>().Property(x => x.Numero).HasMaxLength(40);
+        modelBuilder.Entity<Tramite>().Property(x => x.Responsable).HasMaxLength(160);
+        modelBuilder.Entity<Tramite>().Property(x => x.Tercero).HasMaxLength(160);
+        modelBuilder.Entity<Tramite>().HasIndex(x => new { x.EmpresaId, x.Numero }).IsUnique();
+        modelBuilder.Entity<Tramite>().HasIndex(x => new { x.EmpresaId, x.Estado, x.FechaEstimada });
+        modelBuilder.Entity<Tramite>().HasIndex(x => new { x.EmpresaId, x.PuntoVentaId, x.Tipo });
+        modelBuilder.Entity<Tramite>().HasOne(x => x.SolicitudCredito).WithMany().HasForeignKey(x => x.SolicitudCreditoId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<Tramite>().HasOne(x => x.Cliente).WithMany().HasForeignKey(x => x.ClienteId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<Tramite>().HasOne(x => x.Producto).WithMany().HasForeignKey(x => x.ProductoId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<Tramite>().HasOne(x => x.PuntoVenta).WithMany().HasForeignKey(x => x.PuntoVentaId).OnDelete(DeleteBehavior.Restrict);
 
         modelBuilder.Entity<Empresa>().HasQueryFilter(x => !tenantContext.EmpresaId.HasValue || x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<Usuario>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
@@ -237,6 +249,7 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
         modelBuilder.Entity<EntregaMoto>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<OrdenRecaudo>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<DetalleOrdenRecaudo>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
+        modelBuilder.Entity<Tramite>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
