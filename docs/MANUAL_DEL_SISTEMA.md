@@ -1,7 +1,7 @@
 # Manual de usuario - EnMarcha CRM
 
-Ultima actualizacion: 2026-06-22  
-Version del manual: 7.6
+Ultima actualizacion: 2026-06-23  
+Version del manual: 7.7
 Sistema: EnMarcha CRM para gestion comercial y ventas a credito  
 
 ## 1. Bienvenida
@@ -65,6 +65,7 @@ El menu lateral permite moverse por las opciones principales:
 - **Cotizaciones:** creacion y consulta de propuestas comerciales.
 - **Clientes:** maestro de clientes y vista Cliente 360.
 - **Solicitudes de credito:** gestion de documentos, codeudor, referencias y decision.
+- **Ordenes de recaudo:** emision y seguimiento de cobros por vehiculo, documentos y anticipo.
 - **Entregas:** control de entrega del producto al cliente.
 - **Pipeline:** seguimiento visual de negocios por etapa.
 - **Actividades:** agenda de tareas, llamadas y reuniones.
@@ -367,7 +368,36 @@ Se diligencian dentro de **Solicitudes de credito**, en la solicitud del cliente
 
 Registre datos claros y verificables. Si falta informacion, deje una actividad pendiente para solicitarla al cliente.
 
-## 14. Entregas
+## 14. Ordenes de recaudo
+
+### Para que sirve
+
+Ordenes de recaudo permite emitir cobros asociados a una solicitud de credito. La orden separa los conceptos de **vehiculo**, **documentos** y **anticipo** para que el usuario pueda ver claramente cuanto debe pagar el cliente por cada parte.
+
+### Crear una orden
+
+1. Entre a **Ordenes recaudo**.
+2. Presione **Nueva orden**.
+3. Seleccione la solicitud del cliente.
+4. Defina la fecha de vencimiento.
+5. Ingrese el valor de vehiculo, documentos y anticipo.
+6. Registre el valor pagado si ya existe un abono.
+7. Seleccione el estado correspondiente.
+8. Guarde.
+
+### Estados
+
+- **Emitida:** orden generada y pendiente de pago.
+- **Pagada:** el valor pagado cubre el total de la orden.
+- **Parcial:** existe un abono, pero queda saldo pendiente.
+- **Vencida:** la fecha de vencimiento paso y no hay pago completo.
+- **Anulada:** la orden ya no debe cobrarse.
+
+### Recomendacion de uso
+
+Use la orden de recaudo antes de la entrega para controlar cuota inicial, documentos o anticipos. Si el cliente paga parcialmente, actualice el valor pagado para conservar el saldo real.
+
+## 15. Entregas
 
 ### Para que sirve
 
@@ -386,7 +416,7 @@ Entregas permite registrar la entrega final del producto cuando el proceso comer
 
 Use esta opcion solo cuando el producto realmente vaya a entregarse o ya haya sido entregado. Asi los reportes reflejan ventas cerradas correctamente.
 
-## 15. Prospectos
+## 16. Prospectos
 
 ![Prospectos](./assets/manual/07-prospectos.png)
 
@@ -406,7 +436,7 @@ Prospectos permite registrar personas interesadas que todavia no son clientes co
 
 Cuando un prospecto muestra interes real, use la opcion de convertir o llevar a cliente. El sistema permite continuar con la creacion del cliente y completar los datos faltantes.
 
-## 16. Pipeline
+## 17. Pipeline
 
 ![Pipeline](./assets/manual/08-pipeline.png)
 
@@ -433,7 +463,7 @@ Puede mover una tarjeta arrastrandola de una columna a otra. Al hacerlo, el sist
 
 Mantenga el pipeline actualizado todos los dias. Esto permite que el Dashboard y los reportes muestren informacion real.
 
-## 17. Actividades
+## 18. Actividades
 
 ![Actividades](./assets/manual/09-actividades.png)
 
@@ -472,7 +502,7 @@ Si la actividad tenia recordatorio, el sistema conserva la misma anticipacion fr
 
 Al crear una cotizacion, el sistema puede generar una actividad automatica como **Llamar al cliente manana**. Si no se actualiza, puede aparecer como alerta de seguimiento vencido.
 
-## 18. Reportes comerciales
+## 19. Reportes comerciales
 
 ![Reportes comerciales](./assets/manual/11-reportes.png)
 
@@ -492,7 +522,7 @@ Reportes permite revisar resultados comerciales y tomar decisiones con informaci
 
 El supervisor debe revisar reportes con frecuencia para detectar vendedores con oportunidades vencidas, productos mas consultados y cuellos de botella en credito.
 
-## 19. Configuracion
+## 20. Configuracion
 
 ![Configuracion](./assets/manual/10-configuracion.png)
 
@@ -574,7 +604,7 @@ Los cambios aplican a las nuevas cotizaciones de la empresa. Las cotizaciones ya
 
 La sede principal permite que el sistema pueda separar la informacion comercial por punto de venta. Esta configuracion se usara en cotizaciones, reportes, tramites y entregas.
 
-## 20. Manejo de errores
+## 21. Manejo de errores
 
 El sistema muestra mensajes cuando algo no puede completarse.
 
@@ -594,7 +624,7 @@ El sistema muestra mensajes cuando algo no puede completarse.
 - No hay conexion con el servidor.
 - La integracion externa no esta configurada o no respondio.
 
-## 21. Buenas practicas
+## 22. Buenas practicas
 
 - Registre clientes con identificacion correcta.
 - No cree clientes duplicados.
@@ -607,7 +637,7 @@ El sistema muestra mensajes cuando algo no puede completarse.
 - Mantenga productos y precios actualizados.
 - Cierre sesion al terminar si usa un equipo compartido.
 
-## 22. Flujo recomendado de trabajo
+## 23. Flujo recomendado de trabajo
 
 1. Ingresar al CRM.
 2. Revisar Dashboard y alertas.
@@ -616,15 +646,18 @@ El sistema muestra mensajes cuando algo no puede completarse.
 5. Hacer seguimiento con actividades.
 6. Si el cliente continua, completar solicitud de credito.
 7. Adjuntar documentos, codeudor y referencias si aplica.
-8. Actualizar pipeline segun avance.
-9. Registrar aprobacion o rechazo.
-10. Si se concreta la venta, registrar entrega.
-11. Revisar reportes para seguimiento.
+8. Registrar estudio de credito y decision.
+9. Emitir orden de recaudo si corresponde.
+10. Registrar pagos parciales o totales de la orden.
+11. Actualizar pipeline segun avance.
+12. Si se concreta la venta, registrar entrega.
+13. Revisar reportes para seguimiento.
 
-## 23. Historial del manual
+## 24. Historial del manual
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-06-23 | 7.7 | Se agrega el modulo de ordenes de recaudo con conceptos separados de vehiculo, documentos y anticipo, estados de pago y control de saldo. |
 | 2026-06-22 | 7.6 | Se formaliza el estudio de credito con Paso 0 RUNT/SIMIT, validacion de identidad, recalculo del analista, aprobacion con ajuste o codeudor, negacion y carta de condiciones finales. |
 | 2026-06-22 | 7.5 | Se fortalece el gestor de documentos con vigencia, rechazo con motivo, validacion por permisos y alerta cuando el checklist queda completo. |
 | 2026-06-22 | 7.4 | Se agregan promociones y planes tacticos con descuentos automaticos por producto, marca, color, sede y vigencia en cotizaciones. |

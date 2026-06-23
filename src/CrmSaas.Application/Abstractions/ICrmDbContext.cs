@@ -29,5 +29,7 @@ public interface ICrmDbContext
     DbSet<SolicitudCredito> SolicitudesCredito { get; }
     DbSet<DocumentoSolicitudCredito> DocumentosSolicitudCredito { get; }
     DbSet<EntregaMoto> EntregasMoto { get; }
+    DbSet<OrdenRecaudo> OrdenesRecaudo { get; }
+    DbSet<DetalleOrdenRecaudo> DetallesOrdenRecaudo { get; }
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

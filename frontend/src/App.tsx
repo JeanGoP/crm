@@ -35,7 +35,7 @@ import Search from '@mui/icons-material/Search';
 import { AxiosError } from 'axios';
 import { api } from './api';
 import { useAuthStore } from './store';
-import { Activity, ColombianIdentityLookup, CommercialReports, Company, CreditApplication, CreditDocument, Customer, Customer360, CustomerAiAnalysis, CustomerTimelineItem, Dashboard, Deal, DealStage, FinancialSettings, Lead, MotorcycleDelivery, Product, ProductPhoto, Promotion, Quote, QuoteSimulationResult, RequirementProfile, SalesPoint, User } from './types';
+import { Activity, ColombianIdentityLookup, CollectionOrder, CommercialReports, Company, CreditApplication, CreditDocument, Customer, Customer360, CustomerAiAnalysis, CustomerTimelineItem, Dashboard, Deal, DealStage, FinancialSettings, Lead, MotorcycleDelivery, Product, ProductPhoto, Promotion, Quote, QuoteSimulationResult, RequirementProfile, SalesPoint, User } from './types';
 
 const drawerWidth = 248;
 const today = new Date().toISOString().slice(0, 10);
@@ -66,6 +66,7 @@ const nav: NavItem[] = [
   { to: '/cotizaciones', label: 'Cotizaciones', icon: <ReceiptLong /> },
   { to: '/clientes', label: 'Clientes', icon: <Groups /> },
   { to: '/solicitudes-credito', label: 'Solicitudes credito', icon: <Assignment /> },
+  { to: '/ordenes-recaudo', label: 'Ordenes recaudo', icon: <ReceiptLong /> },
   { to: '/entregas', label: 'Entregas', icon: <LocalShipping /> },
   { to: '/pipeline', label: 'Pipeline', icon: <ViewKanban /> },
   { to: '/actividades', label: 'Actividades', icon: <EventNote /> },
@@ -133,6 +134,16 @@ const emptyMotorcycleDelivery = {
   registrationDelivered: false,
   warrantyManualDelivered: false,
   deliveryCertificateSigned: false,
+  status: 1,
+  notes: ''
+};
+const emptyCollectionOrder = {
+  creditApplicationId: '',
+  dueDate: today,
+  vehicleAmount: 0,
+  documentsAmount: 0,
+  advanceAmount: 0,
+  paidAmount: 0,
   status: 1,
   notes: ''
 };
@@ -214,6 +225,7 @@ function Layout() {
             <Route path="/productos" element={<ProductsPage />} />
             <Route path="/cotizaciones" element={<QuotesPage />} />
             <Route path="/solicitudes-credito" element={<CreditApplicationsPage />} />
+            <Route path="/ordenes-recaudo" element={<CollectionOrdersPage />} />
             <Route path="/entregas" element={<MotorcycleDeliveriesPage />} />
             <Route path="/prospectos" element={<LeadsPage />} />
             <Route path="/pipeline" element={<PipelinePage />} />
@@ -1117,6 +1129,113 @@ function CreditStudySummary({ application, onStep0, onRecalculate, onDecision }:
       </>}
     </Stack>
   </Stack>;
+}
+
+function CollectionOrdersPage() {
+  const { data: rows = [], loading, error, reload, setData } = useResource<CollectionOrder[]>('/api/collection-orders', []);
+  const { data: applications = [] } = useResource<CreditApplication[]>('/api/credit-applications', []);
+  const [form, setForm] = useState<FormMode<CollectionOrder>>({ open: false });
+  const [notice, setNotice] = useState<Notice>();
+  const eligibleApplications = applications.filter((x) => ![6, 9].includes(x.status));
+
+  const save = async (payload: typeof emptyCollectionOrder) => {
+    try {
+      const body = {
+        creditApplicationId: payload.creditApplicationId,
+        dueDate: new Date(`${payload.dueDate}T00:00:00`).toISOString(),
+        vehicleAmount: Number(payload.vehicleAmount),
+        documentsAmount: Number(payload.documentsAmount),
+        advanceAmount: Number(payload.advanceAmount),
+        paidAmount: Number(payload.paidAmount),
+        status: Number(payload.status),
+        notes: payload.notes || null
+      };
+      const { data } = form.item
+        ? await api.put<CollectionOrder>(`/api/collection-orders/${form.item.id}`, body)
+        : await api.post<CollectionOrder>('/api/collection-orders', body);
+      setData(form.item ? rows.map((x) => x.id === data.id ? data : x) : [data, ...rows]);
+      setNotice({ type: 'success', text: form.item ? 'Orden actualizada.' : 'Orden de recaudo emitida.' });
+      setForm({ open: false });
+    } catch (err) {
+      setNotice({ type: 'error', text: apiError(err) });
+    }
+  };
+
+  return <Stack spacing={3}>
+    <Header title="Ordenes de recaudo" action="Nueva orden" onAction={() => setForm({ open: true })} onRefresh={reload} />
+    <StatusBar loading={loading} error={error} />
+    <EntityTable
+      headers={['Numero', 'Cliente', 'Solicitud', 'Conceptos', 'Total', 'Pagado', 'Saldo', 'Vence', 'Estado', 'Acciones']}
+      empty="No hay ordenes de recaudo"
+      rows={rows.map((r) => [
+        r.number,
+        r.customerName,
+        r.creditApplicationNumber,
+        <Stack spacing={.25}>
+          <Typography variant="body2">Vehiculo: {money(r.vehicleAmount)}</Typography>
+          <Typography variant="body2">Documentos: {money(r.documentsAmount)}</Typography>
+          <Typography variant="body2">Anticipo: {money(r.advanceAmount)}</Typography>
+        </Stack>,
+        money(r.total),
+        money(r.paidAmount),
+        money(r.balance),
+        new Date(r.dueDate).toLocaleDateString(),
+        <StatusChip label={collectionOrderStatus(r.status)} tone={collectionOrderTone(r.status)} />,
+        <Actions onEdit={() => setForm({ open: true, item: r })} />
+      ])}
+    />
+    <CollectionOrderDialog form={form} applications={eligibleApplications} onClose={() => setForm({ open: false })} onSave={save} />
+    <Notice notice={notice} onClose={() => setNotice(undefined)} />
+  </Stack>;
+}
+
+function CollectionOrderDialog({ form, applications, onClose, onSave }: DialogProps<CollectionOrder, typeof emptyCollectionOrder> & { applications: CreditApplication[] }) {
+  const initial = form.item ? {
+    creditApplicationId: form.item.creditApplicationId,
+    dueDate: form.item.dueDate.slice(0, 10),
+    vehicleAmount: form.item.vehicleAmount,
+    documentsAmount: form.item.documentsAmount,
+    advanceAmount: form.item.advanceAmount,
+    paidAmount: form.item.paidAmount,
+    status: form.item.status,
+    notes: form.item.notes ?? ''
+  } : { ...emptyCollectionOrder, creditApplicationId: applications[0]?.id ?? '' };
+
+  return <FormDialog title={form.item ? 'Editar orden de recaudo' : 'Nueva orden de recaudo'} open={form.open} initial={initial} onClose={onClose} onSave={onSave} maxWidth="md">
+    {(v, set) => {
+      const application = applications.find((x) => x.id === v.creditApplicationId);
+      const total = Number(v.vehicleAmount) + Number(v.documentsAmount) + Number(v.advanceAmount);
+      return <Stack spacing={2}>
+        <FieldGrid>
+          <TextField required select label="Solicitud" value={v.creditApplicationId} onChange={(e) => {
+            const selected = applications.find((x) => x.id === e.target.value);
+            set({
+              creditApplicationId: e.target.value,
+              vehicleAmount: selected?.analystApprovedAmount ?? selected?.motorcycleValue ?? v.vehicleAmount,
+              advanceAmount: selected?.approvedDownPayment ?? selected?.downPayment ?? v.advanceAmount
+            });
+          }}>
+            {applications.map((x) => <MenuItem key={x.id} value={x.id}>{x.number} - {x.customerName}</MenuItem>)}
+          </TextField>
+          <TextField required label="Fecha vencimiento" type="date" value={v.dueDate} onChange={(e) => set({ dueDate: e.target.value })} InputLabelProps={{ shrink: true }} />
+        </FieldGrid>
+        {application && <Alert severity="info">Solicitud {application.number}: {application.customerName} · {creditStatus(application.status)}</Alert>}
+        <FieldGrid columns={3}>
+          <TextField label="Vehiculo" type="number" value={v.vehicleAmount} onChange={(e) => set({ vehicleAmount: Number(e.target.value) })} />
+          <TextField label="Documentos" type="number" value={v.documentsAmount} onChange={(e) => set({ documentsAmount: Number(e.target.value) })} />
+          <TextField label="Anticipo" type="number" value={v.advanceAmount} onChange={(e) => set({ advanceAmount: Number(e.target.value) })} />
+        </FieldGrid>
+        <FieldGrid columns={3}>
+          <TextField label="Total" value={money(total)} InputProps={{ readOnly: true }} />
+          <TextField label="Valor pagado" type="number" value={v.paidAmount} onChange={(e) => set({ paidAmount: Number(e.target.value) })} />
+          <TextField select label="Estado" value={v.status} onChange={(e) => set({ status: Number(e.target.value) })}>
+            {[1, 2, 3, 4, 5].map((x) => <MenuItem key={x} value={x}>{collectionOrderStatus(x)}</MenuItem>)}
+          </TextField>
+        </FieldGrid>
+        <TextField label="Observaciones" value={v.notes} onChange={(e) => set({ notes: e.target.value })} multiline minRows={2} />
+      </Stack>;
+    }}
+  </FormDialog>;
 }
 
 function MotorcycleDeliveriesPage() {
@@ -3685,6 +3804,13 @@ function creditTone(value: number): 'success' | 'warning' | 'error' | 'default' 
 function documentStatus(value: number) { return ['-', 'Pendiente', 'Recibido', 'Validado', 'Rechazado'][value] ?? 'Pendiente'; }
 function documentType(value: number) { return ['-', 'Cedula', 'Soporte ingresos', 'Recibo servicio', 'Referencias', 'Otro'][value] ?? 'Otro'; }
 function deliveryStatus(value: number) { return ['-', 'Programada', 'Entregada', 'Cancelada'][value] ?? 'Programada'; }
+function collectionOrderStatus(value: number) { return ['-', 'Emitida', 'Pagada', 'Parcial', 'Vencida', 'Anulada'][value] ?? 'Emitida'; }
+function collectionOrderTone(value: number): 'success' | 'warning' | 'error' | 'default' {
+  if (value === 2) return 'success';
+  if (value === 3 || value === 1) return 'warning';
+  if (value === 4 || value === 5) return 'error';
+  return 'default';
+}
 const identificationOptions = [
   { value: 1, label: 'Cedula de ciudadania' },
   { value: 2, label: 'Cedula de extranjeria' },

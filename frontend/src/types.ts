@@ -397,6 +397,34 @@ export interface MotorcycleDelivery {
   notes?: string;
 }
 
+export interface CollectionOrderDetail {
+  id: string;
+  type: number;
+  concept: string;
+  amount: number;
+}
+
+export interface CollectionOrder {
+  id: string;
+  number: string;
+  creditApplicationId: string;
+  creditApplicationNumber: string;
+  customerId: string;
+  customerName: string;
+  issueDate: string;
+  dueDate: string;
+  vehicleAmount: number;
+  documentsAmount: number;
+  advanceAmount: number;
+  total: number;
+  paidAmount: number;
+  balance: number;
+  paidAt?: string;
+  status: number;
+  notes?: string;
+  details: CollectionOrderDetail[];
+}
+
 export interface Customer360 {
   customer: Customer;
   quotes: Quote[];

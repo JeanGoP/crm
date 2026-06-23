@@ -386,3 +386,29 @@ public sealed class EntregaMoto : AuditableTenantEntity
     public EstadoEntregaMoto Estado { get; set; } = EstadoEntregaMoto.Programada;
     public string? Observaciones { get; set; }
 }
+
+public sealed class OrdenRecaudo : AuditableTenantEntity
+{
+    public string Numero { get; set; } = string.Empty;
+    public Guid SolicitudCreditoId { get; set; }
+    public SolicitudCredito? SolicitudCredito { get; set; }
+    public Guid ClienteId { get; set; }
+    public Cliente? Cliente { get; set; }
+    public DateTime FechaEmision { get; set; } = ColombiaTime.Now;
+    public DateTime FechaVencimiento { get; set; } = ColombiaTime.Now.Date.AddDays(3);
+    public decimal Total { get; set; }
+    public decimal ValorPagado { get; set; }
+    public DateTime? FechaPago { get; set; }
+    public EstadoOrdenRecaudo Estado { get; set; } = EstadoOrdenRecaudo.Emitida;
+    public string? Observaciones { get; set; }
+    public ICollection<DetalleOrdenRecaudo> Detalles { get; set; } = new List<DetalleOrdenRecaudo>();
+}
+
+public sealed class DetalleOrdenRecaudo : AuditableTenantEntity
+{
+    public Guid OrdenRecaudoId { get; set; }
+    public OrdenRecaudo? OrdenRecaudo { get; set; }
+    public TipoConceptoRecaudo Tipo { get; set; }
+    public string Concepto { get; set; } = string.Empty;
+    public decimal Valor { get; set; }
+}

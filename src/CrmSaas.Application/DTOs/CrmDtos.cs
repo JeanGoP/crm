@@ -488,6 +488,42 @@ public sealed record UpsertMotorcycleDeliveryDto(
     EstadoEntregaMoto Status,
     string? Notes);
 
+public sealed record CollectionOrderDetailDto(
+    Guid Id,
+    TipoConceptoRecaudo Type,
+    string Concept,
+    decimal Amount);
+
+public sealed record CollectionOrderDto(
+    Guid Id,
+    string Number,
+    Guid CreditApplicationId,
+    string CreditApplicationNumber,
+    Guid CustomerId,
+    string CustomerName,
+    DateTime IssueDate,
+    DateTime DueDate,
+    decimal VehicleAmount,
+    decimal DocumentsAmount,
+    decimal AdvanceAmount,
+    decimal Total,
+    decimal PaidAmount,
+    decimal Balance,
+    DateTime? PaidAt,
+    EstadoOrdenRecaudo Status,
+    string? Notes,
+    IReadOnlyCollection<CollectionOrderDetailDto> Details);
+
+public sealed record UpsertCollectionOrderDto(
+    Guid CreditApplicationId,
+    DateTime DueDate,
+    decimal VehicleAmount,
+    decimal DocumentsAmount,
+    decimal AdvanceAmount,
+    decimal PaidAmount,
+    EstadoOrdenRecaudo Status,
+    string? Notes);
+
 public sealed record Customer360Dto(
     CustomerDto Customer,
     IReadOnlyCollection<QuoteDto> Quotes,

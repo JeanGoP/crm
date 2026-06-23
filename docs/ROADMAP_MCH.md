@@ -39,7 +39,7 @@ Incluye:
 7. Formalizar estudio de credito. Implementado.
    Paso 0 RUNT/SIMIT, validacion de identidad, recalculo por analista, aprobado con ajuste, aprobado con codeudor, negado y carta de condiciones finales.
 
-8. Crear orden de recaudo.
+8. Crear orden de recaudo. Implementado.
    Conceptos separados: vehiculo, documentos y anticipo. Estados: emitida, pagada, parcial, vencida y anulada.
 
 9. Crear modulo de tramites.
