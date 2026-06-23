@@ -33,7 +33,7 @@ Incluye:
 5. Crear promociones / planes tacticos. Implementado.
    Descuentos por producto, marca, color, sede y vigencia. La cotizacion aplica automaticamente la promocion vigente mas especifica.
 
-6. Fortalecer gestor de documentos.
+6. Fortalecer gestor de documentos. Implementado.
    Documentos ligados al cliente, vigencia por tipo, rechazo con motivo, permiso de validacion y alerta al analista cuando el checklist este completo.
 
 7. Formalizar estudio de credito.
