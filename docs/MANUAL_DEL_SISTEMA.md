@@ -1,7 +1,7 @@
 # Manual de usuario - EnMarcha CRM
 
 Ultima actualizacion: 2026-06-22  
-Version del manual: 7.5
+Version del manual: 7.6
 Sistema: EnMarcha CRM para gestion comercial y ventas a credito  
 
 ## 1. Bienvenida
@@ -337,6 +337,22 @@ Los usuarios con permiso de supervision pueden validar o rechazar documentos. Si
 
 Cuando todos los documentos quedan recibidos o validados, la solicitud pasa a **Documentos recibidos** y el sistema muestra una alerta para revision del analista. Desde ahi se puede enviar formalmente a estudio, aprobar, rechazar o continuar el flujo correspondiente.
 
+### Estudio formal de credito
+
+El panel de estudio permite al supervisor o administrador controlar la revision antes de aprobar o negar.
+
+1. Use los botones **RUNT** y **SIMIT** para abrir las consultas externas. El sistema copia el numero de identificacion al portapapeles para facilitar la busqueda.
+2. Presione **Paso 0** cuando RUNT, SIMIT e identidad hayan sido revisados.
+3. Use **Recalcular** para registrar valor aprobado, cuota inicial aprobada, plazo aprobado y cuota mensual aprobada por el analista.
+4. Cuando la solicitud este en estudio, seleccione una decision:
+   - **Aprobar:** conserva condiciones normales.
+   - **Con ajuste:** aprueba con valores recalculados por el analista.
+   - **Con codeudor:** deja la aprobacion condicionada a codeudor registrado.
+   - **Negar:** registra el motivo de negacion.
+5. Escriba las condiciones finales que deben quedar en la carta.
+
+Para enviar una solicitud a estudio, el Paso 0 debe estar completo y los documentos no pueden estar pendientes o rechazados.
+
 ## 13. Codeudor y referencias
 
 ### Para que sirve
@@ -609,6 +625,7 @@ El sistema muestra mensajes cuando algo no puede completarse.
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-06-22 | 7.6 | Se formaliza el estudio de credito con Paso 0 RUNT/SIMIT, validacion de identidad, recalculo del analista, aprobacion con ajuste o codeudor, negacion y carta de condiciones finales. |
 | 2026-06-22 | 7.5 | Se fortalece el gestor de documentos con vigencia, rechazo con motivo, validacion por permisos y alerta cuando el checklist queda completo. |
 | 2026-06-22 | 7.4 | Se agregan promociones y planes tacticos con descuentos automaticos por producto, marca, color, sede y vigencia en cotizaciones. |
 | 2026-06-22 | 7.3 | Se agregan perfiles de requisitos por empresa y generacion automatica del checklist documental desde la cotizacion hacia la solicitud de credito. |

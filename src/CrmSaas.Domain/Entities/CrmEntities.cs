@@ -318,6 +318,19 @@ public sealed class SolicitudCredito : AuditableTenantEntity
     public string? Observaciones { get; set; }
     public DateTime? FechaEnvio { get; set; }
     public DateTime? FechaInicioEstudio { get; set; }
+    public DateTime? FechaRevisionPaso0 { get; set; }
+    public bool RuntConsultado { get; set; }
+    public bool SimitConsultado { get; set; }
+    public bool IdentidadValidada { get; set; }
+    public string? UsuarioPaso0 { get; set; }
+    public string? ObservacionPaso0 { get; set; }
+    public decimal? ValorAprobadoAnalista { get; set; }
+    public decimal? CuotaInicialAprobada { get; set; }
+    public int? PlazoAprobadoMeses { get; set; }
+    public decimal? CuotaMensualAprobada { get; set; }
+    public bool RequiereCodeudorParaAprobar { get; set; }
+    public string? CondicionesFinales { get; set; }
+    public string? ResultadoEstudio { get; set; }
     public DateTime? FechaAprobacion { get; set; }
     public DateTime? FechaRechazo { get; set; }
     public DateTime? FechaDesembolso { get; set; }

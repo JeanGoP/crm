@@ -36,7 +36,7 @@ Incluye:
 6. Fortalecer gestor de documentos. Implementado.
    Documentos ligados al cliente, vigencia por tipo, rechazo con motivo, permiso de validacion y alerta al analista cuando el checklist este completo.
 
-7. Formalizar estudio de credito.
+7. Formalizar estudio de credito. Implementado.
    Paso 0 RUNT/SIMIT, validacion de identidad, recalculo por analista, aprobado con ajuste, aprobado con codeudor, negado y carta de condiciones finales.
 
 8. Crear orden de recaudo.

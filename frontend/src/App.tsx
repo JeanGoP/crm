@@ -857,16 +857,61 @@ function CreditApplicationsPage() {
   };
 
   const changeStatus = async (application: CreditApplication, status: number) => {
-    const { data } = await api.post<CreditApplication>(`/api/credit-applications/${application.id}/status`, { status });
-    setData(rows.map((x) => x.id === data.id ? data : x));
-    setNotice({ type: 'success', text: `Solicitud marcada como ${creditStatus(status)}.` });
-  };
-
-  const decide = async (application: CreditApplication, status: number, notes?: string) => {
     try {
-      const { data } = await api.post<CreditApplication>(`/api/credit-applications/${application.id}/decision`, { status, notes: notes ?? null });
+      const { data } = await api.post<CreditApplication>(`/api/credit-applications/${application.id}/status`, { status });
       setData(rows.map((x) => x.id === data.id ? data : x));
       setNotice({ type: 'success', text: `Solicitud marcada como ${creditStatus(status)}.` });
+    } catch (err) {
+      setNotice({ type: 'error', text: apiError(err) });
+    }
+  };
+
+  const decide = async (application: CreditApplication, status: number, notes?: string, study?: Partial<CreditApplication> & { result?: string }) => {
+    try {
+      const { data } = await api.post<CreditApplication>(`/api/credit-applications/${application.id}/decision`, {
+        status,
+        notes: notes ?? null,
+        result: study?.result ?? null,
+        approvedAmount: study?.analystApprovedAmount ?? null,
+        approvedDownPayment: study?.approvedDownPayment ?? null,
+        approvedTermMonths: study?.approvedTermMonths ?? null,
+        approvedMonthlyPayment: study?.approvedMonthlyPayment ?? null,
+        requiresCoDebtor: study?.requiresCoDebtorForApproval ?? false,
+        finalConditions: study?.finalConditions ?? null
+      });
+      setData(rows.map((x) => x.id === data.id ? data : x));
+      setNotice({ type: 'success', text: `Solicitud marcada como ${creditStatus(status)}.` });
+    } catch (err) {
+      setNotice({ type: 'error', text: apiError(err) });
+    }
+  };
+
+  const saveStep0 = async (application: CreditApplication, patch?: Partial<CreditApplication>) => {
+    try {
+      const { data } = await api.post<CreditApplication>(`/api/credit-applications/${application.id}/study/step0`, {
+        runtChecked: patch?.runtChecked ?? application.runtChecked,
+        simitChecked: patch?.simitChecked ?? application.simitChecked,
+        identityValidated: patch?.identityValidated ?? application.identityValidated,
+        notes: patch?.step0Notes ?? application.step0Notes ?? null
+      });
+      setData(rows.map((x) => x.id === data.id ? data : x));
+      setNotice({ type: 'success', text: 'Paso 0 actualizado.' });
+    } catch (err) {
+      setNotice({ type: 'error', text: apiError(err) });
+    }
+  };
+
+  const saveRecalculation = async (application: CreditApplication, patch: Partial<CreditApplication>) => {
+    try {
+      const { data } = await api.post<CreditApplication>(`/api/credit-applications/${application.id}/study/recalculation`, {
+        approvedAmount: patch.analystApprovedAmount ?? application.analystApprovedAmount ?? application.motorcycleValue,
+        approvedDownPayment: patch.approvedDownPayment ?? application.approvedDownPayment ?? application.downPayment,
+        approvedTermMonths: patch.approvedTermMonths ?? application.approvedTermMonths ?? application.termMonths,
+        approvedMonthlyPayment: patch.approvedMonthlyPayment ?? application.approvedMonthlyPayment ?? 0,
+        notes: patch.decisionNotes ?? application.decisionNotes ?? null
+      });
+      setData(rows.map((x) => x.id === data.id ? data : x));
+      setNotice({ type: 'success', text: 'Recalculo del analista guardado.' });
     } catch (err) {
       setNotice({ type: 'error', text: apiError(err) });
     }
@@ -959,7 +1004,7 @@ function CreditApplicationsPage() {
           {r.reference2Name && <Typography variant="body2">{r.reference2Name} - {r.reference2Mobile ?? 'Sin celular'}</Typography>}
         </Stack> : '-',
         <DocumentSummary application={r} onUpdate={updateDocument} onUpload={uploadDocument} onDownload={downloadDocument} />,
-        <ApprovalSummary application={r} onDecision={decide} />,
+        <CreditStudySummary application={r} onStep0={saveStep0} onRecalculate={saveRecalculation} onDecision={decide} />,
         <CreditTemplateDownloads application={r} onDownload={downloadTemplate} />,
         <Stack direction="row" gap={1} alignItems="center">
           <Actions onAi={() => analyzeCustomer(r.customerId, r.mobile)} onEdit={() => setForm({ open: true, item: r })} />
@@ -975,24 +1020,101 @@ function CreditApplicationsPage() {
   </Stack>;
 }
 
-function ApprovalSummary({ application, onDecision }: { application: CreditApplication; onDecision: (application: CreditApplication, status: number, notes?: string) => Promise<void> }) {
+function CreditStudySummary({ application, onStep0, onRecalculate, onDecision }: {
+  application: CreditApplication;
+  onStep0: (application: CreditApplication, patch?: Partial<CreditApplication>) => Promise<void>;
+  onRecalculate: (application: CreditApplication, patch: Partial<CreditApplication>) => Promise<void>;
+  onDecision: (application: CreditApplication, status: number, notes?: string, study?: Partial<CreditApplication> & { result?: string }) => Promise<void>;
+}) {
   const actions = [
     { status: 8, label: 'Interesado', show: application.status === 1 },
     { status: 2, label: 'Documentos', show: application.status === 1 || application.status === 8 },
     { status: 4, label: 'Estudio', show: application.status === 2 || application.status === 3 },
-    { status: 5, label: 'Aprobar', show: application.status === 4 },
-    { status: 6, label: 'Rechazar', show: application.status === 4 || application.status === 5 },
     { status: 7, label: 'Entregar', show: application.status === 5 },
     { status: 9, label: 'Desistir', show: ![6, 7, 9].includes(application.status) }
   ].filter((x) => x.show);
   const lastDate = application.disbursedAt ?? application.approvedAt ?? application.rejectedAt ?? application.reviewStartedAt ?? application.submittedAt;
-  return <Stack spacing={.75} sx={{ minWidth: 180, maxWidth: 210 }}>
+  const step0Ready = application.runtChecked && application.simitChecked && application.identityValidated;
+  const approvedAmount = application.analystApprovedAmount ?? application.motorcycleValue;
+  const approvedDownPayment = application.approvedDownPayment ?? application.downPayment;
+  const approvedTerm = application.approvedTermMonths ?? application.termMonths;
+  const approvedPayment = application.approvedMonthlyPayment ?? 0;
+
+  const requestNumber = (label: string, current: number) => {
+    const value = window.prompt(label, String(current || 0));
+    if (value === null) return undefined;
+    const number = Number(value.replace(/\D/g, ''));
+    return Number.isFinite(number) ? number : undefined;
+  };
+
+  const registerStep0 = () => {
+    const notes = window.prompt('Observaciones de Paso 0 RUNT/SIMIT e identidad', application.step0Notes ?? '');
+    if (notes === null) return;
+    onStep0(application, { runtChecked: true, simitChecked: true, identityValidated: true, step0Notes: notes });
+  };
+
+  const recalculate = () => {
+    const amount = requestNumber('Valor aprobado por analista', approvedAmount);
+    if (amount === undefined) return;
+    const downPayment = requestNumber('Cuota inicial aprobada', approvedDownPayment);
+    if (downPayment === undefined) return;
+    const term = requestNumber('Plazo aprobado en meses', approvedTerm);
+    if (term === undefined) return;
+    const payment = requestNumber('Cuota mensual aprobada', approvedPayment);
+    if (payment === undefined) return;
+    const notes = window.prompt('Observaciones del recalculo', application.decisionNotes ?? '');
+    if (notes === null) return;
+    onRecalculate(application, { analystApprovedAmount: amount, approvedDownPayment: downPayment, approvedTermMonths: term, approvedMonthlyPayment: payment, decisionNotes: notes });
+  };
+
+  const approve = (requiresCoDebtor: boolean, withAdjustment: boolean) => {
+    const finalConditions = window.prompt('Condiciones finales para la carta', application.finalConditions ?? '');
+    if (finalConditions === null) return;
+    const result = withAdjustment ? 'Aprobado con ajuste' : 'Aprobado';
+    onDecision(application, 5, finalConditions, {
+      result,
+      analystApprovedAmount: approvedAmount,
+      approvedDownPayment,
+      approvedTermMonths: approvedTerm,
+      approvedMonthlyPayment: approvedPayment,
+      requiresCoDebtorForApproval: requiresCoDebtor,
+      finalConditions
+    });
+  };
+
+  const reject = () => {
+    const reason = window.prompt('Motivo de negacion del credito', application.decisionNotes ?? '');
+    if (!reason?.trim()) return;
+    onDecision(application, 6, reason.trim(), { result: 'Negado', finalConditions: reason.trim() });
+  };
+
+  return <Stack spacing={.75} sx={{ minWidth: 240, maxWidth: 280 }}>
+    <Stack direction="row" gap={.5} flexWrap="wrap">
+      <Chip size="small" label={step0Ready ? 'Paso 0 listo' : 'Paso 0 pendiente'} color={step0Ready ? 'success' : 'warning'} variant={step0Ready ? 'filled' : 'outlined'} />
+      {application.studyResult && <Chip size="small" label={application.studyResult} color={application.status === 6 ? 'error' : application.status === 5 ? 'success' : 'default'} variant="outlined" />}
+    </Stack>
     <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.25 }}>
       {lastDate ? `${application.decisionUser ?? 'Sistema'} - ${new Date(lastDate).toLocaleDateString()}` : 'Sin decision registrada'}
     </Typography>
+    <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.25 }}>
+      Aprobado: {money(approvedAmount)} · Inicial: {money(approvedDownPayment)} · {approvedTerm} meses
+    </Typography>
+    {approvedPayment > 0 && <Typography variant="caption" color="text.secondary">Cuota analista: {money(approvedPayment)}</Typography>}
     {application.decisionNotes && <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.25 }}>{application.decisionNotes}</Typography>}
     <Stack direction="row" gap={.5} flexWrap="wrap">
+      <Button size="small" variant="outlined" onClick={() => void openExternalLookup(runtUrl, application.identificationNumber)}>RUNT</Button>
+      <Button size="small" variant="outlined" onClick={() => void openExternalLookup(simitUrl, application.identificationNumber)}>SIMIT</Button>
+      <Button size="small" variant="outlined" onClick={registerStep0}>Paso 0</Button>
+      <Button size="small" variant="outlined" onClick={recalculate}>Recalcular</Button>
+    </Stack>
+    <Stack direction="row" gap={.5} flexWrap="wrap">
       {actions.length ? actions.map((action) => <Button key={action.status} size="small" variant="outlined" onClick={() => onDecision(application, action.status)}>{action.label}</Button>) : <Chip size="small" label="Sin acciones" variant="outlined" />}
+      {application.status === 4 && <>
+        <Button size="small" variant="contained" onClick={() => approve(false, false)}>Aprobar</Button>
+        <Button size="small" variant="outlined" onClick={() => approve(false, true)}>Con ajuste</Button>
+        <Button size="small" variant="outlined" onClick={() => approve(true, false)}>Con codeudor</Button>
+        <Button size="small" color="error" variant="outlined" onClick={reject}>Negar</Button>
+      </>}
     </Stack>
   </Stack>;
 }

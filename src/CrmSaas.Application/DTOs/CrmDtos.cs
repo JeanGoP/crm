@@ -300,6 +300,19 @@ public sealed record CreditApplicationDto(
     string? Notes,
     DateTime? SubmittedAt,
     DateTime? ReviewStartedAt,
+    DateTime? Step0ReviewedAt,
+    bool RuntChecked,
+    bool SimitChecked,
+    bool IdentityValidated,
+    string? Step0User,
+    string? Step0Notes,
+    decimal? AnalystApprovedAmount,
+    decimal? ApprovedDownPayment,
+    int? ApprovedTermMonths,
+    decimal? ApprovedMonthlyPayment,
+    bool RequiresCoDebtorForApproval,
+    string? FinalConditions,
+    string? StudyResult,
     DateTime? ApprovedAt,
     DateTime? RejectedAt,
     DateTime? DisbursedAt,
@@ -360,7 +373,18 @@ public sealed record CreditDocumentDto(
     DateTime? UploadedAt);
 public sealed record UpsertCreditDocumentDto(TipoDocumentoCredito Type, string Name, EstadoDocumentoCredito Status, DateTime? ReceivedAt, DateTime? ExpiresAt, string? Notes, string? RejectionReason);
 public sealed record ChangeCreditApplicationStatusDto(EstadoSolicitudCredito Status);
-public sealed record CreditApplicationDecisionDto(EstadoSolicitudCredito Status, string? Notes);
+public sealed record CreditApplicationDecisionDto(
+    EstadoSolicitudCredito Status,
+    string? Notes,
+    string? Result,
+    decimal? ApprovedAmount,
+    decimal? ApprovedDownPayment,
+    int? ApprovedTermMonths,
+    decimal? ApprovedMonthlyPayment,
+    bool RequiresCoDebtor,
+    string? FinalConditions);
+public sealed record CreditStudyStep0Dto(bool RuntChecked, bool SimitChecked, bool IdentityValidated, string? Notes);
+public sealed record CreditStudyRecalculationDto(decimal ApprovedAmount, decimal ApprovedDownPayment, int ApprovedTermMonths, decimal ApprovedMonthlyPayment, string? Notes);
 
 public sealed record RequirementDocumentDto(
     Guid Id,

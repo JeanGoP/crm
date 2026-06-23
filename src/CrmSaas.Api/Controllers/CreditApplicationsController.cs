@@ -172,6 +172,12 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
             ?? throw new KeyNotFoundException("Solicitud de credito no encontrada.");
 
+        if (dto.Status is EstadoSolicitudCredito.EnEstudio or EstadoSolicitudCredito.Aprobada or EstadoSolicitudCredito.Rechazada or EstadoSolicitudCredito.Desembolsada && !CanValidateDocuments())
+        {
+            return Forbid();
+        }
+
+        ValidateDecision(entity, dto.Status);
         entity.Estado = dto.Status;
         ApplyDecision(entity, dto.Status, null);
         await SyncPipelineAsync(entity, cancellationToken);
@@ -192,9 +198,61 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             ?? throw new KeyNotFoundException("Solicitud de credito no encontrada.");
 
         ValidateDecision(entity, dto.Status);
+        ApplyFormalStudy(entity, dto);
         entity.Estado = dto.Status;
         ApplyDecision(entity, dto.Status, dto.Notes);
         await SyncPipelineAsync(entity, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+        return Ok(ToDto(entity));
+    }
+
+    [HttpPost("{id:guid}/study/step0")]
+    [Authorize(Roles = "Administrador,Supervisor")]
+    public async Task<ActionResult<CreditApplicationDto>> SaveStep0(Guid id, CreditStudyStep0Dto dto, CancellationToken cancellationToken)
+    {
+        var entity = await db.SolicitudesCredito
+            .Include(x => x.Cliente)
+            .Include(x => x.Producto)
+            .Include(x => x.PerfilRequisito)
+            .Include(x => x.Documentos)
+            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
+            ?? throw new KeyNotFoundException("Solicitud de credito no encontrada.");
+
+        entity.RuntConsultado = dto.RuntChecked;
+        entity.SimitConsultado = dto.SimitChecked;
+        entity.IdentidadValidada = dto.IdentityValidated;
+        entity.ObservacionPaso0 = Normalize(dto.Notes);
+        entity.UsuarioPaso0 = tenantContext.UsuarioActual;
+        entity.FechaRevisionPaso0 = ColombiaTime.Now;
+
+        await db.SaveChangesAsync(cancellationToken);
+        return Ok(ToDto(entity));
+    }
+
+    [HttpPost("{id:guid}/study/recalculation")]
+    [Authorize(Roles = "Administrador,Supervisor")]
+    public async Task<ActionResult<CreditApplicationDto>> SaveRecalculation(Guid id, CreditStudyRecalculationDto dto, CancellationToken cancellationToken)
+    {
+        if (dto.ApprovedAmount <= 0) throw new ValidationException("El valor aprobado debe ser mayor a cero.");
+        if (dto.ApprovedDownPayment < 0) throw new ValidationException("La cuota inicial aprobada no puede ser negativa.");
+        if (dto.ApprovedTermMonths <= 0) throw new ValidationException("El plazo aprobado debe ser mayor a cero.");
+        if (dto.ApprovedMonthlyPayment <= 0) throw new ValidationException("La cuota aprobada debe ser mayor a cero.");
+
+        var entity = await db.SolicitudesCredito
+            .Include(x => x.Cliente)
+            .Include(x => x.Producto)
+            .Include(x => x.PerfilRequisito)
+            .Include(x => x.Documentos)
+            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
+            ?? throw new KeyNotFoundException("Solicitud de credito no encontrada.");
+
+        entity.ValorAprobadoAnalista = dto.ApprovedAmount;
+        entity.CuotaInicialAprobada = dto.ApprovedDownPayment;
+        entity.PlazoAprobadoMeses = dto.ApprovedTermMonths;
+        entity.CuotaMensualAprobada = dto.ApprovedMonthlyPayment;
+        entity.ObservacionDecision = string.IsNullOrWhiteSpace(dto.Notes) ? entity.ObservacionDecision : dto.Notes.Trim();
+        entity.UsuarioDecision = tenantContext.UsuarioActual;
+
         await db.SaveChangesAsync(cancellationToken);
         return Ok(ToDto(entity));
     }
@@ -480,6 +538,11 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             throw new ValidationException("Para enviar a estudio todos los documentos deben estar recibidos o validados.");
         }
 
+        if (status == EstadoSolicitudCredito.EnEstudio && (!entity.RuntConsultado || !entity.SimitConsultado || !entity.IdentidadValidada))
+        {
+            throw new ValidationException("Antes de enviar a estudio debe completar paso 0: RUNT, SIMIT e identidad validada.");
+        }
+
         if (status == EstadoSolicitudCredito.Aprobada && entity.Estado != EstadoSolicitudCredito.EnEstudio)
         {
             throw new ValidationException("Solo se puede aprobar una solicitud que este en estudio.");
@@ -493,6 +556,39 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         if (status == EstadoSolicitudCredito.Desistida && entity.Estado == EstadoSolicitudCredito.Desembolsada)
         {
             throw new ValidationException("No se puede desistir una solicitud ya entregada.");
+        }
+    }
+
+    private static void ApplyFormalStudy(SolicitudCredito entity, CreditApplicationDecisionDto dto)
+    {
+        var result = Normalize(dto.Result);
+        if (dto.Status == EstadoSolicitudCredito.Aprobada)
+        {
+            if (dto.RequiresCoDebtor && string.IsNullOrWhiteSpace(entity.CodeudorNombre))
+            {
+                throw new ValidationException("Para aprobar con codeudor debe registrar los datos del codeudor.");
+            }
+
+            entity.ResultadoEstudio = dto.RequiresCoDebtor ? "Aprobado con codeudor" : "Aprobado";
+            if (!string.IsNullOrWhiteSpace(result) && result.Contains("ajuste", StringComparison.OrdinalIgnoreCase))
+            {
+                entity.ResultadoEstudio = dto.RequiresCoDebtor ? "Aprobado con ajuste y codeudor" : "Aprobado con ajuste";
+            }
+
+            entity.ValorAprobadoAnalista = dto.ApprovedAmount ?? entity.ValorAprobadoAnalista ?? entity.ValorMoto;
+            entity.CuotaInicialAprobada = dto.ApprovedDownPayment ?? entity.CuotaInicialAprobada ?? entity.CuotaInicial;
+            entity.PlazoAprobadoMeses = dto.ApprovedTermMonths ?? entity.PlazoAprobadoMeses ?? entity.PlazoMeses;
+            entity.CuotaMensualAprobada = dto.ApprovedMonthlyPayment ?? entity.CuotaMensualAprobada;
+            entity.RequiereCodeudorParaAprobar = dto.RequiresCoDebtor;
+            entity.CondicionesFinales = Normalize(dto.FinalConditions);
+            return;
+        }
+
+        if (dto.Status == EstadoSolicitudCredito.Rechazada)
+        {
+            entity.ResultadoEstudio = string.IsNullOrWhiteSpace(result) ? "Negado" : result;
+            entity.CondicionesFinales = Normalize(dto.FinalConditions);
+            entity.RequiereCodeudorParaAprobar = false;
         }
     }
 
@@ -628,6 +724,19 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             x.Observaciones,
             x.FechaEnvio,
             x.FechaInicioEstudio,
+            x.FechaRevisionPaso0,
+            x.RuntConsultado,
+            x.SimitConsultado,
+            x.IdentidadValidada,
+            x.UsuarioPaso0,
+            x.ObservacionPaso0,
+            x.ValorAprobadoAnalista,
+            x.CuotaInicialAprobada,
+            x.PlazoAprobadoMeses,
+            x.CuotaMensualAprobada,
+            x.RequiereCodeudorParaAprobar,
+            x.CondicionesFinales,
+            x.ResultadoEstudio,
             x.FechaAprobacion,
             x.FechaRechazo,
             x.FechaDesembolso,
