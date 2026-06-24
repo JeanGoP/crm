@@ -3,7 +3,7 @@ import { Navigate, NavLink, Route, Routes, useNavigate, useParams } from 'react-
 import {
   Alert, AppBar, Box, Button, Card, CardContent, Checkbox, Chip, CssBaseline, Dialog, DialogActions,
   DialogContent, DialogTitle, Divider, Drawer, Grid, IconButton, LinearProgress, MenuItem,
-  FormControlLabel, Paper, Snackbar, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, InputAdornment,
+  FormControlLabel, Paper, Snackbar, Stack, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tabs, TextField, InputAdornment,
   ThemeProvider, Toolbar, Tooltip, Typography, createTheme, useMediaQuery, useTheme
 } from '@mui/material';
 import DashboardIcon from '@mui/icons-material/Dashboard';
@@ -966,9 +966,11 @@ function CreditApplicationsPage() {
   const { data: deals = [] } = useResource<Deal[]>('/api/pipeline/deals', []);
   const { data: requirementProfiles = [] } = useResource<RequirementProfile[]>('/api/requirement-profiles', []);
   const [form, setForm] = useState<FormMode<CreditApplication>>({ open: false });
+  const [management, setManagement] = useState<CreditApplication>();
   const [analysis, setAnalysis] = useState<CustomerAiAnalysis>();
   const [analysisPhone, setAnalysisPhone] = useState<string>();
   const [notice, setNotice] = useState<Notice>();
+  const managementApplication = management ? rows.find((x) => x.id === management.id) ?? management : undefined;
 
   const save = async (payload: typeof emptyCreditApplication) => {
     const body = {
@@ -1137,7 +1139,7 @@ function CreditApplicationsPage() {
     <Header title="Solicitudes de credito" action="Nueva solicitud" onAction={() => setForm({ open: true })} onRefresh={reload} />
     <StatusBar loading={loading} error={error} />
     <EntityTable
-      headers={['Solicitud', 'Cliente', 'Credito', 'Estado', 'Gestion']}
+      headers={['Solicitud', 'Cliente', 'Credito', 'Estado', 'Pendientes', 'Acciones']}
       empty="No hay solicitudes de credito"
       rows={rows.map((r) => [
         <Row primary={r.number} secondary={r.requirementProfileName || 'Sin perfil'} />,
@@ -1151,29 +1153,56 @@ function CreditApplicationsPage() {
           <Typography variant="caption" color="text.secondary">{r.coDebtorName ? `Codeudor: ${r.coDebtorName}` : 'Sin codeudor'} · {[r.reference1Name, r.reference2Name].filter(Boolean).length || 0} ref.</Typography>
         </Stack>,
         <StatusChip label={creditStatus(r.status)} tone={creditTone(r.status)} />,
-        <CreditApplicationManagement
-          application={r}
-          onUpdateDocument={updateDocument}
-          onUploadDocument={uploadDocument}
-          onDownloadDocument={downloadDocument}
-          onStep0={saveStep0}
-          onRecalculate={saveRecalculation}
-          onDecision={decide}
-          onDownloadTemplate={downloadTemplate}
-          onAnalyze={() => analyzeCustomer(r.customerId, r.mobile)}
-          onEdit={() => setForm({ open: true, item: r })}
-          onChangeStatus={(status) => changeStatus(r, status)}
-        />
+        <CreditApplicationPendingSummary application={r} />,
+        <Stack direction="row" gap={1} alignItems="center" flexWrap="wrap" useFlexGap>
+          <Button size="small" variant="contained" onClick={() => setManagement(r)}>Gestionar</Button>
+          <Actions onAi={() => analyzeCustomer(r.customerId, r.mobile)} onEdit={() => setForm({ open: true, item: r })} />
+        </Stack>
       ])}
     />
     <CreditApplicationDialog form={form} customers={customers} products={products.filter((x) => x.active)} quotes={quotes} deals={deals} requirementProfiles={requirementProfiles.filter((x) => x.active)} onClose={() => setForm({ open: false })} onSave={save} />
+    <CreditApplicationManagementDialog
+      application={managementApplication}
+      onClose={() => setManagement(undefined)}
+      onUpdateDocument={updateDocument}
+      onUploadDocument={uploadDocument}
+      onDownloadDocument={downloadDocument}
+      onStep0={saveStep0}
+      onRecalculate={saveRecalculation}
+      onDecision={decide}
+      onDownloadTemplate={downloadTemplate}
+      onAnalyze={(application) => analyzeCustomer(application.customerId, application.mobile)}
+      onEdit={(application) => setForm({ open: true, item: application })}
+      onChangeStatus={(application, status) => changeStatus(application, status)}
+    />
     <AiAnalysisDialog analysis={analysis} phone={analysisPhone} onClose={() => { setAnalysis(undefined); setAnalysisPhone(undefined); }} />
     <Notice notice={notice} onClose={() => setNotice(undefined)} />
   </Stack>;
 }
 
-function CreditApplicationManagement({
+function CreditApplicationPendingSummary({ application }: { application: CreditApplication }) {
+  const validDocuments = application.documents.filter((x) => x.status === 3).length;
+  const pendingDocuments = application.documents.filter((x) => x.status === 1 || x.status === 4 || x.isExpired).length;
+  const step0Ready = application.runtChecked && application.simitChecked && application.identityValidated;
+  const items = [
+    pendingDocuments > 0 ? `${pendingDocuments} doc. pendientes` : 'Docs ok',
+    step0Ready ? 'Paso 0 listo' : 'Paso 0 pendiente',
+    application.studyResult || (application.status === 4 ? 'En estudio' : undefined),
+    application.status === 5 && 'Aprobada',
+    application.status === 6 && 'Negada'
+  ].filter(Boolean);
+
+  return <Stack direction="row" gap={.5} flexWrap="wrap" useFlexGap>
+    <Chip size="small" color={pendingDocuments ? 'warning' : 'success'} label={`${validDocuments}/${application.documents.length} docs`} />
+    <Chip size="small" color={step0Ready ? 'success' : 'warning'} variant={step0Ready ? 'filled' : 'outlined'} label={step0Ready ? 'Paso 0 listo' : 'Paso 0 pendiente'} />
+    {application.studyResult && <Chip size="small" label={application.studyResult} variant="outlined" color={application.status === 6 ? 'error' : application.status === 5 ? 'success' : 'default'} />}
+    {!application.studyResult && items.length === 0 && <Chip size="small" variant="outlined" label="Sin pendientes" />}
+  </Stack>;
+}
+
+function CreditApplicationManagementDialog({
   application,
+  onClose,
   onUpdateDocument,
   onUploadDocument,
   onDownloadDocument,
@@ -1185,7 +1214,8 @@ function CreditApplicationManagement({
   onEdit,
   onChangeStatus
 }: {
-  application: CreditApplication;
+  application?: CreditApplication;
+  onClose: () => void;
   onUpdateDocument: (application: CreditApplication, document: CreditDocument, status: number, patch?: Partial<Pick<CreditDocument, 'expiresAt' | 'notes' | 'rejectionReason'>>) => Promise<void>;
   onUploadDocument: (application: CreditApplication, document: CreditDocument, file: File) => Promise<void>;
   onDownloadDocument: (application: CreditApplication, document: CreditDocument) => Promise<void>;
@@ -1193,45 +1223,72 @@ function CreditApplicationManagement({
   onRecalculate: (application: CreditApplication, patch: Partial<CreditApplication>) => Promise<void>;
   onDecision: (application: CreditApplication, status: number, notes?: string, study?: Partial<CreditApplication> & { result?: string }) => Promise<void>;
   onDownloadTemplate: (application: CreditApplication, template: CreditTemplate) => Promise<void>;
-  onAnalyze: () => void;
-  onEdit: () => void;
-  onChangeStatus: (status: number) => void;
+  onAnalyze: (application: CreditApplication) => void;
+  onEdit: (application: CreditApplication) => void;
+  onChangeStatus: (application: CreditApplication, status: number) => void;
 }) {
-  const validDocuments = application.documents.filter((x) => x.status === 3).length;
-  const pendingDocuments = application.documents.filter((x) => x.status === 1 || x.status === 4 || x.isExpired).length;
+  const [tab, setTab] = useState(0);
+  useEffect(() => { if (application) setTab(0); }, [application?.id]);
 
-  return <Stack spacing={1} sx={{ minWidth: 0 }}>
-    <Paper variant="outlined" sx={{ p: 1.25, bgcolor: '#fbfdff' }}>
-      <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }} gap={1} sx={{ mb: 1 }}>
-        <Typography variant="subtitle2" fontWeight={900}>Documentos</Typography>
-        <Stack direction="row" gap={.5} flexWrap="wrap">
-          <Chip size="small" color={pendingDocuments ? 'warning' : 'success'} label={`${validDocuments}/${application.documents.length} validados`} />
-          {pendingDocuments > 0 && <Chip size="small" variant="outlined" color="warning" label={`${pendingDocuments} pendientes`} />}
-        </Stack>
+  if (!application) return null;
+
+  return <Dialog open={!!application} onClose={onClose} fullWidth maxWidth="lg">
+    <DialogTitle>
+      <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" gap={1.5} alignItems={{ xs: 'flex-start', sm: 'center' }}>
+        <Box>
+          <Typography variant="h6" fontWeight={900}>Gestionar solicitud</Typography>
+          <Typography variant="body2" color="text.secondary">{application.number} · {application.customerName} · {application.productName}</Typography>
+        </Box>
+        <StatusChip label={creditStatus(application.status)} tone={creditTone(application.status)} />
       </Stack>
-      <DocumentSummary application={application} onUpdate={onUpdateDocument} onUpload={onUploadDocument} onDownload={onDownloadDocument} />
-    </Paper>
-
-    <Paper variant="outlined" sx={{ p: 1.25, bgcolor: '#fff' }}>
-      <Typography variant="subtitle2" fontWeight={900} sx={{ mb: 1 }}>Estudio y aprobacion</Typography>
-      <CreditStudySummary application={application} onStep0={onStep0} onRecalculate={onRecalculate} onDecision={onDecision} />
-    </Paper>
-
-    <Paper variant="outlined" sx={{ p: 1.25, bgcolor: '#fff' }}>
-      <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', md: 'center' }} gap={1.25}>
-        <Stack spacing={.5}>
-          <Typography variant="subtitle2" fontWeight={900}>Plantillas</Typography>
+    </DialogTitle>
+    <DialogContent dividers sx={{ p: 0 }}>
+      <Tabs value={tab} onChange={(_, value) => setTab(value)} variant="scrollable" scrollButtons="auto" sx={{ px: 2, borderBottom: '1px solid #e2e8f0' }}>
+        <Tab label="Documentos" />
+        <Tab label="Estudio" />
+        <Tab label="Plantillas" />
+        <Tab label="Acciones" />
+      </Tabs>
+      <Box sx={{ p: 2.5 }}>
+        {tab === 0 && <Stack spacing={2}>
+          <Stack direction="row" gap={.75} flexWrap="wrap" useFlexGap>
+            <CreditApplicationPendingSummary application={application} />
+          </Stack>
+          <DocumentSummary application={application} onUpdate={onUpdateDocument} onUpload={onUploadDocument} onDownload={onDownloadDocument} />
+        </Stack>}
+        {tab === 1 && <CreditStudySummary application={application} onStep0={onStep0} onRecalculate={onRecalculate} onDecision={onDecision} />}
+        {tab === 2 && <Stack spacing={2}>
+          <Typography variant="subtitle2" fontWeight={900}>Descargar documentos</Typography>
           <CreditTemplateDownloads application={application} onDownload={onDownloadTemplate} />
+        </Stack>}
+        {tab === 3 && <Stack spacing={2}>
+          <FieldGrid>
+            <TextField select size="small" label="Estado" value={application.status} onChange={(e) => onChangeStatus(application, Number(e.target.value))}>
+              {creditStatusOptions.map((x) => <MenuItem key={x} value={x}>{creditStatus(x)}</MenuItem>)}
+            </TextField>
+            <Box>
+              <Typography variant="subtitle2" fontWeight={900} sx={{ mb: .75 }}>Acciones rapidas</Typography>
+              <Stack direction="row" gap={1} flexWrap="wrap" useFlexGap>
+                <Button variant="outlined" startIcon={<AutoAwesome />} onClick={() => onAnalyze(application)}>Analizar IA</Button>
+                <Button variant="outlined" startIcon={<Edit />} onClick={() => onEdit(application)}>Editar solicitud</Button>
+              </Stack>
+            </Box>
+          </FieldGrid>
+          <Paper variant="outlined" sx={{ p: 1.5 }}>
+            <Typography variant="subtitle2" fontWeight={900}>Resumen</Typography>
+            <InfoLine label="Ingresos" value={money(application.monthlyIncome)} />
+            <InfoLine label="Cuota inicial" value={money(application.downPayment)} />
+            <InfoLine label="Codeudor" value={application.coDebtorName || 'Sin codeudor'} />
+            <InfoLine label="Referencias" value={[application.reference1Name, application.reference2Name].filter(Boolean).join(', ') || 'Sin referencias'} />
+          </Paper>
         </Stack>
-        <Stack direction="row" gap={1} alignItems="center" flexWrap="wrap" useFlexGap>
-          <Actions onAi={onAnalyze} onEdit={onEdit} />
-          <TextField select size="small" label="Estado" value={application.status} onChange={(e) => onChangeStatus(Number(e.target.value))} sx={{ minWidth: 180 }}>
-            {creditStatusOptions.map((x) => <MenuItem key={x} value={x}>{creditStatus(x)}</MenuItem>)}
-          </TextField>
-        </Stack>
-      </Stack>
-    </Paper>
-  </Stack>;
+        }
+      </Box>
+    </DialogContent>
+    <DialogActions>
+      <Button onClick={onClose}>Cerrar</Button>
+    </DialogActions>
+  </Dialog>;
 }
 
 function CreditStudySummary({ application, onStep0, onRecalculate, onDecision }: {
@@ -3894,6 +3951,7 @@ function ReportTable({ headers, rows, empty }: { headers: string[]; rows: ReactN
 }
 
 function tableMinWidth(headers: string[]) {
+  if (headers.includes('Pendientes')) return 1120;
   if (headers.includes('Gestion')) return 1180;
   return headers.includes('Plantillas') ? 1760 : 760;
 }
@@ -3908,6 +3966,7 @@ function tableColumnSx(header: string) {
     Producto: 220,
     Ciudad: 150,
     Estado: 150,
+    Pendientes: 250,
     Gestion: 560,
     Ingresos: 130,
     Codeudor: 170,
@@ -3915,7 +3974,7 @@ function tableColumnSx(header: string) {
     Documentos: 410,
     Aprobacion: 220,
     Plantillas: 170,
-    Acciones: 230
+    Acciones: 220
   };
   return {
     width: widths[header] ?? 180,
