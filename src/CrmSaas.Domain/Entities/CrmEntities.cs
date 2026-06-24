@@ -383,6 +383,12 @@ public sealed class EntregaMoto : AuditableTenantEntity
     public bool MatriculaEntregada { get; set; }
     public bool ManualGarantiaEntregado { get; set; }
     public bool ActaEntregaFirmada { get; set; }
+    public bool ChecklistPreEntregaCompletado { get; set; }
+    public string? ProtocoloEntrega { get; set; }
+    public string? FotoEntregaDataUrl { get; set; }
+    public string? FotoEntregaNombre { get; set; }
+    public DateTime? PrimeraRevisionProgramadaEn { get; set; }
+    public Guid? ActividadPrimeraRevisionId { get; set; }
     public EstadoEntregaMoto Estado { get; set; } = EstadoEntregaMoto.Programada;
     public string? Observaciones { get; set; }
 }

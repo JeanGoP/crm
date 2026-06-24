@@ -195,8 +195,11 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
         modelBuilder.Entity<EntregaMoto>().Property(x => x.NumeroChasis).HasMaxLength(80);
         modelBuilder.Entity<EntregaMoto>().Property(x => x.NumeroMotor).HasMaxLength(80);
         modelBuilder.Entity<EntregaMoto>().Property(x => x.Placa).HasMaxLength(20);
+        modelBuilder.Entity<EntregaMoto>().Property(x => x.ProtocoloEntrega).HasMaxLength(800);
+        modelBuilder.Entity<EntregaMoto>().Property(x => x.FotoEntregaNombre).HasMaxLength(180);
         modelBuilder.Entity<EntregaMoto>().HasIndex(x => new { x.EmpresaId, x.Numero }).IsUnique();
         modelBuilder.Entity<EntregaMoto>().HasIndex(x => new { x.EmpresaId, x.SolicitudCreditoId }).IsUnique();
+        modelBuilder.Entity<EntregaMoto>().HasIndex(x => new { x.EmpresaId, x.PrimeraRevisionProgramadaEn });
         modelBuilder.Entity<EntregaMoto>().HasOne(x => x.SolicitudCredito).WithMany().HasForeignKey(x => x.SolicitudCreditoId).OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<EntregaMoto>().HasOne(x => x.Cliente).WithMany().HasForeignKey(x => x.ClienteId).OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<EntregaMoto>().HasOne(x => x.Producto).WithMany().HasForeignKey(x => x.ProductoId).OnDelete(DeleteBehavior.Restrict);

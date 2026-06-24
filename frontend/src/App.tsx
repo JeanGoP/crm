@@ -45,6 +45,7 @@ const runtUrl = 'https://portalpublico.runt.gov.co/#/consulta-ciudadano-document
 const companyLogoWidth = 320;
 const companyLogoHeight = 160;
 const companyLogoMaxBytes = 1_000_000;
+const deliveryPhotoMaxBytes = 1_000_000;
 
 const theme = createTheme({
   palette: {
@@ -135,6 +136,11 @@ const emptyMotorcycleDelivery = {
   registrationDelivered: false,
   warrantyManualDelivered: false,
   deliveryCertificateSigned: false,
+  preDeliveryChecklistCompleted: false,
+  deliveryProtocol: '',
+  deliveryPhotoDataUrl: '',
+  deliveryPhotoFileName: '',
+  firstServiceScheduledAt: '',
   status: 1,
   notes: ''
 };
@@ -1392,6 +1398,10 @@ function MotorcycleDeliveriesPage() {
       engineNumber: payload.engineNumber || null,
       plate: payload.plate || null,
       deliveryMileage: payload.deliveryMileage === '' ? null : Number(payload.deliveryMileage),
+      deliveryProtocol: payload.deliveryProtocol || null,
+      deliveryPhotoDataUrl: payload.deliveryPhotoDataUrl || null,
+      deliveryPhotoFileName: payload.deliveryPhotoFileName || null,
+      firstServiceScheduledAt: payload.firstServiceScheduledAt ? new Date(payload.firstServiceScheduledAt).toISOString() : null,
       status: Number(payload.status),
       notes: payload.notes || null
     };
@@ -1407,7 +1417,7 @@ function MotorcycleDeliveriesPage() {
     <Header title="Entregas de motos" action="Nueva entrega" onAction={() => setForm({ open: true })} onRefresh={reload} />
     <StatusBar loading={loading} error={error} />
     <EntityTable
-      headers={['Numero', 'Cliente', 'Producto', 'Estado', 'Fecha', 'Tecnicos', 'Documentos', 'Acciones']}
+      headers={['Numero', 'Cliente', 'Producto', 'Estado', 'Fecha', 'Tecnicos', 'Protocolo', 'Acciones']}
       empty="No hay entregas registradas"
       rows={rows.map((r) => [
         r.number,
@@ -1420,7 +1430,10 @@ function MotorcycleDeliveriesPage() {
           <Typography variant="body2">Motor: {r.engineNumber || '-'}</Typography>
           <Typography variant="body2">Placa: {r.plate || '-'}</Typography>
         </Stack>,
-        <DeliveryChecklist delivery={r} />,
+        <Stack spacing={1}>
+          <DeliveryChecklist delivery={r} />
+          <Row primary={r.deliveryPhotoDataUrl ? 'Foto registrada' : 'Sin foto'} secondary={r.firstServiceScheduledAt ? `Revision: ${new Date(r.firstServiceScheduledAt).toLocaleString()}` : 'Revision pendiente'} />
+        </Stack>,
         <Actions onEdit={() => setForm({ open: true, item: r })} />
       ])}
     />
@@ -1435,10 +1448,55 @@ function DeliveryChecklist({ delivery }: { delivery: MotorcycleDelivery }) {
     ['SOAT', delivery.soatDelivered],
     ['Matricula', delivery.registrationDelivered],
     ['Garantia', delivery.warrantyManualDelivered],
-    ['Acta', delivery.deliveryCertificateSigned]
+    ['Acta', delivery.deliveryCertificateSigned],
+    ['Checklist', delivery.preDeliveryChecklistCompleted],
+    ['Foto', !!delivery.deliveryPhotoDataUrl]
   ];
   return <Stack direction="row" gap={.5} flexWrap="wrap">
     {items.map(([label, ok]) => <Chip key={String(label)} size="small" label={label} color={ok ? 'success' : undefined} variant={ok ? 'filled' : 'outlined'} />)}
+  </Stack>;
+}
+
+function DeliveryPhotoPicker({ value, fileName, onChange }: { value?: string; fileName?: string; onChange: (value: string, fileName: string) => void }) {
+  const [error, setError] = useState('');
+  const handlePhoto = async (file?: File) => {
+    if (!file) return;
+    try {
+      setError('');
+      onChange(await normalizeDeliveryPhoto(file), file.name);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo procesar la foto.');
+    }
+  };
+
+  return <Stack spacing={1}>
+    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ xs: 'stretch', sm: 'center' }}>
+      <Box sx={{
+        width: 150,
+        height: 96,
+        border: '1px dashed',
+        borderColor: 'divider',
+        borderRadius: 1,
+        bgcolor: 'background.default',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden'
+      }}>
+        {value ? <Box component="img" src={value} alt="Foto de entrega" sx={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Typography color="text.secondary" fontSize={13}>Foto entrega</Typography>}
+      </Box>
+      <Stack spacing={1} sx={{ minWidth: 0 }}>
+        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+          <Button variant="outlined" component="label" startIcon={<UploadFile />}>
+            Adjuntar foto
+            <input hidden type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => void handlePhoto(e.target.files?.[0])} />
+          </Button>
+          {value && <Button color="inherit" onClick={() => onChange('', '')}>Quitar</Button>}
+        </Stack>
+        <Typography variant="caption" color="text.secondary">{fileName || 'PNG, JPG o WebP hasta 1 MB.'}</Typography>
+      </Stack>
+    </Stack>
+    {error && <Alert severity="error">{error}</Alert>}
   </Stack>;
 }
 
@@ -1457,6 +1515,11 @@ function MotorcycleDeliveryDialog({ form, applications, onClose, onSave }: Dialo
     registrationDelivered: form.item.registrationDelivered,
     warrantyManualDelivered: form.item.warrantyManualDelivered,
     deliveryCertificateSigned: form.item.deliveryCertificateSigned,
+    preDeliveryChecklistCompleted: form.item.preDeliveryChecklistCompleted,
+    deliveryProtocol: form.item.deliveryProtocol ?? '',
+    deliveryPhotoDataUrl: form.item.deliveryPhotoDataUrl ?? '',
+    deliveryPhotoFileName: form.item.deliveryPhotoFileName ?? '',
+    firstServiceScheduledAt: form.item.firstServiceScheduledAt ? toInputDateTime(form.item.firstServiceScheduledAt) : '',
     status: form.item.status,
     notes: form.item.notes ?? ''
   } : { ...emptyMotorcycleDelivery, creditApplicationId: applications[0]?.id ?? '' };
@@ -1478,13 +1541,25 @@ function MotorcycleDeliveryDialog({ form, applications, onClose, onSave }: Dialo
       <TextField select label="Estado" value={v.status} onChange={(e) => set({ status: Number(e.target.value) })} fullWidth>
         {[1, 2, 3].map((x) => <MenuItem key={x} value={x}>{deliveryStatus(x)}</MenuItem>)}
       </TextField>
+      <Divider />
+      <Typography variant="subtitle2" fontWeight={900} color="primary">Protocolo digital y evidencia</Typography>
+      <TextField label="Protocolo por marca" value={v.deliveryProtocol} onChange={(e) => set({ deliveryProtocol: e.target.value })} fullWidth multiline minRows={2} helperText="Si se deja vacio, el sistema aplica un protocolo base segun la marca del producto." />
+      <DeliveryPhotoPicker
+        value={v.deliveryPhotoDataUrl}
+        fileName={v.deliveryPhotoFileName}
+        onChange={(deliveryPhotoDataUrl, deliveryPhotoFileName) => set({ deliveryPhotoDataUrl, deliveryPhotoFileName })}
+      />
+      <Divider />
+      <Typography variant="subtitle2" fontWeight={900} color="primary">Checklist obligatorio</Typography>
       <Grid container spacing={1}>
         <Grid item xs={12} sm={6}><FormControlLabel control={<Checkbox checked={v.helmetDelivered} onChange={(e) => set({ helmetDelivered: e.target.checked })} />} label="Casco entregado" /></Grid>
         <Grid item xs={12} sm={6}><FormControlLabel control={<Checkbox checked={v.soatDelivered} onChange={(e) => set({ soatDelivered: e.target.checked })} />} label="SOAT entregado" /></Grid>
         <Grid item xs={12} sm={6}><FormControlLabel control={<Checkbox checked={v.registrationDelivered} onChange={(e) => set({ registrationDelivered: e.target.checked })} />} label="Matricula entregada" /></Grid>
         <Grid item xs={12} sm={6}><FormControlLabel control={<Checkbox checked={v.warrantyManualDelivered} onChange={(e) => set({ warrantyManualDelivered: e.target.checked })} />} label="Manual/garantia" /></Grid>
         <Grid item xs={12}><FormControlLabel control={<Checkbox checked={v.deliveryCertificateSigned} onChange={(e) => set({ deliveryCertificateSigned: e.target.checked })} />} label="Acta de entrega firmada" /></Grid>
+        <Grid item xs={12}><FormControlLabel control={<Checkbox checked={v.preDeliveryChecklistCompleted} onChange={(e) => set({ preDeliveryChecklistCompleted: e.target.checked })} />} label="Checklist preentrega completado" /></Grid>
       </Grid>
+      <TextField type="datetime-local" label="Primera revision" value={v.firstServiceScheduledAt} onChange={(e) => set({ firstServiceScheduledAt: e.target.value })} fullWidth InputLabelProps={{ shrink: true }} helperText="Si queda vacia y la entrega se marca como entregada, se agenda automaticamente a 30 dias." />
       <TextField label="Observaciones" value={v.notes} onChange={(e) => set({ notes: e.target.value })} fullWidth multiline minRows={2} />
     </>}
   </FormDialog>;
@@ -3832,6 +3907,25 @@ async function normalizeCompanyLogo(file: File) {
   const y = Math.round((companyLogoHeight - height) / 2);
   context.drawImage(image, x, y, width, height);
   return canvas.toDataURL('image/png');
+}
+async function normalizeDeliveryPhoto(file: File) {
+  if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+    throw new Error('La foto debe estar en formato PNG, JPG o WebP.');
+  }
+  if (file.size > deliveryPhotoMaxBytes) {
+    throw new Error('La foto no puede superar 1 MB.');
+  }
+
+  const image = await loadImage(await readFileAsDataUrl(file));
+  const canvas = document.createElement('canvas');
+  const maxSide = 1280;
+  const scale = Math.min(1, maxSide / Math.max(image.width, image.height));
+  canvas.width = Math.max(1, Math.round(image.width * scale));
+  canvas.height = Math.max(1, Math.round(image.height * scale));
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('No se pudo preparar la foto.');
+  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL('image/jpeg', 0.82);
 }
 function IdentificationLookupAdornment({ identification, inline = false }: { identification?: string; inline?: boolean }) {
   const digits = identificationDigits(identification);

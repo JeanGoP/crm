@@ -468,6 +468,12 @@ public sealed record MotorcycleDeliveryDto(
     bool RegistrationDelivered,
     bool WarrantyManualDelivered,
     bool DeliveryCertificateSigned,
+    bool PreDeliveryChecklistCompleted,
+    string? DeliveryProtocol,
+    string? DeliveryPhotoDataUrl,
+    string? DeliveryPhotoFileName,
+    DateTime? FirstServiceScheduledAt,
+    Guid? FirstServiceActivityId,
     EstadoEntregaMoto Status,
     string? Notes);
 
@@ -485,6 +491,11 @@ public sealed record UpsertMotorcycleDeliveryDto(
     bool RegistrationDelivered,
     bool WarrantyManualDelivered,
     bool DeliveryCertificateSigned,
+    bool PreDeliveryChecklistCompleted,
+    string? DeliveryProtocol,
+    string? DeliveryPhotoDataUrl,
+    string? DeliveryPhotoFileName,
+    DateTime? FirstServiceScheduledAt,
     EstadoEntregaMoto Status,
     string? Notes);
 

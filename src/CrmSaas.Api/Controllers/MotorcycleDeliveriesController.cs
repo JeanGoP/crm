@@ -15,6 +15,9 @@ namespace CrmSaas.Api.Controllers;
 [Route("api/motorcycle-deliveries")]
 public sealed class MotorcycleDeliveriesController(CrmDbContext db) : ControllerBase
 {
+    private const int MaxDeliveryPhotoDataUrlLength = 1_500_000;
+    private static readonly string[] AllowedDeliveryPhotoPrefixes = ["data:image/png;base64,", "data:image/jpeg;base64,", "data:image/webp;base64,"];
+
     [HttpGet]
     public async Task<ActionResult<IReadOnlyCollection<MotorcycleDeliveryDto>>> Get(CancellationToken cancellationToken)
     {
@@ -63,11 +66,17 @@ public sealed class MotorcycleDeliveriesController(CrmDbContext db) : Controller
             MatriculaEntregada = dto.RegistrationDelivered,
             ManualGarantiaEntregado = dto.WarrantyManualDelivered,
             ActaEntregaFirmada = dto.DeliveryCertificateSigned,
+            ChecklistPreEntregaCompletado = dto.PreDeliveryChecklistCompleted,
+            ProtocoloEntrega = Normalize(dto.DeliveryProtocol) ?? BuildDefaultProtocol(application.Producto),
+            FotoEntregaDataUrl = NormalizeDeliveryPhoto(dto.DeliveryPhotoDataUrl),
+            FotoEntregaNombre = Normalize(dto.DeliveryPhotoFileName),
+            PrimeraRevisionProgramadaEn = ResolveFirstServiceDate(dto.FirstServiceScheduledAt, dto.DeliveryDate, dto.Status),
             Estado = dto.Status,
             Observaciones = Normalize(dto.Notes)
         };
 
         ApplyDeliveryStatus(application, entity.Estado);
+        ScheduleFirstService(entity, application);
         db.EntregasMoto.Add(entity);
         await db.SaveChangesAsync(cancellationToken);
 
@@ -108,10 +117,16 @@ public sealed class MotorcycleDeliveriesController(CrmDbContext db) : Controller
         entity.MatriculaEntregada = dto.RegistrationDelivered;
         entity.ManualGarantiaEntregado = dto.WarrantyManualDelivered;
         entity.ActaEntregaFirmada = dto.DeliveryCertificateSigned;
+        entity.ChecklistPreEntregaCompletado = dto.PreDeliveryChecklistCompleted;
+        entity.ProtocoloEntrega = Normalize(dto.DeliveryProtocol) ?? BuildDefaultProtocol(entity.Producto);
+        entity.FotoEntregaDataUrl = NormalizeDeliveryPhoto(dto.DeliveryPhotoDataUrl);
+        entity.FotoEntregaNombre = Normalize(dto.DeliveryPhotoFileName);
+        entity.PrimeraRevisionProgramadaEn = ResolveFirstServiceDate(dto.FirstServiceScheduledAt, dto.DeliveryDate, dto.Status);
         entity.Estado = dto.Status;
         entity.Observaciones = Normalize(dto.Notes);
 
         ApplyDeliveryStatus(application, entity.Estado);
+        ScheduleFirstService(entity, application);
         await db.SaveChangesAsync(cancellationToken);
         return Ok(ToDto(entity));
     }
@@ -125,7 +140,11 @@ public sealed class MotorcycleDeliveriesController(CrmDbContext db) : Controller
             if (string.IsNullOrWhiteSpace(dto.ChassisNumber)) throw new ValidationException("El numero de chasis es obligatorio para entregar.");
             if (string.IsNullOrWhiteSpace(dto.EngineNumber)) throw new ValidationException("El numero de motor es obligatorio para entregar.");
             if (!dto.DeliveryCertificateSigned) throw new ValidationException("Para entregar debe estar firmada el acta de entrega.");
+            if (!dto.PreDeliveryChecklistCompleted) throw new ValidationException("Para entregar debe completarse el checklist obligatorio.");
+            if (string.IsNullOrWhiteSpace(dto.DeliveryPhotoDataUrl)) throw new ValidationException("Para entregar debe adjuntarse una foto de entrega.");
         }
+
+        NormalizeDeliveryPhoto(dto.DeliveryPhotoDataUrl);
     }
 
     private static void EnsureCanDeliver(SolicitudCredito application)
@@ -143,6 +162,47 @@ public sealed class MotorcycleDeliveriesController(CrmDbContext db) : Controller
             application.Estado = EstadoSolicitudCredito.Desembolsada;
             application.FechaDesembolso ??= ColombiaTime.Now;
         }
+    }
+
+    private void ScheduleFirstService(EntregaMoto delivery, SolicitudCredito application)
+    {
+        if (delivery.Estado != EstadoEntregaMoto.Entregada || delivery.PrimeraRevisionProgramadaEn is null)
+        {
+            return;
+        }
+
+        var productName = application.Producto is null ? "producto entregado" : ProductName(application.Producto);
+        var activityId = delivery.ActividadPrimeraRevisionId ?? Guid.NewGuid();
+        var title = "Primera revision postventa";
+        var description = $"Agendar y confirmar primera revision del cliente por entrega {delivery.Numero} - {productName}.";
+
+        var existing = db.Actividades.Local.FirstOrDefault(x => x.Id == activityId);
+        if (existing is null)
+        {
+            existing = db.Actividades.FirstOrDefault(x => x.Id == activityId);
+        }
+
+        if (existing is null)
+        {
+            existing = new Actividad
+            {
+                Id = activityId,
+                Titulo = title,
+                Tipo = TipoActividad.Llamada,
+                Estado = EstadoActividad.Pendiente,
+                ClienteId = application.ClienteId
+            };
+            db.Actividades.Add(existing);
+        }
+
+        existing.Titulo = title;
+        existing.Descripcion = description;
+        existing.Tipo = TipoActividad.Llamada;
+        existing.Estado = EstadoActividad.Pendiente;
+        existing.FechaProgramada = delivery.PrimeraRevisionProgramadaEn.Value;
+        existing.RecordatorioEn = delivery.PrimeraRevisionProgramadaEn.Value.AddHours(-24);
+        existing.ClienteId = application.ClienteId;
+        delivery.ActividadPrimeraRevisionId = activityId;
     }
 
     private static MotorcycleDeliveryDto ToDto(EntregaMoto x)
@@ -171,6 +231,12 @@ public sealed class MotorcycleDeliveriesController(CrmDbContext db) : Controller
             x.MatriculaEntregada,
             x.ManualGarantiaEntregado,
             x.ActaEntregaFirmada,
+            x.ChecklistPreEntregaCompletado,
+            x.ProtocoloEntrega,
+            x.FotoEntregaDataUrl,
+            x.FotoEntregaNombre,
+            x.PrimeraRevisionProgramadaEn,
+            x.ActividadPrimeraRevisionId,
             x.Estado,
             x.Observaciones);
     }
@@ -179,6 +245,43 @@ public sealed class MotorcycleDeliveriesController(CrmDbContext db) : Controller
     {
         if (!string.IsNullOrWhiteSpace(product.Nombre)) return product.Nombre.Trim();
         return $"{product.Marca} {product.Modelo} {product.Referencia}".Trim();
+    }
+
+    private static DateTime? ResolveFirstServiceDate(DateTime? requestedDate, DateTime deliveryDate, EstadoEntregaMoto status)
+    {
+        if (status != EstadoEntregaMoto.Entregada)
+        {
+            return requestedDate;
+        }
+
+        return requestedDate ?? deliveryDate.AddDays(30);
+    }
+
+    private static string BuildDefaultProtocol(Producto? product)
+    {
+        var brand = string.IsNullOrWhiteSpace(product?.Marca) ? "la marca" : product.Marca.Trim();
+        return $"Protocolo digital {brand}: validar identidad del cliente, seriales del vehiculo, estado fisico, accesorios, documentos, explicacion de garantia y firma del acta.";
+    }
+
+    private static string? NormalizeDeliveryPhoto(string? dataUrl)
+    {
+        if (string.IsNullOrWhiteSpace(dataUrl))
+        {
+            return null;
+        }
+
+        var photo = dataUrl.Trim();
+        if (photo.Length > MaxDeliveryPhotoDataUrlLength)
+        {
+            throw new ValidationException("La foto de entrega es demasiado grande. Usa una imagen menor a 1 MB.");
+        }
+
+        if (!AllowedDeliveryPhotoPrefixes.Any(prefix => photo.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new ValidationException("La foto de entrega debe ser PNG, JPG o WebP.");
+        }
+
+        return photo;
     }
 
     private static string? Normalize(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();

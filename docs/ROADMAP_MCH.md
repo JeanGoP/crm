@@ -45,7 +45,7 @@ Incluye:
 9. Crear modulo de tramites. Implementado.
    SOAT, matricula, placas, terceros, tiempos por sede, listas de atrasados y notificaciones al cliente.
 
-10. Fortalecer entrega.
+10. Fortalecer entrega. Implementado.
     Protocolo digital por marca, acta, foto de entrega, checklist obligatorio y agendamiento automatico de primera revision.
 
 11. Inventario comercial.

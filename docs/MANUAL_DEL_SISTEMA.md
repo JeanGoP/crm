@@ -1,7 +1,7 @@
 # Manual de usuario - EnMarcha CRM
 
 Ultima actualizacion: 2026-06-23  
-Version del manual: 7.8
+Version del manual: 7.9
 Sistema: EnMarcha CRM para gestion comercial y ventas a credito  
 
 ## 1. Bienvenida
@@ -436,20 +436,33 @@ Revise la lista de atrasados al iniciar el dia. Los tramites atrasados tambien a
 
 ### Para que sirve
 
-Entregas permite registrar la entrega final del producto cuando el proceso comercial y de credito ya esta listo.
+Entregas permite registrar la entrega final del producto cuando el proceso comercial y de credito ya esta listo. Esta opcion ayuda a dejar evidencia del protocolo aplicado, los documentos entregados, la foto de entrega y la primera revision postventa.
 
 ### Paso a paso
 
 1. Entre a **Entregas**.
 2. Seleccione la solicitud o venta aprobada.
 3. Verifique datos del cliente y producto.
-4. Complete los datos de entrega.
-5. Revise el checklist.
-6. Guarde la entrega.
+4. Complete fecha, asesor, placa, chasis, motor, VIN y kilometraje.
+5. Revise o complete el protocolo digital por marca.
+6. Adjunte la foto de entrega.
+7. Marque el checklist obligatorio: casco, SOAT, matricula, garantia, acta y checklist preentrega.
+8. Defina la fecha de primera revision. Si la deja vacia y marca la entrega como entregada, el sistema la agenda automaticamente.
+9. Guarde la entrega.
+
+### Campos importantes
+
+- **Protocolo por marca:** instrucciones internas que se deben cumplir antes de entregar el producto.
+- **Foto de entrega:** evidencia visual de la entrega al cliente.
+- **Acta de entrega firmada:** confirma que el cliente recibio el producto y acepta la entrega.
+- **Checklist preentrega completado:** confirma que se revisaron los puntos obligatorios antes de finalizar.
+- **Primera revision:** fecha en la que se debe contactar o atender al cliente despues de la entrega.
+
+Cuando una entrega queda en estado **Entregada**, el sistema exige chasis, motor, acta firmada, checklist completo y foto de entrega. Tambien crea automaticamente una actividad de primera revision para dar seguimiento al cliente.
 
 ### Recomendacion de uso
 
-Use esta opcion solo cuando el producto realmente vaya a entregarse o ya haya sido entregado. Asi los reportes reflejan ventas cerradas correctamente.
+Use esta opcion solo cuando el producto realmente vaya a entregarse o ya haya sido entregado. Antes de guardar, confirme que la evidencia y el checklist esten completos para evitar reclamos posteriores.
 
 ## 17. Prospectos
 
@@ -693,6 +706,7 @@ El sistema muestra mensajes cuando algo no puede completarse.
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-06-23 | 7.9 | Se fortalece Entregas con protocolo digital, foto de entrega, checklist obligatorio, acta firmada y agendamiento automatico de primera revision. |
 | 2026-06-23 | 7.8 | Se agrega el modulo de tramites para SOAT, matricula, placas y terceros, con tiempos por sede, atrasados y notificacion por WhatsApp. |
 | 2026-06-23 | 7.7 | Se agrega el modulo de ordenes de recaudo con conceptos separados de vehiculo, documentos y anticipo, estados de pago y control de saldo. |
 | 2026-06-22 | 7.6 | Se formaliza el estudio de credito con Paso 0 RUNT/SIMIT, validacion de identidad, recalculo del analista, aprobacion con ajuste o codeudor, negacion y carta de condiciones finales. |

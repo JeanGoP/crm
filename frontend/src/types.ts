@@ -393,6 +393,12 @@ export interface MotorcycleDelivery {
   registrationDelivered: boolean;
   warrantyManualDelivered: boolean;
   deliveryCertificateSigned: boolean;
+  preDeliveryChecklistCompleted: boolean;
+  deliveryProtocol?: string;
+  deliveryPhotoDataUrl?: string;
+  deliveryPhotoFileName?: string;
+  firstServiceScheduledAt?: string;
+  firstServiceActivityId?: string;
   status: number;
   notes?: string;
 }
