@@ -1137,34 +1137,100 @@ function CreditApplicationsPage() {
     <Header title="Solicitudes de credito" action="Nueva solicitud" onAction={() => setForm({ open: true })} onRefresh={reload} />
     <StatusBar loading={loading} error={error} />
     <EntityTable
-      headers={['Numero', 'Cliente', 'Producto', 'Perfil', 'Estado', 'Ingresos', 'Codeudor', 'Referencias', 'Documentos', 'Aprobacion', 'Plantillas', 'Acciones']}
+      headers={['Solicitud', 'Cliente', 'Credito', 'Estado', 'Gestion']}
       empty="No hay solicitudes de credito"
       rows={rows.map((r) => [
-        r.number,
-        r.customerName,
-        r.productName,
-        r.requirementProfileName || '-',
+        <Row primary={r.number} secondary={r.requirementProfileName || 'Sin perfil'} />,
+        <Stack spacing={.5}>
+          <Typography fontWeight={800}>{r.customerName}</Typography>
+          <Typography variant="caption" color="text.secondary">{r.identificationNumber || 'Sin identificacion'} · {r.mobile || 'Sin telefono'}</Typography>
+        </Stack>,
+        <Stack spacing={.5}>
+          <Typography fontWeight={800}>{r.productName}</Typography>
+          <Typography variant="caption" color="text.secondary">Ingresos {money(r.monthlyIncome)} · Inicial {money(r.downPayment)}</Typography>
+          <Typography variant="caption" color="text.secondary">{r.coDebtorName ? `Codeudor: ${r.coDebtorName}` : 'Sin codeudor'} · {[r.reference1Name, r.reference2Name].filter(Boolean).length || 0} ref.</Typography>
+        </Stack>,
         <StatusChip label={creditStatus(r.status)} tone={creditTone(r.status)} />,
-        money(r.monthlyIncome),
-        r.coDebtorName ? <Row primary={r.coDebtorName} secondary={r.coDebtorMobile ?? 'Sin celular'} /> : '-',
-        [r.reference1Name, r.reference2Name].filter(Boolean).length ? <Stack spacing={.5}>
-          {r.reference1Name && <Typography variant="body2">{r.reference1Name} - {r.reference1Mobile ?? 'Sin celular'}</Typography>}
-          {r.reference2Name && <Typography variant="body2">{r.reference2Name} - {r.reference2Mobile ?? 'Sin celular'}</Typography>}
-        </Stack> : '-',
-        <DocumentSummary application={r} onUpdate={updateDocument} onUpload={uploadDocument} onDownload={downloadDocument} />,
-        <CreditStudySummary application={r} onStep0={saveStep0} onRecalculate={saveRecalculation} onDecision={decide} />,
-        <CreditTemplateDownloads application={r} onDownload={downloadTemplate} />,
-        <Stack direction="row" gap={1} alignItems="center">
-          <Actions onAi={() => analyzeCustomer(r.customerId, r.mobile)} onEdit={() => setForm({ open: true, item: r })} />
-          <TextField select size="small" label="Estado" value={r.status} onChange={(e) => changeStatus(r, Number(e.target.value))} sx={{ minWidth: 160 }}>
-            {creditStatusOptions.map((x) => <MenuItem key={x} value={x}>{creditStatus(x)}</MenuItem>)}
-          </TextField>
-        </Stack>
+        <CreditApplicationManagement
+          application={r}
+          onUpdateDocument={updateDocument}
+          onUploadDocument={uploadDocument}
+          onDownloadDocument={downloadDocument}
+          onStep0={saveStep0}
+          onRecalculate={saveRecalculation}
+          onDecision={decide}
+          onDownloadTemplate={downloadTemplate}
+          onAnalyze={() => analyzeCustomer(r.customerId, r.mobile)}
+          onEdit={() => setForm({ open: true, item: r })}
+          onChangeStatus={(status) => changeStatus(r, status)}
+        />
       ])}
     />
     <CreditApplicationDialog form={form} customers={customers} products={products.filter((x) => x.active)} quotes={quotes} deals={deals} requirementProfiles={requirementProfiles.filter((x) => x.active)} onClose={() => setForm({ open: false })} onSave={save} />
     <AiAnalysisDialog analysis={analysis} phone={analysisPhone} onClose={() => { setAnalysis(undefined); setAnalysisPhone(undefined); }} />
     <Notice notice={notice} onClose={() => setNotice(undefined)} />
+  </Stack>;
+}
+
+function CreditApplicationManagement({
+  application,
+  onUpdateDocument,
+  onUploadDocument,
+  onDownloadDocument,
+  onStep0,
+  onRecalculate,
+  onDecision,
+  onDownloadTemplate,
+  onAnalyze,
+  onEdit,
+  onChangeStatus
+}: {
+  application: CreditApplication;
+  onUpdateDocument: (application: CreditApplication, document: CreditDocument, status: number, patch?: Partial<Pick<CreditDocument, 'expiresAt' | 'notes' | 'rejectionReason'>>) => Promise<void>;
+  onUploadDocument: (application: CreditApplication, document: CreditDocument, file: File) => Promise<void>;
+  onDownloadDocument: (application: CreditApplication, document: CreditDocument) => Promise<void>;
+  onStep0: (application: CreditApplication, patch?: Partial<CreditApplication>) => Promise<void>;
+  onRecalculate: (application: CreditApplication, patch: Partial<CreditApplication>) => Promise<void>;
+  onDecision: (application: CreditApplication, status: number, notes?: string, study?: Partial<CreditApplication> & { result?: string }) => Promise<void>;
+  onDownloadTemplate: (application: CreditApplication, template: CreditTemplate) => Promise<void>;
+  onAnalyze: () => void;
+  onEdit: () => void;
+  onChangeStatus: (status: number) => void;
+}) {
+  const validDocuments = application.documents.filter((x) => x.status === 3).length;
+  const pendingDocuments = application.documents.filter((x) => x.status === 1 || x.status === 4 || x.isExpired).length;
+
+  return <Stack spacing={1} sx={{ minWidth: 0 }}>
+    <Paper variant="outlined" sx={{ p: 1.25, bgcolor: '#fbfdff' }}>
+      <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }} gap={1} sx={{ mb: 1 }}>
+        <Typography variant="subtitle2" fontWeight={900}>Documentos</Typography>
+        <Stack direction="row" gap={.5} flexWrap="wrap">
+          <Chip size="small" color={pendingDocuments ? 'warning' : 'success'} label={`${validDocuments}/${application.documents.length} validados`} />
+          {pendingDocuments > 0 && <Chip size="small" variant="outlined" color="warning" label={`${pendingDocuments} pendientes`} />}
+        </Stack>
+      </Stack>
+      <DocumentSummary application={application} onUpdate={onUpdateDocument} onUpload={onUploadDocument} onDownload={onDownloadDocument} />
+    </Paper>
+
+    <Paper variant="outlined" sx={{ p: 1.25, bgcolor: '#fff' }}>
+      <Typography variant="subtitle2" fontWeight={900} sx={{ mb: 1 }}>Estudio y aprobacion</Typography>
+      <CreditStudySummary application={application} onStep0={onStep0} onRecalculate={onRecalculate} onDecision={onDecision} />
+    </Paper>
+
+    <Paper variant="outlined" sx={{ p: 1.25, bgcolor: '#fff' }}>
+      <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', md: 'center' }} gap={1.25}>
+        <Stack spacing={.5}>
+          <Typography variant="subtitle2" fontWeight={900}>Plantillas</Typography>
+          <CreditTemplateDownloads application={application} onDownload={onDownloadTemplate} />
+        </Stack>
+        <Stack direction="row" gap={1} alignItems="center" flexWrap="wrap" useFlexGap>
+          <Actions onAi={onAnalyze} onEdit={onEdit} />
+          <TextField select size="small" label="Estado" value={application.status} onChange={(e) => onChangeStatus(Number(e.target.value))} sx={{ minWidth: 180 }}>
+            {creditStatusOptions.map((x) => <MenuItem key={x} value={x}>{creditStatus(x)}</MenuItem>)}
+          </TextField>
+        </Stack>
+      </Stack>
+    </Paper>
   </Stack>;
 }
 
@@ -1236,7 +1302,7 @@ function CreditStudySummary({ application, onStep0, onRecalculate, onDecision }:
     onDecision(application, 6, reason.trim(), { result: 'Negado', finalConditions: reason.trim() });
   };
 
-  return <Stack spacing={.75} sx={{ minWidth: 240, maxWidth: 280 }}>
+  return <Stack spacing={.75} sx={{ minWidth: 0 }}>
     <Stack direction="row" gap={.5} flexWrap="wrap">
       <Chip size="small" label={step0Ready ? 'Paso 0 listo' : 'Paso 0 pendiente'} color={step0Ready ? 'success' : 'warning'} variant={step0Ready ? 'filled' : 'outlined'} />
       {application.studyResult && <Chip size="small" label={application.studyResult} color={application.status === 6 ? 'error' : application.status === 5 ? 'success' : 'default'} variant="outlined" />}
@@ -1689,7 +1755,7 @@ const creditTemplates: CreditTemplate[] = [
 ];
 
 function CreditTemplateDownloads({ application, onDownload }: { application: CreditApplication; onDownload: (application: CreditApplication, template: CreditTemplate) => Promise<void> }) {
-  return <Stack direction="row" gap={.5} flexWrap="wrap" sx={{ minWidth: 142, maxWidth: 150 }}>
+  return <Stack direction="row" gap={.5} flexWrap="wrap">
     {creditTemplates.map((template) => {
       const disabled = template.disabled?.(application) ?? false;
       return <Tooltip key={template.id} title={disabled ? template.reason ?? '' : `Descargar ${template.label}`}>
@@ -3500,7 +3566,7 @@ function DocumentSummary({ application, onUpdate, onUpload, onDownload }: {
     onUpdate(application, document, status);
   };
 
-  return <Stack spacing={1} sx={{ minWidth: 430, maxWidth: 520 }}>
+  return <Stack spacing={1} sx={{ minWidth: 0, width: '100%' }}>
     {application.documents.map((document) => {
       const documentStatusOptions = statusOptions.includes(document.status) ? statusOptions : [...statusOptions, document.status];
       return <Stack key={document.id} spacing={.75} sx={{ p: 1, border: '1px solid #e2e8f0', borderRadius: 1, bgcolor: '#fff' }}>
@@ -3828,17 +3894,21 @@ function ReportTable({ headers, rows, empty }: { headers: string[]; rows: ReactN
 }
 
 function tableMinWidth(headers: string[]) {
+  if (headers.includes('Gestion')) return 1180;
   return headers.includes('Plantillas') ? 1760 : 760;
 }
 
 function tableColumnSx(header: string) {
   const widths: Record<string, number> = {
+    Solicitud: 170,
     Identificacion: 150,
     Numero: 150,
-    Cliente: 170,
+    Cliente: 220,
+    Credito: 260,
     Producto: 220,
     Ciudad: 150,
     Estado: 150,
+    Gestion: 560,
     Ingresos: 130,
     Codeudor: 170,
     Referencias: 210,
