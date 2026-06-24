@@ -35,7 +35,7 @@ import Search from '@mui/icons-material/Search';
 import { AxiosError } from 'axios';
 import { api } from './api';
 import { useAuthStore } from './store';
-import { Activity, ColombianIdentityLookup, CollectionOrder, CommercialReports, Company, CreditApplication, CreditDocument, Customer, Customer360, CustomerAiAnalysis, CustomerTimelineItem, Dashboard, Deal, DealStage, FinancialSettings, Lead, MotorcycleDelivery, Procedure, Product, ProductPhoto, Promotion, Quote, QuoteSimulationResult, RequirementProfile, SalesPoint, User } from './types';
+import { Activity, ColombianIdentityLookup, CollectionOrder, CommercialInventory, CommercialInventorySummary, CommercialReports, Company, CreditApplication, CreditDocument, Customer, Customer360, CustomerAiAnalysis, CustomerTimelineItem, Dashboard, Deal, DealStage, FinancialSettings, Lead, MotorcycleDelivery, Procedure, Product, ProductPhoto, Promotion, Quote, QuoteSimulationResult, RequirementProfile, SalesPoint, User } from './types';
 
 const drawerWidth = 248;
 const today = new Date().toISOString().slice(0, 10);
@@ -73,6 +73,7 @@ const nav: NavItem[] = [
   { to: '/pipeline', label: 'Pipeline', icon: <ViewKanban /> },
   { to: '/actividades', label: 'Actividades', icon: <EventNote /> },
   { to: '/productos', label: 'Productos', icon: <Inventory2 /> },
+  { to: '/inventario', label: 'Inventario', icon: <Inventory2 /> },
   { to: '/prospectos', label: 'Prospectos', icon: <Handshake /> },
   { to: '/reportes', label: 'Reportes', icon: <Assessment /> },
   { to: '/configuracion', label: 'Configuracion', icon: <Settings /> }
@@ -108,6 +109,8 @@ const emptyActivity = { title: '', description: '', type: 1, status: 1, schedule
 const emptyCompany = { name: '', subdomain: '', customDomain: '', logoDataUrl: '', active: true };
 const emptyUser = { fullName: '', email: '', password: '', companyId: '', salesPointId: '', roles: ['Vendedor'] };
 const emptyProduct = { name: '', category: 'Moto', brand: '', model: '', line: '', version: '', reference: '', description: '', engineCc: '', year: '', color: '', price: 0, soat: 0, registrationFee: 0, taxes: 0, technicalSheet: '', priceValidFrom: today, active: true };
+const emptyCommercialInventory = { productId: '', salesPointId: '', vin: '', chassisNumber: '', engineNumber: '', plate: '', color: '', isUsed: false, mileage: '', status: 1, notes: '' };
+const emptyInventoryReservation = { customerId: '', quoteId: '', creditApplicationId: '', reservationExpiresAt: new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10), notes: '' };
 const emptyFinancialSettings = { minimumWage: 1400000, consumerAnnualRate: 29.72, lowAmountAnnualRate: 56.33, factorMonthlyRate: 4.5, maxTermMonths: 30, paymentRounding: 1000, useMontelibanoTable: true, active: true };
 const emptySalesPoint = { name: '', code: '', city: '', address: '', phone: '', mainBrand: 'Honda', brandLogoDataUrl: '', factorMonthlyRate: 4.5, maxTermMonths: 30, quoteValidityDays: 7, deliveryMode: 'ConSoat', soatDays: 14, registrationDays: 20, soatProvider: '', registrationAgent: '', commercialTerms: 'Cotizacion sujeta a disponibilidad del producto, validacion comercial y aprobacion final.', active: true };
 const emptyRequirementDocument = { type: 5, name: '', description: '', required: true, order: 1 };
@@ -244,6 +247,7 @@ function Layout() {
             <Route path="/clientes" element={<CustomersPage />} />
             <Route path="/clientes/:id" element={<Customer360Page />} />
             <Route path="/productos" element={<ProductsPage />} />
+            <Route path="/inventario" element={<CommercialInventoryPage />} />
             <Route path="/cotizaciones" element={<QuotesPage />} />
             <Route path="/solicitudes-credito" element={<CreditApplicationsPage />} />
             <Route path="/ordenes-recaudo" element={<CollectionOrdersPage />} />
@@ -743,6 +747,116 @@ function ProductsPage() {
     />
     <ProductDialog form={form} onClose={() => setForm({ open: false })} onSave={save} onChanged={reload} />
     <ConfirmDialog title="Inactivar producto" text={`Se inactivara ${confirm ? productName(confirm) : ''}. Las cotizaciones existentes conservaran el historial.`} open={!!confirm} onClose={() => setConfirm(undefined)} onConfirm={remove} confirmLabel="Inactivar" />
+    <Notice notice={notice} onClose={() => setNotice(undefined)} />
+  </Stack>;
+}
+
+function CommercialInventoryPage() {
+  const { data: rows = [], loading, error, reload, setData } = useResource<CommercialInventory[]>('/api/commercial-inventory', []);
+  const { data: summary = [], reload: reloadSummary } = useResource<CommercialInventorySummary[]>('/api/commercial-inventory/summary', []);
+  const { data: products = [] } = useResource<Product[]>('/api/products', []);
+  const { data: salesPoints = [] } = useResource<SalesPoint[]>('/api/sales-points', []);
+  const { data: customers = [] } = useResource<Customer[]>('/api/customers', []);
+  const { data: quotes = [] } = useResource<Quote[]>('/api/quotes', []);
+  const { data: applications = [] } = useResource<CreditApplication[]>('/api/credit-applications', []);
+  const [form, setForm] = useState<FormMode<CommercialInventory>>({ open: false });
+  const [reserveForm, setReserveForm] = useState<FormMode<CommercialInventory>>({ open: false });
+  const [notice, setNotice] = useState<Notice>();
+  const canManage = useCanManage();
+
+  const refreshAll = async () => {
+    await Promise.all([reload(), reloadSummary()]);
+  };
+
+  const save = async (payload: typeof emptyCommercialInventory) => {
+    const body = {
+      ...payload,
+      vin: payload.vin || null,
+      chassisNumber: payload.chassisNumber || null,
+      engineNumber: payload.engineNumber || null,
+      plate: payload.plate || null,
+      color: payload.color || null,
+      mileage: payload.mileage === '' ? null : Number(payload.mileage),
+      status: Number(payload.status),
+      notes: payload.notes || null
+    };
+    const { data } = form.item
+      ? await api.put<CommercialInventory>(`/api/commercial-inventory/${form.item.id}`, body)
+      : await api.post<CommercialInventory>('/api/commercial-inventory', body);
+    setData(form.item ? rows.map((x) => x.id === data.id ? data : x) : [data, ...rows]);
+    await reloadSummary();
+    setNotice({ type: 'success', text: form.item ? 'Unidad actualizada.' : 'Unidad registrada.' });
+    setForm({ open: false });
+  };
+
+  const reserve = async (payload: typeof emptyInventoryReservation) => {
+    if (!reserveForm.item) return;
+    const body = {
+      customerId: payload.customerId || null,
+      quoteId: payload.quoteId || null,
+      creditApplicationId: payload.creditApplicationId || null,
+      reservationExpiresAt: payload.reservationExpiresAt || null,
+      notes: payload.notes || null
+    };
+    const { data } = await api.post<CommercialInventory>(`/api/commercial-inventory/${reserveForm.item.id}/reserve`, body);
+    setData(rows.map((x) => x.id === data.id ? data : x));
+    await reloadSummary();
+    setNotice({ type: 'success', text: 'Unidad separada contra disponibilidad.' });
+    setReserveForm({ open: false });
+  };
+
+  const quickAction = async (item: CommercialInventory, action: 'release' | 'sell') => {
+    const { data } = await api.post<CommercialInventory>(`/api/commercial-inventory/${item.id}/${action}`);
+    setData(rows.map((x) => x.id === data.id ? data : x));
+    await reloadSummary();
+    setNotice({ type: 'success', text: action === 'release' ? 'Separacion liberada.' : 'Unidad marcada como vendida.' });
+  };
+
+  return <Stack spacing={3}>
+    <Header title="Inventario comercial" action={canManage ? 'Nueva unidad' : undefined} onAction={() => setForm({ open: true })} onRefresh={refreshAll} />
+    <StatusBar loading={loading} error={error} />
+    <Grid container spacing={2}>
+      {summary.slice(0, 6).map((item) => <Grid item xs={12} md={6} lg={4} key={`${item.productId}-${item.salesPointId}`}>
+        <Paper variant="outlined" sx={{ p: 2, height: '100%' }}>
+          <Typography fontWeight={900}>{item.productName}</Typography>
+          <Typography variant="body2" color="text.secondary">{item.salesPointName}</Typography>
+          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mt: 1.5 }}>
+            <Chip size="small" color="success" label={`Disp. ${item.available}`} />
+            <Chip size="small" color="warning" label={`Sep. ${item.reserved}`} />
+            <Chip size="small" variant="outlined" label={`Usadas ${item.used}`} />
+            <Chip size="small" variant="outlined" label={`Vend. ${item.sold}`} />
+          </Stack>
+        </Paper>
+      </Grid>)}
+      {summary.length === 0 && <Grid item xs={12}><Alert severity="info">Aun no hay inventario registrado por sede.</Alert></Grid>}
+    </Grid>
+    <EntityTable
+      headers={['Producto', 'Sede', 'Seriales', 'Tipo', 'Estado', 'Reserva', 'Acciones']}
+      empty="No hay unidades de inventario registradas"
+      rows={rows.map((r) => [
+        <Row primary={r.productName} secondary={r.color || 'Sin color'} />,
+        r.salesPointName,
+        <Stack spacing={.4}>
+          <Typography variant="body2">Chasis: {r.chassisNumber || '-'}</Typography>
+          <Typography variant="body2">Motor: {r.engineNumber || '-'}</Typography>
+          <Typography variant="body2">Placa: {r.plate || '-'}</Typography>
+        </Stack>,
+        <Row primary={r.isUsed ? 'Usada' : 'Nueva'} secondary={r.mileage != null ? `${r.mileage} km` : r.vin || 'Sin VIN'} />,
+        <StatusChip label={inventoryStatus(r.status)} tone={inventoryTone(r.status, r.reservationExpired)} />,
+        <Row
+          primary={r.reservedCustomerName || r.reservedQuoteNumber || r.reservedCreditApplicationNumber || 'Sin separacion'}
+          secondary={r.reservationExpiresAt ? `Vence ${new Date(r.reservationExpiresAt).toLocaleDateString()}` : r.notes || ''}
+        />,
+        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+          <Actions onEdit={canManage ? () => setForm({ open: true, item: r }) : undefined} />
+          {(r.status === 1 || r.status === 4) && <Button size="small" variant="outlined" onClick={() => setReserveForm({ open: true, item: r })}>Separar</Button>}
+          {r.status === 2 && <Button size="small" variant="outlined" color="inherit" onClick={() => void quickAction(r, 'release')}>Liberar</Button>}
+          {(r.status === 1 || r.status === 2 || r.status === 4) && <Button size="small" variant="contained" onClick={() => void quickAction(r, 'sell')}>Vendida</Button>}
+        </Stack>
+      ])}
+    />
+    <CommercialInventoryDialog form={form} products={products.filter((x) => x.active)} salesPoints={salesPoints.filter((x) => x.active)} onClose={() => setForm({ open: false })} onSave={save} />
+    <InventoryReservationDialog form={reserveForm} customers={customers} quotes={quotes} applications={applications} onClose={() => setReserveForm({ open: false })} onSave={reserve} />
     <Notice notice={notice} onClose={() => setNotice(undefined)} />
   </Stack>;
 }
@@ -2724,6 +2838,76 @@ function ProductPhotoThumb({ photo, size = 54 }: { photo?: ProductPhoto; size?: 
   </Box>;
 }
 
+function CommercialInventoryDialog({ form, products, salesPoints, onClose, onSave }: DialogProps<CommercialInventory, typeof emptyCommercialInventory> & { products: Product[]; salesPoints: SalesPoint[] }) {
+  const initial = form.item ? {
+    productId: form.item.productId,
+    salesPointId: form.item.salesPointId,
+    vin: form.item.vin ?? '',
+    chassisNumber: form.item.chassisNumber ?? '',
+    engineNumber: form.item.engineNumber ?? '',
+    plate: form.item.plate ?? '',
+    color: form.item.color ?? '',
+    isUsed: form.item.isUsed,
+    mileage: form.item.mileage?.toString() ?? '',
+    status: form.item.status === 2 ? 1 : form.item.status,
+    notes: form.item.notes ?? ''
+  } : { ...emptyCommercialInventory, productId: products[0]?.id ?? '', salesPointId: salesPoints[0]?.id ?? '' };
+
+  return <FormDialog open={form.open} title={form.item ? 'Editar unidad de inventario' : 'Nueva unidad de inventario'} initial={initial} onClose={onClose} onSave={onSave} maxWidth="md">
+    {(v, set) => <Stack spacing={2}>
+      <FieldGrid>
+        <TextField select required label="Producto" value={v.productId} onChange={(e) => set({ productId: e.target.value })}>
+          {products.map((x) => <MenuItem key={x.id} value={x.id}>{productName(x)}</MenuItem>)}
+        </TextField>
+        <TextField select required label="Sede" value={v.salesPointId} onChange={(e) => set({ salesPointId: e.target.value })}>
+          {salesPoints.map((x) => <MenuItem key={x.id} value={x.id}>{x.name} - {x.city}</MenuItem>)}
+        </TextField>
+        <TextField label="Color" value={v.color} onChange={(e) => set({ color: e.target.value })} />
+        <TextField select label="Estado" value={v.status} onChange={(e) => set({ status: Number(e.target.value) })}>
+          {[1, 3, 4, 5].map((x) => <MenuItem key={x} value={x}>{inventoryStatus(x)}</MenuItem>)}
+        </TextField>
+      </FieldGrid>
+      <FieldGrid>
+        <TextField label="VIN" value={v.vin} onChange={(e) => set({ vin: e.target.value })} />
+        <TextField label="Numero chasis" value={v.chassisNumber} onChange={(e) => set({ chassisNumber: e.target.value })} />
+        <TextField label="Numero motor" value={v.engineNumber} onChange={(e) => set({ engineNumber: e.target.value })} />
+        <TextField label="Placa" value={v.plate} onChange={(e) => set({ plate: e.target.value.toUpperCase() })} />
+      </FieldGrid>
+      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+        <FormControlLabel control={<Checkbox checked={v.isUsed} onChange={(e) => set({ isUsed: e.target.checked, status: e.target.checked && v.status === 1 ? 4 : v.status })} />} label="Moto usada" />
+        <TextField type="number" label="Kilometraje" value={v.mileage} onChange={(e) => set({ mileage: e.target.value })} sx={{ minWidth: 220 }} />
+      </Stack>
+      <TextField label="Observaciones" value={v.notes} onChange={(e) => set({ notes: e.target.value })} multiline minRows={2} />
+    </Stack>}
+  </FormDialog>;
+}
+
+function InventoryReservationDialog({ form, customers, quotes, applications, onClose, onSave }: DialogProps<CommercialInventory, typeof emptyInventoryReservation> & { customers: Customer[]; quotes: Quote[]; applications: CreditApplication[] }) {
+  const initial = emptyInventoryReservation;
+  const quoteOptions = quotes.filter((x) => !form.item || x.productId === form.item.productId || (x.items ?? []).some((item) => item.productId === form.item?.productId));
+  const applicationOptions = applications.filter((x) => !form.item || x.productId === form.item.productId);
+
+  return <FormDialog open={form.open} title={`Separar ${form.item?.productName ?? 'unidad'}`} initial={initial} onClose={onClose} onSave={onSave} maxWidth="sm">
+    {(v, set) => <Stack spacing={2}>
+      <Alert severity="info">La unidad queda bloqueada contra disponibilidad hasta la fecha indicada.</Alert>
+      <TextField select label="Cliente" value={v.customerId} onChange={(e) => set({ customerId: e.target.value })}>
+        <MenuItem value="">Seleccionar por cotizacion o solicitud</MenuItem>
+        {customers.map((x) => <MenuItem key={x.id} value={x.id}>{customerDisplayName(x)}</MenuItem>)}
+      </TextField>
+      <TextField select label="Cotizacion" value={v.quoteId} onChange={(e) => set({ quoteId: e.target.value })}>
+        <MenuItem value="">Sin cotizacion</MenuItem>
+        {quoteOptions.map((x) => <MenuItem key={x.id} value={x.id}>{x.number} - {x.customerFirstNames} {x.customerLastNames}</MenuItem>)}
+      </TextField>
+      <TextField select label="Solicitud de credito" value={v.creditApplicationId} onChange={(e) => set({ creditApplicationId: e.target.value })}>
+        <MenuItem value="">Sin solicitud</MenuItem>
+        {applicationOptions.map((x) => <MenuItem key={x.id} value={x.id}>{x.number} - {x.customerName}</MenuItem>)}
+      </TextField>
+      <TextField type="date" label="Vence separacion" value={v.reservationExpiresAt} onChange={(e) => set({ reservationExpiresAt: e.target.value })} InputLabelProps={{ shrink: true }} />
+      <TextField label="Observaciones" value={v.notes} onChange={(e) => set({ notes: e.target.value })} multiline minRows={2} />
+    </Stack>}
+  </FormDialog>;
+}
+
 function ProductPhotosManager({ product, onChanged }: { product: Product; onChanged: () => void }) {
   const [photos, setPhotos] = useState<ProductPhoto[]>(product.photos ?? []);
   const [uploading, setUploading] = useState(false);
@@ -3862,6 +4046,17 @@ function toActivityPayload(payload: typeof emptyActivity | Activity) {
 
 function money(value?: number) { return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(value ?? 0); }
 function percent(value?: number) { return `${new Intl.NumberFormat('es-CO', { maximumFractionDigits: 2 }).format(value ?? 0)}%`; }
+function customerDisplayName(customer: Customer) {
+  return [customer.firstNames, customer.lastNames].filter(Boolean).join(' ').trim() || customer.name || customer.email || 'Cliente';
+}
+function inventoryStatus(value: number) { return ['-', 'Disponible', 'Separada', 'Vendida', 'Usada', 'No disponible'][value] ?? 'Disponible'; }
+function inventoryTone(value: number, expired?: boolean): 'success' | 'warning' | 'error' | 'default' {
+  if (expired) return 'error';
+  if (value === 1) return 'success';
+  if (value === 2) return 'warning';
+  if (value === 5) return 'error';
+  return 'default';
+}
 function identificationDigits(value?: string) { return (value ?? '').replace(/\D/g, ''); }
 async function openExternalLookup(url: string, identification?: string) {
   const digits = identificationDigits(identification);

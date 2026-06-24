@@ -137,6 +137,31 @@ public sealed class ProductoFoto : AuditableTenantEntity
     public int Orden { get; set; }
 }
 
+public sealed class InventarioComercial : AuditableTenantEntity
+{
+    public Guid ProductoId { get; set; }
+    public Producto? Producto { get; set; }
+    public Guid PuntoVentaId { get; set; }
+    public PuntoVenta? PuntoVenta { get; set; }
+    public string? Vin { get; set; }
+    public string? NumeroChasis { get; set; }
+    public string? NumeroMotor { get; set; }
+    public string? Placa { get; set; }
+    public string? Color { get; set; }
+    public bool EsUsada { get; set; }
+    public int? Kilometraje { get; set; }
+    public EstadoInventarioComercial Estado { get; set; } = EstadoInventarioComercial.Disponible;
+    public Guid? ClienteReservaId { get; set; }
+    public Cliente? ClienteReserva { get; set; }
+    public Guid? CotizacionReservaId { get; set; }
+    public Cotizacion? CotizacionReserva { get; set; }
+    public Guid? SolicitudCreditoReservaId { get; set; }
+    public SolicitudCredito? SolicitudCreditoReserva { get; set; }
+    public DateTime? FechaReserva { get; set; }
+    public DateTime? FechaVencimientoReserva { get; set; }
+    public string? Observaciones { get; set; }
+}
+
 public sealed class ConfiguracionFinancieraEmpresa : AuditableTenantEntity
 {
     public decimal SalarioMinimoVigente { get; set; } = 1400000;

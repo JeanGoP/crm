@@ -21,6 +21,7 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
     public DbSet<Archivo> Archivos => Set<Archivo>();
     public DbSet<Producto> Productos => Set<Producto>();
     public DbSet<ProductoFoto> ProductoFotos => Set<ProductoFoto>();
+    public DbSet<InventarioComercial> InventarioComercial => Set<InventarioComercial>();
     public DbSet<ConfiguracionFinancieraEmpresa> ConfiguracionesFinancierasEmpresa => Set<ConfiguracionFinancieraEmpresa>();
     public DbSet<PuntoVenta> PuntosVenta => Set<PuntoVenta>();
     public DbSet<PerfilRequisito> PerfilesRequisito => Set<PerfilRequisito>();
@@ -51,6 +52,7 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
         modelBuilder.Entity<Archivo>().ToTable("Archivos");
         modelBuilder.Entity<Producto>().ToTable("Productos");
         modelBuilder.Entity<ProductoFoto>().ToTable("ProductoFotos");
+        modelBuilder.Entity<InventarioComercial>().ToTable("InventarioComercial");
         modelBuilder.Entity<ConfiguracionFinancieraEmpresa>().ToTable("ConfiguracionesFinancierasEmpresa");
         modelBuilder.Entity<PuntoVenta>().ToTable("PuntosVenta");
         modelBuilder.Entity<PerfilRequisito>().ToTable("PerfilesRequisito");
@@ -99,6 +101,21 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
         modelBuilder.Entity<ProductoFoto>().Property(x => x.ContentType).HasMaxLength(80);
         modelBuilder.Entity<ProductoFoto>().HasIndex(x => new { x.EmpresaId, x.ProductoId });
         modelBuilder.Entity<ProductoFoto>().HasOne(x => x.Producto).WithMany(x => x.Fotos).HasForeignKey(x => x.ProductoId).OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<InventarioComercial>().Property(x => x.Vin).HasMaxLength(80);
+        modelBuilder.Entity<InventarioComercial>().Property(x => x.NumeroChasis).HasMaxLength(80);
+        modelBuilder.Entity<InventarioComercial>().Property(x => x.NumeroMotor).HasMaxLength(80);
+        modelBuilder.Entity<InventarioComercial>().Property(x => x.Placa).HasMaxLength(20);
+        modelBuilder.Entity<InventarioComercial>().Property(x => x.Color).HasMaxLength(80);
+        modelBuilder.Entity<InventarioComercial>().HasIndex(x => new { x.EmpresaId, x.PuntoVentaId, x.ProductoId, x.Estado });
+        modelBuilder.Entity<InventarioComercial>().HasIndex(x => new { x.EmpresaId, x.NumeroChasis });
+        modelBuilder.Entity<InventarioComercial>().HasIndex(x => new { x.EmpresaId, x.NumeroMotor });
+        modelBuilder.Entity<InventarioComercial>().HasIndex(x => new { x.EmpresaId, x.Placa });
+        modelBuilder.Entity<InventarioComercial>().HasIndex(x => new { x.EmpresaId, x.FechaVencimientoReserva });
+        modelBuilder.Entity<InventarioComercial>().HasOne(x => x.Producto).WithMany().HasForeignKey(x => x.ProductoId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<InventarioComercial>().HasOne(x => x.PuntoVenta).WithMany().HasForeignKey(x => x.PuntoVentaId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<InventarioComercial>().HasOne(x => x.ClienteReserva).WithMany().HasForeignKey(x => x.ClienteReservaId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<InventarioComercial>().HasOne(x => x.CotizacionReserva).WithMany().HasForeignKey(x => x.CotizacionReservaId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<InventarioComercial>().HasOne(x => x.SolicitudCreditoReserva).WithMany().HasForeignKey(x => x.SolicitudCreditoReservaId).OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<ConfiguracionFinancieraEmpresa>().Property(x => x.SalarioMinimoVigente).HasPrecision(18, 2);
         modelBuilder.Entity<ConfiguracionFinancieraEmpresa>().Property(x => x.TasaConsumoEa).HasPrecision(6, 3);
         modelBuilder.Entity<ConfiguracionFinancieraEmpresa>().Property(x => x.TasaBajoMontoEa).HasPrecision(6, 3);
@@ -240,6 +257,7 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
         modelBuilder.Entity<Archivo>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<Producto>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<ProductoFoto>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
+        modelBuilder.Entity<InventarioComercial>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<ConfiguracionFinancieraEmpresa>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<PuntoVenta>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<PerfilRequisito>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);

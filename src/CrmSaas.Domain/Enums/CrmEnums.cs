@@ -14,3 +14,4 @@ public enum EstadoOrdenRecaudo { Emitida = 1, Pagada = 2, Parcial = 3, Vencida =
 public enum TipoConceptoRecaudo { Vehiculo = 1, Documentos = 2, Anticipo = 3 }
 public enum TipoTramite { Soat = 1, Matricula = 2, Placas = 3, Terceros = 4 }
 public enum EstadoTramite { Pendiente = 1, EnProceso = 2, Completado = 3, Atrasado = 4, Cancelado = 5 }
+public enum EstadoInventarioComercial { Disponible = 1, Separada = 2, Vendida = 3, Usada = 4, NoDisponible = 5 }

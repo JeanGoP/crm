@@ -74,6 +74,53 @@ public sealed record ProductPhotoDto(Guid Id, string FileName, string ContentTyp
 public sealed record ProductDto(Guid Id, string Name, string Category, string Brand, string Model, string? Line, string? Version, string Reference, string? Description, int? EngineCc, int? Year, string? Color, decimal Price, decimal Soat, decimal RegistrationFee, decimal Taxes, string? TechnicalSheet, DateTime? PriceValidFrom, bool Active, IReadOnlyCollection<ProductPhotoDto> Photos);
 public sealed record UpsertProductDto(string Name, string Category, string Brand, string Model, string? Line, string? Version, string Reference, string? Description, int? EngineCc, int? Year, string? Color, decimal Price, decimal Soat, decimal RegistrationFee, decimal Taxes, string? TechnicalSheet, DateTime? PriceValidFrom, bool Active);
 
+public sealed record CommercialInventoryDto(
+    Guid Id,
+    Guid ProductId,
+    string ProductName,
+    Guid SalesPointId,
+    string SalesPointName,
+    string? Vin,
+    string? ChassisNumber,
+    string? EngineNumber,
+    string? Plate,
+    string? Color,
+    bool IsUsed,
+    int? Mileage,
+    EstadoInventarioComercial Status,
+    Guid? ReservedCustomerId,
+    string? ReservedCustomerName,
+    Guid? ReservedQuoteId,
+    string? ReservedQuoteNumber,
+    Guid? ReservedCreditApplicationId,
+    string? ReservedCreditApplicationNumber,
+    DateTime? ReservedAt,
+    DateTime? ReservationExpiresAt,
+    bool ReservationExpired,
+    string? Notes);
+
+public sealed record UpsertCommercialInventoryDto(
+    Guid ProductId,
+    Guid SalesPointId,
+    string? Vin,
+    string? ChassisNumber,
+    string? EngineNumber,
+    string? Plate,
+    string? Color,
+    bool IsUsed,
+    int? Mileage,
+    EstadoInventarioComercial Status,
+    string? Notes);
+
+public sealed record ReserveCommercialInventoryDto(
+    Guid? CustomerId,
+    Guid? QuoteId,
+    Guid? CreditApplicationId,
+    DateTime? ReservationExpiresAt,
+    string? Notes);
+
+public sealed record CommercialInventorySummaryDto(Guid ProductId, string ProductName, Guid SalesPointId, string SalesPointName, int Available, int Reserved, int Sold, int Used, int Unavailable);
+
 public sealed record FinancialSettingsDto(
     Guid Id,
     decimal MinimumWage,

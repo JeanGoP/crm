@@ -125,6 +125,44 @@ export interface Product {
   photos: ProductPhoto[];
 }
 
+export interface CommercialInventory {
+  id: string;
+  productId: string;
+  productName: string;
+  salesPointId: string;
+  salesPointName: string;
+  vin?: string;
+  chassisNumber?: string;
+  engineNumber?: string;
+  plate?: string;
+  color?: string;
+  isUsed: boolean;
+  mileage?: number;
+  status: number;
+  reservedCustomerId?: string;
+  reservedCustomerName?: string;
+  reservedQuoteId?: string;
+  reservedQuoteNumber?: string;
+  reservedCreditApplicationId?: string;
+  reservedCreditApplicationNumber?: string;
+  reservedAt?: string;
+  reservationExpiresAt?: string;
+  reservationExpired: boolean;
+  notes?: string;
+}
+
+export interface CommercialInventorySummary {
+  productId: string;
+  productName: string;
+  salesPointId: string;
+  salesPointName: string;
+  available: number;
+  reserved: number;
+  sold: number;
+  used: number;
+  unavailable: number;
+}
+
 export interface FinancialSettings {
   id: string;
   minimumWage: number;

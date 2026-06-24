@@ -1,7 +1,7 @@
 # Manual de usuario - EnMarcha CRM
 
 Ultima actualizacion: 2026-06-23  
-Version del manual: 7.9
+Version del manual: 8.0
 Sistema: EnMarcha CRM para gestion comercial y ventas a credito  
 
 ## 1. Bienvenida
@@ -71,6 +71,7 @@ El menu lateral permite moverse por las opciones principales:
 - **Pipeline:** seguimiento visual de negocios por etapa.
 - **Actividades:** agenda de tareas, llamadas y reuniones.
 - **Productos:** catalogo de productos disponibles para cotizar.
+- **Inventario:** unidades disponibles por sede, seriales, separaciones y motos usadas.
 - **Prospectos:** interesados que pueden convertirse en clientes.
 - **Reportes:** indicadores comerciales.
 - **Configuracion:** empresas, sedes, usuarios, roles y parametros generales.
@@ -209,7 +210,37 @@ La foto marcada como **Foto PDF** sera la imagen comercial que aparecera en el P
 
 Mantenga precios, modelos, cargos, vigencias y estados actualizados. Una cotizacion depende de que el producto tenga informacion correcta.
 
-## 10. Cotizaciones
+## 10. Inventario comercial
+
+### Para que sirve
+
+Inventario comercial permite controlar las unidades disponibles por sede. Aqui se registran seriales, chasis, motor, placa, color, estado, motos usadas y separaciones contra disponibilidad.
+
+### Registrar una unidad
+
+1. Entre a **Inventario**.
+2. Revise el resumen por producto y sede.
+3. Presione **Nueva unidad**.
+4. Seleccione producto y sede.
+5. Complete VIN, chasis, motor, placa, color y kilometraje si aplica.
+6. Marque si la unidad es usada.
+7. Guarde la unidad.
+
+### Separar una unidad
+
+1. Ubique una unidad disponible o usada.
+2. Presione **Separar**.
+3. Seleccione cliente, cotizacion o solicitud de credito.
+4. Defina la fecha de vencimiento de la separacion.
+5. Guarde.
+
+Cuando una unidad queda separada, deja de contarse como disponible. Si la venta no continua, use **Liberar** para devolverla a disponibilidad. Si se concreta la venta, use **Vendida**.
+
+### Recomendacion de uso
+
+Registre chasis y motor tan pronto la unidad llegue a la sede. Asi ventas puede separar unidades reales y evitar prometer productos que ya no estan disponibles.
+
+## 11. Cotizaciones
 
 ![Cotizaciones](./assets/manual/05-cotizaciones.png)
 
@@ -261,7 +292,7 @@ El PDF toma automaticamente el nombre y logo configurados en la empresa. El form
 
 Cuando la cotizacion tiene dos o mas articulos, el PDF muestra un **comparativo** para que el cliente pueda revisar precio, cuota inicial, valor financiado, plazo y cuota aproximada de cada opcion.
 
-## 11. Simulador financiero
+## 12. Simulador financiero
 
 ![Simulador de credito en cotizacion](./assets/manual/05-cotizaciones-simulador.png)
 
@@ -291,7 +322,7 @@ El simulador ayuda a estimar rapidamente el valor de la cuota cuando el cliente 
 
 Explique al cliente que la cuota es aproximada y puede cambiar segun la aprobacion final, politicas de credito, documentos entregados o condiciones comerciales vigentes.
 
-## 12. Solicitudes de credito
+## 13. Solicitudes de credito
 
 ![Solicitudes credito](./assets/manual/06-solicitudes-credito.png)
 
@@ -355,7 +386,7 @@ El panel de estudio permite al supervisor o administrador controlar la revision 
 
 Para enviar una solicitud a estudio, el Paso 0 debe estar completo y los documentos no pueden estar pendientes o rechazados.
 
-## 13. Codeudor y referencias
+## 14. Codeudor y referencias
 
 ### Para que sirve
 
@@ -369,7 +400,7 @@ Se diligencian dentro de **Solicitudes de credito**, en la solicitud del cliente
 
 Registre datos claros y verificables. Si falta informacion, deje una actividad pendiente para solicitarla al cliente.
 
-## 14. Ordenes de recaudo
+## 15. Ordenes de recaudo
 
 ### Para que sirve
 
@@ -398,7 +429,7 @@ Ordenes de recaudo permite emitir cobros asociados a una solicitud de credito. L
 
 Use la orden de recaudo antes de la entrega para controlar cuota inicial, documentos o anticipos. Si el cliente paga parcialmente, actualice el valor pagado para conservar el saldo real.
 
-## 15. Tramites
+## 16. Tramites
 
 ### Para que sirve
 
@@ -432,7 +463,7 @@ Cuando el tramite tiene marcada la opcion de notificar, la tabla muestra un boto
 
 Revise la lista de atrasados al iniciar el dia. Los tramites atrasados tambien aparecen como alerta interna en el Dashboard.
 
-## 16. Entregas
+## 17. Entregas
 
 ### Para que sirve
 
@@ -464,7 +495,7 @@ Cuando una entrega queda en estado **Entregada**, el sistema exige chasis, motor
 
 Use esta opcion solo cuando el producto realmente vaya a entregarse o ya haya sido entregado. Antes de guardar, confirme que la evidencia y el checklist esten completos para evitar reclamos posteriores.
 
-## 17. Prospectos
+## 18. Prospectos
 
 ![Prospectos](./assets/manual/07-prospectos.png)
 
@@ -484,7 +515,7 @@ Prospectos permite registrar personas interesadas que todavia no son clientes co
 
 Cuando un prospecto muestra interes real, use la opcion de convertir o llevar a cliente. El sistema permite continuar con la creacion del cliente y completar los datos faltantes.
 
-## 18. Pipeline
+## 19. Pipeline
 
 ![Pipeline](./assets/manual/08-pipeline.png)
 
@@ -511,7 +542,7 @@ Puede mover una tarjeta arrastrandola de una columna a otra. Al hacerlo, el sist
 
 Mantenga el pipeline actualizado todos los dias. Esto permite que el Dashboard y los reportes muestren informacion real.
 
-## 19. Actividades
+## 20. Actividades
 
 ![Actividades](./assets/manual/09-actividades.png)
 
@@ -550,7 +581,7 @@ Si la actividad tenia recordatorio, el sistema conserva la misma anticipacion fr
 
 Al crear una cotizacion, el sistema puede generar una actividad automatica como **Llamar al cliente manana**. Si no se actualiza, puede aparecer como alerta de seguimiento vencido.
 
-## 20. Reportes comerciales
+## 21. Reportes comerciales
 
 ![Reportes comerciales](./assets/manual/11-reportes.png)
 
@@ -570,7 +601,7 @@ Reportes permite revisar resultados comerciales y tomar decisiones con informaci
 
 El supervisor debe revisar reportes con frecuencia para detectar vendedores con oportunidades vencidas, productos mas consultados y cuellos de botella en credito.
 
-## 21. Configuracion
+## 22. Configuracion
 
 ![Configuracion](./assets/manual/10-configuracion.png)
 
@@ -652,7 +683,7 @@ Los cambios aplican a las nuevas cotizaciones de la empresa. Las cotizaciones ya
 
 La sede principal permite que el sistema pueda separar la informacion comercial por punto de venta. Esta configuracion se usara en cotizaciones, reportes, tramites y entregas.
 
-## 22. Manejo de errores
+## 23. Manejo de errores
 
 El sistema muestra mensajes cuando algo no puede completarse.
 
@@ -672,7 +703,7 @@ El sistema muestra mensajes cuando algo no puede completarse.
 - No hay conexion con el servidor.
 - La integracion externa no esta configurada o no respondio.
 
-## 23. Buenas practicas
+## 24. Buenas practicas
 
 - Registre clientes con identificacion correcta.
 - No cree clientes duplicados.
@@ -685,7 +716,7 @@ El sistema muestra mensajes cuando algo no puede completarse.
 - Mantenga productos y precios actualizados.
 - Cierre sesion al terminar si usa un equipo compartido.
 
-## 24. Flujo recomendado de trabajo
+## 25. Flujo recomendado de trabajo
 
 1. Ingresar al CRM.
 2. Revisar Dashboard y alertas.
@@ -702,10 +733,11 @@ El sistema muestra mensajes cuando algo no puede completarse.
 13. Si se concreta la venta, registrar entrega.
 14. Revisar reportes para seguimiento.
 
-## 25. Historial del manual
+## 26. Historial del manual
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-06-23 | 8.0 | Se agrega Inventario comercial con stock por sede, seriales, separaciones contra disponibilidad y control de motos usadas. |
 | 2026-06-23 | 7.9 | Se fortalece Entregas con protocolo digital, foto de entrega, checklist obligatorio, acta firmada y agendamiento automatico de primera revision. |
 | 2026-06-23 | 7.8 | Se agrega el modulo de tramites para SOAT, matricula, placas y terceros, con tiempos por sede, atrasados y notificacion por WhatsApp. |
 | 2026-06-23 | 7.7 | Se agrega el modulo de ordenes de recaudo con conceptos separados de vehiculo, documentos y anticipo, estados de pago y control de saldo. |

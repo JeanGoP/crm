@@ -48,7 +48,7 @@ Incluye:
 10. Fortalecer entrega. Implementado.
     Protocolo digital por marca, acta, foto de entrega, checklist obligatorio y agendamiento automatico de primera revision.
 
-11. Inventario comercial.
+11. Inventario comercial. Implementado.
     Stock por sede, seriales/chasis/motor, separaciones contra disponibilidad y motos usadas.
 
 12. Integracion Zeus.
