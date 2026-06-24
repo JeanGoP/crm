@@ -1,7 +1,7 @@
 # Manual de usuario - EnMarcha CRM
 
 Ultima actualizacion: 2026-06-23  
-Version del manual: 8.0
+Version del manual: 8.1
 Sistema: EnMarcha CRM para gestion comercial y ventas a credito  
 
 ## 1. Bienvenida
@@ -375,16 +375,18 @@ Cuando todos los documentos quedan recibidos o validados, la solicitud pasa a **
 El panel de estudio permite al supervisor o administrador controlar la revision antes de aprobar o negar.
 
 1. Use los botones **RUNT** y **SIMIT** para abrir las consultas externas. El sistema copia el numero de identificacion al portapapeles para facilitar la busqueda.
-2. Presione **Paso 0** cuando RUNT, SIMIT e identidad hayan sido revisados.
-3. Use **Recalcular** para registrar valor aprobado, cuota inicial aprobada, plazo aprobado y cuota mensual aprobada por el analista.
-4. Cuando la solicitud este en estudio, seleccione una decision:
+2. Presione **Validacion inicial**.
+3. Marque si RUNT fue consultado, si SIMIT fue consultado y si la identidad fue validada.
+4. En observaciones, registre el resultado de la revision. Ejemplo: `RUNT y SIMIT consultados sin novedades. Identidad validada con cedula del cliente.`
+5. Use **Recalcular** para registrar valor aprobado, cuota inicial aprobada, plazo aprobado y cuota mensual aprobada por el analista.
+6. Cuando la solicitud este en estudio, seleccione una decision:
    - **Aprobar:** conserva condiciones normales.
    - **Con ajuste:** aprueba con valores recalculados por el analista.
    - **Con codeudor:** deja la aprobacion condicionada a codeudor registrado.
    - **Negar:** registra el motivo de negacion.
-5. Escriba las condiciones finales que deben quedar en la carta.
+7. Escriba las condiciones finales que deben quedar en la carta.
 
-Para enviar una solicitud a estudio, el Paso 0 debe estar completo y los documentos no pueden estar pendientes o rechazados.
+Para enviar una solicitud a estudio, la **Validacion inicial** debe estar completa y los documentos no pueden estar pendientes o rechazados.
 
 ## 14. Codeudor y referencias
 
@@ -737,6 +739,7 @@ El sistema muestra mensajes cuando algo no puede completarse.
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-06-23 | 8.1 | Se renombra Paso 0 como Validacion inicial y se documenta el checklist de RUNT, SIMIT, identidad y observaciones. |
 | 2026-06-23 | 8.0 | Se agrega Inventario comercial con stock por sede, seriales, separaciones contra disponibilidad y control de motos usadas. |
 | 2026-06-23 | 7.9 | Se fortalece Entregas con protocolo digital, foto de entrega, checklist obligatorio, acta firmada y agendamiento automatico de primera revision. |
 | 2026-06-23 | 7.8 | Se agrega el modulo de tramites para SOAT, matricula, placas y terceros, con tiempos por sede, atrasados y notificacion por WhatsApp. |

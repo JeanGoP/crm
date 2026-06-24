@@ -1045,7 +1045,7 @@ function CreditApplicationsPage() {
         notes: patch?.step0Notes ?? application.step0Notes ?? null
       });
       setData(rows.map((x) => x.id === data.id ? data : x));
-      setNotice({ type: 'success', text: 'Paso 0 actualizado.' });
+      setNotice({ type: 'success', text: 'Validacion inicial actualizada.' });
     } catch (err) {
       setNotice({ type: 'error', text: apiError(err) });
     }
@@ -1186,7 +1186,7 @@ function CreditApplicationPendingSummary({ application }: { application: CreditA
   const step0Ready = application.runtChecked && application.simitChecked && application.identityValidated;
   const items = [
     pendingDocuments > 0 ? `${pendingDocuments} doc. pendientes` : 'Docs ok',
-    step0Ready ? 'Paso 0 listo' : 'Paso 0 pendiente',
+    step0Ready ? 'Validacion inicial lista' : 'Validacion inicial pendiente',
     application.studyResult || (application.status === 4 ? 'En estudio' : undefined),
     application.status === 5 && 'Aprobada',
     application.status === 6 && 'Negada'
@@ -1194,7 +1194,7 @@ function CreditApplicationPendingSummary({ application }: { application: CreditA
 
   return <Stack direction="row" gap={.5} flexWrap="wrap" useFlexGap>
     <Chip size="small" color={pendingDocuments ? 'warning' : 'success'} label={`${validDocuments}/${application.documents.length} docs`} />
-    <Chip size="small" color={step0Ready ? 'success' : 'warning'} variant={step0Ready ? 'filled' : 'outlined'} label={step0Ready ? 'Paso 0 listo' : 'Paso 0 pendiente'} />
+    <Chip size="small" color={step0Ready ? 'success' : 'warning'} variant={step0Ready ? 'filled' : 'outlined'} label={step0Ready ? 'Validacion inicial lista' : 'Validacion inicial pendiente'} />
     {application.studyResult && <Chip size="small" label={application.studyResult} variant="outlined" color={application.status === 6 ? 'error' : application.status === 5 ? 'success' : 'default'} />}
     {!application.studyResult && items.length === 0 && <Chip size="small" variant="outlined" label="Sin pendientes" />}
   </Stack>;
@@ -1310,6 +1310,13 @@ function CreditStudySummary({ application, onStep0, onRecalculate, onDecision }:
   const approvedDownPayment = application.approvedDownPayment ?? application.downPayment;
   const approvedTerm = application.approvedTermMonths ?? application.termMonths;
   const approvedPayment = application.approvedMonthlyPayment ?? 0;
+  const [initialValidationOpen, setInitialValidationOpen] = useState(false);
+  const [initialValidation, setInitialValidation] = useState({
+    runtChecked: application.runtChecked,
+    simitChecked: application.simitChecked,
+    identityValidated: application.identityValidated,
+    notes: application.step0Notes ?? ''
+  });
 
   const requestNumber = (label: string, current: number) => {
     const value = window.prompt(label, String(current || 0));
@@ -1318,10 +1325,24 @@ function CreditStudySummary({ application, onStep0, onRecalculate, onDecision }:
     return Number.isFinite(number) ? number : undefined;
   };
 
-  const registerStep0 = () => {
-    const notes = window.prompt('Observaciones de Paso 0 RUNT/SIMIT e identidad', application.step0Notes ?? '');
-    if (notes === null) return;
-    onStep0(application, { runtChecked: true, simitChecked: true, identityValidated: true, step0Notes: notes });
+  const openInitialValidation = () => {
+    setInitialValidation({
+      runtChecked: application.runtChecked,
+      simitChecked: application.simitChecked,
+      identityValidated: application.identityValidated,
+      notes: application.step0Notes ?? ''
+    });
+    setInitialValidationOpen(true);
+  };
+
+  const saveInitialValidation = () => {
+    onStep0(application, {
+      runtChecked: initialValidation.runtChecked,
+      simitChecked: initialValidation.simitChecked,
+      identityValidated: initialValidation.identityValidated,
+      step0Notes: initialValidation.notes
+    });
+    setInitialValidationOpen(false);
   };
 
   const recalculate = () => {
@@ -1359,9 +1380,10 @@ function CreditStudySummary({ application, onStep0, onRecalculate, onDecision }:
     onDecision(application, 6, reason.trim(), { result: 'Negado', finalConditions: reason.trim() });
   };
 
-  return <Stack spacing={.75} sx={{ minWidth: 0 }}>
+  return <>
+  <Stack spacing={.75} sx={{ minWidth: 0 }}>
     <Stack direction="row" gap={.5} flexWrap="wrap">
-      <Chip size="small" label={step0Ready ? 'Paso 0 listo' : 'Paso 0 pendiente'} color={step0Ready ? 'success' : 'warning'} variant={step0Ready ? 'filled' : 'outlined'} />
+      <Chip size="small" label={step0Ready ? 'Validacion inicial lista' : 'Validacion inicial pendiente'} color={step0Ready ? 'success' : 'warning'} variant={step0Ready ? 'filled' : 'outlined'} />
       {application.studyResult && <Chip size="small" label={application.studyResult} color={application.status === 6 ? 'error' : application.status === 5 ? 'success' : 'default'} variant="outlined" />}
     </Stack>
     <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.25 }}>
@@ -1375,7 +1397,7 @@ function CreditStudySummary({ application, onStep0, onRecalculate, onDecision }:
     <Stack direction="row" gap={.5} flexWrap="wrap">
       <Button size="small" variant="outlined" onClick={() => void openExternalLookup(runtUrl, application.identificationNumber)}>RUNT</Button>
       <Button size="small" variant="outlined" onClick={() => void openExternalLookup(simitUrl, application.identificationNumber)}>SIMIT</Button>
-      <Button size="small" variant="outlined" onClick={registerStep0}>Paso 0</Button>
+      <Button size="small" variant="outlined" onClick={openInitialValidation}>Validacion inicial</Button>
       <Button size="small" variant="outlined" onClick={recalculate}>Recalcular</Button>
     </Stack>
     <Stack direction="row" gap={.5} flexWrap="wrap">
@@ -1387,7 +1409,41 @@ function CreditStudySummary({ application, onStep0, onRecalculate, onDecision }:
         <Button size="small" color="error" variant="outlined" onClick={reject}>Negar</Button>
       </>}
     </Stack>
-  </Stack>;
+  </Stack>
+  <Dialog open={initialValidationOpen} onClose={() => setInitialValidationOpen(false)} fullWidth maxWidth="sm">
+    <DialogTitle>Validacion inicial</DialogTitle>
+    <DialogContent dividers>
+      <Stack spacing={2}>
+        <Alert severity="info">Confirma las consultas basicas antes de avanzar el credito a estudio.</Alert>
+        <FormControlLabel
+          control={<Checkbox checked={initialValidation.runtChecked} onChange={(e) => setInitialValidation((current) => ({ ...current, runtChecked: e.target.checked }))} />}
+          label="RUNT consultado"
+        />
+        <FormControlLabel
+          control={<Checkbox checked={initialValidation.simitChecked} onChange={(e) => setInitialValidation((current) => ({ ...current, simitChecked: e.target.checked }))} />}
+          label="SIMIT consultado"
+        />
+        <FormControlLabel
+          control={<Checkbox checked={initialValidation.identityValidated} onChange={(e) => setInitialValidation((current) => ({ ...current, identityValidated: e.target.checked }))} />}
+          label="Identidad validada"
+        />
+        <TextField
+          label="Observaciones"
+          value={initialValidation.notes}
+          onChange={(e) => setInitialValidation((current) => ({ ...current, notes: e.target.value }))}
+          placeholder="Ej: RUNT y SIMIT consultados sin novedades. Identidad validada con cedula del cliente."
+          multiline
+          minRows={3}
+          fullWidth
+        />
+      </Stack>
+    </DialogContent>
+    <DialogActions>
+      <Button onClick={() => setInitialValidationOpen(false)}>Cancelar</Button>
+      <Button variant="contained" onClick={saveInitialValidation}>Guardar validacion</Button>
+    </DialogActions>
+  </Dialog>
+  </>;
 }
 
 function CollectionOrdersPage() {
