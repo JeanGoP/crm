@@ -2,6 +2,7 @@ html, body, #root {
   min-height: 100%;
   margin: 0;
   overflow-x: hidden;
+  background: #f9fafb;
 }
 
 * {
@@ -18,15 +19,20 @@ a {
   display: grid;
   place-items: center;
   background:
-    linear-gradient(120deg, rgba(21, 94, 117, .86), rgba(124, 45, 18, .72)),
-    url('https://images.unsplash.com/photo-1556761175-b413da4baf72?auto=format&fit=crop&w=1800&q=80');
+    radial-gradient(circle at 15% 20%, rgba(70, 95, 255, .24), transparent 34%),
+    radial-gradient(circle at 88% 12%, rgba(14, 147, 132, .16), transparent 28%),
+    linear-gradient(135deg, #f9fafb 0%, #eef2ff 48%, #f8fafc 100%);
   background-size: cover;
   background-position: center;
+  padding: 24px;
 }
 
 .loginPanel {
   width: min(420px, calc(100vw - 32px));
   padding: clamp(20px, 6vw, 32px);
+  border: 1px solid #eaecf0;
+  border-radius: 20px;
+  box-shadow: 0 24px 70px rgba(16, 24, 40, .14);
 }
 
 .kanban {
@@ -39,19 +45,26 @@ a {
 .kanbanColumn {
   min-height: 520px;
   padding: 16px;
-  background: #eef4f7;
+  background: #ffffff;
+  border: 1px solid #eaecf0;
+  border-radius: 16px;
+  box-shadow: 0 1px 3px rgba(16, 24, 40, .08);
   transition: background-color .16s ease, outline-color .16s ease, transform .16s ease;
 }
 
 .kanbanColumnOver {
-  background: #dbeafe;
-  outline: 2px solid #155e75;
+  background: #eef2ff;
+  outline: 2px solid #465fff;
   outline-offset: -2px;
 }
 
 .kanbanCard {
   cursor: grab;
   transition: opacity .16s ease, transform .16s ease, box-shadow .16s ease;
+}
+
+.kanbanCard:hover {
+  box-shadow: 0 12px 24px rgba(16, 24, 40, .10);
 }
 
 .kanbanCard:active {
@@ -79,7 +92,7 @@ a {
   width: 100%;
   aspect-ratio: 4 / 3;
   object-fit: cover;
-  background: #e2e8f0;
+  background: #f2f4f7;
 }
 
 @media (max-width: 700px) {
