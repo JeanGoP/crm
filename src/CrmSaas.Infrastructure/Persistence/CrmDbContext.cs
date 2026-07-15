@@ -19,6 +19,7 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
     public DbSet<Actividad> Actividades => Set<Actividad>();
     public DbSet<Nota> Notas => Set<Nota>();
     public DbSet<Archivo> Archivos => Set<Archivo>();
+    public DbSet<CategoriaProducto> CategoriasProducto => Set<CategoriaProducto>();
     public DbSet<Producto> Productos => Set<Producto>();
     public DbSet<ProductoFoto> ProductoFotos => Set<ProductoFoto>();
     public DbSet<InventarioComercial> InventarioComercial => Set<InventarioComercial>();
@@ -50,6 +51,7 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
         modelBuilder.Entity<Actividad>().ToTable("Actividades");
         modelBuilder.Entity<Nota>().ToTable("Notas");
         modelBuilder.Entity<Archivo>().ToTable("Archivos");
+        modelBuilder.Entity<CategoriaProducto>().ToTable("CategoriasProducto");
         modelBuilder.Entity<Producto>().ToTable("Productos");
         modelBuilder.Entity<ProductoFoto>().ToTable("ProductoFotos");
         modelBuilder.Entity<InventarioComercial>().ToTable("InventarioComercial");
@@ -86,6 +88,9 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
         modelBuilder.Entity<Negocio>().Property(x => x.Valor).HasPrecision(18, 2);
         modelBuilder.Entity<Negocio>().Property(x => x.ProbabilidadCierre).HasPrecision(5, 2);
         modelBuilder.Entity<EtapaNegocio>().Property(x => x.ProbabilidadPredeterminada).HasPrecision(5, 2);
+        modelBuilder.Entity<CategoriaProducto>().Property(x => x.Nombre).HasMaxLength(80);
+        modelBuilder.Entity<CategoriaProducto>().Property(x => x.Descripcion).HasMaxLength(400);
+        modelBuilder.Entity<CategoriaProducto>().HasIndex(x => new { x.EmpresaId, x.Nombre }).IsUnique();
         modelBuilder.Entity<Producto>().Property(x => x.Nombre).HasMaxLength(180);
         modelBuilder.Entity<Producto>().Property(x => x.Categoria).HasMaxLength(80);
         modelBuilder.Entity<Producto>().Property(x => x.Linea).HasMaxLength(100);
@@ -255,6 +260,7 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
         modelBuilder.Entity<Actividad>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<Nota>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<Archivo>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
+        modelBuilder.Entity<CategoriaProducto>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<Producto>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<ProductoFoto>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<InventarioComercial>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);

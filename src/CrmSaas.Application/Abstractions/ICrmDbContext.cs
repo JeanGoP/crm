@@ -17,6 +17,7 @@ public interface ICrmDbContext
     DbSet<Actividad> Actividades { get; }
     DbSet<Nota> Notas { get; }
     DbSet<Archivo> Archivos { get; }
+    DbSet<CategoriaProducto> CategoriasProducto { get; }
     DbSet<Producto> Productos { get; }
     DbSet<ProductoFoto> ProductoFotos { get; }
     DbSet<InventarioComercial> InventarioComercial { get; }

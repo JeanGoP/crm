@@ -35,7 +35,7 @@ import Search from '@mui/icons-material/Search';
 import { AxiosError } from 'axios';
 import { api } from './api';
 import { useAuthStore } from './store';
-import { Activity, ColombianIdentityLookup, CollectionOrder, CommercialInventory, CommercialInventorySummary, CommercialReports, Company, CreditApplication, CreditDocument, Customer, Customer360, CustomerAiAnalysis, CustomerTimelineItem, Dashboard, Deal, DealStage, FinancialSettings, Lead, MotorcycleDelivery, Procedure, Product, ProductPhoto, Promotion, Quote, QuoteSimulationResult, RequirementProfile, SalesPoint, User } from './types';
+import { Activity, ColombianIdentityLookup, CollectionOrder, CommercialInventory, CommercialInventorySummary, CommercialReports, Company, CreditApplication, CreditDocument, Customer, Customer360, CustomerAiAnalysis, CustomerTimelineItem, Dashboard, Deal, DealStage, FinancialSettings, Lead, MotorcycleDelivery, Procedure, Product, ProductCategory, ProductPhoto, Promotion, Quote, QuoteSimulationResult, RequirementProfile, SalesPoint, User } from './types';
 
 const drawerWidth = 248;
 const today = new Date().toISOString().slice(0, 10);
@@ -178,6 +178,7 @@ const emptyCompany = { name: '', subdomain: '', customDomain: '', logoDataUrl: '
 const emptyUser = { fullName: '', email: '', password: '', companyId: '', salesPointId: '', roles: ['Vendedor'] };
 const emptyProduct = { name: '', category: 'Moto', brand: '', model: '', line: '', version: '', reference: '', description: '', engineCc: '', year: '', color: '', price: 0, soat: 0, registrationFee: 0, taxes: 0, technicalSheet: '', priceValidFrom: today, active: true };
 const emptyCommercialInventory = { productId: '', salesPointId: '', vin: '', chassisNumber: '', engineNumber: '', plate: '', color: '', isUsed: false, mileage: '', status: 1, notes: '' };
+const emptyProductCategory = { name: '', description: '', quoteAsBundle: false, active: true };
 const emptyInventoryReservation = { customerId: '', quoteId: '', creditApplicationId: '', reservationExpiresAt: new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10), notes: '' };
 const emptyFinancialSettings = { minimumWage: 1400000, consumerAnnualRate: 29.72, lowAmountAnnualRate: 56.33, factorMonthlyRate: 4.5, maxTermMonths: 30, paymentRounding: 1000, useMontelibanoTable: true, active: true };
 const emptySalesPoint = { name: '', code: '', city: '', address: '', phone: '', mainBrand: 'Honda', brandLogoDataUrl: '', factorMonthlyRate: 4.5, maxTermMonths: 30, quoteValidityDays: 7, deliveryMode: 'ConSoat', soatDays: 14, registrationDays: 20, soatProvider: '', registrationAgent: '', commercialTerms: 'Cotizacion sujeta a disponibilidad del producto, validacion comercial y aprobacion final.', active: true };
@@ -804,6 +805,7 @@ function CustomerTimeline({ items }: { items: CustomerTimelineItem[] }) {
 
 function ProductsPage() {
   const { data: rows = [], loading, error, reload, setData } = useResource<Product[]>('/api/products', []);
+  const { data: categories = [] } = useResource<ProductCategory[]>('/api/product-categories', []);
   const [form, setForm] = useState<FormMode<Product>>({ open: false });
   const [confirm, setConfirm] = useState<Product>();
   const [notice, setNotice] = useState<Notice>();
@@ -873,7 +875,7 @@ function ProductsPage() {
         <Actions onEdit={canManage ? () => setForm({ open: true, item: r }) : undefined} onDelete={canManage && r.active ? () => setConfirm(r) : undefined} />
       ])}
     />
-    <ProductDialog form={form} onClose={() => setForm({ open: false })} onSave={save} onChanged={reload} />
+    <ProductDialog form={form} categories={categories.filter((category) => category.active)} onClose={() => setForm({ open: false })} onSave={save} onChanged={reload} />
     <ConfirmDialog title="Inactivar producto" text={`Se inactivara ${confirm ? productName(confirm) : ''}. Las cotizaciones existentes conservaran el historial.`} open={!!confirm} onClose={() => setConfirm(undefined)} onConfirm={remove} confirmLabel="Inactivar" />
     <Notice notice={notice} onClose={() => setNotice(undefined)} />
   </Stack>;
@@ -992,6 +994,7 @@ function CommercialInventoryPage() {
 function QuotesPage() {
   const { data: rows = [], loading, error, reload, setData } = useResource<Quote[]>('/api/quotes', []);
   const { data: products = [] } = useResource<Product[]>('/api/products', []);
+  const { data: productCategories = [] } = useResource<ProductCategory[]>('/api/product-categories', []);
   const { data: customers = [] } = useResource<Customer[]>('/api/customers', []);
   const { data: requirementProfiles = [] } = useResource<RequirementProfile[]>('/api/requirement-profiles', []);
   const [form, setForm] = useState<FormMode<Quote>>({ open: false });
@@ -1079,7 +1082,7 @@ function QuotesPage() {
         <Actions onAi={() => analyzeCustomer(r.customerId, customers.find((x) => x.id === r.customerId)?.phone)} onDownload={() => setPreviewQuote(r)} />
       ])}
     />
-    <QuoteDialog form={form} products={products.filter((x) => x.active)} requirementProfiles={requirementProfiles.filter((x) => x.active)} onClose={() => setForm({ open: false })} onSave={save} />
+    <QuoteDialog form={form} products={products.filter((x) => x.active)} productCategories={productCategories.filter((x) => x.active)} requirementProfiles={requirementProfiles.filter((x) => x.active)} onClose={() => setForm({ open: false })} onSave={save} />
     <QuotePdfPreviewDialog quote={previewQuote} onClose={() => setPreviewQuote(undefined)} onDownload={downloadPdf} />
     <AiAnalysisDialog analysis={analysis} phone={analysisPhone} onClose={() => { setAnalysis(undefined); setAnalysisPhone(undefined); }} />
     <Notice notice={notice} onClose={() => setNotice(undefined)} />
@@ -2441,12 +2444,14 @@ function SettingsPage() {
   const { data: companies = [], loading: loadingCompanies, error: companiesError, reload: reloadCompanies, setData: setCompanies } = useResource<Company[]>('/api/companies', []);
   const { data: users = [], loading: loadingUsers, error: usersError, reload: reloadUsers, setData: setUsers } = useResource<User[]>('/api/users', []);
   const { data: products = [] } = useResource<Product[]>('/api/products', []);
+  const { data: productCategories = [], loading: loadingProductCategories, error: productCategoriesError, reload: reloadProductCategories, setData: setProductCategories } = useResource<ProductCategory[]>('/api/product-categories', []);
   const { data: financialSettings, loading: loadingFinancialSettings, error: financialSettingsError, reload: reloadFinancialSettings, setData: setFinancialSettings } = useResource<FinancialSettings>('/api/financial-settings');
   const { data: salesPoints = [], loading: loadingSalesPoints, error: salesPointsError, reload: reloadSalesPoints, setData: setSalesPoints } = useResource<SalesPoint[]>('/api/sales-points', []);
   const { data: requirementProfiles = [], loading: loadingRequirementProfiles, error: requirementProfilesError, reload: reloadRequirementProfiles, setData: setRequirementProfiles } = useResource<RequirementProfile[]>('/api/requirement-profiles', []);
   const { data: promotions = [], loading: loadingPromotions, error: promotionsError, reload: reloadPromotions, setData: setPromotions } = useResource<Promotion[]>('/api/promotions', []);
   const [companyForm, setCompanyForm] = useState<FormMode<Company>>({ open: false });
   const [userForm, setUserForm] = useState<FormMode<User>>({ open: false });
+  const [productCategoryForm, setProductCategoryForm] = useState<FormMode<ProductCategory>>({ open: false });
   const [financialForm, setFinancialForm] = useState<FormMode<FinancialSettings>>({ open: false });
   const [salesPointForm, setSalesPointForm] = useState<FormMode<SalesPoint>>({ open: false });
   const [requirementProfileForm, setRequirementProfileForm] = useState<FormMode<RequirementProfile>>({ open: false });
@@ -2491,6 +2496,21 @@ function SettingsPage() {
     setFinancialSettings(data);
     setNotice({ type: 'success', text: 'Configuracion financiera actualizada.' });
     setFinancialForm({ open: false });
+  };
+
+  const saveProductCategory = async (payload: typeof emptyProductCategory) => {
+    const body = {
+      name: payload.name,
+      description: payload.description || null,
+      quoteAsBundle: Boolean(payload.quoteAsBundle),
+      active: Boolean(payload.active)
+    };
+    const { data } = productCategoryForm.item
+      ? await api.put<ProductCategory>(`/api/product-categories/${productCategoryForm.item.id}`, body)
+      : await api.post<ProductCategory>('/api/product-categories', body);
+    setProductCategories(productCategoryForm.item ? productCategories.map((x) => x.id === data.id ? data : x) : [...productCategories, data].sort((a, b) => a.name.localeCompare(b.name)));
+    setNotice({ type: 'success', text: productCategoryForm.item ? 'Categoria actualizada.' : 'Categoria creada.' });
+    setProductCategoryForm({ open: false });
   };
 
   const saveSalesPoint = async (payload: typeof emptySalesPoint) => {
@@ -2570,7 +2590,7 @@ function SettingsPage() {
   };
 
   return <Stack spacing={3}>
-    <Header title="Configuracion" onRefresh={() => { reloadCompanies(); reloadUsers(); reloadFinancialSettings(); reloadSalesPoints(); reloadRequirementProfiles(); reloadPromotions(); }} />
+    <Header title="Configuracion" onRefresh={() => { reloadCompanies(); reloadUsers(); reloadProductCategories(); reloadFinancialSettings(); reloadSalesPoints(); reloadRequirementProfiles(); reloadPromotions(); }} />
     <Card><CardContent><Grid container spacing={2}>
       <Grid item xs={12} md={6}><TextField fullWidth label="API URL" value={import.meta.env.VITE_API_URL ?? ''} InputProps={{ readOnly: true }} /></Grid>
       <Grid item xs={12} md={6}><TextField fullWidth label="Tenant" value={import.meta.env.VITE_TENANT ?? 'demo'} InputProps={{ readOnly: true }} /></Grid>
@@ -2623,6 +2643,29 @@ function SettingsPage() {
             `SOAT ${point.soatDays}d · Matricula ${point.registrationDays}d`,
             <StatusChip label={point.active ? 'Activa' : 'Inactiva'} tone={point.active ? 'success' : 'default'} />,
             <Actions onEdit={canManage ? () => setSalesPointForm({ open: true, item: point }) : undefined} />
+          ])}
+        />
+      </Stack>
+    </CardContent></Card>
+    <Card><CardContent>
+      <Stack spacing={2}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', sm: 'center' }} gap={1}>
+          <Box>
+            <Typography variant="h5" fontWeight={900}>Categorias de productos</Typography>
+            <Typography color="text.secondary" fontSize={14}>Maestro usado al crear productos y al calcular cotizaciones por paquetes.</Typography>
+          </Box>
+          {canManage && <Button variant="contained" startIcon={<Add />} onClick={() => setProductCategoryForm({ open: true })}>Nueva categoria</Button>}
+        </Stack>
+        <StatusBar loading={loadingProductCategories} error={productCategoriesError} />
+        <EntityTable
+          headers={['Categoria', 'Modo cotizacion', 'Descripcion', 'Estado', 'Acciones']}
+          empty="No hay categorias registradas"
+          rows={productCategories.map((category) => [
+            <Typography fontWeight={800}>{category.name}</Typography>,
+            category.quoteAsBundle ? <StatusChip label="Paquete / suma articulos" tone="warning" /> : <StatusChip label="Individual" tone="default" />,
+            category.description || '-',
+            <StatusChip label={category.active ? 'Activa' : 'Inactiva'} tone={category.active ? 'success' : 'default'} />,
+            <Actions onEdit={canManage ? () => setProductCategoryForm({ open: true, item: category }) : undefined} />
           ])}
         />
       </Stack>
@@ -2711,6 +2754,7 @@ function SettingsPage() {
     </>}
     <CompanyDialog form={companyForm} onClose={() => setCompanyForm({ open: false })} onSave={saveCompany} />
     <SalesPointDialog form={salesPointForm} onClose={() => setSalesPointForm({ open: false })} onSave={saveSalesPoint} />
+    <ProductCategoryDialog form={productCategoryForm} onClose={() => setProductCategoryForm({ open: false })} onSave={saveProductCategory} />
     <RequirementProfileDialog form={requirementProfileForm} onClose={() => setRequirementProfileForm({ open: false })} onSave={saveRequirementProfile} />
     <PromotionDialog form={promotionForm} products={products.filter((x) => x.active)} salesPoints={salesPoints.filter((x) => x.active)} onClose={() => setPromotionForm({ open: false })} onSave={savePromotion} />
     <UserDialog form={userForm} companies={companies.filter((x) => x.active)} salesPoints={salesPoints.filter((x) => x.active)} onClose={() => setUserForm({ open: false })} onSave={saveUser} />
@@ -2728,6 +2772,29 @@ function CompanyDialog({ form, onClose, onSave }: DialogProps<Company, typeof em
       <TextField required label="Subdominio" value={v.subdomain} onChange={(e) => set({ subdomain: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') })} />
       <TextField label="Dominio personalizado" value={v.customDomain} onChange={(e) => set({ customDomain: e.target.value })} />
       <TextField select label="Estado" value={String(v.active)} onChange={(e) => set({ active: e.target.value === 'true' })}><MenuItem value="true">Activa</MenuItem><MenuItem value="false">Inactiva</MenuItem></TextField>
+    </>}
+  </FormDialog>;
+}
+
+function ProductCategoryDialog({ form, onClose, onSave }: DialogProps<ProductCategory, typeof emptyProductCategory>) {
+  const initial = form.item ? {
+    name: form.item.name,
+    description: form.item.description ?? '',
+    quoteAsBundle: form.item.quoteAsBundle,
+    active: form.item.active
+  } : emptyProductCategory;
+  return <FormDialog title={form.item ? 'Editar categoria' : 'Nueva categoria'} open={form.open} initial={initial} onClose={onClose} onSave={onSave}>
+    {(v, set) => <>
+      <TextField required label="Nombre" value={v.name} onChange={(e) => set({ name: e.target.value })} />
+      <TextField label="Descripcion" value={v.description} onChange={(e) => set({ description: e.target.value })} multiline minRows={2} />
+      <FormControlLabel
+        control={<Checkbox checked={v.quoteAsBundle} onChange={(e) => set({ quoteAsBundle: e.target.checked })} />}
+        label="Cotizar como paquete (sumar varios articulos de esta categoria en una sola financiacion)"
+      />
+      <TextField select label="Estado" value={String(v.active)} onChange={(e) => set({ active: e.target.value === 'true' })}>
+        <MenuItem value="true">Activa</MenuItem>
+        <MenuItem value="false">Inactiva</MenuItem>
+      </TextField>
     </>}
   </FormDialog>;
 }
@@ -3062,7 +3129,7 @@ function CustomerDialog({ form, onClose, onSave }: DialogProps<Customer, typeof 
   </FormDialog>;
 }
 
-function ProductDialog({ form, onClose, onSave, onChanged }: DialogProps<Product, typeof emptyProduct> & { onChanged: () => void }) {
+function ProductDialog({ form, categories, onClose, onSave, onChanged }: DialogProps<Product, typeof emptyProduct> & { categories: ProductCategory[]; onChanged: () => void }) {
   const initial = form.item ? {
     name: form.item.name,
     category: form.item.category,
@@ -3082,14 +3149,16 @@ function ProductDialog({ form, onClose, onSave, onChanged }: DialogProps<Product
     technicalSheet: form.item.technicalSheet ?? '',
     priceValidFrom: form.item.priceValidFrom?.slice(0, 10) ?? today,
     active: form.item.active
-  } : emptyProduct;
+  } : { ...emptyProduct, category: categories[0]?.name ?? emptyProduct.category };
   return <FormDialog title={form.item ? 'Editar producto' : 'Nuevo producto'} open={form.open} initial={initial} onClose={onClose} onSave={onSave}>
     {(v, set) => <>
       <SectionTitle title="Datos comerciales" />
       <FieldGrid columns={2}>
         <TextField fullWidth required label="Nombre del producto" value={v.name} onChange={(e) => set({ name: e.target.value })} />
         <TextField fullWidth required select label="Categoria" value={v.category} onChange={(e) => set({ category: e.target.value })}>
-          {['Moto', 'Accesorio', 'Seguro', 'Tramite', 'Repuesto', 'Servicio', 'Garantia', 'Otro'].map((category) => <MenuItem key={category} value={category}>{category}</MenuItem>)}
+          {categories.length
+            ? categories.map((category) => <MenuItem key={category.id} value={category.name}>{category.name}{category.quoteAsBundle ? ' - paquete' : ''}</MenuItem>)
+            : <MenuItem value={v.category || 'Moto'}>{v.category || 'Sin categorias activas'}</MenuItem>}
         </TextField>
       </FieldGrid>
       <FieldGrid columns={3}>
@@ -3303,7 +3372,7 @@ function ProductPhotosManager({ product, onChanged }: { product: Product; onChan
   </Paper>;
 }
 
-function QuoteDialog({ form, products, requirementProfiles, onClose, onSave }: DialogProps<Quote, typeof emptyQuote> & { products: Product[]; requirementProfiles: RequirementProfile[] }) {
+function QuoteDialog({ form, products, productCategories, requirementProfiles, onClose, onSave }: DialogProps<Quote, typeof emptyQuote> & { products: Product[]; productCategories: ProductCategory[]; requirementProfiles: RequirementProfile[] }) {
   const firstProduct = products[0];
   const initialItem = {
     ...emptyQuoteItem,
@@ -3363,6 +3432,13 @@ function QuoteDialog({ form, products, requirementProfiles, onClose, onSave }: D
   return <FormDialog title="Nueva cotizacion" open={form.open} initial={initial} onClose={onClose} onSave={onSave} maxWidth="lg">
     {(v, set) => {
       const quoteItems = v.items?.length ? v.items : [{ ...emptyQuoteItem, productId: v.productId }];
+      const selectedProducts = quoteItems.map((item) => products.find((product) => product.id === item.productId)).filter(Boolean) as Product[];
+      const selectedCategory = selectedProducts.map((product) => product.category).filter(Boolean)[0];
+      const isBundleQuote = quoteItems.length > 1
+        && selectedProducts.length === quoteItems.length
+        && selectedProducts.every((product) => product.category === selectedCategory)
+        && productCategories.some((category) => category.name === selectedCategory && category.quoteAsBundle);
+      const bundleTotal = selectedProducts.reduce((sum, product) => sum + Number(product.price || 0), 0);
       const updateItem = (index: number, patch: Partial<typeof emptyQuoteItem>) => {
         const items = quoteItems.map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item);
         set({ items, productId: items[0]?.productId ?? '', downPayment: Number(items[0]?.downPayment ?? 0), insurance: Number(items[0]?.insurance ?? 0), administrativeFees: Number(items[0]?.administrativeFees ?? 0), termMonths: Number(items[0]?.termMonths ?? 24), monthlyInterestRate: Number(items[0]?.monthlyInterestRate ?? 2.2) });
@@ -3477,6 +3553,9 @@ function QuoteDialog({ form, products, requirementProfiles, onClose, onSave }: D
               </Stack>
             </Paper>;
           })}
+          {isBundleQuote && <Alert severity="info">
+            Esta categoria cotiza como paquete: se sumaran los articulos seleccionados y la financiacion se calculara sobre {money(bundleTotal)}.
+          </Alert>}
         </Stack>
         <TextField label="Observaciones" value={v.notes} onChange={(e) => set({ notes: e.target.value })} multiline minRows={2} />
       </>;

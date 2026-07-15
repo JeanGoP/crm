@@ -77,7 +77,29 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
         }).ToList();
         var primary = calculatedItems[0];
         var product = primary.Product;
-        var simulation = primary.Simulation;
+        var quoteCategories = calculatedItems
+            .Select(x => x.Product.Categoria.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var quoteCategory = quoteCategories.Count == 1 ? quoteCategories[0] : null;
+        var quoteAsBundle = calculatedItems.Count > 1
+            && !string.IsNullOrWhiteSpace(quoteCategory)
+            && await db.CategoriasProducto.AnyAsync(x => x.Nombre == quoteCategory && x.Activa && x.CotizarComoPaquete, cancellationToken);
+        var quoteProductPrice = quoteAsBundle ? calculatedItems.Sum(x => x.Product.Precio) : product.Precio;
+        var quotePromotionDiscount = quoteAsBundle ? calculatedItems.Sum(x => x.Promotion.DiscountAmount) : primary.Promotion.DiscountAmount;
+        var quotePromotion = quoteAsBundle ? null : primary.Promotion.Promotion;
+        var quotePromotionName = quoteAsBundle && quotePromotionDiscount > 0 ? "Promociones aplicadas" : primary.Promotion.Promotion?.Nombre;
+        var simulation = quoteAsBundle
+            ? CalculateSimulation(
+                calculatedItems.Sum(x => x.Promotion.DiscountedProductPrice),
+                primary.Simulation.DownPayment,
+                calculatedItems.Sum(x => x.Simulation.Insurance),
+                calculatedItems.Sum(x => x.Simulation.AdministrativeFees),
+                primary.Simulation.TermMonths,
+                primary.Simulation.MonthlyInterestRate,
+                financialSettings,
+                salesPoint)
+            : primary.Simulation;
         var initialStage = await db.EtapasNegocio
             .Where(x => x.Activa)
             .OrderBy(x => x.Orden)
@@ -86,7 +108,7 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
 
         var fullName = $"{firstNames} {lastNames}".Trim();
         var phone = FormatPhone(dto.PhoneCountryCode, dto.PhoneNumber);
-        var productName = ProductName(product);
+        var productName = quoteAsBundle ? $"{quoteCategory} ({calculatedItems.Count} articulos)" : ProductName(product);
         var normalizedIdentification = NormalizeIdentification(dto.IdentificationNumber);
         var customerReference = CustomerReference(fullName, normalizedIdentification, dto.PhoneNumber);
         var customer = string.IsNullOrWhiteSpace(normalizedIdentification)
@@ -166,11 +188,11 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             PlazoMaximoMesesSede = salesPoint?.PlazoMaximoMeses,
             VigenciaCotizacionDiasSede = salesPoint?.VigenciaCotizacionDias,
             CondicionesSede = salesPoint?.CondicionesComerciales,
-            PromocionId = primary.Promotion.Promotion?.Id,
-            Promocion = primary.Promotion.Promotion,
-            NombrePromocion = primary.Promotion.Promotion?.Nombre,
-            DescuentoPromocion = primary.Promotion.DiscountAmount,
-            PrecioProducto = product.Precio,
+            PromocionId = quotePromotion?.Id,
+            Promocion = quotePromotion,
+            NombrePromocion = quotePromotionName,
+            DescuentoPromocion = quotePromotionDiscount,
+            PrecioProducto = quoteProductPrice,
             CuotaInicial = simulation.DownPayment,
             Seguro = simulation.Insurance,
             GastosAdministrativos = simulation.AdministrativeFees,
@@ -213,7 +235,7 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             Titulo = calculatedItems.Count > 1 ? $"{customerReference} - Comparativo {calculatedItems.Count} productos" : $"{customerReference} - {productName}",
             ClienteId = customer.Id,
             EtapaNegocioId = initialStage.Id,
-            Valor = calculatedItems.Max(x => x.Product.Precio),
+            Valor = quoteProductPrice,
             ProbabilidadCierre = initialStage.ProbabilidadPredeterminada,
             FechaEstimadaCierre = now.AddDays(15),
             Estado = EstadoNegocio.Abierto

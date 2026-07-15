@@ -125,6 +125,14 @@ public sealed class Producto : AuditableTenantEntity
     public ICollection<ProductoFoto> Fotos { get; set; } = [];
 }
 
+public sealed class CategoriaProducto : AuditableTenantEntity
+{
+    public string Nombre { get; set; } = string.Empty;
+    public string? Descripcion { get; set; }
+    public bool CotizarComoPaquete { get; set; }
+    public bool Activa { get; set; } = true;
+}
+
 public sealed class ProductoFoto : AuditableTenantEntity
 {
     public Guid ProductoId { get; set; }

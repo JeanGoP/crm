@@ -102,6 +102,14 @@ export interface ProductPhoto {
   dataUrl: string;
 }
 
+export interface ProductCategory {
+  id: string;
+  name: string;
+  description?: string;
+  quoteAsBundle: boolean;
+  active: boolean;
+}
+
 export interface Product {
   id: string;
   name: string;

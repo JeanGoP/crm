@@ -28,10 +28,11 @@ public sealed class ProductsController(CrmDbContext db) : ControllerBase
     public async Task<ActionResult<ProductDto>> Create(UpsertProductDto dto, CancellationToken cancellationToken)
     {
         Validate(dto);
+        var category = await ResolveCategoryAsync(dto.Category, cancellationToken);
         var product = new Producto
         {
             Nombre = dto.Name.Trim(),
-            Categoria = NormalizeCategory(dto.Category),
+            Categoria = category.Nombre,
             Marca = dto.Brand.Trim(),
             Modelo = dto.Model.Trim(),
             Linea = NormalizeOptional(dto.Line),
@@ -59,12 +60,13 @@ public sealed class ProductsController(CrmDbContext db) : ControllerBase
     public async Task<ActionResult<ProductDto>> Update(Guid id, UpsertProductDto dto, CancellationToken cancellationToken)
     {
         Validate(dto);
+        var category = await ResolveCategoryAsync(dto.Category, cancellationToken);
         var product = await db.Productos
             .Include(x => x.Fotos)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
             ?? throw new KeyNotFoundException("Producto no encontrado.");
         product.Nombre = dto.Name.Trim();
-        product.Categoria = NormalizeCategory(dto.Category);
+        product.Categoria = category.Nombre;
         product.Marca = dto.Brand.Trim();
         product.Modelo = dto.Model.Trim();
         product.Linea = NormalizeOptional(dto.Line);
@@ -226,6 +228,13 @@ public sealed class ProductsController(CrmDbContext db) : ControllerBase
         {
             throw new ValidationException("Solo se permiten imagenes JPG, PNG o WebP.");
         }
+    }
+
+    private async Task<CategoriaProducto> ResolveCategoryAsync(string categoryName, CancellationToken cancellationToken)
+    {
+        var normalized = NormalizeCategory(categoryName);
+        return await db.CategoriasProducto.FirstOrDefaultAsync(x => x.Nombre == normalized && x.Activa, cancellationToken)
+            ?? throw new ValidationException("La categoria no existe o esta inactiva. Creela primero en Configuracion.");
     }
 
     private static string NormalizeCategory(string category) => string.IsNullOrWhiteSpace(category) ? "General" : category.Trim();
