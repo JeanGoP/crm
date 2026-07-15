@@ -309,18 +309,6 @@ public static class SimplePdfGenerator
     private static string Value(string? value) => string.IsNullOrWhiteSpace(value) ? "N/A" : value.Trim();
     private static string Value(string? value, string fallback) => string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
 
-    private static decimal EstimatePaymentForTerm(decimal financedAmount, int termMonths, decimal monthlyInterestRate)
-    {
-        if (financedAmount <= 0 || termMonths <= 0) return 0;
-        var rate = monthlyInterestRate / 100m;
-        if (rate <= 0) return Math.Round(financedAmount / termMonths, 0);
-
-        var rateDouble = (double)rate;
-        var amountDouble = (double)financedAmount;
-        var payment = amountDouble * rateDouble / (1 - Math.Pow(1 + rateDouble, -termMonths));
-        return Math.Round((decimal)payment, 0);
-    }
-
     private static string CreditStatus(EstadoSolicitudCredito status) => status switch
     {
         EstadoSolicitudCredito.Borrador => "Cotizado",
@@ -439,27 +427,17 @@ public static class SimplePdfGenerator
         }
         else
         {
-            DrawPanel(commands, 46, 332, 250, 214, "CUOTAS APROXIMADAS");
+            DrawPanel(commands, 46, 332, 250, 214, "RESUMEN COMERCIAL");
             KeyValue(commands, 62, 512, "Precio final", Money(quote.DiscountedProductPrice), 82, 140);
             KeyValue(commands, 62, 490, "Cuota inicial", Money(quote.DownPayment), 82, 140);
-            if (quote.PromotionDiscount > 0)
-            {
-                KeyValue(commands, 62, 468, "Promocion", Shorten(Value(quote.PromotionName), 22), 82, 140);
-            }
-            commands.AppendLine("0.90 0.94 0.96 rg 62 458 216 22 re f");
-            commands.AppendLine("0.09 0.11 0.15 rg BT /F2 8 Tf 76 466 Td (PLAZO) Tj ET");
-            commands.AppendLine("0.09 0.11 0.15 rg BT /F2 8 Tf 154 466 Td (CUOTA) Tj ET");
-            var terms = new[] { 1, 6, 12, 18, 24, 30, 36 };
-            var termY = 440;
-            foreach (var term in terms)
-            {
-                var payment = term == quote.TermMonths ? quote.EstimatedMonthlyPayment : EstimatePaymentForTerm(quote.FinancedAmount, term, quote.MonthlyInterestRate);
-                var isSelected = term == quote.TermMonths;
-                if (isSelected) commands.AppendLine($"0.90 0.97 0.94 rg 62 {termY - 5} 216 20 re f");
-                commands.AppendLine($"0.08 0.10 0.14 rg BT /F{(isSelected ? "2" : "1")} 10 Tf 80 {termY} Td ({term} meses) Tj ET");
-                commands.AppendLine($"0.08 0.10 0.14 rg BT /F{(isSelected ? "2" : "1")} 10 Tf 154 {termY} Td ({Escape(Money(payment))}) Tj ET");
-                termY -= 22;
-            }
+            KeyValue(commands, 62, 468, "Valor producto", Money(quote.ProductPrice), 82, 140);
+            KeyValue(commands, 62, 446, "Descuento", quote.PromotionDiscount > 0 ? Money(quote.PromotionDiscount) : "N/A", 82, 140);
+            KeyValue(commands, 62, 424, "Promocion", quote.PromotionDiscount > 0 ? Shorten(Value(quote.PromotionName), 22) : "N/A", 82, 140);
+            KeyValue(commands, 62, 402, "Vigencia", Date(quote.ValidUntil), 82, 140);
+
+            commands.AppendLine("0.94 0.97 0.98 rg 62 356 216 32 re f");
+            commands.AppendLine($"0.082 0.373 0.459 rg BT /F2 10 Tf 78 375 Td (Cotizacion por {quote.TermMonths} meses) Tj ET");
+            commands.AppendLine($"0.36 0.42 0.48 rg BT /F1 8 Tf 78 362 Td (Cuota seleccionada en el formulario) Tj ET");
 
             DrawPanel(commands, 316, 332, 250, 214, "RESUMEN DEL CREDITO");
             var creditBase = Math.Max(quote.DiscountedProductPrice - quote.DownPayment, 0);
