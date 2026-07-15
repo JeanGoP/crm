@@ -3402,7 +3402,7 @@ function QuoteDialog({ form, products, requirementProfiles, onClose, onSave }: D
               gap: 1.5,
               alignItems: 'center'
             }}>
-              <TextField required select label="Tipo identificacion" value={v.identificationType} onChange={(e) => set({ identificationType: Number(e.target.value) })}>
+              <TextField select label="Tipo identificacion" value={v.identificationType} onChange={(e) => set({ identificationType: Number(e.target.value) })}>
                 {identificationOptions.map((option) => <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>)}
               </TextField>
               <TextField
@@ -3418,9 +3418,9 @@ function QuoteDialog({ form, products, requirementProfiles, onClose, onSave }: D
               </Stack>
             </Box>
             <FieldGrid columns={4}>
-              <TextField fullWidth required label="Primer nombre" value={v.customerFirstName} onChange={(e) => set({ customerFirstName: e.target.value, customerFirstNames: fullFirstNames(e.target.value, v.customerMiddleName) })} />
+              <TextField fullWidth label="Primer nombre" value={v.customerFirstName} onChange={(e) => set({ customerFirstName: e.target.value, customerFirstNames: fullFirstNames(e.target.value, v.customerMiddleName) })} />
               <TextField fullWidth label="Segundo nombre" value={v.customerMiddleName} onChange={(e) => set({ customerMiddleName: e.target.value, customerFirstNames: fullFirstNames(v.customerFirstName, e.target.value) })} />
-              <TextField fullWidth required label="Primer apellido" value={v.customerLastName} onChange={(e) => set({ customerLastName: e.target.value, customerLastNames: fullLastNames(e.target.value, v.customerSecondLastName) })} />
+              <TextField fullWidth label="Primer apellido" value={v.customerLastName} onChange={(e) => set({ customerLastName: e.target.value, customerLastNames: fullLastNames(e.target.value, v.customerSecondLastName) })} />
               <TextField fullWidth label="Segundo apellido" value={v.customerSecondLastName} onChange={(e) => set({ customerSecondLastName: e.target.value, customerLastNames: fullLastNames(v.customerLastName, e.target.value) })} />
             </FieldGrid>
             <Box sx={{
@@ -3429,8 +3429,8 @@ function QuoteDialog({ form, products, requirementProfiles, onClose, onSave }: D
               gap: 1.5,
               maxWidth: { md: 620 }
             }}>
-              <TextField fullWidth required label="Indicativo" value={v.phoneCountryCode} onChange={(e) => set({ phoneCountryCode: e.target.value })} />
-              <TextField fullWidth required label="Telefono / WhatsApp" value={v.phoneNumber} onChange={(e) => set({ phoneNumber: e.target.value })} />
+              <TextField fullWidth label="Indicativo" value={v.phoneCountryCode} onChange={(e) => set({ phoneCountryCode: e.target.value })} />
+              <TextField fullWidth label="Telefono / WhatsApp" value={v.phoneNumber} onChange={(e) => set({ phoneNumber: e.target.value })} />
             </Box>
             <Box sx={{ maxWidth: { md: 520 } }}>
               <TextField fullWidth select label="Perfil de requisitos" value={v.requirementProfileId} onChange={(e) => set({ requirementProfileId: e.target.value })} helperText="Este perfil generara el checklist de documentos si la cotizacion pasa a solicitud de credito.">
@@ -3465,7 +3465,7 @@ function QuoteDialog({ form, products, requirementProfiles, onClose, onSave }: D
                   gap: 1.5,
                   alignItems: 'stretch'
                 }}>
-                  <TextField required select label="Producto" value={item.productId} onChange={(e) => updateItemProduct(index, e.target.value)}>
+                  <TextField select label="Producto" value={item.productId} onChange={(e) => updateItemProduct(index, e.target.value)}>
                     {products.length ? products.map((product) => <MenuItem key={product.id} value={product.id}>{productName(product)} ({product.category}) - {money(product.price)}</MenuItem>) : <MenuItem value="">No hay productos activos</MenuItem>}
                   </TextField>
                   <TextField fullWidth label="Cuota inicial" type="number" value={item.downPayment} onChange={(e) => updateItem(index, { downPayment: Number(e.target.value) })} />

@@ -276,8 +276,8 @@ public sealed record QuoteDto(
 public sealed record CreateQuoteDto(
     TipoIdentificacionColombia IdentificationType,
     string? IdentificationNumber,
-    string CustomerFirstNames,
-    string CustomerLastNames,
+    string? CustomerFirstNames,
+    string? CustomerLastNames,
     string? CustomerFirstName,
     string? CustomerMiddleName,
     string? CustomerLastName,

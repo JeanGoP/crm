@@ -43,9 +43,6 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
         var firstNames = Join(firstName, middleName);
         var lastNames = Join(lastName, secondLastName);
 
-        if (string.IsNullOrWhiteSpace(firstName)) throw new ValidationException("El primer nombre del cliente es obligatorio.");
-        if (string.IsNullOrWhiteSpace(lastName)) throw new ValidationException("El primer apellido del cliente es obligatorio.");
-        if (string.IsNullOrWhiteSpace(dto.PhoneNumber)) throw new ValidationException("El telefono del cliente es obligatorio.");
         var financialSettings = await GetFinancialSettingsAsync(cancellationToken);
         var salesPoint = await GetCurrentSalesPointAsync(cancellationToken);
         var requirementProfile = dto.RequirementProfileId.HasValue
@@ -91,6 +88,7 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
         var phone = FormatPhone(dto.PhoneCountryCode, dto.PhoneNumber);
         var productName = ProductName(product);
         var normalizedIdentification = NormalizeIdentification(dto.IdentificationNumber);
+        var customerReference = CustomerReference(fullName, normalizedIdentification, dto.PhoneNumber);
         var customer = string.IsNullOrWhiteSpace(normalizedIdentification)
             ? null
             : await db.Clientes
@@ -123,13 +121,19 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
         }
         else
         {
-            customer.Nombre = firstNames;
-            customer.Nombres = firstNames;
-            customer.Apellidos = lastNames;
-            customer.PrimerNombre = firstName;
-            customer.SegundoNombre = middleName;
-            customer.PrimerApellido = lastName;
-            customer.SegundoApellido = secondLastName;
+            if (!string.IsNullOrWhiteSpace(firstNames))
+            {
+                customer.Nombre = firstNames;
+                customer.Nombres = firstNames;
+                customer.PrimerNombre = firstName;
+                customer.SegundoNombre = middleName;
+            }
+            if (!string.IsNullOrWhiteSpace(lastNames))
+            {
+                customer.Apellidos = lastNames;
+                customer.PrimerApellido = lastName;
+                customer.SegundoApellido = secondLastName;
+            }
             customer.TipoIdentificacion = dto.IdentificationType;
             customer.NumeroIdentificacion = normalizedIdentification ?? dto.IdentificationNumber;
             customer.IndicativoTelefono = string.IsNullOrWhiteSpace(dto.PhoneCountryCode) ? customer.IndicativoTelefono : dto.PhoneCountryCode.Trim();
@@ -206,7 +210,7 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
         }
         var deal = new Negocio
         {
-            Titulo = calculatedItems.Count > 1 ? $"{fullName} - Comparativo {calculatedItems.Count} productos" : $"{fullName} - {productName}",
+            Titulo = calculatedItems.Count > 1 ? $"{customerReference} - Comparativo {calculatedItems.Count} productos" : $"{customerReference} - {productName}",
             ClienteId = customer.Id,
             EtapaNegocioId = initialStage.Id,
             Valor = calculatedItems.Max(x => x.Product.Precio),
@@ -217,7 +221,7 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
         var followUp = new Actividad
         {
             Titulo = AutomaticFollowUpTitle,
-            Descripcion = $"Cotizacion {number}: contactar a {fullName} para resolver dudas y avanzar la venta de {productName}.",
+            Descripcion = $"Cotizacion {number}: contactar a {customerReference} para resolver dudas y avanzar la venta de {productName}.",
             Tipo = TipoActividad.Llamada,
             Estado = EstadoActividad.Pendiente,
             FechaProgramada = now.AddDays(1),
@@ -613,10 +617,20 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
 
     private static string FormatPhone(string? countryCode, string? phoneNumber)
     {
+        var normalizedNumber = new string((phoneNumber ?? string.Empty).Where(char.IsDigit).ToArray());
+        if (string.IsNullOrWhiteSpace(normalizedNumber)) return string.Empty;
         var normalizedCode = string.IsNullOrWhiteSpace(countryCode) ? "+57" : countryCode.Trim();
         if (!normalizedCode.StartsWith("+")) normalizedCode = "+" + normalizedCode;
-        var normalizedNumber = new string((phoneNumber ?? string.Empty).Where(char.IsDigit).ToArray());
         return $"{normalizedCode} {normalizedNumber}".Trim();
+    }
+
+    private static string CustomerReference(string? fullName, string? identification, string? phoneNumber)
+    {
+        if (!string.IsNullOrWhiteSpace(fullName)) return fullName.Trim();
+        if (!string.IsNullOrWhiteSpace(identification)) return $"Documento {identification.Trim()}";
+        var normalizedPhone = new string((phoneNumber ?? string.Empty).Where(char.IsDigit).ToArray());
+        if (!string.IsNullOrWhiteSpace(normalizedPhone)) return $"Telefono {normalizedPhone}";
+        return "Cliente sin nombre";
     }
 
     private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
