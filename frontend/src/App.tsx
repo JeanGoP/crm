@@ -3235,17 +3235,25 @@ function ProductDialog({ form, categories, salesPoints, onClose, onSave, onChang
             const pointPrice = priceForSalesPoint(point.id);
             return <Box key={point.id} sx={{
               display: 'grid',
-              gridTemplateColumns: { xs: '1fr', md: 'minmax(180px, 1fr) 180px 170px 120px' },
-              gap: 1.5,
-              alignItems: 'center'
+              gridTemplateColumns: { xs: '1fr', md: 'minmax(0, 1fr) minmax(150px, 170px) minmax(175px, 190px)' },
+              gap: 1.25,
+              alignItems: 'start',
+              p: 1.25,
+              border: `1px solid ${uiBorder}`,
+              borderRadius: 2,
+              bgcolor: '#fff'
             }}>
-              <Box>
+              <Box sx={{ minWidth: 0 }}>
                 <Typography fontWeight={800}>{point.name}</Typography>
                 <Typography variant="caption" color="text.secondary">{point.city}</Typography>
+                <FormControlLabel
+                  sx={{ mt: .25, '& .MuiFormControlLabel-label': { fontSize: 12 } }}
+                  control={<Checkbox size="small" checked={pointPrice?.active ?? true} onChange={(e) => updateSalesPointPrice(point.id, { active: e.target.checked })} />}
+                  label="Activo"
+                />
               </Box>
-              <TextField fullWidth label="Precio sede" type="number" value={pointPrice?.price ?? ''} onChange={(e) => updateSalesPointPrice(point.id, { price: e.target.value === '' ? '' : Number(e.target.value) })} />
-              <TextField fullWidth label="Vigente desde" type="date" value={pointPrice?.priceValidFrom ?? ''} onChange={(e) => updateSalesPointPrice(point.id, { priceValidFrom: e.target.value })} InputLabelProps={{ shrink: true }} />
-              <FormControlLabel control={<Checkbox checked={pointPrice?.active ?? true} onChange={(e) => updateSalesPointPrice(point.id, { active: e.target.checked })} />} label="Activo" />
+              <TextField fullWidth size="small" label="Precio sede" type="number" value={pointPrice?.price ?? ''} onChange={(e) => updateSalesPointPrice(point.id, { price: e.target.value === '' ? '' : Number(e.target.value) })} />
+              <TextField fullWidth size="small" label="Vigente desde" type="date" value={pointPrice?.priceValidFrom ?? ''} onChange={(e) => updateSalesPointPrice(point.id, { priceValidFrom: e.target.value })} InputLabelProps={{ shrink: true }} />
             </Box>;
           })}
         </Stack>
