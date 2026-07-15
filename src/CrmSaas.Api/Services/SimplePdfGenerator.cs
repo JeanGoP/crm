@@ -436,8 +436,8 @@ public static class SimplePdfGenerator
             KeyValue(commands, 62, 402, "Vigencia", Date(quote.ValidUntil), 82, 140);
 
             commands.AppendLine("0.94 0.97 0.98 rg 62 356 216 32 re f");
-            commands.AppendLine($"0.082 0.373 0.459 rg BT /F2 10 Tf 78 375 Td (Cotizacion por {quote.TermMonths} meses) Tj ET");
-            commands.AppendLine($"0.36 0.42 0.48 rg BT /F1 8 Tf 78 362 Td (Cuota seleccionada en el formulario) Tj ET");
+            commands.AppendLine($"0.082 0.373 0.459 rg BT /F2 10 Tf 78 375 Td (Resumen de valores) Tj ET");
+            commands.AppendLine($"0.36 0.42 0.48 rg BT /F1 8 Tf 78 362 Td (Sujeto a validacion comercial) Tj ET");
 
             DrawPanel(commands, 316, 332, 250, 214, "RESUMEN DEL CREDITO");
             var creditBase = Math.Max(quote.DiscountedProductPrice - quote.DownPayment, 0);
@@ -448,7 +448,7 @@ public static class SimplePdfGenerator
             commands.AppendLine("0.082 0.373 0.459 rg 332 396 218 38 re f");
             commands.AppendLine($"1 1 1 rg BT /F2 10 Tf 346 419 Td (Total credito) Tj ET");
             commands.AppendLine($"1 1 1 rg BT /F2 12 Tf 446 419 Td ({Escape(Money(quote.FinancedAmount))}) Tj ET");
-            commands.AppendLine($"1 1 1 rg BT /F1 9 Tf 346 404 Td (Cuota seleccionada: {quote.TermMonths} meses - {Escape(Money(quote.EstimatedMonthlyPayment))}) Tj ET");
+            commands.AppendLine($"1 1 1 rg BT /F1 9 Tf 346 404 Td (Valor sujeto a estudio y aprobacion) Tj ET");
             KeyValue(commands, 332, 370, "Total estimado", Money(quote.EstimatedTotalPayment), 88, 130);
             KeyValue(commands, 332, 350, "Marca / tasa", $"{Value(quote.SalesPointBrand, "Marca")} - {quote.MonthlyInterestRate:N3}%", 88, 130);
         }
@@ -487,8 +487,8 @@ public static class SimplePdfGenerator
     {
         DrawPanel(commands, x, y, 520, 214, "COMPARATIVO DE ARTICULOS");
         commands.AppendLine($"0.90 0.94 0.96 rg {x + 16} {y + 158} 488 24 re f");
-        var headers = new[] { "Producto", "Precio", "Inicial", "Financiado", "Plazo", "Cuota" };
-        var columns = new[] { x + 24, x + 160, x + 232, x + 304, x + 386, x + 438 };
+        var headers = new[] { "Producto", "Precio", "Inicial", "Financiado" };
+        var columns = new[] { x + 24, x + 210, x + 318, x + 410 };
         for (var i = 0; i < headers.Length; i++)
         {
             commands.AppendLine($"0.09 0.11 0.15 rg BT /F2 7 Tf {columns[i]} {y + 168} Td ({headers[i]}) Tj ET");
@@ -502,15 +502,13 @@ public static class SimplePdfGenerator
             commands.AppendLine($"0.08 0.10 0.14 rg BT /F1 8 Tf {columns[1]} {rowY} Td ({Escape(Money(item.DiscountedProductPrice))}) Tj ET");
             commands.AppendLine($"0.08 0.10 0.14 rg BT /F1 8 Tf {columns[2]} {rowY} Td ({Escape(Money(item.DownPayment))}) Tj ET");
             commands.AppendLine($"0.08 0.10 0.14 rg BT /F1 8 Tf {columns[3]} {rowY} Td ({Escape(Money(item.FinancedAmount))}) Tj ET");
-            commands.AppendLine($"0.08 0.10 0.14 rg BT /F1 8 Tf {columns[4]} {rowY} Td ({item.TermMonths}) Tj ET");
-            commands.AppendLine($"0.08 0.10 0.14 rg BT /F2 8 Tf {columns[5]} {rowY} Td ({Escape(Money(item.EstimatedMonthlyPayment))}) Tj ET");
             rowY -= 30;
         }
 
-        var bestPayment = items.OrderBy(x => x.EstimatedMonthlyPayment).First();
         var bestPrice = items.OrderBy(x => x.DiscountedProductPrice).First();
+        var total = items.Sum(x => x.DiscountedProductPrice);
         commands.AppendLine("0.082 0.373 0.459 rg " + (x + 16) + " " + (y + 18) + " 488 34 re f");
-        commands.AppendLine($"1 1 1 rg BT /F2 9 Tf {x + 30} {y + 38} Td (Menor cuota: {Escape(Shorten(bestPayment.ProductName, 28))} - {Escape(Money(bestPayment.EstimatedMonthlyPayment))}) Tj ET");
+        commands.AppendLine($"1 1 1 rg BT /F2 9 Tf {x + 30} {y + 38} Td (Total articulos: {Escape(Money(total))}) Tj ET");
         commands.AppendLine($"1 1 1 rg BT /F1 8 Tf {x + 30} {y + 24} Td (Menor precio: {Escape(Shorten(bestPrice.ProductName, 28))} - {Escape(Money(bestPrice.DiscountedProductPrice))}) Tj ET");
     }
 
