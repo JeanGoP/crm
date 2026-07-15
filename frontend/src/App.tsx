@@ -859,34 +859,35 @@ function ProductsPage() {
     <Header title="Productos" action={canManage ? 'Nuevo producto' : undefined} onAction={() => setForm({ open: true })} onRefresh={reload} />
     <StatusBar loading={loading} error={error} />
     <EntityTable
+      compact
       headers={['Producto', 'Fotos', 'Categoria', 'Marca', 'Referencia', 'Caracteristicas', 'Cargos', 'Precio', 'Estado', 'Acciones']}
       empty="No hay productos registrados"
       rows={rows.map((r) => [
-        <Stack direction="row" spacing={1.5} alignItems="center">
-          <ProductPhotoThumb photo={(r.photos ?? []).find((photo) => photo.isQuoteDefault) ?? (r.photos ?? [])[0]} />
-          <Box>
-            <Typography fontWeight={800}>{productName(r)}</Typography>
-            <Typography variant="caption" color="text.secondary">{r.description || 'Sin descripcion'}</Typography>
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0 }}>
+          <ProductPhotoThumb photo={(r.photos ?? []).find((photo) => photo.isQuoteDefault) ?? (r.photos ?? [])[0]} size={36} />
+          <Box sx={{ minWidth: 0 }}>
+            <Typography fontWeight={900} sx={{ fontSize: 12.5, lineHeight: 1.25, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{productName(r)}</Typography>
+            <Typography color="text.secondary" sx={{ fontSize: 11.5, lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.description ? 'Con descripcion' : 'Sin descripcion'}</Typography>
           </Box>
         </Stack>,
-        <Stack spacing={.5}>
-          <Chip size="small" label={`${r.photos?.length ?? 0} foto${(r.photos?.length ?? 0) === 1 ? '' : 's'}`} variant="outlined" />
-          {(r.photos ?? []).some((photo) => photo.isQuoteDefault) && <Typography variant="caption" color="text.secondary">Principal PDF lista</Typography>}
+        <Stack direction="row" spacing={.5} alignItems="center" flexWrap="wrap" useFlexGap>
+          <Chip size="small" label={`${r.photos?.length ?? 0}`} variant="outlined" />
+          {(r.photos ?? []).some((photo) => photo.isQuoteDefault) && <Chip size="small" color="success" label="PDF" />}
         </Stack>,
-        r.category,
-        r.brand,
-        r.reference,
-        [r.model, r.line, r.version, r.engineCc ? `${r.engineCc} cc` : undefined, r.year, r.color].filter(Boolean).join(' / ') || r.description,
-        <Stack spacing={0.25}>
-          <Typography variant="body2">{money((r.soat ?? 0) + (r.registrationFee ?? 0) + (r.taxes ?? 0))}</Typography>
-          <Typography variant="caption" color="text.secondary">SOAT {money(r.soat ?? 0)} · Mat. {money(r.registrationFee ?? 0)}</Typography>
+        <Typography sx={{ fontSize: 12.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.category}</Typography>,
+        <Typography sx={{ fontSize: 12.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.brand || '-'}</Typography>,
+        <Typography sx={{ fontSize: 12.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.reference}</Typography>,
+        <Typography sx={{ fontSize: 12.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{[r.model, r.line, r.version, r.engineCc ? `${r.engineCc} cc` : undefined, r.year, r.color].filter(Boolean).join(' / ') || '-'}</Typography>,
+        <Stack spacing={0.15}>
+          <Typography sx={{ fontSize: 12.5 }}>{money((r.soat ?? 0) + (r.registrationFee ?? 0) + (r.taxes ?? 0))}</Typography>
+          <Typography color="text.secondary" sx={{ fontSize: 11.5, lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>S {money(r.soat ?? 0)} · M {money(r.registrationFee ?? 0)}</Typography>
         </Stack>,
-        <Stack spacing={0.25}>
-          <Typography variant="body2">{money(r.price)}</Typography>
-          {isApplianceCategoryName(r.category) && (r.salesPointPrices?.length ?? 0) > 0 && <Typography variant="caption" color="text.secondary">{r.salesPointPrices.length} precio(s) por sede</Typography>}
+        <Stack spacing={0.15}>
+          <Typography sx={{ fontSize: 12.5 }}>{money(r.price)}</Typography>
+          {isApplianceCategoryName(r.category) && (r.salesPointPrices?.length ?? 0) > 0 && <Typography color="text.secondary" sx={{ fontSize: 11.5, lineHeight: 1.2 }}>{r.salesPointPrices.length} sede(s)</Typography>}
         </Stack>,
         <StatusChip label={r.active ? 'Activa' : 'Inactiva'} tone={r.active ? 'success' : 'default'} />,
-        <Actions onEdit={canManage ? () => setForm({ open: true, item: r }) : undefined} onDelete={canManage && r.active ? () => setConfirm(r) : undefined} />
+        <Actions compact onEdit={canManage ? () => setForm({ open: true, item: r }) : undefined} onDelete={canManage && r.active ? () => setConfirm(r) : undefined} />
       ])}
     />
     <ProductDialog form={form} categories={categories.filter((category) => category.active)} salesPoints={salesPoints.filter((point) => point.active)} onClose={() => setForm({ open: false })} onSave={save} onChanged={reload} />
@@ -4292,6 +4293,7 @@ function ReportTable({ headers, rows, empty }: { headers: string[]; rows: ReactN
 function tableMinWidth(headers: string[], compact = false) {
   if (headers.includes('Pendientes')) return compact ? 980 : 1120;
   if (headers.includes('Gestion')) return 1180;
+  if (headers.includes('Caracteristicas') && headers.includes('Fotos')) return compact ? 1360 : 1520;
   return headers.includes('Plantillas') ? 1760 : 760;
 }
 
@@ -4302,9 +4304,16 @@ function tableColumnSx(header: string, compact = false) {
     Numero: 150,
     Cliente: compact ? 250 : 220,
     Credito: compact ? 280 : 260,
-    Producto: 220,
+    Producto: compact ? 235 : 220,
+    Fotos: compact ? 90 : 180,
+    Categoria: compact ? 140 : 180,
+    Marca: compact ? 120 : 180,
+    Referencia: compact ? 150 : 180,
+    Caracteristicas: compact ? 210 : 180,
+    Cargos: compact ? 130 : 180,
+    Precio: compact ? 130 : 180,
     Ciudad: 150,
-    Estado: compact ? 128 : 150,
+    Estado: compact ? 112 : 150,
     Pendientes: compact ? 205 : 250,
     Gestion: 560,
     Ingresos: 130,
@@ -4313,7 +4322,7 @@ function tableColumnSx(header: string, compact = false) {
     Documentos: 410,
     Aprobacion: 220,
     Plantillas: 170,
-    Acciones: compact ? 180 : 220
+    Acciones: compact ? 120 : 220
   };
   return {
     width: widths[header] ?? 180,
