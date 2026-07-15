@@ -1016,6 +1016,12 @@ function QuotesPage() {
   };
 
   const save = async (payload: typeof emptyQuote) => {
+    const customerFirstName = payload.customerFirstName.trim();
+    const customerLastName = payload.customerLastName.trim();
+    const phoneDigits = (payload.phoneNumber ?? '').replace(/\D/g, '');
+    if (!customerFirstName) throw new Error('El primer nombre del cliente es obligatorio.');
+    if (!customerLastName) throw new Error('El primer apellido del cliente es obligatorio.');
+    if (!phoneDigits) throw new Error('El telefono del cliente es obligatorio.');
     const quoteItems = (payload.items?.length ? payload.items : [{ ...emptyQuoteItem, productId: payload.productId, downPayment: payload.downPayment, insurance: payload.insurance, administrativeFees: payload.administrativeFees, termMonths: payload.termMonths, monthlyInterestRate: payload.monthlyInterestRate }])
       .filter((item) => item.productId)
       .map((item) => ({
@@ -3494,9 +3500,9 @@ function QuoteDialog({ form, products, productCategories, requirementProfiles, o
               </Stack>
             </Box>
             <FieldGrid columns={4}>
-              <TextField fullWidth label="Primer nombre" value={v.customerFirstName} onChange={(e) => set({ customerFirstName: e.target.value, customerFirstNames: fullFirstNames(e.target.value, v.customerMiddleName) })} />
+              <TextField fullWidth required label="Primer nombre" value={v.customerFirstName} onChange={(e) => set({ customerFirstName: e.target.value, customerFirstNames: fullFirstNames(e.target.value, v.customerMiddleName) })} />
               <TextField fullWidth label="Segundo nombre" value={v.customerMiddleName} onChange={(e) => set({ customerMiddleName: e.target.value, customerFirstNames: fullFirstNames(v.customerFirstName, e.target.value) })} />
-              <TextField fullWidth label="Primer apellido" value={v.customerLastName} onChange={(e) => set({ customerLastName: e.target.value, customerLastNames: fullLastNames(e.target.value, v.customerSecondLastName) })} />
+              <TextField fullWidth required label="Primer apellido" value={v.customerLastName} onChange={(e) => set({ customerLastName: e.target.value, customerLastNames: fullLastNames(e.target.value, v.customerSecondLastName) })} />
               <TextField fullWidth label="Segundo apellido" value={v.customerSecondLastName} onChange={(e) => set({ customerSecondLastName: e.target.value, customerLastNames: fullLastNames(v.customerLastName, e.target.value) })} />
             </FieldGrid>
             <Box sx={{
@@ -3506,7 +3512,7 @@ function QuoteDialog({ form, products, productCategories, requirementProfiles, o
               maxWidth: { md: 620 }
             }}>
               <TextField fullWidth label="Indicativo" value={v.phoneCountryCode} onChange={(e) => set({ phoneCountryCode: e.target.value })} />
-              <TextField fullWidth label="Telefono / WhatsApp" value={v.phoneNumber} onChange={(e) => set({ phoneNumber: e.target.value })} />
+              <TextField fullWidth required label="Telefono / WhatsApp" value={v.phoneNumber} onChange={(e) => set({ phoneNumber: e.target.value })} />
             </Box>
             <Box sx={{ maxWidth: { md: 520 } }}>
               <TextField fullWidth select label="Perfil de requisitos" value={v.requirementProfileId} onChange={(e) => set({ requirementProfileId: e.target.value })} helperText="Este perfil generara el checklist de documentos si la cotizacion pasa a solicitud de credito.">

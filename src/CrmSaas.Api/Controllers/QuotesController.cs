@@ -42,6 +42,9 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
         var secondLastName = Clean(dto.CustomerSecondLastName) ?? Join(Split(dto.CustomerLastNames).Skip(1));
         var firstNames = Join(firstName, middleName);
         var lastNames = Join(lastName, secondLastName);
+        if (string.IsNullOrWhiteSpace(firstName)) throw new ValidationException("El primer nombre del cliente es obligatorio.");
+        if (string.IsNullOrWhiteSpace(lastName)) throw new ValidationException("El primer apellido del cliente es obligatorio.");
+        if (string.IsNullOrWhiteSpace(NormalizePhoneDigits(dto.PhoneNumber))) throw new ValidationException("El telefono del cliente es obligatorio.");
 
         var financialSettings = await GetFinancialSettingsAsync(cancellationToken);
         var salesPoint = await GetCurrentSalesPointAsync(cancellationToken);
@@ -642,7 +645,7 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
 
     private static string FormatPhone(string? countryCode, string? phoneNumber)
     {
-        var normalizedNumber = new string((phoneNumber ?? string.Empty).Where(char.IsDigit).ToArray());
+        var normalizedNumber = NormalizePhoneDigits(phoneNumber);
         if (string.IsNullOrWhiteSpace(normalizedNumber)) return string.Empty;
         var normalizedCode = string.IsNullOrWhiteSpace(countryCode) ? "+57" : countryCode.Trim();
         if (!normalizedCode.StartsWith("+")) normalizedCode = "+" + normalizedCode;
@@ -653,12 +656,13 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
     {
         if (!string.IsNullOrWhiteSpace(fullName)) return fullName.Trim();
         if (!string.IsNullOrWhiteSpace(identification)) return $"Documento {identification.Trim()}";
-        var normalizedPhone = new string((phoneNumber ?? string.Empty).Where(char.IsDigit).ToArray());
+        var normalizedPhone = NormalizePhoneDigits(phoneNumber);
         if (!string.IsNullOrWhiteSpace(normalizedPhone)) return $"Telefono {normalizedPhone}";
         return "Cliente sin nombre";
     }
 
     private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    private static string NormalizePhoneDigits(string? value) => new((value ?? string.Empty).Where(char.IsDigit).ToArray());
     private static string? NormalizeIdentification(string? value)
     {
         var digits = new string((value ?? string.Empty).Where(char.IsDigit).ToArray());
