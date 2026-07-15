@@ -32,6 +32,42 @@ namespace CrmSaas.Infrastructure.Persistence.Migrations
                 });
 
             migrationBuilder.Sql("""
+                WITH source AS (
+                    SELECT
+                        EmpresaId,
+                        NULLIF(LTRIM(RTRIM(Categoria)), '') AS Nombre,
+                        CAST(NULL AS nvarchar(400)) AS Descripcion,
+                        CAST(CASE WHEN LTRIM(RTRIM(Categoria)) LIKE '%Electrodom%' THEN 1 ELSE 0 END AS int) AS CotizarComoPaquete
+                    FROM Productos
+                    WHERE NULLIF(LTRIM(RTRIM(Categoria)), '') IS NOT NULL
+
+                    UNION ALL
+
+                    SELECT
+                        Id AS EmpresaId,
+                        'Moto' AS Nombre,
+                        'Categoria principal para motos y vehiculos.' AS Descripcion,
+                        0 AS CotizarComoPaquete
+                    FROM Empresas
+
+                    UNION ALL
+
+                    SELECT
+                        Id AS EmpresaId,
+                        'Electrodomesticos' AS Nombre,
+                        'Categoria para cotizar varios articulos como un solo paquete.' AS Descripcion,
+                        1 AS CotizarComoPaquete
+                    FROM Empresas
+                ),
+                deduplicated AS (
+                    SELECT
+                        EmpresaId,
+                        MIN(Nombre) AS Nombre,
+                        MAX(Descripcion) AS Descripcion,
+                        CAST(MAX(CotizarComoPaquete) AS bit) AS CotizarComoPaquete
+                    FROM source
+                    GROUP BY EmpresaId, UPPER(Nombre)
+                )
                 INSERT INTO CategoriasProducto
                     (Id, Nombre, Descripcion, CotizarComoPaquete, Activa, EmpresaId, FechaCreacion, UsuarioCreacion)
                 SELECT
@@ -43,38 +79,12 @@ namespace CrmSaas.Infrastructure.Persistence.Migrations
                     source.EmpresaId,
                     DATEADD(HOUR, -5, SYSUTCDATETIME()),
                     'migracion'
-                FROM (
-                    SELECT DISTINCT
-                        EmpresaId,
-                        NULLIF(LTRIM(RTRIM(Categoria)), '') AS Nombre,
-                        CAST(NULL AS nvarchar(400)) AS Descripcion,
-                        CAST(CASE WHEN LTRIM(RTRIM(Categoria)) LIKE '%Electrodom%' THEN 1 ELSE 0 END AS bit) AS CotizarComoPaquete
-                    FROM Productos
-                    WHERE NULLIF(LTRIM(RTRIM(Categoria)), '') IS NOT NULL
-
-                    UNION
-
-                    SELECT
-                        Id AS EmpresaId,
-                        'Moto' AS Nombre,
-                        'Categoria principal para motos y vehiculos.' AS Descripcion,
-                        CAST(0 AS bit) AS CotizarComoPaquete
-                    FROM Empresas
-
-                    UNION
-
-                    SELECT
-                        Id AS EmpresaId,
-                        'Electrodomesticos' AS Nombre,
-                        'Categoria para cotizar varios articulos como un solo paquete.' AS Descripcion,
-                        CAST(1 AS bit) AS CotizarComoPaquete
-                    FROM Empresas
-                ) source
+                FROM deduplicated source
                 WHERE NOT EXISTS (
                     SELECT 1
                     FROM CategoriasProducto existing
                     WHERE existing.EmpresaId = source.EmpresaId
-                      AND existing.Nombre = source.Nombre
+                      AND UPPER(existing.Nombre) = UPPER(source.Nombre)
                 );
                 """);
 
