@@ -1004,7 +1004,7 @@ function QuotesPage() {
   const [notice, setNotice] = useState<Notice>();
 
   const downloadPdf = async (quote: Quote) => {
-    const { data } = await api.get<Blob>(`/api/quotes/${quote.id}/pdf`, { responseType: 'blob' });
+    const { data } = await api.get<Blob>(`/api/quotes/${quote.id}/pdf?t=${Date.now()}`, { responseType: 'blob' });
     const url = URL.createObjectURL(data);
     const link = document.createElement('a');
     link.href = url;
@@ -3657,7 +3657,7 @@ function QuotePdfPreviewDialog({ quote, onClose, onDownload }: { quote?: Quote; 
 
     setLoading(true);
     setError('');
-    api.get<Blob>(`/api/quotes/${quote.id}/pdf`, { responseType: 'blob' })
+    api.get<Blob>(`/api/quotes/${quote.id}/pdf?t=${Date.now()}`, { responseType: 'blob' })
       .then(({ data }) => {
         objectUrl = URL.createObjectURL(data);
         setUrl(objectUrl);

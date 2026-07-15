@@ -334,6 +334,9 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             quote.Cliente?.Telefono,
             quote.Cliente?.Direccion,
             quote.UsuarioCreacion);
+        Response.Headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0";
+        Response.Headers["Pragma"] = "no-cache";
+        Response.Headers["Expires"] = "0";
         return File(bytes, "application/pdf", $"{quote.Numero}.pdf");
     }
 
