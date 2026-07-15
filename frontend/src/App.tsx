@@ -1290,24 +1290,27 @@ function CreditApplicationsPage() {
     <Header title="Solicitudes de credito" action="Nueva solicitud" onAction={() => setForm({ open: true })} onRefresh={reload} />
     <StatusBar loading={loading} error={error} />
     <EntityTable
+      compact
       headers={['Solicitud', 'Cliente', 'Credito', 'Estado', 'Pendientes', 'Acciones']}
       empty="No hay solicitudes de credito"
       rows={rows.map((r) => [
-        <Row primary={r.number} secondary={r.requirementProfileName || 'Sin perfil'} />,
-        <Stack spacing={.5}>
-          <Typography fontWeight={800}>{r.customerName}</Typography>
-          <Typography variant="caption" color="text.secondary">{r.identificationNumber || 'Sin identificacion'} · {r.mobile || 'Sin telefono'}</Typography>
+        <Stack spacing={.2} sx={{ minWidth: 0 }}>
+          <Typography fontWeight={800} sx={{ fontSize: 12.5, lineHeight: 1.25, wordBreak: 'break-word' }}>{r.number}</Typography>
+          <Typography color="text.secondary" sx={{ fontSize: 11.5, lineHeight: 1.2 }}>{r.requirementProfileName || 'Sin perfil'}</Typography>
         </Stack>,
-        <Stack spacing={.5}>
-          <Typography fontWeight={800}>{r.productName}</Typography>
-          <Typography variant="caption" color="text.secondary">Ingresos {money(r.monthlyIncome)} · Inicial {money(r.downPayment)}</Typography>
-          <Typography variant="caption" color="text.secondary">{r.coDebtorName ? `Codeudor: ${r.coDebtorName}` : 'Sin codeudor'} · {[r.reference1Name, r.reference2Name].filter(Boolean).length || 0} ref.</Typography>
+        <Stack spacing={.2} sx={{ minWidth: 0 }}>
+          <Typography fontWeight={900} sx={{ fontSize: 12.5, lineHeight: 1.25, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.customerName}</Typography>
+          <Typography color="text.secondary" sx={{ fontSize: 11.5, lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{[r.identificationNumber, r.mobile].filter(Boolean).join(' · ') || '-'}</Typography>
+        </Stack>,
+        <Stack spacing={.2} sx={{ minWidth: 0 }}>
+          <Typography fontWeight={900} sx={{ fontSize: 12.5, lineHeight: 1.25, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.productName}</Typography>
+          <Typography color="text.secondary" sx={{ fontSize: 11.5, lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{money(r.motorcycleValue)} · Ini. {money(r.downPayment)} · {[r.reference1Name, r.reference2Name].filter(Boolean).length || 0} ref.</Typography>
         </Stack>,
         <StatusChip label={creditStatus(r.status)} tone={creditTone(r.status)} />,
-        <CreditApplicationPendingSummary application={r} />,
-        <Stack direction="row" gap={1} alignItems="center" flexWrap="wrap" useFlexGap>
-          <Button size="small" variant="contained" onClick={() => setManagement(r)}>Gestionar</Button>
-          <Actions onAi={() => analyzeCustomer(r.customerId, r.mobile)} onEdit={() => setForm({ open: true, item: r })} />
+        <CreditApplicationPendingSummary application={r} compact />,
+        <Stack direction="row" gap={.5} alignItems="center" flexWrap="nowrap">
+          <Button size="small" variant="contained" onClick={() => setManagement(r)} sx={{ minHeight: 28, px: 1.25, fontSize: 11.5 }}>Gestionar</Button>
+          <Actions compact onAi={() => analyzeCustomer(r.customerId, r.mobile)} onEdit={() => setForm({ open: true, item: r })} />
         </Stack>
       ])}
     />
@@ -1331,7 +1334,7 @@ function CreditApplicationsPage() {
   </Stack>;
 }
 
-function CreditApplicationPendingSummary({ application }: { application: CreditApplication }) {
+function CreditApplicationPendingSummary({ application, compact = false }: { application: CreditApplication; compact?: boolean }) {
   const validDocuments = application.documents.filter((x) => x.status === 3).length;
   const pendingDocuments = application.documents.filter((x) => x.status === 1 || x.status === 4 || x.isExpired).length;
   const step0Ready = application.runtChecked && application.simitChecked && application.identityValidated;
@@ -1344,8 +1347,8 @@ function CreditApplicationPendingSummary({ application }: { application: CreditA
   ].filter(Boolean);
 
   return <Stack direction="row" gap={.5} flexWrap="wrap" useFlexGap>
-    <Chip size="small" color={pendingDocuments ? 'warning' : 'success'} label={`${validDocuments}/${application.documents.length} docs`} />
-    <Chip size="small" color={step0Ready ? 'success' : 'warning'} variant={step0Ready ? 'filled' : 'outlined'} label={step0Ready ? 'Validacion inicial lista' : 'Validacion inicial pendiente'} />
+    <Chip size="small" color={pendingDocuments ? 'warning' : 'success'} label={compact ? `${validDocuments}/${application.documents.length}` : `${validDocuments}/${application.documents.length} docs`} />
+    <Chip size="small" color={step0Ready ? 'success' : 'warning'} variant={step0Ready ? 'filled' : 'outlined'} label={compact ? (step0Ready ? 'Inicial ok' : 'Inicial') : (step0Ready ? 'Validacion inicial lista' : 'Validacion inicial pendiente')} />
     {application.studyResult && <Chip size="small" label={application.studyResult} variant="outlined" color={application.status === 6 ? 'error' : application.status === 5 ? 'success' : 'default'} />}
     {!application.studyResult && items.length === 0 && <Chip size="small" variant="outlined" label="Sin pendientes" />}
   </Stack>;
@@ -4257,12 +4260,21 @@ function Header({ title, action, onAction, onRefresh, secondaryAction }: { title
   </Stack>;
 }
 
-function EntityTable({ headers, rows, empty }: { headers: string[]; rows: ReactNode[][]; empty: string }) {
+function EntityTable({ headers, rows, empty, compact = false }: { headers: string[]; rows: ReactNode[][]; empty: string; compact?: boolean }) {
   return <Card sx={{ width: '100%', overflow: 'hidden' }}>
     <TableContainer sx={{ width: '100%', overflowX: 'auto' }}>
-      <Table size="small" sx={{ minWidth: tableMinWidth(headers), tableLayout: 'fixed' }}>
-        <TableHead><TableRow>{headers.map((h) => <TableCell key={h} sx={{ ...tableColumnSx(h), whiteSpace: 'nowrap', fontWeight: 900, py: 1.35 }}>{h}</TableCell>)}</TableRow></TableHead>
-        <TableBody>{rows.length ? rows.map((row, i) => <TableRow key={i} sx={{ '&:hover': { bgcolor: '#f9fafb' } }}>{row.map((c, j) => <TableCell key={j} sx={{ ...tableColumnSx(headers[j]), verticalAlign: 'top', py: 1.5 }}>{c ?? '-'}</TableCell>)}</TableRow>) : <TableRow><TableCell colSpan={headers.length}><EmptyState text={empty} /></TableCell></TableRow>}</TableBody>
+      <Table size="small" sx={{
+        minWidth: tableMinWidth(headers, compact),
+        tableLayout: 'fixed',
+        ...(compact ? {
+          '& .MuiTableCell-root': { fontSize: 12.5 },
+          '& .MuiChip-root': { height: 22, fontSize: 11.25 },
+          '& .MuiIconButton-root': { p: .45 },
+          '& .MuiSvgIcon-root': { fontSize: 18 }
+        } : {})
+      }}>
+        <TableHead><TableRow>{headers.map((h) => <TableCell key={h} sx={{ ...tableColumnSx(h, compact), whiteSpace: 'nowrap', fontWeight: 900, py: compact ? .8 : 1.35 }}>{h}</TableCell>)}</TableRow></TableHead>
+        <TableBody>{rows.length ? rows.map((row, i) => <TableRow key={i} sx={{ '&:hover': { bgcolor: '#f9fafb' } }}>{row.map((c, j) => <TableCell key={j} sx={{ ...tableColumnSx(headers[j], compact), verticalAlign: 'middle', py: compact ? .65 : 1.5 }}>{c ?? '-'}</TableCell>)}</TableRow>) : <TableRow><TableCell colSpan={headers.length}><EmptyState text={empty} /></TableCell></TableRow>}</TableBody>
       </Table>
     </TableContainer>
   </Card>;
@@ -4277,23 +4289,23 @@ function ReportTable({ headers, rows, empty }: { headers: string[]; rows: ReactN
   </TableContainer>;
 }
 
-function tableMinWidth(headers: string[]) {
-  if (headers.includes('Pendientes')) return 1120;
+function tableMinWidth(headers: string[], compact = false) {
+  if (headers.includes('Pendientes')) return compact ? 980 : 1120;
   if (headers.includes('Gestion')) return 1180;
   return headers.includes('Plantillas') ? 1760 : 760;
 }
 
-function tableColumnSx(header: string) {
+function tableColumnSx(header: string, compact = false) {
   const widths: Record<string, number> = {
-    Solicitud: 170,
+    Solicitud: compact ? 132 : 170,
     Identificacion: 150,
     Numero: 150,
-    Cliente: 220,
-    Credito: 260,
+    Cliente: compact ? 250 : 220,
+    Credito: compact ? 280 : 260,
     Producto: 220,
     Ciudad: 150,
-    Estado: 150,
-    Pendientes: 250,
+    Estado: compact ? 128 : 150,
+    Pendientes: compact ? 205 : 250,
     Gestion: 560,
     Ingresos: 130,
     Codeudor: 170,
@@ -4301,7 +4313,7 @@ function tableColumnSx(header: string) {
     Documentos: 410,
     Aprobacion: 220,
     Plantillas: 170,
-    Acciones: 220
+    Acciones: compact ? 180 : 220
   };
   return {
     width: widths[header] ?? 180,
