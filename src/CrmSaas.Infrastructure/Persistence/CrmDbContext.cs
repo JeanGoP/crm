@@ -22,6 +22,7 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
     public DbSet<CategoriaProducto> CategoriasProducto => Set<CategoriaProducto>();
     public DbSet<Producto> Productos => Set<Producto>();
     public DbSet<ProductoFoto> ProductoFotos => Set<ProductoFoto>();
+    public DbSet<ProductoPrecioSede> ProductoPreciosSede => Set<ProductoPrecioSede>();
     public DbSet<InventarioComercial> InventarioComercial => Set<InventarioComercial>();
     public DbSet<ConfiguracionFinancieraEmpresa> ConfiguracionesFinancierasEmpresa => Set<ConfiguracionFinancieraEmpresa>();
     public DbSet<PuntoVenta> PuntosVenta => Set<PuntoVenta>();
@@ -54,6 +55,7 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
         modelBuilder.Entity<CategoriaProducto>().ToTable("CategoriasProducto");
         modelBuilder.Entity<Producto>().ToTable("Productos");
         modelBuilder.Entity<ProductoFoto>().ToTable("ProductoFotos");
+        modelBuilder.Entity<ProductoPrecioSede>().ToTable("ProductoPreciosSede");
         modelBuilder.Entity<InventarioComercial>().ToTable("InventarioComercial");
         modelBuilder.Entity<ConfiguracionFinancieraEmpresa>().ToTable("ConfiguracionesFinancierasEmpresa");
         modelBuilder.Entity<PuntoVenta>().ToTable("PuntosVenta");
@@ -106,6 +108,11 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
         modelBuilder.Entity<ProductoFoto>().Property(x => x.ContentType).HasMaxLength(80);
         modelBuilder.Entity<ProductoFoto>().HasIndex(x => new { x.EmpresaId, x.ProductoId });
         modelBuilder.Entity<ProductoFoto>().HasOne(x => x.Producto).WithMany(x => x.Fotos).HasForeignKey(x => x.ProductoId).OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<ProductoPrecioSede>().Property(x => x.Precio).HasPrecision(18, 2);
+        modelBuilder.Entity<ProductoPrecioSede>().HasIndex(x => new { x.EmpresaId, x.ProductoId, x.PuntoVentaId }).IsUnique();
+        modelBuilder.Entity<ProductoPrecioSede>().HasIndex(x => new { x.EmpresaId, x.PuntoVentaId });
+        modelBuilder.Entity<ProductoPrecioSede>().HasOne(x => x.Producto).WithMany(x => x.PreciosPorSede).HasForeignKey(x => x.ProductoId).OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<ProductoPrecioSede>().HasOne(x => x.PuntoVenta).WithMany().HasForeignKey(x => x.PuntoVentaId).OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<InventarioComercial>().Property(x => x.Vin).HasMaxLength(80);
         modelBuilder.Entity<InventarioComercial>().Property(x => x.NumeroChasis).HasMaxLength(80);
         modelBuilder.Entity<InventarioComercial>().Property(x => x.NumeroMotor).HasMaxLength(80);

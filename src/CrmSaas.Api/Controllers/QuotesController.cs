@@ -58,6 +58,7 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
 
         var productIds = requestedItems.Select(x => x.ProductId).Distinct().ToArray();
         var products = await db.Productos
+            .Include(x => x.PreciosPorSede)
             .Where(x => productIds.Contains(x.Id) && x.Activo)
             .ToDictionaryAsync(x => x.Id, cancellationToken);
         if (products.Count != productIds.Length) throw new KeyNotFoundException("Uno de los productos no existe o esta inactivo.");
@@ -72,11 +73,12 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             if (item.TermMonths <= 0) throw new ValidationException("El plazo debe ser mayor a cero.");
             if (item.MonthlyInterestRate < 0) throw new ValidationException("La tasa mensual no puede ser negativa.");
             var product = products[item.ProductId];
+            var productPrice = ResolveProductPrice(product, salesPoint);
             var insurance = item.Insurance > 0 ? item.Insurance : product.Soat;
             var administrativeFees = item.AdministrativeFees > 0 ? item.AdministrativeFees : product.Matricula + product.Impuestos;
-            var promotion = ResolvePromotion(product, salesPoint, promotions);
+            var promotion = ResolvePromotion(product, salesPoint, promotions, productPrice);
             var simulation = CalculateSimulation(promotion.DiscountedProductPrice, item.DownPayment, insurance, administrativeFees, item.TermMonths, item.MonthlyInterestRate, financialSettings, salesPoint);
-            return new { Product = product, Promotion = promotion, Simulation = simulation, Order = index + 1 };
+            return new { Product = product, ProductPrice = productPrice, Promotion = promotion, Simulation = simulation, Order = index + 1 };
         }).ToList();
         var primary = calculatedItems[0];
         var product = primary.Product;
@@ -88,7 +90,7 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
         var quoteAsBundle = calculatedItems.Count > 1
             && !string.IsNullOrWhiteSpace(quoteCategory)
             && await db.CategoriasProducto.AnyAsync(x => x.Nombre == quoteCategory && x.Activa && x.CotizarComoPaquete, cancellationToken);
-        var quoteProductPrice = quoteAsBundle ? calculatedItems.Sum(x => x.Product.Precio) : product.Precio;
+        var quoteProductPrice = quoteAsBundle ? calculatedItems.Sum(x => x.ProductPrice) : primary.ProductPrice;
         var quotePromotionDiscount = quoteAsBundle ? calculatedItems.Sum(x => x.Promotion.DiscountAmount) : primary.Promotion.DiscountAmount;
         var quotePromotion = quoteAsBundle ? null : primary.Promotion.Promotion;
         var quotePromotionName = quoteAsBundle && quotePromotionDiscount > 0 ? "Promociones aplicadas" : primary.Promotion.Promotion?.Nombre;
@@ -216,7 +218,7 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             {
                 ProductoId = item.Product.Id,
                 Orden = item.Order,
-                PrecioProducto = item.Product.Precio,
+                PrecioProducto = item.ProductPrice,
                 PromocionId = item.Promotion.Promotion?.Id,
                 Promocion = item.Promotion.Promotion,
                 NombrePromocion = item.Promotion.Promotion?.Nombre,
@@ -277,11 +279,14 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
         if (dto.AdministrativeFees < 0) throw new ValidationException("Los gastos administrativos no pueden ser negativos.");
         if (dto.TermMonths <= 0) throw new ValidationException("El plazo debe ser mayor a cero.");
 
-        var product = await db.Productos.FirstOrDefaultAsync(x => x.Id == dto.ProductId && x.Activo, cancellationToken)
+        var product = await db.Productos
+            .Include(x => x.PreciosPorSede)
+            .FirstOrDefaultAsync(x => x.Id == dto.ProductId && x.Activo, cancellationToken)
             ?? throw new KeyNotFoundException("Producto no encontrado o inactivo.");
         var financialSettings = await GetFinancialSettingsAsync(cancellationToken);
         var salesPoint = await GetCurrentSalesPointAsync(cancellationToken);
-        var promotion = ResolvePromotion(product, salesPoint, await GetActivePromotionsAsync(ColombiaTime.Now, cancellationToken));
+        var productPrice = ResolveProductPrice(product, salesPoint);
+        var promotion = ResolvePromotion(product, salesPoint, await GetActivePromotionsAsync(ColombiaTime.Now, cancellationToken), productPrice);
         var insurance = dto.Insurance > 0 ? dto.Insurance : product.Soat;
         var administrativeFees = dto.AdministrativeFees > 0 ? dto.AdministrativeFees : product.Matricula + product.Impuestos;
         var simulation = CalculateSimulation(promotion.DiscountedProductPrice, dto.DownPayment, insurance, administrativeFees, dto.TermMonths, dto.MonthlyInterestRate, financialSettings, salesPoint);
@@ -520,13 +525,13 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             .Where(x => x.Activa && x.VigenteDesde.Date <= now.Date && x.VigenteHasta.Date >= now.Date)
             .ToListAsync(cancellationToken);
 
-    private static PromotionApplication ResolvePromotion(Producto product, PuntoVenta? salesPoint, IReadOnlyCollection<Promocion> promotions)
+    private static PromotionApplication ResolvePromotion(Producto product, PuntoVenta? salesPoint, IReadOnlyCollection<Promocion> promotions, decimal productPrice)
     {
         var candidates = promotions
             .Where(x => AppliesToProduct(x, product) && AppliesToSalesPoint(x, salesPoint))
             .Select(x =>
             {
-                var discount = PromotionDiscount(product.Precio, x);
+                var discount = PromotionDiscount(productPrice, x);
                 var specificity = (x.ProductoId.HasValue ? 8 : 0)
                     + (!string.IsNullOrWhiteSpace(x.Marca) ? 4 : 0)
                     + (!string.IsNullOrWhiteSpace(x.Color) ? 2 : 0)
@@ -540,8 +545,22 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             .FirstOrDefault();
 
         return candidates is null
-            ? new PromotionApplication(null, 0, product.Precio)
-            : new PromotionApplication(candidates.Promotion, candidates.Discount, DiscountedPrice(product.Precio, candidates.Discount));
+            ? new PromotionApplication(null, 0, productPrice)
+            : new PromotionApplication(candidates.Promotion, candidates.Discount, DiscountedPrice(productPrice, candidates.Discount));
+    }
+
+    private static decimal ResolveProductPrice(Producto product, PuntoVenta? salesPoint)
+    {
+        if (salesPoint is not null && IsApplianceCategory(product.Categoria))
+        {
+            var salesPointPrice = product.PreciosPorSede
+                .Where(x => x.Activo && x.PuntoVentaId == salesPoint.Id)
+                .OrderByDescending(x => x.VigenteDesde ?? DateTime.MinValue)
+                .FirstOrDefault();
+            if (salesPointPrice is not null) return salesPointPrice.Precio;
+        }
+
+        return product.Precio;
     }
 
     private static bool AppliesToProduct(Promocion promotion, Producto product)
@@ -554,6 +573,9 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
 
     private static bool AppliesToSalesPoint(Promocion promotion, PuntoVenta? salesPoint) =>
         !promotion.PuntoVentaId.HasValue || (salesPoint is not null && promotion.PuntoVentaId.Value == salesPoint.Id);
+
+    private static bool IsApplianceCategory(string category) =>
+        (category ?? string.Empty).Contains("electrodom", StringComparison.OrdinalIgnoreCase);
 
     private static decimal PromotionDiscount(decimal productPrice, Promocion promotion)
     {

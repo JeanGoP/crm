@@ -176,7 +176,7 @@ const emptyDeal = { title: '', customerId: '', stageId: '', value: 0, closeProba
 const emptyActivity = { title: '', description: '', type: 1, status: 1, scheduledAt: `${today}T09:00`, reminderAt: '', customerId: '', dealId: '', assignedUserId: '' };
 const emptyCompany = { name: '', subdomain: '', customDomain: '', logoDataUrl: '', active: true };
 const emptyUser = { fullName: '', email: '', password: '', companyId: '', salesPointId: '', roles: ['Vendedor'] };
-const emptyProduct = { name: '', category: 'Moto', brand: '', model: '', line: '', version: '', reference: '', description: '', engineCc: '', year: '', color: '', price: 0, soat: 0, registrationFee: 0, taxes: 0, technicalSheet: '', priceValidFrom: today, active: true };
+const emptyProduct = { name: '', category: 'Moto', brand: '', model: '', line: '', version: '', reference: '', description: '', engineCc: '', year: '', color: '', price: 0, soat: 0, registrationFee: 0, taxes: 0, technicalSheet: '', priceValidFrom: today, active: true, salesPointPrices: [] as { salesPointId: string; price: number | ''; priceValidFrom: string; active: boolean }[] };
 const emptyCommercialInventory = { productId: '', salesPointId: '', vin: '', chassisNumber: '', engineNumber: '', plate: '', color: '', isUsed: false, mileage: '', status: 1, notes: '' };
 const emptyProductCategory = { name: '', description: '', quoteAsBundle: false, active: true };
 const emptyInventoryReservation = { customerId: '', quoteId: '', creditApplicationId: '', reservationExpiresAt: new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10), notes: '' };
@@ -806,6 +806,7 @@ function CustomerTimeline({ items }: { items: CustomerTimelineItem[] }) {
 function ProductsPage() {
   const { data: rows = [], loading, error, reload, setData } = useResource<Product[]>('/api/products', []);
   const { data: categories = [] } = useResource<ProductCategory[]>('/api/product-categories', []);
+  const { data: salesPoints = [] } = useResource<SalesPoint[]>('/api/sales-points', []);
   const [form, setForm] = useState<FormMode<Product>>({ open: false });
   const [confirm, setConfirm] = useState<Product>();
   const [notice, setNotice] = useState<Notice>();
@@ -826,7 +827,17 @@ function ProductsPage() {
       taxes: Number(payload.taxes),
       technicalSheet: payload.technicalSheet || null,
       priceValidFrom: payload.priceValidFrom || null,
-      active: Boolean(payload.active)
+      active: Boolean(payload.active),
+      salesPointPrices: isApplianceCategoryName(payload.category)
+        ? (payload.salesPointPrices ?? [])
+          .filter((price) => price.salesPointId && Number(price.price) > 0)
+          .map((price) => ({
+            salesPointId: price.salesPointId,
+            price: Number(price.price),
+            priceValidFrom: price.priceValidFrom || null,
+            active: Boolean(price.active)
+          }))
+        : []
     };
     const { data } = form.item
       ? await api.put<Product>(`/api/products/${form.item.id}`, body)
@@ -870,12 +881,15 @@ function ProductsPage() {
           <Typography variant="body2">{money((r.soat ?? 0) + (r.registrationFee ?? 0) + (r.taxes ?? 0))}</Typography>
           <Typography variant="caption" color="text.secondary">SOAT {money(r.soat ?? 0)} · Mat. {money(r.registrationFee ?? 0)}</Typography>
         </Stack>,
-        money(r.price),
+        <Stack spacing={0.25}>
+          <Typography variant="body2">{money(r.price)}</Typography>
+          {isApplianceCategoryName(r.category) && (r.salesPointPrices?.length ?? 0) > 0 && <Typography variant="caption" color="text.secondary">{r.salesPointPrices.length} precio(s) por sede</Typography>}
+        </Stack>,
         <StatusChip label={r.active ? 'Activa' : 'Inactiva'} tone={r.active ? 'success' : 'default'} />,
         <Actions onEdit={canManage ? () => setForm({ open: true, item: r }) : undefined} onDelete={canManage && r.active ? () => setConfirm(r) : undefined} />
       ])}
     />
-    <ProductDialog form={form} categories={categories.filter((category) => category.active)} onClose={() => setForm({ open: false })} onSave={save} onChanged={reload} />
+    <ProductDialog form={form} categories={categories.filter((category) => category.active)} salesPoints={salesPoints.filter((point) => point.active)} onClose={() => setForm({ open: false })} onSave={save} onChanged={reload} />
     <ConfirmDialog title="Inactivar producto" text={`Se inactivara ${confirm ? productName(confirm) : ''}. Las cotizaciones existentes conservaran el historial.`} open={!!confirm} onClose={() => setConfirm(undefined)} onConfirm={remove} confirmLabel="Inactivar" />
     <Notice notice={notice} onClose={() => setNotice(undefined)} />
   </Stack>;
@@ -3135,7 +3149,7 @@ function CustomerDialog({ form, onClose, onSave }: DialogProps<Customer, typeof 
   </FormDialog>;
 }
 
-function ProductDialog({ form, categories, onClose, onSave, onChanged }: DialogProps<Product, typeof emptyProduct> & { categories: ProductCategory[]; onChanged: () => void }) {
+function ProductDialog({ form, categories, salesPoints, onClose, onSave, onChanged }: DialogProps<Product, typeof emptyProduct> & { categories: ProductCategory[]; salesPoints: SalesPoint[]; onChanged: () => void }) {
   const initial = form.item ? {
     name: form.item.name,
     category: form.item.category,
@@ -3154,10 +3168,24 @@ function ProductDialog({ form, categories, onClose, onSave, onChanged }: DialogP
     taxes: form.item.taxes ?? 0,
     technicalSheet: form.item.technicalSheet ?? '',
     priceValidFrom: form.item.priceValidFrom?.slice(0, 10) ?? today,
-    active: form.item.active
+    active: form.item.active,
+    salesPointPrices: (form.item.salesPointPrices ?? []).map((price) => ({
+      salesPointId: price.salesPointId,
+      price: price.price,
+      priceValidFrom: price.priceValidFrom?.slice(0, 10) ?? '',
+      active: price.active
+    }))
   } : { ...emptyProduct, category: categories[0]?.name ?? emptyProduct.category };
   return <FormDialog title={form.item ? 'Editar producto' : 'Nuevo producto'} open={form.open} initial={initial} onClose={onClose} onSave={onSave}>
-    {(v, set) => <>
+    {(v, set) => {
+      const usesSalesPointPrices = isApplianceCategoryName(v.category);
+      const priceForSalesPoint = (salesPointId: string) => v.salesPointPrices.find((price) => price.salesPointId === salesPointId);
+      const updateSalesPointPrice = (salesPointId: string, patch: Partial<{ price: number | ''; priceValidFrom: string; active: boolean }>) => {
+        const current = priceForSalesPoint(salesPointId) ?? { salesPointId, price: '', priceValidFrom: '', active: true };
+        const next = { ...current, ...patch };
+        set({ salesPointPrices: [...v.salesPointPrices.filter((price) => price.salesPointId !== salesPointId), next] });
+      };
+      return <>
       <SectionTitle title="Datos comerciales" />
       <FieldGrid columns={2}>
         <TextField fullWidth required label="Nombre del producto" value={v.name} onChange={(e) => set({ name: e.target.value })} />
@@ -3192,10 +3220,37 @@ function ProductDialog({ form, categories, onClose, onSave, onChanged }: DialogP
         <TextField fullWidth label="Matricula" type="number" value={v.registrationFee} onChange={(e) => set({ registrationFee: Number(e.target.value) })} />
         <TextField fullWidth label="Impuestos" type="number" value={v.taxes} onChange={(e) => set({ taxes: Number(e.target.value) })} />
       </FieldGrid>
+      {usesSalesPointPrices && <Paper variant="outlined" sx={{ p: 2, bgcolor: '#f8fafc' }}>
+        <Stack spacing={1.5}>
+          <Box>
+            <SectionTitle title="Precios por sede" />
+            <Typography variant="body2" color="text.secondary">Si una sede no tiene precio propio, se usara el precio base.</Typography>
+          </Box>
+          {!salesPoints.length && <Alert severity="info">Cree o active sedes en Configuracion para asignar precios por punto de venta.</Alert>}
+          {salesPoints.map((point) => {
+            const pointPrice = priceForSalesPoint(point.id);
+            return <Box key={point.id} sx={{
+              display: 'grid',
+              gridTemplateColumns: { xs: '1fr', md: 'minmax(180px, 1fr) 180px 170px 120px' },
+              gap: 1.5,
+              alignItems: 'center'
+            }}>
+              <Box>
+                <Typography fontWeight={800}>{point.name}</Typography>
+                <Typography variant="caption" color="text.secondary">{point.city}</Typography>
+              </Box>
+              <TextField fullWidth label="Precio sede" type="number" value={pointPrice?.price ?? ''} onChange={(e) => updateSalesPointPrice(point.id, { price: e.target.value === '' ? '' : Number(e.target.value) })} />
+              <TextField fullWidth label="Vigente desde" type="date" value={pointPrice?.priceValidFrom ?? ''} onChange={(e) => updateSalesPointPrice(point.id, { priceValidFrom: e.target.value })} InputLabelProps={{ shrink: true }} />
+              <FormControlLabel control={<Checkbox checked={pointPrice?.active ?? true} onChange={(e) => updateSalesPointPrice(point.id, { active: e.target.checked })} />} label="Activo" />
+            </Box>;
+          })}
+        </Stack>
+      </Paper>}
       <TextField select label="Estado" value={String(v.active)} onChange={(e) => set({ active: e.target.value === 'true' })}><MenuItem value="true">Activa</MenuItem><MenuItem value="false">Inactiva</MenuItem></TextField>
       {form.item && <ProductPhotosManager product={form.item} onChanged={onChanged} />}
       {!form.item && <Alert severity="info">Guarde el producto primero. Luego podra editarlo para adjuntar una o varias fotos y elegir la foto principal del PDF.</Alert>}
-    </>}
+    </>;
+    }}
   </FormDialog>;
 }
 
@@ -4259,13 +4314,18 @@ function tableColumnSx(header: string) {
 
 function AiAnalysisDialog({ analysis, phone, onClose }: { analysis?: CustomerAiAnalysis; phone?: string; onClose: () => void }) {
   const [copied, setCopied] = useState(false);
+  const [message, setMessage] = useState('');
+  useEffect(() => {
+    setMessage(analysis?.whatsappMessage ?? '');
+    setCopied(false);
+  }, [analysis?.whatsappMessage]);
   const sendMessage = async () => {
-    if (!analysis?.whatsappMessage) return;
-    const message = analysis.whatsappMessage;
+    const outgoingMessage = message.trim();
+    if (!outgoingMessage) return;
     if (phone) {
-      window.open(whatsappUrl(phone, message), '_blank', 'noopener,noreferrer');
+      window.open(whatsappUrl(phone, outgoingMessage), '_blank', 'noopener,noreferrer');
     }
-    await navigator.clipboard?.writeText(message).catch(() => undefined);
+    await navigator.clipboard?.writeText(outgoingMessage).catch(() => undefined);
     setCopied(true);
     setTimeout(() => setCopied(false), 1800);
   };
@@ -4293,9 +4353,14 @@ function AiAnalysisDialog({ analysis, phone, onClose }: { analysis?: CustomerAiA
         </Box>
         <Box>
           <SectionTitle title="Mensaje sugerido para WhatsApp" />
-          <Paper variant="outlined" sx={{ p: 2, bgcolor: '#f8fafc' }}>
-            <Typography>{analysis.whatsappMessage}</Typography>
-          </Paper>
+          <TextField
+            fullWidth
+            multiline
+            minRows={4}
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            helperText="Puede ajustar el texto antes de enviarlo por WhatsApp."
+          />
         </Box>
         <Box>
           <SectionTitle title="Senales usadas" />
@@ -4305,7 +4370,7 @@ function AiAnalysisDialog({ analysis, phone, onClose }: { analysis?: CustomerAiA
     </DialogContent>
     <DialogActions sx={{ flexWrap: 'wrap' }}>
       <Button onClick={onClose}>Cerrar</Button>
-      <Button variant="contained" startIcon={<WhatsApp />} onClick={sendMessage}>
+      <Button variant="contained" startIcon={<WhatsApp />} onClick={sendMessage} disabled={!message.trim()}>
         {phone ? 'Enviar por WhatsApp' : copied ? 'Copiado' : 'Copiar mensaje'}
       </Button>
     </DialogActions>
@@ -4594,6 +4659,9 @@ function alertSeverityTone(severity?: string): 'success' | 'warning' | 'error' |
 }
 function productName(product: Product) {
   return product.name?.trim() || [product.brand, product.model, product.line, product.version, product.reference].filter(Boolean).join(' ').trim() || 'Producto';
+}
+function isApplianceCategoryName(category?: string) {
+  return (category ?? '').toLowerCase().includes('electrodom');
 }
 function readableFileSize(bytes: number) {
   if (!Number.isFinite(bytes) || bytes <= 0) return '0 KB';

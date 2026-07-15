@@ -18,6 +18,7 @@ public sealed class ProductsController(CrmDbContext db) : ControllerBase
     {
         var products = await db.Productos
             .Include(x => x.Fotos)
+            .Include(x => x.PreciosPorSede).ThenInclude(x => x.PuntoVenta)
             .OrderBy(x => x.Categoria).ThenBy(x => x.Nombre)
             .ToListAsync(cancellationToken);
         return Ok(products.Select(ToDto).ToList());
@@ -51,7 +52,9 @@ public sealed class ProductsController(CrmDbContext db) : ControllerBase
             Activo = dto.Active
         };
         db.Productos.Add(product);
+        await ApplySalesPointPricesAsync(product, dto, category.Nombre, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
+        await db.Entry(product).Collection(x => x.PreciosPorSede).Query().Include(x => x.PuntoVenta).LoadAsync(cancellationToken);
         return Ok(ToDto(product));
     }
 
@@ -63,6 +66,7 @@ public sealed class ProductsController(CrmDbContext db) : ControllerBase
         var category = await ResolveCategoryAsync(dto.Category, cancellationToken);
         var product = await db.Productos
             .Include(x => x.Fotos)
+            .Include(x => x.PreciosPorSede).ThenInclude(x => x.PuntoVenta)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
             ?? throw new KeyNotFoundException("Producto no encontrado.");
         product.Nombre = dto.Name.Trim();
@@ -83,6 +87,7 @@ public sealed class ProductsController(CrmDbContext db) : ControllerBase
         product.FichaTecnica = NormalizeOptional(dto.TechnicalSheet);
         product.VigenteDesde = dto.PriceValidFrom;
         product.Activo = dto.Active;
+        await ApplySalesPointPricesAsync(product, dto, category.Nombre, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         return Ok(ToDto(product));
     }
@@ -93,6 +98,7 @@ public sealed class ProductsController(CrmDbContext db) : ControllerBase
     {
         var product = await db.Productos
             .Include(x => x.Fotos)
+            .Include(x => x.PreciosPorSede).ThenInclude(x => x.PuntoVenta)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
             ?? throw new KeyNotFoundException("Producto no encontrado.");
         product.Activo = false;
@@ -206,6 +212,15 @@ public sealed class ProductsController(CrmDbContext db) : ControllerBase
                 photo.TamanoBytes,
                 photo.EsPrincipalCotizacion,
                 $"data:{photo.ContentType};base64,{Convert.ToBase64String(photo.Datos)}"))
+            .ToList(),
+        x.PreciosPorSede
+            .OrderBy(price => price.PuntoVenta == null ? string.Empty : price.PuntoVenta.Nombre)
+            .Select(price => new ProductSalesPointPriceDto(
+                price.PuntoVentaId,
+                price.PuntoVenta?.Nombre,
+                price.Precio,
+                price.VigenteDesde,
+                price.Activo))
             .ToList());
 
     private static void Validate(UpsertProductDto dto)
@@ -217,6 +232,66 @@ public sealed class ProductsController(CrmDbContext db) : ControllerBase
         if (dto.Soat < 0) throw new ValidationException("El SOAT no puede ser negativo.");
         if (dto.RegistrationFee < 0) throw new ValidationException("La matricula no puede ser negativa.");
         if (dto.Taxes < 0) throw new ValidationException("Los impuestos no pueden ser negativos.");
+        if (dto.SalesPointPrices is null) return;
+        var duplicated = dto.SalesPointPrices
+            .Where(x => x.SalesPointId != Guid.Empty)
+            .GroupBy(x => x.SalesPointId)
+            .FirstOrDefault(x => x.Count() > 1);
+        if (duplicated is not null) throw new ValidationException("No puede repetir una sede en los precios del producto.");
+        foreach (var price in dto.SalesPointPrices)
+        {
+            if (price.SalesPointId == Guid.Empty) throw new ValidationException("Debe seleccionar una sede valida para el precio por sede.");
+            if (price.Price <= 0) throw new ValidationException("El precio por sede debe ser mayor a cero.");
+        }
+    }
+
+    private async Task ApplySalesPointPricesAsync(Producto product, UpsertProductDto dto, string categoryName, CancellationToken cancellationToken)
+    {
+        if (!IsApplianceCategory(categoryName))
+        {
+            db.ProductoPreciosSede.RemoveRange(product.PreciosPorSede);
+            return;
+        }
+
+        var requestedPrices = (dto.SalesPointPrices ?? [])
+            .Where(x => x.Active || x.Price > 0)
+            .ToList();
+        if (requestedPrices.Count == 0)
+        {
+            db.ProductoPreciosSede.RemoveRange(product.PreciosPorSede);
+            return;
+        }
+
+        var salesPointIds = requestedPrices.Select(x => x.SalesPointId).Distinct().ToArray();
+        var existingSalesPointIds = await db.PuntosVenta
+            .Where(x => salesPointIds.Contains(x.Id) && x.Activa)
+            .Select(x => x.Id)
+            .ToListAsync(cancellationToken);
+        if (existingSalesPointIds.Count != salesPointIds.Length) throw new ValidationException("Una de las sedes de precio no existe o esta inactiva.");
+
+        foreach (var current in product.PreciosPorSede.Where(x => !salesPointIds.Contains(x.PuntoVentaId)).ToList())
+        {
+            db.ProductoPreciosSede.Remove(current);
+        }
+
+        foreach (var price in requestedPrices)
+        {
+            var current = product.PreciosPorSede.FirstOrDefault(x => x.PuntoVentaId == price.SalesPointId);
+            if (current is null)
+            {
+                current = new ProductoPrecioSede
+                {
+                    Producto = product,
+                    ProductoId = product.Id,
+                    PuntoVentaId = price.SalesPointId
+                };
+                product.PreciosPorSede.Add(current);
+            }
+
+            current.Precio = price.Price;
+            current.VigenteDesde = price.PriceValidFrom;
+            current.Activo = price.Active;
+        }
     }
 
     private static void ValidatePhoto(IFormFile file)
@@ -238,6 +313,9 @@ public sealed class ProductsController(CrmDbContext db) : ControllerBase
     }
 
     private static string NormalizeCategory(string category) => string.IsNullOrWhiteSpace(category) ? "General" : category.Trim();
+
+    private static bool IsApplianceCategory(string category) =>
+        NormalizeCategory(category).Contains("electrodom", StringComparison.OrdinalIgnoreCase);
 
     private static string? NormalizeOptional(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

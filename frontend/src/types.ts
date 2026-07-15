@@ -131,6 +131,15 @@ export interface Product {
   priceValidFrom?: string;
   active: boolean;
   photos: ProductPhoto[];
+  salesPointPrices: ProductSalesPointPrice[];
+}
+
+export interface ProductSalesPointPrice {
+  salesPointId: string;
+  salesPointName?: string;
+  price: number;
+  priceValidFrom?: string;
+  active: boolean;
 }
 
 export interface CommercialInventory {

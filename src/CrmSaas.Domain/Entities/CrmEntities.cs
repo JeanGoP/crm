@@ -123,6 +123,7 @@ public sealed class Producto : AuditableTenantEntity
     public DateTime? VigenteDesde { get; set; }
     public bool Activo { get; set; } = true;
     public ICollection<ProductoFoto> Fotos { get; set; } = [];
+    public ICollection<ProductoPrecioSede> PreciosPorSede { get; set; } = [];
 }
 
 public sealed class CategoriaProducto : AuditableTenantEntity
@@ -143,6 +144,17 @@ public sealed class ProductoFoto : AuditableTenantEntity
     public byte[] Datos { get; set; } = [];
     public bool EsPrincipalCotizacion { get; set; }
     public int Orden { get; set; }
+}
+
+public sealed class ProductoPrecioSede : AuditableTenantEntity
+{
+    public Guid ProductoId { get; set; }
+    public Producto? Producto { get; set; }
+    public Guid PuntoVentaId { get; set; }
+    public PuntoVenta? PuntoVenta { get; set; }
+    public decimal Precio { get; set; }
+    public DateTime? VigenteDesde { get; set; }
+    public bool Activo { get; set; } = true;
 }
 
 public sealed class InventarioComercial : AuditableTenantEntity

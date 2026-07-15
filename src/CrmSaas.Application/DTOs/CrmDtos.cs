@@ -73,8 +73,10 @@ public sealed record UpsertActivityDto(string Title, string? Description, TipoAc
 public sealed record ProductPhotoDto(Guid Id, string FileName, string ContentType, long SizeBytes, bool IsQuoteDefault, string DataUrl);
 public sealed record ProductCategoryDto(Guid Id, string Name, string? Description, bool QuoteAsBundle, bool Active);
 public sealed record UpsertProductCategoryDto(string Name, string? Description, bool QuoteAsBundle, bool Active);
-public sealed record ProductDto(Guid Id, string Name, string Category, string Brand, string Model, string? Line, string? Version, string Reference, string? Description, int? EngineCc, int? Year, string? Color, decimal Price, decimal Soat, decimal RegistrationFee, decimal Taxes, string? TechnicalSheet, DateTime? PriceValidFrom, bool Active, IReadOnlyCollection<ProductPhotoDto> Photos);
-public sealed record UpsertProductDto(string Name, string Category, string Brand, string Model, string? Line, string? Version, string Reference, string? Description, int? EngineCc, int? Year, string? Color, decimal Price, decimal Soat, decimal RegistrationFee, decimal Taxes, string? TechnicalSheet, DateTime? PriceValidFrom, bool Active);
+public sealed record ProductSalesPointPriceDto(Guid SalesPointId, string? SalesPointName, decimal Price, DateTime? PriceValidFrom, bool Active);
+public sealed record UpsertProductSalesPointPriceDto(Guid SalesPointId, decimal Price, DateTime? PriceValidFrom, bool Active);
+public sealed record ProductDto(Guid Id, string Name, string Category, string Brand, string Model, string? Line, string? Version, string Reference, string? Description, int? EngineCc, int? Year, string? Color, decimal Price, decimal Soat, decimal RegistrationFee, decimal Taxes, string? TechnicalSheet, DateTime? PriceValidFrom, bool Active, IReadOnlyCollection<ProductPhotoDto> Photos, IReadOnlyCollection<ProductSalesPointPriceDto> SalesPointPrices);
+public sealed record UpsertProductDto(string Name, string Category, string Brand, string Model, string? Line, string? Version, string Reference, string? Description, int? EngineCc, int? Year, string? Color, decimal Price, decimal Soat, decimal RegistrationFee, decimal Taxes, string? TechnicalSheet, DateTime? PriceValidFrom, bool Active, IReadOnlyCollection<UpsertProductSalesPointPriceDto>? SalesPointPrices);
 
 public sealed record CommercialInventoryDto(
     Guid Id,
