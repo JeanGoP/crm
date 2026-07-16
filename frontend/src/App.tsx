@@ -3376,10 +3376,13 @@ function ProductPhotosManager({ product, onChanged }: { product: Product; onChan
   const upload = async (files: FileList | null) => {
     if (!files?.length) return;
     const formData = new FormData();
-    Array.from(files).forEach((file) => formData.append('files', file));
     setUploading(true);
     setNotice(undefined);
     try {
+      for (const file of Array.from(files)) {
+        const normalized = await normalizeProductPhoto(file);
+        formData.append('files', normalized, normalized.name);
+      }
       const { data } = await api.post<Product>(`/api/products/${product.id}/photos`, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
       replaceProduct(data);
       setNotice({ type: 'success', text: 'Fotos cargadas correctamente.' });
@@ -3415,7 +3418,7 @@ function ProductPhotosManager({ product, onChanged }: { product: Product; onChan
       <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', sm: 'center' }} gap={1}>
         <Box>
           <Typography fontWeight={800}>Fotos del producto</Typography>
-          <Typography variant="caption" color="text.secondary">Puede cargar varias fotos y marcar cual se imprime en la cotizacion. El PDF admite JPG/JPEG y PNG compatibles.</Typography>
+          <Typography variant="caption" color="text.secondary">Puede cargar varias fotos y marcar cual se imprime en la cotizacion. El sistema las prepara en JPG para el PDF.</Typography>
         </Box>
         <Button component="label" variant="outlined" startIcon={<UploadFile />} disabled={uploading}>
           {uploading ? 'Subiendo...' : 'Adjuntar fotos'}
@@ -4622,6 +4625,37 @@ async function normalizeDeliveryPhoto(file: File) {
   if (!context) throw new Error('No se pudo preparar la foto.');
   context.drawImage(image, 0, 0, canvas.width, canvas.height);
   return canvas.toDataURL('image/jpeg', 0.82);
+}
+async function normalizeProductPhoto(file: File) {
+  if (!['image/png', 'image/jpeg', 'image/jpg', 'image/webp'].includes(file.type)) {
+    throw new Error('La foto debe estar en formato PNG, JPG o WebP.');
+  }
+  if (file.size > 5_000_000) {
+    throw new Error('Cada foto debe pesar maximo 5 MB.');
+  }
+
+  const image = await loadImage(await readFileAsDataUrl(file));
+  const canvas = document.createElement('canvas');
+  const maxSide = 1400;
+  const scale = Math.min(1, maxSide / Math.max(image.width, image.height));
+  canvas.width = Math.max(1, Math.round(image.width * scale));
+  canvas.height = Math.max(1, Math.round(image.height * scale));
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('No se pudo preparar la foto.');
+  context.fillStyle = '#ffffff';
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+  return new Promise<File>((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        reject(new Error('No se pudo preparar la foto para PDF.'));
+        return;
+      }
+      const safeName = file.name.replace(/\.[^.]+$/, '') || 'producto';
+      resolve(new File([blob], `${safeName}.jpg`, { type: 'image/jpeg' }));
+    }, 'image/jpeg', 0.86);
+  });
 }
 function IdentificationLookupAdornment({ identification, inline = false }: { identification?: string; inline?: boolean }) {
   const digits = identificationDigits(identification);

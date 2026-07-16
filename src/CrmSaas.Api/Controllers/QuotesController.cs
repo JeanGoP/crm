@@ -362,9 +362,23 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
     }
 
     private static bool IsPdfSupportedPhoto(ProductoFoto photo) =>
-        photo.ContentType.Equals("image/png", StringComparison.OrdinalIgnoreCase) ||
-        photo.ContentType.Equals("image/jpeg", StringComparison.OrdinalIgnoreCase) ||
-        photo.ContentType.Equals("image/jpg", StringComparison.OrdinalIgnoreCase);
+        IsJpeg(photo.Datos) || IsPng(photo.Datos);
+
+    private static bool IsJpeg(byte[] data) =>
+        data.Length > 4 &&
+        data[0] == 0xFF &&
+        data[1] == 0xD8;
+
+    private static bool IsPng(byte[] data) =>
+        data.Length > 8 &&
+        data[0] == 137 &&
+        data[1] == 80 &&
+        data[2] == 78 &&
+        data[3] == 71 &&
+        data[4] == 13 &&
+        data[5] == 10 &&
+        data[6] == 26 &&
+        data[7] == 10;
 
     private static QuotePdfImage? ToPdfImage(string? dataUrl, string fileName)
     {
