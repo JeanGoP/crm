@@ -183,6 +183,7 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
             x.ClienteId,
             x.ProductoId,
             productName,
+            x.Producto?.FichaTecnica,
             x.PuntoVentaId,
             x.NombreSede,
             x.MarcaSede,

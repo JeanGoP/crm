@@ -13,9 +13,9 @@ public static class SimplePdfGenerator
 {
     private static readonly CultureInfo ColombianCulture = CultureInfo.GetCultureInfo("es-CO");
 
-    public static byte[] Quote(QuoteDto quote, string companyName, QuotePdfImage? productImage = null, QuotePdfImage? companyLogo = null, string? customerPhone = null, string? customerAddress = null, string? advisor = null)
+    public static byte[] Quote(QuoteDto quote, string companyName, QuotePdfImage? productImage = null, QuotePdfImage? companyLogo = null, QuotePdfImage? brandLogo = null, string? customerPhone = null, string? customerAddress = null, string? advisor = null)
     {
-        return CreateQuotePdf(quote, companyName, productImage, companyLogo, customerPhone, customerAddress, advisor);
+        return CreateQuotePdf(quote, companyName, productImage, companyLogo, brandLogo, customerPhone, customerAddress, advisor);
     }
 
     public static byte[] CreditApplication(CreditApplicationDto application, string companyName, string template)
@@ -340,12 +340,13 @@ public static class SimplePdfGenerator
         .Where(c => c < 128)
         .Aggregate(new StringBuilder(), (sb, c) => sb.Append(c), sb => sb.ToString());
 
-    private static byte[] CreateQuotePdf(QuoteDto quote, string companyName, QuotePdfImage? productImage, QuotePdfImage? companyLogo, string? customerPhone, string? customerAddress, string? advisor)
+    private static byte[] CreateQuotePdf(QuoteDto quote, string companyName, QuotePdfImage? productImage, QuotePdfImage? companyLogo, QuotePdfImage? brandLogo, string? customerPhone, string? customerAddress, string? advisor)
     {
         var logoImage = TryCreatePdfImage(companyLogo);
+        var brandLogoImage = TryCreatePdfImage(brandLogo);
         var pdfImage = TryCreatePdfImage(productImage);
 
-        var content = QuotePageContent(quote, companyName, logoImage is not null, pdfImage is not null, customerPhone, customerAddress, advisor);
+        var content = QuotePageContent(quote, companyName, logoImage is not null, brandLogoImage is not null, pdfImage is not null, customerPhone, customerAddress, advisor);
         var objects = new List<PdfObject>
         {
             new("<< /Type /Catalog /Pages 2 0 R >>"),
@@ -356,6 +357,7 @@ public static class SimplePdfGenerator
 
         var xObjects = new List<string>();
         AddImageObject(objects, xObjects, "Logo", logoImage);
+        AddImageObject(objects, xObjects, "BrandLogo", brandLogoImage);
         AddImageObject(objects, xObjects, "Product", pdfImage);
 
         var pageNumber = objects.Count + 1;
@@ -379,7 +381,7 @@ public static class SimplePdfGenerator
         xObjects.Add($"/{name} {objectNumber} 0 R");
     }
 
-    private static string QuotePageContent(QuoteDto quote, string companyName, bool includeLogo, bool includeProductImage, string? customerPhone, string? customerAddress, string? advisor)
+    private static string QuotePageContent(QuoteDto quote, string companyName, bool includeCompanyLogo, bool includeBrandLogo, bool includeProductImage, string? customerPhone, string? customerAddress, string? advisor)
     {
         var customerName = $"{quote.CustomerFirstName} {quote.CustomerMiddleName} {quote.CustomerLastName} {quote.CustomerSecondLastName}"
             .Replace("  ", " ")
@@ -387,87 +389,192 @@ public static class SimplePdfGenerator
         if (string.IsNullOrWhiteSpace(customerName)) customerName = $"{quote.CustomerFirstNames} {quote.CustomerLastNames}".Trim();
 
         var commands = new StringBuilder();
-        commands.AppendLine("0.98 0.99 1 rg 0 0 612 792 re f");
-        commands.AppendLine("1 1 1 rg 30 30 552 732 re f");
-        commands.AppendLine("0.84 0.88 0.92 RG 1 w 30 30 552 732 re S");
+        commands.AppendLine("1 1 1 rg 0 0 612 792 re f");
+        commands.AppendLine("0.06 0.06 0.06 RG 0.8 w 40 28 532 736 re S");
 
-        commands.AppendLine("0.082 0.373 0.459 rg 30 705 552 57 re f");
-        if (includeLogo)
+        if (includeCompanyLogo)
         {
-            commands.AppendLine("q 112 0 0 48 46 711 cm /Logo Do Q");
+            commands.AppendLine("q 126 0 0 56 48 685 cm /Logo Do Q");
         }
         else
         {
-            commands.AppendLine($"1 1 1 rg BT /F2 18 Tf 48 735 Td ({Escape(companyName)}) Tj ET");
+            commands.AppendLine($"0.06 0.06 0.06 rg BT /F2 16 Tf 48 714 Td ({Escape(Shorten(companyName, 22))}) Tj ET");
         }
-        commands.AppendLine($"1 1 1 rg BT /F2 12 Tf 392 738 Td ({Escape(quote.Number)}) Tj ET");
-        commands.AppendLine($"1 1 1 rg BT /F1 9 Tf 392 722 Td (Fecha: {Escape(Date(quote.QuoteDate))}) Tj ET");
 
-        DrawPanel(commands, 46, 575, 250, 110, "CLIENTE");
-        KeyValue(commands, 62, 653, "Nombre", customerName, 70, 166);
-        KeyValue(commands, 62, 631, "Identificacion", $"{IdentificationType(quote.IdentificationType)} {Value(quote.IdentificationNumber)}", 70, 166);
-        KeyValue(commands, 62, 609, "Telefono", Value(customerPhone), 70, 166);
-        KeyValue(commands, 62, 587, "Direccion", Value(customerAddress), 70, 166);
+        CenterText(commands, 306, 728, companyName.ToUpperInvariant(), 14, true);
+        CenterText(commands, 306, 711, Value(quote.SalesPointName, "Sede principal"), 10, true);
+        CenterText(commands, 306, 696, Value(quote.SalesPointCommercialTerms, "Cotizacion comercial"), 9, false, 44);
 
-        DrawPanel(commands, 316, 575, 250, 110, "PRODUCTO");
-        KeyValue(commands, 332, 653, "Producto", quote.ProductName, 74, 156);
-        KeyValue(commands, 332, 631, "Precio base", Money(quote.ProductPrice), 74, 156);
-        KeyValue(commands, 332, 609, "Descuento", quote.PromotionDiscount > 0 ? Money(quote.PromotionDiscount) : "N/A", 74, 156);
-        KeyValue(commands, 332, 587, "Precio final", Money(quote.DiscountedProductPrice), 74, 156);
+        if (includeBrandLogo)
+        {
+            commands.AppendLine("q 96 0 0 58 466 682 cm /BrandLogo Do Q");
+        }
+        else
+        {
+            CenterText(commands, 514, 706, Value(quote.SalesPointBrand, "MARCA"), 18, true);
+        }
+
+        commands.AppendLine($"0.05 0.05 0.05 rg BT /F1 10 Tf 45 650 Td (Fecha: {Escape(Date(quote.QuoteDate))}) Tj ET");
+        commands.AppendLine($"0.05 0.05 0.05 rg BT /F1 8 Tf 412 660 Td (Cotizacion valida hasta {Escape(Date(quote.ValidUntil))}) Tj ET");
+        commands.AppendLine($"0.05 0.05 0.05 rg BT /F2 12 Tf 418 646 Td (#{Escape(quote.Number)}) Tj ET");
+
+        DrawRoundedLikeBox(commands, 45, 608, 522, 34);
+        commands.AppendLine($"0.05 0.05 0.05 rg BT /F2 12 Tf 60 629 Td (Asesor Comercial:) Tj ET");
+        commands.AppendLine($"0.05 0.05 0.05 rg BT /F1 9 Tf 60 615 Td ({Escape(Shorten(Value(advisor, "Asesor comercial"), 34))}) Tj ET");
+        commands.AppendLine($"0.05 0.05 0.05 rg BT /F2 10 Tf 300 629 Td (Correo:) Tj ET");
+        commands.AppendLine($"0.05 0.05 0.05 rg BT /F1 9 Tf 345 629 Td ({Escape(Shorten(Value(advisor), 31))}) Tj ET");
+        commands.AppendLine($"0.05 0.05 0.05 rg BT /F2 10 Tf 300 615 Td (Cel:) Tj ET");
+        commands.AppendLine($"0.05 0.05 0.05 rg BT /F1 9 Tf 345 615 Td ({Escape(Value(customerPhone))}) Tj ET");
 
         if (includeProductImage)
         {
-            commands.AppendLine("q 138 0 0 82 237 480 cm /Product Do Q");
+            commands.AppendLine("q 230 0 0 150 58 422 cm /Product Do Q");
+        }
+        else
+        {
+            commands.AppendLine("0.93 0.95 0.96 rg 58 422 230 150 re f");
+            CenterText(commands, 173, 493, "Sin foto del producto", 10, false);
+        }
+
+        commands.AppendLine($"0.05 0.05 0.05 rg BT /F2 17 Tf 315 575 Td ({Escape(Shorten(quote.ProductName.ToUpperInvariant(), 24))}) Tj ET");
+        commands.AppendLine($"0.05 0.05 0.05 rg BT /F1 12 Tf 315 558 Td ({Escape(Shorten(quote.ProductName, 34))}) Tj ET");
+        commands.AppendLine($"0.05 0.05 0.05 rg BT /F2 13 Tf 315 528 Td (Ficha Tecnica:) Tj ET");
+        var techY = 514;
+        foreach (var line in TechnicalLines(quote).Take(10))
+        {
+            commands.AppendLine($"0.05 0.05 0.05 rg BT /F2 6 Tf 315 {techY} Td (- {Escape(Shorten(line, 44))}) Tj ET");
+            techY -= 10;
         }
 
         var quoteItems = quote.Items.Count > 0 ? quote.Items.OrderBy(x => x.Order).ToList() : [];
         if (quoteItems.Count > 1)
         {
-            DrawComparison(commands, 46, 332, quoteItems);
+            DrawComparison(commands, 126, 305, quoteItems);
         }
         else
         {
-            DrawPanel(commands, 46, 332, 250, 214, "RESUMEN COMERCIAL");
-            KeyValue(commands, 62, 512, "Precio final", Money(quote.DiscountedProductPrice), 82, 140);
-            KeyValue(commands, 62, 490, "Cuota inicial", Money(quote.DownPayment), 82, 140);
-            KeyValue(commands, 62, 468, "Valor producto", Money(quote.ProductPrice), 82, 140);
-            KeyValue(commands, 62, 446, "Descuento", quote.PromotionDiscount > 0 ? Money(quote.PromotionDiscount) : "N/A", 82, 140);
-            KeyValue(commands, 62, 424, "Promocion", quote.PromotionDiscount > 0 ? Shorten(Value(quote.PromotionName), 22) : "N/A", 82, 140);
-            KeyValue(commands, 62, 402, "Vigencia", Date(quote.ValidUntil), 82, 140);
-
-            commands.AppendLine("0.94 0.97 0.98 rg 62 356 216 32 re f");
-            commands.AppendLine($"0.082 0.373 0.459 rg BT /F2 10 Tf 78 375 Td (Resumen de valores) Tj ET");
-            commands.AppendLine($"0.36 0.42 0.48 rg BT /F1 8 Tf 78 362 Td (Sujeto a validacion comercial) Tj ET");
-
-            DrawPanel(commands, 316, 332, 250, 214, "RESUMEN DEL CREDITO");
-            var creditBase = Math.Max(quote.DiscountedProductPrice - quote.DownPayment, 0);
-            CreditRow(commands, 332, 512, "Valor a financiar", Money(creditBase));
-            CreditRow(commands, 332, 488, "SOAT / Seguro", Money(quote.Insurance));
-            CreditRow(commands, 332, 464, "Gastos / Matricula", Money(quote.AdministrativeFees));
-            CreditRow(commands, 332, 440, "Otros", Money(0));
-            commands.AppendLine("0.082 0.373 0.459 rg 332 396 218 38 re f");
-            commands.AppendLine($"1 1 1 rg BT /F2 10 Tf 346 419 Td (Total credito) Tj ET");
-            commands.AppendLine($"1 1 1 rg BT /F2 12 Tf 446 419 Td ({Escape(Money(quote.FinancedAmount))}) Tj ET");
-            commands.AppendLine($"1 1 1 rg BT /F1 9 Tf 346 404 Td (Valor sujeto a estudio y aprobacion) Tj ET");
-            KeyValue(commands, 332, 370, "Total estimado", Money(quote.EstimatedTotalPayment), 88, 130);
-            KeyValue(commands, 332, 350, "Marca / tasa", $"{Value(quote.SalesPointBrand, "Marca")} - {quote.MonthlyInterestRate:N3}%", 88, 130);
+            DrawCommercialValues(commands, quote);
         }
 
-        DrawPanel(commands, 46, 190, 520, 112, "REQUISITOS GENERALES");
-        RequirementColumn(commands, 62, 266, "Empleados", new[] { "Fotocopia Cedula", "Carta laboral o dos ultimas colillas", "Recibo de servicio publico" });
-        RequirementColumn(commands, 232, 266, "Independientes", new[] { "Fotocopia Cedula", "Certificado de ingresos", "Camara de comercio o extractos" });
-        RequirementColumn(commands, 402, 266, "Pensionados", new[] { "Fotocopia Cedula", "Dos ultimas colillas", "Recibo de servicio publico" });
+        DrawRoundedLikeBox(commands, 45, 162, 522, 34);
+        commands.AppendLine($"0.05 0.05 0.05 rg BT /F2 12 Tf 52 182 Td (Cliente:) Tj ET");
+        commands.AppendLine($"0.05 0.05 0.05 rg BT /F1 9 Tf 52 169 Td ({Escape(Shorten(customerName.ToUpperInvariant(), 42))}) Tj ET");
+        commands.AppendLine($"0.05 0.05 0.05 rg BT /F2 10 Tf 310 182 Td (Correo:) Tj ET");
+        commands.AppendLine($"0.05 0.05 0.05 rg BT /F1 9 Tf 352 182 Td (N/A) Tj ET");
+        commands.AppendLine($"0.05 0.05 0.05 rg BT /F2 10 Tf 310 169 Td (Cel:) Tj ET");
+        commands.AppendLine($"0.05 0.05 0.05 rg BT /F1 9 Tf 352 169 Td ({Escape(Value(customerPhone))}) Tj ET");
 
-        DrawPanel(commands, 46, 98, 250, 64, "ASESOR");
-        KeyValue(commands, 62, 132, "Nombre", Value(advisor, "Asesor comercial"), 52, 166);
-        KeyValue(commands, 62, 112, "Contacto", Value(customerPhone), 52, 166);
+        commands.AppendLine($"0.05 0.05 0.05 rg BT /F1 9 Tf 170 92 Td (CC: {Escape(Value(quote.IdentificationNumber))}) Tj ET");
+        commands.AppendLine("0.05 0.05 0.05 RG 0.6 w 170 112 252 0 m S");
+        commands.AppendLine($"0.05 0.05 0.05 rg BT /F2 8 Tf 170 76 Td (AUTORIZACION DE TRATAMIENTO DE DATOS) Tj ET");
+        Paragraph(commands, 170, 64, "La aceptacion de esta cotizacion autoriza el tratamiento de datos personales para gestion comercial y estudio de credito.", 72, 6, 2);
 
-        DrawPanel(commands, 316, 98, 250, 64, "OBSERVACIONES");
-        Paragraph(commands, 332, 134, Value(quote.Notes, Value(quote.SalesPointCommercialTerms, "Cotizacion sujeta a aprobacion final y disponibilidad del producto.")), 46, 8, 3);
-
-        var legal = "Autorizacion de tratamiento de datos: con la firma o aceptacion de esta cotizacion, el cliente autoriza el uso de sus datos para gestion comercial, estudio de credito, seguimiento, cobranza e informacion relacionada con productos y servicios.";
-        Paragraph(commands, 46, 72, legal, 116, 7, 2);
+        DrawQrPlaceholder(commands, 45, 44, "SIGUENOS");
+        DrawQrPlaceholder(commands, 462, 44, "ENCUESTA");
+        CenterText(commands, 306, 38, "CRM / Powered by EnMarcha CRM", 8, false);
         return commands.ToString();
+    }
+
+    private static void DrawCommercialValues(StringBuilder commands, QuoteDto quote)
+    {
+        var boxX = 132;
+        var boxY = 200;
+        var boxW = 435;
+        var boxH = 214;
+        DrawRoundedLikeBox(commands, boxX, boxY, boxW, boxH);
+        CenterText(commands, boxX + boxW / 2, boxY + boxH - 22, quote.ProductName.ToUpperInvariant(), 12, true, 32);
+        CenterText(commands, boxX + boxW / 2, boxY + boxH - 50, Value(quote.CreditType, "CONTADO").ToUpperInvariant(), 9, true, 24);
+
+        var labels = new[]
+        {
+            "Forma de pago", "Modelo", "Precio Vehiculo", "Valor Tramites", "Valor Bono",
+            "Valor Dcto", "Accesorios", "Otros", "", "Financiera", "Cuota Inicial",
+            "Nro de Cuotas", "Valor de Cuotas", "Valor Garantia", "Valor Poliza RC"
+        };
+        var values = new[]
+        {
+            Value(quote.CreditType, "CONTADO"),
+            quote.ValidUntil.Year.ToString(CultureInfo.InvariantCulture),
+            Money(quote.ProductPrice),
+            Money(quote.AdministrativeFees),
+            "-",
+            quote.PromotionDiscount > 0 ? Money(quote.PromotionDiscount) : "-",
+            "-",
+            quote.Insurance > 0 ? Money(quote.Insurance) : "-",
+            "",
+            "-",
+            quote.DownPayment > 0 ? Money(quote.DownPayment) : "-",
+            quote.TermMonths > 0 ? quote.TermMonths.ToString(CultureInfo.InvariantCulture) : "-",
+            quote.EstimatedMonthlyPayment > 0 ? Money(quote.EstimatedMonthlyPayment) : "-",
+            "-",
+            "-"
+        };
+
+        var y = boxY + boxH - 70;
+        for (var i = 0; i < labels.Length; i++)
+        {
+            if (!string.IsNullOrWhiteSpace(labels[i]))
+            {
+                commands.AppendLine($"0.05 0.05 0.05 rg BT /F{(labels[i] is "Precio Vehiculo" or "Cuota Inicial" or "Nro de Cuotas" or "Valor de Cuotas" ? "2" : "1")} 8 Tf 45 {y} Td ({Escape(labels[i])}) Tj ET");
+                commands.AppendLine($"0.90 0.90 0.90 RG 0.25 w 45 {y - 4} 522 0 m S");
+                CenterText(commands, boxX + boxW / 2, y, values[i], labels[i] == "Precio Vehiculo" ? 13 : 9, labels[i] == "Precio Vehiculo" || labels[i] == "VALOR TOTAL");
+            }
+            y -= 13;
+        }
+
+        commands.AppendLine($"0.05 0.05 0.05 rg BT /F2 10 Tf 45 {boxY + 9} Td (VALOR TOTAL) Tj ET");
+        CenterText(commands, boxX + boxW / 2, boxY + 9, Money(quote.DiscountedProductPrice + quote.AdministrativeFees + quote.Insurance), 13, true);
+    }
+
+    private static IReadOnlyList<string> TechnicalLines(QuoteDto quote)
+    {
+        var raw = quote.ProductTechnicalSheet ?? string.Empty;
+        var lines = raw
+            .Replace("\r", "\n")
+            .Split(new[] { '\n', ';', '|' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .ToList();
+
+        if (lines.Count > 0) return lines;
+
+        return
+        [
+            $"Producto: {quote.ProductName}",
+            $"Marca: {Value(quote.SalesPointBrand, "N/A")}",
+            $"Entrega: {Value(quote.SalesPointDeliveryMode, "N/A")}",
+            $"Precio: {Money(quote.ProductPrice)}",
+            $"Vigencia: {Date(quote.ValidUntil)}"
+        ];
+    }
+
+    private static void DrawRoundedLikeBox(StringBuilder commands, int x, int y, int width, int height)
+    {
+        commands.AppendLine($"1 1 1 rg {x} {y} {width} {height} re f");
+        commands.AppendLine($"0.05 0.05 0.05 RG 0.6 w {x} {y} {width} {height} re S");
+    }
+
+    private static void CenterText(StringBuilder commands, int centerX, int y, string text, int size, bool bold, int maxChars = 64)
+    {
+        var value = Shorten(text, maxChars);
+        var approxWidth = value.Length * size * 0.26;
+        var x = Math.Max(35, (int)Math.Round(centerX - approxWidth));
+        commands.AppendLine($"0.05 0.05 0.05 rg BT /F{(bold ? "2" : "1")} {size} Tf {x} {y} Td ({Escape(value)}) Tj ET");
+    }
+
+    private static void DrawQrPlaceholder(StringBuilder commands, int x, int y, string label)
+    {
+        commands.AppendLine($"0.05 0.05 0.05 rg BT /F2 7 Tf {x + 10} {y + 92} Td ({Escape(label)}) Tj ET");
+        commands.AppendLine($"0.05 0.05 0.05 RG 0.5 w {x} {y} 80 80 re S");
+        for (var row = 0; row < 8; row++)
+        {
+            for (var col = 0; col < 8; col++)
+            {
+                if ((row * 3 + col * 5 + label.Length) % 4 == 0)
+                {
+                    commands.AppendLine($"0.05 0.05 0.05 rg {x + 8 + col * 8} {y + 8 + row * 8} 6 6 re f");
+                }
+            }
+        }
     }
 
     private static void LabelValue(StringBuilder commands, int x, int y, string label, string value, int labelSize, int valueSize, int valueWidth)
@@ -589,7 +696,7 @@ public static class SimplePdfGenerator
         if (!string.IsNullOrWhiteSpace(current)) yield return current;
     }
 
-    private static string Shorten(string value, int max) => value.Length <= max ? value : value[..Math.Max(0, max - 1)] + "…";
+    private static string Shorten(string value, int max) => value.Length <= max ? value : value[..Math.Max(0, max - 3)] + "...";
 
     private static bool IsJpeg(QuotePdfImage? image) =>
         image is not null &&

@@ -302,6 +302,7 @@ export interface Quote {
   customerId: string;
   productId: string;
   productName: string;
+  productTechnicalSheet?: string;
   salesPointId?: string;
   salesPointName?: string;
   salesPointBrand?: string;

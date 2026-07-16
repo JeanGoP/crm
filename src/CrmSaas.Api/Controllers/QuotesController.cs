@@ -333,12 +333,13 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             ? null
             : new QuotePdfImage(quotePhoto.Datos, quotePhoto.ContentType, quotePhoto.NombreArchivo);
         var brandLogo = ToPdfImage(quote.PuntoVenta?.LogoMarcaDataUrl, "logo-marca.png");
-        var logo = brandLogo ?? ToPdfImage(company?.LogoDataUrl, "logo-empresa.png");
+        var companyLogo = ToPdfImage(company?.LogoDataUrl, "logo-empresa.png");
         var bytes = SimplePdfGenerator.Quote(
             dto,
             company?.Nombre ?? "Empresa",
             image,
-            logo,
+            companyLogo,
+            brandLogo,
             quote.Cliente?.Telefono,
             quote.Cliente?.Direccion,
             quote.UsuarioCreacion);
@@ -391,6 +392,7 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             x.ClienteId,
             x.ProductoId,
             productName,
+            x.Producto?.FichaTecnica,
             x.PuntoVentaId,
             x.NombreSede,
             x.MarcaSede,

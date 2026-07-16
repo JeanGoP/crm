@@ -251,6 +251,7 @@ public sealed record QuoteDto(
     Guid CustomerId,
     Guid ProductId,
     string ProductName,
+    string? ProductTechnicalSheet,
     Guid? SalesPointId,
     string? SalesPointName,
     string? SalesPointBrand,
