@@ -325,10 +325,7 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             ?? throw new KeyNotFoundException("Cotizacion no encontrada.");
         var company = await db.Empresas.IgnoreQueryFilters().FirstOrDefaultAsync(x => x.Id == tenantContext.EmpresaId, cancellationToken);
         var dto = ToDto(quote);
-        var quotePhoto = (quote.Items.OrderBy(x => x.Orden).FirstOrDefault()?.Producto ?? quote.Producto)?.Fotos
-            .OrderByDescending(x => x.EsPrincipalCotizacion)
-            .ThenBy(x => x.Orden)
-            .FirstOrDefault();
+        var quotePhoto = ResolveQuotePhoto(quote);
         var image = quotePhoto is null
             ? null
             : new QuotePdfImage(quotePhoto.Datos, quotePhoto.ContentType, quotePhoto.NombreArchivo);
@@ -348,6 +345,26 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
         Response.Headers["Expires"] = "0";
         return File(bytes, "application/pdf", $"{quote.Numero}.pdf");
     }
+
+    private static ProductoFoto? ResolveQuotePhoto(Cotizacion quote)
+    {
+        static IEnumerable<ProductoFoto> OrderedPhotos(Producto? product) =>
+            (product?.Fotos ?? [])
+                .OrderByDescending(x => x.EsPrincipalCotizacion)
+                .ThenBy(x => x.Orden);
+
+        var itemPhoto = quote.Items
+            .OrderBy(x => x.Orden)
+            .SelectMany(item => OrderedPhotos(item.Producto))
+            .FirstOrDefault(IsPdfSupportedPhoto);
+
+        return itemPhoto ?? OrderedPhotos(quote.Producto).FirstOrDefault(IsPdfSupportedPhoto);
+    }
+
+    private static bool IsPdfSupportedPhoto(ProductoFoto photo) =>
+        photo.ContentType.Equals("image/png", StringComparison.OrdinalIgnoreCase) ||
+        photo.ContentType.Equals("image/jpeg", StringComparison.OrdinalIgnoreCase) ||
+        photo.ContentType.Equals("image/jpg", StringComparison.OrdinalIgnoreCase);
 
     private static QuotePdfImage? ToPdfImage(string? dataUrl, string fileName)
     {
