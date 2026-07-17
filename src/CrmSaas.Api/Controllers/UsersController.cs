@@ -42,9 +42,15 @@ public sealed class UsersController(CrmDbContext db, IPasswordHasher passwordHas
             return BadRequest(new { detail = "Selecciona al menos un rol valido para la empresa." });
         }
 
+        var isAdministrator = roles.Any(x => x.Nombre == "Administrador");
         Guid? salesPointId = null;
-        if (dto.SalesPointId.HasValue)
+        if (!isAdministrator)
         {
+            if (!dto.SalesPointId.HasValue)
+            {
+                return BadRequest(new { detail = "Debe seleccionar una sede para usuarios vendedores o supervisores." });
+            }
+
             salesPointId = await db.PuntosVenta.IgnoreQueryFilters()
                 .Where(x => x.EmpresaId == dto.CompanyId && x.Id == dto.SalesPointId.Value && x.Activa)
                 .Select(x => (Guid?)x.Id)
@@ -54,15 +60,6 @@ public sealed class UsersController(CrmDbContext db, IPasswordHasher passwordHas
             {
                 return BadRequest(new { detail = "Sede no encontrada o inactiva para la empresa seleccionada." });
             }
-        }
-        else
-        {
-            salesPointId = await db.PuntosVenta.IgnoreQueryFilters()
-                .Where(x => x.EmpresaId == dto.CompanyId && x.Activa)
-                .OrderByDescending(x => x.Codigo == "PRINCIPAL")
-                .ThenBy(x => x.Nombre)
-                .Select(x => (Guid?)x.Id)
-                .FirstOrDefaultAsync(cancellationToken);
         }
 
         var user = new Usuario

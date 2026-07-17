@@ -2499,7 +2499,8 @@ function SettingsPage() {
   };
 
   const saveUser = async (payload: typeof emptyUser) => {
-    const { data } = await api.post<User>('/api/users', { ...payload, salesPointId: payload.salesPointId || null });
+    const isAdministrator = payload.roles.includes('Administrador');
+    const { data } = await api.post<User>('/api/users', { ...payload, salesPointId: isAdministrator ? null : payload.salesPointId || null });
     setUsers([...users, data].sort((a, b) => a.fullName.localeCompare(b.fullName)));
     setNotice({ type: 'success', text: 'Usuario creado.' });
     setUserForm({ open: false });
@@ -3047,16 +3048,22 @@ function UserDialog({ form, companies, salesPoints, onClose, onSave }: DialogPro
   return <FormDialog title="Nuevo usuario" open={form.open} initial={initial} onClose={onClose} onSave={onSave}>
     {(v, set) => {
       const currentSalesPoints = salesPoints;
+      const selectedRole = v.roles[0] ?? 'Vendedor';
+      const isAdministrator = selectedRole === 'Administrador';
+      const defaultSalesPointId = currentSalesPoints[0]?.id ?? '';
       return <>
       <TextField required label="Nombre completo" value={v.fullName} onChange={(e) => set({ fullName: e.target.value })} />
       <TextField required label="Email" value={v.email} onChange={(e) => set({ email: e.target.value })} />
       <TextField required label="Contrasena temporal" type="password" value={v.password} onChange={(e) => set({ password: e.target.value })} />
-      <TextField required select label="Empresa" value={v.companyId} onChange={(e) => set({ companyId: e.target.value, salesPointId: currentSalesPoints[0]?.id ?? '' })}>{companies.map((c) => <MenuItem key={c.id} value={c.id}>{c.name} ({c.subdomain})</MenuItem>)}</TextField>
-      <TextField select label="Sede principal" value={v.salesPointId} onChange={(e) => set({ salesPointId: e.target.value })} helperText="Se usara en cotizaciones, reportes y tramites por sede.">
-        <MenuItem value="">Sin sede asignada</MenuItem>
+      <TextField required select label="Empresa" value={v.companyId} onChange={(e) => set({ companyId: e.target.value, salesPointId: isAdministrator ? '' : defaultSalesPointId })}>{companies.map((c) => <MenuItem key={c.id} value={c.id}>{c.name} ({c.subdomain})</MenuItem>)}</TextField>
+      <TextField select label="Rol" value={selectedRole} onChange={(e) => {
+        const role = e.target.value;
+        set({ roles: [role], salesPointId: role === 'Administrador' ? '' : (v.salesPointId || defaultSalesPointId) });
+      }}>{['Administrador', 'Supervisor', 'Vendedor'].map((role) => <MenuItem key={role} value={role}>{role}</MenuItem>)}</TextField>
+      {!isAdministrator && <TextField required select label="Sede principal" value={v.salesPointId} onChange={(e) => set({ salesPointId: e.target.value })} helperText="Se usara en cotizaciones, reportes y tramites por sede.">
+        {currentSalesPoints.length === 0 && <MenuItem value="">Cree una sede antes de crear vendedores.</MenuItem>}
         {currentSalesPoints.map((point) => <MenuItem key={point.id} value={point.id}>{point.name} - {point.city}</MenuItem>)}
-      </TextField>
-      <TextField select label="Rol" value={v.roles[0] ?? 'Vendedor'} onChange={(e) => set({ roles: [e.target.value] })}>{['Administrador', 'Supervisor', 'Vendedor'].map((role) => <MenuItem key={role} value={role}>{role}</MenuItem>)}</TextField>
+      </TextField>}
     </>;
     }}
   </FormDialog>;
