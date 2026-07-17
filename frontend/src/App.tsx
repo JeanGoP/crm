@@ -2526,7 +2526,7 @@ function SettingsPage() {
   const saveUser = async (payload: typeof emptyUser) => {
     const isAdministrator = payload.roles.includes('Administrador');
     const isSupervisor = payload.roles.includes('Supervisor');
-    const companyId = isGlobalAdmin ? currentCompanyId ?? user?.companyId ?? payload.companyId : user?.companyId ?? payload.companyId;
+    const companyId = isGlobalAdmin ? payload.companyId : user?.companyId ?? payload.companyId;
     const { data } = await api.post<User>('/api/users', {
       ...payload,
       companyId,
@@ -2647,10 +2647,7 @@ function SettingsPage() {
   };
 
   const activeCompanies = companies.filter((x) => x.active);
-  const dialogCompanies = isGlobalAdmin && currentCompanyId
-    ? activeCompanies.filter((x) => x.id === currentCompanyId)
-    : activeCompanies;
-  const userDialogCompanies = dialogCompanies.length > 0 ? dialogCompanies : activeCompanies;
+  const userDialogCompanies = activeCompanies;
 
   return <Stack spacing={3}>
     <Header title="Configuracion" onRefresh={() => { reloadCompanies(); reloadUsers(); reloadProductCategories(); reloadFinancialSettings(); reloadSalesPoints(); reloadRequirementProfiles(); reloadPromotions(); }} />

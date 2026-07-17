@@ -20,14 +20,8 @@ public sealed class UsersController(CrmDbContext db, IPasswordHasher passwordHas
     [HttpGet]
     public async Task<ActionResult<IReadOnlyCollection<UserDto>>> Get(CancellationToken cancellationToken)
     {
-        var useSelectedCompany = IsGlobalAdmin() &&
-            Request.Headers.ContainsKey("X-Company-Id") &&
-            tenantContext.EmpresaId.HasValue;
-
         var query = IsGlobalAdmin()
-            ? useSelectedCompany
-                ? db.Usuarios.IgnoreQueryFilters().Where(x => x.EmpresaId == tenantContext.EmpresaId!.Value)
-                : db.Usuarios.IgnoreQueryFilters()
+            ? db.Usuarios.IgnoreQueryFilters()
             : db.Usuarios.AsQueryable();
 
         var users = await query
