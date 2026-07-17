@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text;
 using CrmSaas.Application.DTOs;
 using CrmSaas.Domain.Entities;
 using CrmSaas.Infrastructure.Persistence;
@@ -13,6 +15,28 @@ namespace CrmSaas.Api.Controllers;
 [Route("api/products")]
 public sealed class ProductsController(CrmDbContext db) : ControllerBase
 {
+    private static readonly string[] ImportHeaders =
+    [
+        "Nombre",
+        "Categoria",
+        "Marca",
+        "Modelo",
+        "Linea",
+        "Version",
+        "Referencia",
+        "Descripcion",
+        "Cilindraje",
+        "Ano",
+        "Color",
+        "Precio",
+        "SOAT",
+        "Matricula",
+        "Impuestos",
+        "FichaTecnica",
+        "VigenteDesde",
+        "Activo"
+    ];
+
     [HttpGet]
     public async Task<ActionResult<IReadOnlyCollection<ProductDto>>> Get(CancellationToken cancellationToken)
     {
@@ -22,6 +46,133 @@ public sealed class ProductsController(CrmDbContext db) : ControllerBase
             .OrderBy(x => x.Categoria).ThenBy(x => x.Nombre)
             .ToListAsync(cancellationToken);
         return Ok(products.Select(ToDto).ToList());
+    }
+
+    [HttpGet("import-template")]
+    [Authorize(Roles = "Administrador")]
+    public ActionResult DownloadImportTemplate()
+    {
+        var csv = "\uFEFF" + string.Join(';', ImportHeaders) + Environment.NewLine;
+        return File(Encoding.UTF8.GetBytes(csv), "text/csv; charset=utf-8", "plantilla_productos.csv");
+    }
+
+    [HttpPost("import")]
+    [Authorize(Roles = "Administrador")]
+    [RequestSizeLimit(5_000_000)]
+    public async Task<ActionResult<object>> Import([FromForm] IFormFile file, CancellationToken cancellationToken)
+    {
+        if (file is null || file.Length == 0) throw new ValidationException("Debe seleccionar un archivo CSV.");
+        var extension = Path.GetExtension(file.FileName);
+        if (!string.Equals(extension, ".csv", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ValidationException("Por ahora la carga masiva recibe archivos CSV compatibles con Excel.");
+        }
+
+        await using var stream = file.OpenReadStream();
+        using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+        var headerLine = await reader.ReadLineAsync(cancellationToken);
+        if (string.IsNullOrWhiteSpace(headerLine)) throw new ValidationException("El archivo no tiene encabezados.");
+
+        var separator = DetectSeparator(headerLine);
+        var headers = ParseCsvLine(headerLine, separator).Select(NormalizeHeader).ToArray();
+        var headerMap = headers
+            .Select((header, index) => new { header, index })
+            .Where(x => !string.IsNullOrWhiteSpace(x.header))
+            .GroupBy(x => x.header)
+            .ToDictionary(x => x.Key, x => x.First().index);
+
+        foreach (var required in new[] { "NOMBRE", "CATEGORIA", "REFERENCIA", "PRECIO" })
+        {
+            if (!headerMap.ContainsKey(required)) throw new ValidationException($"La plantilla no contiene la columna obligatoria {required}.");
+        }
+
+        var categoryRows = await db.CategoriasProducto.ToListAsync(cancellationToken);
+        var categories = categoryRows
+            .GroupBy(x => NormalizeCategory(x.Nombre))
+            .ToDictionary(x => x.Key, x => x.First());
+        var productRows = await db.Productos.ToListAsync(cancellationToken);
+        var products = productRows
+            .GroupBy(x => x.Referencia.ToUpperInvariant())
+            .ToDictionary(x => x.Key, x => x.First());
+
+        var errors = new List<string>();
+        var created = 0;
+        var updated = 0;
+        var lineNumber = 1;
+        string? line;
+        while ((line = await reader.ReadLineAsync(cancellationToken)) is not null)
+        {
+            lineNumber++;
+            if (string.IsNullOrWhiteSpace(line)) continue;
+
+            var values = ParseCsvLine(line, separator);
+            string Read(string key) => headerMap.TryGetValue(key, out var index) && index < values.Count ? values[index].Trim() : string.Empty;
+
+            try
+            {
+                var name = Read("NOMBRE");
+                var categoryName = NormalizeCategory(Read("CATEGORIA"));
+                var reference = Read("REFERENCIA");
+                if (string.IsNullOrWhiteSpace(name)) throw new ValidationException("Nombre es obligatorio.");
+                if (string.IsNullOrWhiteSpace(categoryName)) throw new ValidationException("Categoria es obligatoria.");
+                if (string.IsNullOrWhiteSpace(reference)) throw new ValidationException("Referencia es obligatoria.");
+
+                if (!categories.TryGetValue(categoryName, out var category))
+                {
+                    category = new CategoriaProducto { Nombre = categoryName, Activa = true };
+                    db.CategoriasProducto.Add(category);
+                    categories[categoryName] = category;
+                }
+
+                var referenceKey = reference.ToUpperInvariant();
+                var exists = products.TryGetValue(referenceKey, out var product);
+                product ??= new Producto();
+
+                product.Nombre = name;
+                product.Categoria = category.Nombre;
+                product.Marca = Read("MARCA");
+                product.Modelo = Read("MODELO");
+                product.Linea = NormalizeOptional(Read("LINEA"));
+                product.Version = NormalizeOptional(Read("VERSION"));
+                product.Referencia = reference;
+                product.Descripcion = NormalizeOptional(Read("DESCRIPCION"));
+                product.Cilindraje = ParseNullableInt(Read("CILINDRAJE"), "Cilindraje");
+                product.Anio = ParseNullableInt(Read("ANO"), "Ano");
+                product.Color = NormalizeOptional(Read("COLOR"));
+                product.Precio = ParseMoney(Read("PRECIO"), "Precio");
+                product.Soat = ParseMoneyOrDefault(Read("SOAT"), "SOAT");
+                product.Matricula = ParseMoneyOrDefault(Read("MATRICULA"), "Matricula");
+                product.Impuestos = ParseMoneyOrDefault(Read("IMPUESTOS"), "Impuestos");
+                product.FichaTecnica = NormalizeOptional(Read("FICHATECNICA"));
+                product.VigenteDesde = ParseNullableDate(Read("VIGENTEDESDE"), "VigenteDesde");
+                product.Activo = ParseActive(Read("ACTIVO"));
+
+                if (product.Precio <= 0) throw new ValidationException("Precio debe ser mayor a cero.");
+                if (product.Soat < 0 || product.Matricula < 0 || product.Impuestos < 0) throw new ValidationException("Los cargos no pueden ser negativos.");
+
+                if (exists)
+                {
+                    updated++;
+                }
+                else
+                {
+                    db.Productos.Add(product);
+                    products[referenceKey] = product;
+                    created++;
+                }
+            }
+            catch (Exception ex) when (ex is ValidationException or FormatException)
+            {
+                errors.Add($"Fila {lineNumber}: {ex.Message}");
+            }
+        }
+
+        if (created + updated > 0)
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
+        return Ok(new { created, updated, errors, totalErrors = errors.Count });
     }
 
     [HttpPost]
@@ -318,4 +469,105 @@ public sealed class ProductsController(CrmDbContext db) : ControllerBase
         NormalizeCategory(category).Contains("electrodom", StringComparison.OrdinalIgnoreCase);
 
     private static string? NormalizeOptional(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static char DetectSeparator(string line) =>
+        line.Count(x => x == ';') >= line.Count(x => x == ',') ? ';' : ',';
+
+    private static List<string> ParseCsvLine(string line, char separator)
+    {
+        var values = new List<string>();
+        var current = new StringBuilder();
+        var inQuotes = false;
+
+        for (var i = 0; i < line.Length; i++)
+        {
+            var character = line[i];
+            if (character == '"')
+            {
+                if (inQuotes && i + 1 < line.Length && line[i + 1] == '"')
+                {
+                    current.Append('"');
+                    i++;
+                }
+                else
+                {
+                    inQuotes = !inQuotes;
+                }
+            }
+            else if (character == separator && !inQuotes)
+            {
+                values.Add(current.ToString());
+                current.Clear();
+            }
+            else
+            {
+                current.Append(character);
+            }
+        }
+
+        values.Add(current.ToString());
+        return values;
+    }
+
+    private static string NormalizeHeader(string value)
+    {
+        var normalized = value.Trim().Normalize(NormalizationForm.FormD);
+        var builder = new StringBuilder();
+        foreach (var character in normalized)
+        {
+            if (CharUnicodeInfo.GetUnicodeCategory(character) == UnicodeCategory.NonSpacingMark) continue;
+            if (char.IsLetterOrDigit(character)) builder.Append(char.ToUpperInvariant(character));
+        }
+
+        return builder.ToString();
+    }
+
+    private static decimal ParseMoney(string value, string field)
+    {
+        if (string.IsNullOrWhiteSpace(value)) throw new ValidationException($"{field} es obligatorio.");
+        var normalized = value.Replace("$", string.Empty).Replace(" ", string.Empty).Trim();
+        if (normalized.Contains('.') && normalized.Contains(','))
+        {
+            normalized = normalized.Replace(".", string.Empty).Replace(",", ".");
+        }
+        else if (normalized.Count(x => x == '.') > 1)
+        {
+            normalized = normalized.Replace(".", string.Empty);
+        }
+        else if (normalized.Contains(','))
+        {
+            normalized = normalized.Replace(",", ".");
+        }
+
+        return decimal.TryParse(normalized, NumberStyles.Number, CultureInfo.InvariantCulture, out var result)
+            ? result
+            : throw new ValidationException($"{field} no tiene un valor numerico valido.");
+    }
+
+    private static decimal ParseMoneyOrDefault(string value, string field) =>
+        string.IsNullOrWhiteSpace(value) ? 0 : ParseMoney(value, field);
+
+    private static int? ParseNullableInt(string value, string field)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        return int.TryParse(value.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var result)
+            ? result
+            : throw new ValidationException($"{field} no tiene un numero valido.");
+    }
+
+    private static DateTime? ParseNullableDate(string value, string field)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        var formats = new[] { "yyyy-MM-dd", "dd/MM/yyyy", "d/M/yyyy" };
+        return DateTime.TryParseExact(value.Trim(), formats, CultureInfo.InvariantCulture, DateTimeStyles.None, out var result)
+            ? result
+            : throw new ValidationException($"{field} debe tener formato yyyy-MM-dd o dd/MM/yyyy.");
+    }
+
+    private static bool ParseActive(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return true;
+        var normalized = value.Trim().ToUpperInvariant();
+        return normalized is "SI" or "S" or "TRUE" or "1" or "ACTIVO" or "ACTIVA";
+    }
 }

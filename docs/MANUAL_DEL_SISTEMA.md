@@ -1,7 +1,7 @@
 # Manual de usuario - EnMarcha CRM
 
-Ultima actualizacion: 2026-06-23  
-Version del manual: 8.1
+Ultima actualizacion: 2026-07-16  
+Version del manual: 8.2
 Sistema: EnMarcha CRM para gestion comercial y ventas a credito  
 
 ## 1. Bienvenida
@@ -205,6 +205,21 @@ Si esos cargos estan configurados en el producto, al seleccionarlo en una cotiza
 ### Foto para la cotizacion
 
 La foto marcada como **Foto PDF** sera la imagen comercial que aparecera en el PDF de cotizacion. El sistema admite imagenes **JPG/JPEG** y **PNG compatibles** para imprimirlas en el PDF.
+
+### Carga masiva de productos
+
+Esta opcion permite que un administrador suba varios productos al sistema usando una plantilla compatible con Excel.
+
+1. Entre a **Productos**.
+2. En **Carga masiva de productos**, presione **Descargar plantilla**.
+3. Abra el archivo CSV en Excel.
+4. Diligencie una fila por cada producto.
+5. Guarde el archivo en formato CSV.
+6. Regrese a **Productos** y presione **Subir productos**.
+7. Seleccione el archivo diligenciado.
+8. Revise el mensaje final con productos creados, actualizados y posibles errores por fila.
+
+La carga masiva crea productos nuevos o actualiza productos existentes usando la **Referencia** como identificador. Solo los usuarios con rol **Administrador** pueden usar esta opcion.
 
 ### Recomendacion de uso
 

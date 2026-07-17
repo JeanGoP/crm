@@ -149,6 +149,7 @@ const nav: NavItem[] = [
 
 type Notice = { type: 'success' | 'error' | 'info'; text: string };
 type FormMode<T> = { open: boolean; item?: T };
+type ProductImportResult = { created: number; updated: number; totalErrors: number; errors: string[] };
 
 const emptyCustomer = {
   identificationType: 1,
@@ -805,10 +806,13 @@ function ProductsPage() {
   const { data: rows = [], loading, error, reload, setData } = useResource<Product[]>('/api/products', []);
   const { data: categories = [] } = useResource<ProductCategory[]>('/api/product-categories', []);
   const { data: salesPoints = [] } = useResource<SalesPoint[]>('/api/sales-points', []);
+  const roles = useAuthStore((s) => s.user?.roles ?? []);
   const [form, setForm] = useState<FormMode<Product>>({ open: false });
   const [confirm, setConfirm] = useState<Product>();
   const [notice, setNotice] = useState<Notice>();
+  const [importing, setImporting] = useState(false);
   const canManage = useCanManage();
+  const canBulkImport = roles.includes('Administrador');
 
   const save = async (payload: typeof emptyProduct) => {
     const body = {
@@ -853,8 +857,63 @@ function ProductsPage() {
     setConfirm(undefined);
   };
 
+  const downloadImportTemplate = async () => {
+    try {
+      const response = await api.get('/api/products/import-template', { responseType: 'blob' });
+      const url = URL.createObjectURL(response.data);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'plantilla_productos.csv';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setNotice({ type: 'error', text: apiError(err) });
+    }
+  };
+
+  const importProducts = async (file?: File) => {
+    if (!file) return;
+    setImporting(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const { data } = await api.post<ProductImportResult>('/api/products/import', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+      await reload();
+      const errorText = data.totalErrors > 0 ? ` Errores: ${data.errors.slice(0, 3).join(' | ')}${data.totalErrors > 3 ? '...' : ''}` : '';
+      setNotice({
+        type: data.totalErrors > 0 ? 'info' : 'success',
+        text: `Carga finalizada. Creados: ${data.created}. Actualizados: ${data.updated}.${errorText}`
+      });
+    } catch (err) {
+      setNotice({ type: 'error', text: apiError(err) });
+    } finally {
+      setImporting(false);
+    }
+  };
+
   return <Stack spacing={3}>
     <Header title="Productos" action={canManage ? 'Nuevo producto' : undefined} onAction={() => setForm({ open: true })} onRefresh={reload} />
+    {canBulkImport && <Card><CardContent>
+      <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', md: 'center' }} gap={1.5}>
+        <Box>
+          <Typography fontWeight={900}>Carga masiva de productos</Typography>
+          <Typography color="text.secondary" fontSize={13}>Descargue la plantilla CSV, diligenciela en Excel y subala para crear o actualizar por referencia.</Typography>
+        </Box>
+        <Stack direction={{ xs: 'column', sm: 'row' }} gap={1}>
+          <Button variant="outlined" startIcon={<Download />} onClick={() => void downloadImportTemplate()}>Descargar plantilla</Button>
+          <Button component="label" variant="contained" startIcon={<UploadFile />} disabled={importing}>
+            {importing ? 'Subiendo...' : 'Subir productos'}
+            <input hidden type="file" accept=".csv,text/csv" onChange={(e) => {
+              const file = e.target.files?.[0];
+              e.currentTarget.value = '';
+              void importProducts(file);
+            }} />
+          </Button>
+        </Stack>
+      </Stack>
+    </CardContent></Card>}
     <StatusBar loading={loading} error={error} />
     <EntityTable
       compact
