@@ -15,26 +15,33 @@ public sealed class AuthService(CrmSaas.Infrastructure.Persistence.CrmDbContext 
 {
     public async Task<AuthResponseDto> LoginAsync(LoginRequestDto request, CancellationToken cancellationToken)
     {
-        if (!tenantContext.EmpresaId.HasValue)
-        {
-            var empresa = await db.Empresas.IgnoreQueryFilters()
-                .FirstOrDefaultAsync(x => x.Subdominio == request.Tenant, cancellationToken)
-                ?? throw new UnauthorizedAccessException("Empresa no encontrada.");
-            tenantContext.SetTenant(empresa.Id, empresa.Subdominio);
-        }
-
-        var user = await db.Usuarios
+        var candidates = await db.Usuarios.IgnoreQueryFilters()
             .Include(x => x.UsuarioRoles).ThenInclude(x => x.Rol)
             .Include(x => x.PuntoVenta)
             .Include(x => x.SedesSupervisadas).ThenInclude(x => x.PuntoVenta)
-            .FirstOrDefaultAsync(x => x.Email == request.Email && x.Activo, cancellationToken)
-            ?? throw new UnauthorizedAccessException("Credenciales invalidas.");
+            .Where(x => x.Email == request.Email && x.Activo)
+            .ToListAsync(cancellationToken);
 
-        if (!passwordHasher.Verify(request.Password, user.PasswordHash))
+        var validUsers = candidates
+            .Where(user => passwordHasher.Verify(request.Password, user.PasswordHash))
+            .ToList();
+
+        if (validUsers.Count == 0)
         {
             throw new UnauthorizedAccessException("Credenciales invalidas.");
         }
 
+        if (validUsers.Count > 1)
+        {
+            throw new UnauthorizedAccessException("El correo existe en mas de una empresa. Solicite usar un correo unico para ingresar sin seleccionar empresa.");
+        }
+
+        var user = validUsers[0];
+        var empresa = await db.Empresas.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(x => x.Id == user.EmpresaId && x.Activa, cancellationToken)
+            ?? throw new UnauthorizedAccessException("Empresa no encontrada o inactiva.");
+
+        tenantContext.SetTenant(empresa.Id, empresa.Subdominio);
         return await IssueTokensAsync(user, cancellationToken);
     }
 

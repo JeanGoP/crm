@@ -393,7 +393,6 @@ function LockedModulePage() {
 function LoginPage() {
   const [email, setEmail] = useState('admin@demo.com');
   const [password, setPassword] = useState('');
-  const [tenant, setTenant] = useState(import.meta.env.VITE_TENANT ?? 'demo');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const setSession = useAuthStore((s) => s.setSession);
@@ -403,7 +402,7 @@ function LoginPage() {
     setLoading(true);
     setError('');
     try {
-      const { data } = await api.post('/api/auth/login', { email, password, tenant });
+      const { data } = await api.post('/api/auth/login', { email, password });
       setSession(data.accessToken, data.refreshToken, data.user);
       navigate('/');
     } catch (err) {
@@ -435,7 +434,6 @@ function LoginPage() {
           </Box>
         </Stack>
         <Stack spacing={2}>
-          <TextField label="Empresa" value={tenant} onChange={(e) => setTenant(e.target.value)} />
           <TextField label="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
           <TextField label="Contrasena" type="password" value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && login()} />
           {error && <Alert severity="error">{error}</Alert>}
