@@ -13,6 +13,8 @@ namespace CrmSaas.Infrastructure.Auth;
 
 public sealed class AuthService(CrmSaas.Infrastructure.Persistence.CrmDbContext db, ITenantContext tenantContext, IPasswordHasher passwordHasher, IOptions<JwtOptions> options) : IAuthService
 {
+    private const string GlobalAdminEmail = "admin@demo.com";
+
     public async Task<AuthResponseDto> LoginAsync(LoginRequestDto request, CancellationToken cancellationToken)
     {
         var candidates = await db.Usuarios.IgnoreQueryFilters()
@@ -72,6 +74,10 @@ public sealed class AuthService(CrmSaas.Infrastructure.Persistence.CrmDbContext 
             new(ClaimTypes.Email, user.Email),
             new("empresa_id", user.EmpresaId.ToString())
         };
+        if (string.Equals(user.Email, GlobalAdminEmail, StringComparison.OrdinalIgnoreCase))
+        {
+            claims.Add(new Claim("global_admin", "true"));
+        }
         claims.AddRange(roles.Select(role => new Claim(ClaimTypes.Role, role)));
 
         var credentials = new SigningCredentials(new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.SigningKey)), SecurityAlgorithms.HmacSha256);

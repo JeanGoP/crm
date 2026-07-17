@@ -1,3 +1,5 @@
+using System.Security.Claims;
+using CrmSaas.Application.Abstractions;
 using CrmSaas.Application.DTOs;
 using CrmSaas.Domain.Entities;
 using CrmSaas.Infrastructure.Persistence;
@@ -10,8 +12,9 @@ namespace CrmSaas.Api.Controllers;
 [ApiController]
 [Authorize(Roles = "Administrador")]
 [Route("api/companies")]
-public sealed class CompaniesController(CrmDbContext db) : ControllerBase
+public sealed class CompaniesController(CrmDbContext db, ITenantContext tenantContext) : ControllerBase
 {
+    private const string GlobalAdminEmail = "admin@demo.com";
     private const int MaxLogoDataUrlLength = 300000;
     private static readonly string[] AllowedLogoPrefixes =
     [
@@ -23,7 +26,11 @@ public sealed class CompaniesController(CrmDbContext db) : ControllerBase
     [HttpGet]
     public async Task<ActionResult<IReadOnlyCollection<CompanyDto>>> Get(CancellationToken cancellationToken)
     {
-        var companies = await db.Empresas.IgnoreQueryFilters()
+        var query = IsGlobalAdmin()
+            ? db.Empresas.IgnoreQueryFilters()
+            : db.Empresas.AsQueryable();
+
+        var companies = await query
             .OrderBy(x => x.Nombre)
             .Select(x => new CompanyDto(x.Id, x.Nombre, x.Subdominio, x.DominioPersonalizado, x.LogoDataUrl, x.Activa))
             .ToListAsync(cancellationToken);
@@ -33,6 +40,11 @@ public sealed class CompaniesController(CrmDbContext db) : ControllerBase
     [HttpPost]
     public async Task<ActionResult<CompanyDto>> Create(UpsertCompanyDto dto, CancellationToken cancellationToken)
     {
+        if (!IsGlobalAdmin())
+        {
+            return Forbid();
+        }
+
         var subdomain = dto.Subdomain.Trim().ToLowerInvariant();
         if (await db.Empresas.IgnoreQueryFilters().AnyAsync(x => x.Subdominio == subdomain, cancellationToken))
         {
@@ -61,6 +73,11 @@ public sealed class CompaniesController(CrmDbContext db) : ControllerBase
     [HttpPut("{id:guid}")]
     public async Task<ActionResult<CompanyDto>> Update(Guid id, UpsertCompanyDto dto, CancellationToken cancellationToken)
     {
+        if (!CanManageCompany(id))
+        {
+            return Forbid();
+        }
+
         var company = await db.Empresas.IgnoreQueryFilters().FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
             ?? throw new KeyNotFoundException("Empresa no encontrada.");
         var subdomain = dto.Subdomain.Trim().ToLowerInvariant();
@@ -81,6 +98,12 @@ public sealed class CompaniesController(CrmDbContext db) : ControllerBase
 
     private static CompanyDto ToDto(Empresa company) =>
         new(company.Id, company.Nombre, company.Subdominio, company.DominioPersonalizado, company.LogoDataUrl, company.Activa);
+
+    private bool IsGlobalAdmin() =>
+        string.Equals(User.FindFirstValue(ClaimTypes.Email), GlobalAdminEmail, StringComparison.OrdinalIgnoreCase);
+
+    private bool CanManageCompany(Guid companyId) =>
+        IsGlobalAdmin() || tenantContext.EmpresaId == companyId;
 
     private static string? NormalizeLogo(string? logoDataUrl)
     {

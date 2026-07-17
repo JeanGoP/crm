@@ -1,3 +1,5 @@
+using System.Security.Claims;
+using CrmSaas.Application.Abstractions;
 using CrmSaas.Application.DTOs;
 using CrmSaas.Domain.Entities;
 using CrmSaas.Infrastructure.Auth;
@@ -11,12 +13,24 @@ namespace CrmSaas.Api.Controllers;
 [ApiController]
 [Authorize(Roles = "Administrador")]
 [Route("api/users")]
-public sealed class UsersController(CrmDbContext db, IPasswordHasher passwordHasher) : ControllerBase
+public sealed class UsersController(CrmDbContext db, IPasswordHasher passwordHasher, ITenantContext tenantContext) : ControllerBase
 {
+    private const string GlobalAdminEmail = "admin@demo.com";
+
     [HttpGet]
     public async Task<ActionResult<IReadOnlyCollection<UserDto>>> Get(CancellationToken cancellationToken)
     {
-        var users = await db.Usuarios.IgnoreQueryFilters()
+        var useSelectedCompany = IsGlobalAdmin() &&
+            Request.Headers.ContainsKey("X-Company-Id") &&
+            tenantContext.EmpresaId.HasValue;
+
+        var query = IsGlobalAdmin()
+            ? useSelectedCompany
+                ? db.Usuarios.IgnoreQueryFilters().Where(x => x.EmpresaId == tenantContext.EmpresaId!.Value)
+                : db.Usuarios.IgnoreQueryFilters()
+            : db.Usuarios.AsQueryable();
+
+        var users = await query
             .Include(x => x.UsuarioRoles).ThenInclude(x => x.Rol)
             .Include(x => x.PuntoVenta)
             .Include(x => x.SedesSupervisadas).ThenInclude(x => x.PuntoVenta)
@@ -38,6 +52,11 @@ public sealed class UsersController(CrmDbContext db, IPasswordHasher passwordHas
     [HttpPost]
     public async Task<ActionResult<UserDto>> Create(CreateUserDto dto, CancellationToken cancellationToken)
     {
+        if (!CanManageCompany(dto.CompanyId))
+        {
+            return Forbid();
+        }
+
         var companyExists = await db.Empresas.IgnoreQueryFilters().AnyAsync(x => x.Id == dto.CompanyId && x.Activa, cancellationToken);
         if (!companyExists)
         {
@@ -124,6 +143,12 @@ public sealed class UsersController(CrmDbContext db, IPasswordHasher passwordHas
                 .ToArrayAsync(cancellationToken);
         return Ok(new UserDto(user.Id, user.NombreCompleto, user.Email, roles.Select(x => x.Nombre).ToArray(), user.EmpresaId, salesPointId, salesPointName, supervisedSalesPointIds, supervisedSalesPointNames));
     }
+
+    private bool IsGlobalAdmin() =>
+        string.Equals(User.FindFirstValue(ClaimTypes.Email), GlobalAdminEmail, StringComparison.OrdinalIgnoreCase);
+
+    private bool CanManageCompany(Guid companyId) =>
+        IsGlobalAdmin() || tenantContext.EmpresaId == companyId;
 }
 
 [ApiController]

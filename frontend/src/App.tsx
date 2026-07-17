@@ -2462,7 +2462,11 @@ function CommercialReportsPage() {
 
 function SettingsPage() {
   const user = useAuthStore((s) => s.user);
+  const activeCompanyId = useAuthStore((s) => s.activeCompanyId);
+  const setActiveCompanyId = useAuthStore((s) => s.setActiveCompanyId);
   const canManage = useCanManage();
+  const isAdmin = user?.roles.includes('Administrador') ?? false;
+  const isGlobalAdmin = user?.email?.toLowerCase() === 'admin@demo.com';
   const { data: companies = [], loading: loadingCompanies, error: companiesError, reload: reloadCompanies, setData: setCompanies } = useResource<Company[]>('/api/companies', []);
   const { data: users = [], loading: loadingUsers, error: usersError, reload: reloadUsers, setData: setUsers } = useResource<User[]>('/api/users', []);
   const { data: products = [] } = useResource<Product[]>('/api/products', []);
@@ -2479,9 +2483,32 @@ function SettingsPage() {
   const [requirementProfileForm, setRequirementProfileForm] = useState<FormMode<RequirementProfile>>({ open: false });
   const [promotionForm, setPromotionForm] = useState<FormMode<Promotion>>({ open: false });
   const [notice, setNotice] = useState<Notice>();
+  const currentCompanyId = isGlobalAdmin ? activeCompanyId ?? user?.companyId : user?.companyId;
+  const currentCompanyName = companies.find((company) => company.id === currentCompanyId)?.name ?? currentCompanyId ?? '';
+
+  useEffect(() => {
+    if (isGlobalAdmin && !activeCompanyId && user?.companyId) {
+      setActiveCompanyId(user.companyId);
+    }
+  }, [activeCompanyId, isGlobalAdmin, setActiveCompanyId, user?.companyId]);
+
+  useEffect(() => {
+    if (!isGlobalAdmin || !activeCompanyId) return;
+    reloadUsers();
+    reloadProductCategories();
+    reloadFinancialSettings();
+    reloadSalesPoints();
+    reloadRequirementProfiles();
+    reloadPromotions();
+  }, [activeCompanyId, isGlobalAdmin]);
 
   const saveCompany = async (payload: typeof emptyCompany) => {
-  const body = {
+    if (!companyForm.item && !isGlobalAdmin) {
+      setNotice({ type: 'error', text: 'Solo el administrador global puede crear empresas.' });
+      return;
+    }
+
+    const body = {
       name: payload.name,
       subdomain: payload.subdomain,
       customDomain: payload.customDomain || null,
@@ -2499,8 +2526,10 @@ function SettingsPage() {
   const saveUser = async (payload: typeof emptyUser) => {
     const isAdministrator = payload.roles.includes('Administrador');
     const isSupervisor = payload.roles.includes('Supervisor');
+    const companyId = isGlobalAdmin ? payload.companyId : user?.companyId ?? payload.companyId;
     const { data } = await api.post<User>('/api/users', {
       ...payload,
+      companyId,
       salesPointId: isAdministrator || isSupervisor ? null : payload.salesPointId || null,
       supervisedSalesPointIds: isSupervisor ? payload.supervisedSalesPointIds : []
     });
@@ -2621,7 +2650,12 @@ function SettingsPage() {
     <Header title="Configuracion" onRefresh={() => { reloadCompanies(); reloadUsers(); reloadProductCategories(); reloadFinancialSettings(); reloadSalesPoints(); reloadRequirementProfiles(); reloadPromotions(); }} />
     <Card><CardContent><Grid container spacing={2}>
       <Grid item xs={12} md={6}><TextField fullWidth label="API URL" value={import.meta.env.VITE_API_URL ?? ''} InputProps={{ readOnly: true }} /></Grid>
-      <Grid item xs={12} md={6}><TextField fullWidth label="Tenant" value={import.meta.env.VITE_TENANT ?? 'demo'} InputProps={{ readOnly: true }} /></Grid>
+      <Grid item xs={12} md={6}>{isGlobalAdmin
+        ? <TextField fullWidth select label="Empresa activa" value={currentCompanyId ?? ''} onChange={(e) => setActiveCompanyId(e.target.value)}>
+            {companies.map((company) => <MenuItem key={company.id} value={company.id}>{company.name} ({company.subdomain})</MenuItem>)}
+          </TextField>
+        : <TextField fullWidth label="Empresa activa" value={currentCompanyName} InputProps={{ readOnly: true }} />}
+      </Grid>
       <Grid item xs={12}><Chip icon={<CheckCircle />} label={`Sesion activa: ${user?.email} (${user?.roles.join(', ')})`} /></Grid>
     </Grid></CardContent></Card>
     <Card><CardContent>
@@ -2745,10 +2779,10 @@ function SettingsPage() {
         />
       </Stack>
     </CardContent></Card>
-    {canManage && <>
+    {isAdmin && <>
       <Stack direction="row" justifyContent="space-between" alignItems="center">
         <Typography variant="h5" fontWeight={900}>Empresas</Typography>
-        <Button variant="contained" startIcon={<Add />} onClick={() => setCompanyForm({ open: true })}>Nueva empresa</Button>
+        {isGlobalAdmin && <Button variant="contained" startIcon={<Add />} onClick={() => setCompanyForm({ open: true })}>Nueva empresa</Button>}
       </Stack>
       <StatusBar loading={loadingCompanies} error={companiesError} />
       <EntityTable

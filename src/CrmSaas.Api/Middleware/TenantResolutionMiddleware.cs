@@ -8,6 +8,20 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
 {
     public async Task InvokeAsync(HttpContext context, CrmDbContext db, ITenantContext tenantContext)
     {
+        var isGlobalAdmin = string.Equals(context.User.FindFirst("global_admin")?.Value, "true", StringComparison.OrdinalIgnoreCase);
+        var selectedCompany = context.Request.Headers["X-Company-Id"].FirstOrDefault();
+        if (isGlobalAdmin && Guid.TryParse(selectedCompany, out var selectedCompanyId))
+        {
+            var empresa = await db.Empresas.IgnoreQueryFilters()
+                .FirstOrDefaultAsync(x => x.Id == selectedCompanyId && x.Activa, context.RequestAborted);
+            if (empresa is not null)
+            {
+                tenantContext.SetTenant(empresa.Id, empresa.Subdominio);
+                await next(context);
+                return;
+            }
+        }
+
         var claimTenant = context.User.FindFirst("empresa_id")?.Value;
         if (Guid.TryParse(claimTenant, out var claimEmpresaId))
         {
