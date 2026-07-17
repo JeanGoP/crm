@@ -2526,7 +2526,7 @@ function SettingsPage() {
   const saveUser = async (payload: typeof emptyUser) => {
     const isAdministrator = payload.roles.includes('Administrador');
     const isSupervisor = payload.roles.includes('Supervisor');
-    const companyId = isGlobalAdmin ? payload.companyId : user?.companyId ?? payload.companyId;
+    const companyId = isGlobalAdmin ? currentCompanyId ?? user?.companyId ?? payload.companyId : user?.companyId ?? payload.companyId;
     const { data } = await api.post<User>('/api/users', {
       ...payload,
       companyId,
@@ -2646,6 +2646,12 @@ function SettingsPage() {
     setPromotionForm({ open: false });
   };
 
+  const activeCompanies = companies.filter((x) => x.active);
+  const dialogCompanies = isGlobalAdmin && currentCompanyId
+    ? activeCompanies.filter((x) => x.id === currentCompanyId)
+    : activeCompanies;
+  const userDialogCompanies = dialogCompanies.length > 0 ? dialogCompanies : activeCompanies;
+
   return <Stack spacing={3}>
     <Header title="Configuracion" onRefresh={() => { reloadCompanies(); reloadUsers(); reloadProductCategories(); reloadFinancialSettings(); reloadSalesPoints(); reloadRequirementProfiles(); reloadPromotions(); }} />
     <Card><CardContent><Grid container spacing={2}>
@@ -2656,7 +2662,7 @@ function SettingsPage() {
           </TextField>
         : <TextField fullWidth label="Empresa activa" value={currentCompanyName} InputProps={{ readOnly: true }} />}
       </Grid>
-      <Grid item xs={12}><Chip icon={<CheckCircle />} label={`Sesion activa: ${user?.email} (${user?.roles.join(', ')})`} /></Grid>
+      <Grid item xs={12}><Chip icon={<CheckCircle />} label={`Sesion activa: ${user?.fullName ?? user?.email} (${user?.roles.join(', ')})`} /></Grid>
     </Grid></CardContent></Card>
     <Card><CardContent>
       <Stack spacing={2}>
@@ -2821,7 +2827,7 @@ function SettingsPage() {
     <ProductCategoryDialog form={productCategoryForm} onClose={() => setProductCategoryForm({ open: false })} onSave={saveProductCategory} />
     <RequirementProfileDialog form={requirementProfileForm} onClose={() => setRequirementProfileForm({ open: false })} onSave={saveRequirementProfile} />
     <PromotionDialog form={promotionForm} products={products.filter((x) => x.active)} salesPoints={salesPoints.filter((x) => x.active)} onClose={() => setPromotionForm({ open: false })} onSave={savePromotion} />
-    <UserDialog form={userForm} companies={companies.filter((x) => x.active)} salesPoints={salesPoints.filter((x) => x.active)} onClose={() => setUserForm({ open: false })} onSave={saveUser} />
+    <UserDialog form={userForm} companies={userDialogCompanies} salesPoints={salesPoints.filter((x) => x.active)} defaultCompanyId={currentCompanyId} onClose={() => setUserForm({ open: false })} onSave={saveUser} />
     <FinancialSettingsDialog form={financialForm} onClose={() => setFinancialForm({ open: false })} onSave={saveFinancialSettings} />
     <Notice notice={notice} onClose={() => setNotice(undefined)} />
   </Stack>;
@@ -3081,8 +3087,8 @@ function PromotionDialog({ form, products, salesPoints, onClose, onSave }: Dialo
   </FormDialog>;
 }
 
-function UserDialog({ form, companies, salesPoints, onClose, onSave }: DialogProps<User, typeof emptyUser> & { companies: Company[]; salesPoints: SalesPoint[] }) {
-  const initialCompanyId = companies[0]?.id ?? '';
+function UserDialog({ form, companies, salesPoints, defaultCompanyId, onClose, onSave }: DialogProps<User, typeof emptyUser> & { companies: Company[]; salesPoints: SalesPoint[]; defaultCompanyId?: string }) {
+  const initialCompanyId = defaultCompanyId && companies.some((company) => company.id === defaultCompanyId) ? defaultCompanyId : companies[0]?.id ?? '';
   const initial = { ...emptyUser, companyId: initialCompanyId, salesPointId: salesPoints[0]?.id ?? '', supervisedSalesPointIds: [] as string[] };
   return <FormDialog title="Nuevo usuario" open={form.open} initial={initial} onClose={onClose} onSave={onSave}>
     {(v, set) => {
