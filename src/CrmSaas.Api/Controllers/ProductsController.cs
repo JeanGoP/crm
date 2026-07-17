@@ -52,7 +52,7 @@ public sealed class ProductsController(CrmDbContext db) : ControllerBase
     [Authorize(Roles = "Administrador")]
     public ActionResult DownloadImportTemplate()
     {
-        var csv = "\uFEFF" + string.Join(';', ImportHeaders) + Environment.NewLine;
+        var csv = "\uFEFFsep=;" + Environment.NewLine + string.Join(';', ImportHeaders) + Environment.NewLine;
         return File(Encoding.UTF8.GetBytes(csv), "text/csv; charset=utf-8", "plantilla_productos.csv");
     }
 
@@ -74,6 +74,14 @@ public sealed class ProductsController(CrmDbContext db) : ControllerBase
         if (string.IsNullOrWhiteSpace(headerLine)) throw new ValidationException("El archivo no tiene encabezados.");
 
         var separator = DetectSeparator(headerLine);
+        if (headerLine.Trim().StartsWith("sep=", StringComparison.OrdinalIgnoreCase))
+        {
+            var configuredSeparator = headerLine.Trim()[4..].Trim();
+            separator = string.IsNullOrEmpty(configuredSeparator) ? separator : configuredSeparator[0];
+            headerLine = await reader.ReadLineAsync(cancellationToken);
+            if (string.IsNullOrWhiteSpace(headerLine)) throw new ValidationException("El archivo no tiene encabezados.");
+        }
+
         var headers = ParseCsvLine(headerLine, separator).Select(NormalizeHeader).ToArray();
         var headerMap = headers
             .Select((header, index) => new { header, index })
