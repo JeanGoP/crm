@@ -319,7 +319,7 @@ function Layout() {
     </Stack>
     <Box sx={{ m: 1.5, p: 1.5, borderRadius: 3, bgcolor: uiSidebarSoft, border: '1px solid rgba(255, 255, 255, .08)' }}>
       <Typography variant="caption" color="#98a2b3">Sesion activa</Typography>
-      <Typography color="#fff" fontWeight={800} fontSize={13} noWrap>{user?.email ?? 'Usuario'}</Typography>
+      <Typography color="#fff" fontWeight={800} fontSize={13} noWrap>{user?.fullName || user?.email || 'Usuario'}</Typography>
     </Box>
   </>;
   return (
