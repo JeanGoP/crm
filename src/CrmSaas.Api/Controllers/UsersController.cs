@@ -19,8 +19,18 @@ public sealed class UsersController(CrmDbContext db, IPasswordHasher passwordHas
         var users = await db.Usuarios.IgnoreQueryFilters()
             .Include(x => x.UsuarioRoles).ThenInclude(x => x.Rol)
             .Include(x => x.PuntoVenta)
+            .Include(x => x.SedesSupervisadas).ThenInclude(x => x.PuntoVenta)
             .OrderBy(x => x.NombreCompleto)
-            .Select(x => new UserDto(x.Id, x.NombreCompleto, x.Email, x.UsuarioRoles.Select(ur => ur.Rol!.Nombre).ToArray(), x.EmpresaId, x.PuntoVentaId, x.PuntoVenta == null ? null : x.PuntoVenta.Nombre))
+            .Select(x => new UserDto(
+                x.Id,
+                x.NombreCompleto,
+                x.Email,
+                x.UsuarioRoles.Select(ur => ur.Rol!.Nombre).ToArray(),
+                x.EmpresaId,
+                x.PuntoVentaId,
+                x.PuntoVenta == null ? null : x.PuntoVenta.Nombre,
+                x.SedesSupervisadas.Select(s => s.PuntoVentaId).ToArray(),
+                x.SedesSupervisadas.Where(s => s.PuntoVenta != null).Select(s => s.PuntoVenta!.Nombre).ToArray()))
             .ToListAsync(cancellationToken);
         return Ok(users);
     }
@@ -43,12 +53,32 @@ public sealed class UsersController(CrmDbContext db, IPasswordHasher passwordHas
         }
 
         var isAdministrator = roles.Any(x => x.Nombre == "Administrador");
+        var isSupervisor = roles.Any(x => x.Nombre == "Supervisor");
         Guid? salesPointId = null;
-        if (!isAdministrator)
+        var supervisedSalesPointIds = Array.Empty<Guid>();
+        if (isSupervisor)
+        {
+            supervisedSalesPointIds = (dto.SupervisedSalesPointIds ?? [])
+                .Where(x => x != Guid.Empty)
+                .Distinct()
+                .ToArray();
+            if (supervisedSalesPointIds.Length == 0)
+            {
+                return BadRequest(new { detail = "Debe seleccionar al menos una sede para supervisar." });
+            }
+
+            var validSupervisedCount = await db.PuntosVenta.IgnoreQueryFilters()
+                .CountAsync(x => x.EmpresaId == dto.CompanyId && x.Activa && supervisedSalesPointIds.Contains(x.Id), cancellationToken);
+            if (validSupervisedCount != supervisedSalesPointIds.Length)
+            {
+                return BadRequest(new { detail = "Una de las sedes supervisadas no existe o esta inactiva para la empresa seleccionada." });
+            }
+        }
+        else if (!isAdministrator)
         {
             if (!dto.SalesPointId.HasValue)
             {
-                return BadRequest(new { detail = "Debe seleccionar una sede para usuarios vendedores o supervisores." });
+                return BadRequest(new { detail = "Debe seleccionar una sede para el vendedor." });
             }
 
             salesPointId = await db.PuntosVenta.IgnoreQueryFilters()
@@ -75,13 +105,24 @@ public sealed class UsersController(CrmDbContext db, IPasswordHasher passwordHas
         {
             user.UsuarioRoles.Add(new UsuarioRol { EmpresaId = dto.CompanyId, RolId = role.Id });
         }
+        foreach (var supervisedSalesPointId in supervisedSalesPointIds)
+        {
+            user.SedesSupervisadas.Add(new UsuarioSedeSupervisada { EmpresaId = dto.CompanyId, UsuarioId = user.Id, PuntoVentaId = supervisedSalesPointId });
+        }
 
         db.Usuarios.Add(user);
         await db.SaveChangesAsync(cancellationToken);
         var salesPointName = salesPointId.HasValue
             ? await db.PuntosVenta.IgnoreQueryFilters().Where(x => x.Id == salesPointId.Value).Select(x => x.Nombre).FirstOrDefaultAsync(cancellationToken)
             : null;
-        return Ok(new UserDto(user.Id, user.NombreCompleto, user.Email, roles.Select(x => x.Nombre).ToArray(), user.EmpresaId, salesPointId, salesPointName));
+        var supervisedSalesPointNames = supervisedSalesPointIds.Length == 0
+            ? Array.Empty<string>()
+            : await db.PuntosVenta.IgnoreQueryFilters()
+                .Where(x => supervisedSalesPointIds.Contains(x.Id))
+                .OrderBy(x => x.Nombre)
+                .Select(x => x.Nombre)
+                .ToArrayAsync(cancellationToken);
+        return Ok(new UserDto(user.Id, user.NombreCompleto, user.Email, roles.Select(x => x.Nombre).ToArray(), user.EmpresaId, salesPointId, salesPointName, supervisedSalesPointIds, supervisedSalesPointNames));
     }
 }
 

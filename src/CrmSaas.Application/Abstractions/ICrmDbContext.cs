@@ -9,6 +9,7 @@ public interface ICrmDbContext
     DbSet<Usuario> Usuarios { get; }
     DbSet<Rol> Roles { get; }
     DbSet<UsuarioRol> UsuarioRoles { get; }
+    DbSet<UsuarioSedeSupervisada> UsuariosSedesSupervisadas { get; }
     DbSet<RefreshToken> RefreshTokens { get; }
     DbSet<Cliente> Clientes { get; }
     DbSet<Prospecto> Prospectos { get; }

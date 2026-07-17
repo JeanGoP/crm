@@ -175,7 +175,7 @@ const emptyLead = { firstNames: '', lastNames: '', firstName: '', middleName: ''
 const emptyDeal = { title: '', customerId: '', stageId: '', value: 0, closeProbability: 10, estimatedCloseDate: today, status: 1 };
 const emptyActivity = { title: '', description: '', type: 1, status: 1, scheduledAt: `${today}T09:00`, reminderAt: '', customerId: '', dealId: '', assignedUserId: '' };
 const emptyCompany = { name: '', subdomain: '', customDomain: '', logoDataUrl: '', active: true };
-const emptyUser = { fullName: '', email: '', password: '', companyId: '', salesPointId: '', roles: ['Vendedor'] };
+const emptyUser = { fullName: '', email: '', password: '', companyId: '', salesPointId: '', roles: ['Vendedor'], supervisedSalesPointIds: [] as string[] };
 const emptyProduct = { name: '', category: 'Moto', brand: '', model: '', line: '', version: '', reference: '', description: '', engineCc: '', year: '', color: '', price: 0, soat: 0, registrationFee: 0, taxes: 0, technicalSheet: '', priceValidFrom: today, active: true, salesPointPrices: [] as { salesPointId: string; price: number | ''; priceValidFrom: string; active: boolean }[] };
 const emptyCommercialInventory = { productId: '', salesPointId: '', vin: '', chassisNumber: '', engineNumber: '', plate: '', color: '', isUsed: false, mileage: '', status: 1, notes: '' };
 const emptyProductCategory = { name: '', description: '', quoteAsBundle: false, active: true };
@@ -2500,7 +2500,12 @@ function SettingsPage() {
 
   const saveUser = async (payload: typeof emptyUser) => {
     const isAdministrator = payload.roles.includes('Administrador');
-    const { data } = await api.post<User>('/api/users', { ...payload, salesPointId: isAdministrator ? null : payload.salesPointId || null });
+    const isSupervisor = payload.roles.includes('Supervisor');
+    const { data } = await api.post<User>('/api/users', {
+      ...payload,
+      salesPointId: isAdministrator || isSupervisor ? null : payload.salesPointId || null,
+      supervisedSalesPointIds: isSupervisor ? payload.supervisedSalesPointIds : []
+    });
     setUsers([...users, data].sort((a, b) => a.fullName.localeCompare(b.fullName)));
     setNotice({ type: 'success', text: 'Usuario creado.' });
     setUserForm({ open: false });
@@ -2772,7 +2777,9 @@ function SettingsPage() {
           u.fullName,
           u.email,
           companies.find((c) => c.id === u.companyId)?.name ?? u.companyId,
-          u.salesPointName ?? salesPoints.find((p) => p.id === u.salesPointId)?.name ?? '-',
+          u.roles.includes('Supervisor')
+            ? (u.supervisedSalesPointNames?.join(', ') || '-')
+            : (u.salesPointName ?? salesPoints.find((p) => p.id === u.salesPointId)?.name ?? '-'),
           u.roles.join(', ')
         ])}
       />
@@ -3044,12 +3051,13 @@ function PromotionDialog({ form, products, salesPoints, onClose, onSave }: Dialo
 
 function UserDialog({ form, companies, salesPoints, onClose, onSave }: DialogProps<User, typeof emptyUser> & { companies: Company[]; salesPoints: SalesPoint[] }) {
   const initialCompanyId = companies[0]?.id ?? '';
-  const initial = { ...emptyUser, companyId: initialCompanyId, salesPointId: salesPoints[0]?.id ?? '' };
+  const initial = { ...emptyUser, companyId: initialCompanyId, salesPointId: salesPoints[0]?.id ?? '', supervisedSalesPointIds: [] as string[] };
   return <FormDialog title="Nuevo usuario" open={form.open} initial={initial} onClose={onClose} onSave={onSave}>
     {(v, set) => {
       const currentSalesPoints = salesPoints;
       const selectedRole = v.roles[0] ?? 'Vendedor';
       const isAdministrator = selectedRole === 'Administrador';
+      const isSupervisor = selectedRole === 'Supervisor';
       const defaultSalesPointId = currentSalesPoints[0]?.id ?? '';
       return <>
       <TextField required label="Nombre completo" value={v.fullName} onChange={(e) => set({ fullName: e.target.value })} />
@@ -3058,11 +3066,42 @@ function UserDialog({ form, companies, salesPoints, onClose, onSave }: DialogPro
       <TextField required select label="Empresa" value={v.companyId} onChange={(e) => set({ companyId: e.target.value, salesPointId: isAdministrator ? '' : defaultSalesPointId })}>{companies.map((c) => <MenuItem key={c.id} value={c.id}>{c.name} ({c.subdomain})</MenuItem>)}</TextField>
       <TextField select label="Rol" value={selectedRole} onChange={(e) => {
         const role = e.target.value;
-        set({ roles: [role], salesPointId: role === 'Administrador' ? '' : (v.salesPointId || defaultSalesPointId) });
+        set({
+          roles: [role],
+          salesPointId: role === 'Vendedor' ? (v.salesPointId || defaultSalesPointId) : '',
+          supervisedSalesPointIds: role === 'Supervisor' ? v.supervisedSalesPointIds : []
+        });
       }}>{['Administrador', 'Supervisor', 'Vendedor'].map((role) => <MenuItem key={role} value={role}>{role}</MenuItem>)}</TextField>
-      {!isAdministrator && <TextField required select label="Sede principal" value={v.salesPointId} onChange={(e) => set({ salesPointId: e.target.value })} helperText="Se usara en cotizaciones, reportes y tramites por sede.">
+      {selectedRole === 'Vendedor' && <TextField required select label="Sede principal" value={v.salesPointId} onChange={(e) => set({ salesPointId: e.target.value })} helperText="Se usara en cotizaciones, reportes y tramites por sede.">
         {currentSalesPoints.length === 0 && <MenuItem value="">Cree una sede antes de crear vendedores.</MenuItem>}
         {currentSalesPoints.map((point) => <MenuItem key={point.id} value={point.id}>{point.name} - {point.city}</MenuItem>)}
+      </TextField>}
+      {isSupervisor && <TextField
+        required
+        select
+        label="Sedes a supervisar"
+        value={v.supervisedSalesPointIds}
+        onChange={(e) => {
+          const value = e.target.value;
+          set({ supervisedSalesPointIds: Array.isArray(value) ? value : String(value).split(',').filter(Boolean) });
+        }}
+        helperText="Seleccione una o varias sedes que este supervisor podra controlar."
+        SelectProps={{
+          multiple: true,
+          renderValue: (selected) => {
+            const selectedIds = selected as string[];
+            return selectedIds
+              .map((id) => currentSalesPoints.find((point) => point.id === id)?.name)
+              .filter(Boolean)
+              .join(', ');
+          }
+        }}
+      >
+        {currentSalesPoints.length === 0 && <MenuItem value="" disabled>Cree sedes antes de crear supervisores.</MenuItem>}
+        {currentSalesPoints.map((point) => <MenuItem key={point.id} value={point.id}>
+          <Checkbox checked={v.supervisedSalesPointIds.includes(point.id)} />
+          <Typography>{point.name} - {point.city}</Typography>
+        </MenuItem>)}
       </TextField>}
     </>;
     }}

@@ -11,6 +11,7 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
     public DbSet<Usuario> Usuarios => Set<Usuario>();
     public DbSet<Rol> Roles => Set<Rol>();
     public DbSet<UsuarioRol> UsuarioRoles => Set<UsuarioRol>();
+    public DbSet<UsuarioSedeSupervisada> UsuariosSedesSupervisadas => Set<UsuarioSedeSupervisada>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<Cliente> Clientes => Set<Cliente>();
     public DbSet<Prospecto> Prospectos => Set<Prospecto>();
@@ -44,6 +45,7 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
         modelBuilder.Entity<Usuario>().ToTable("Usuarios");
         modelBuilder.Entity<Rol>().ToTable("Roles");
         modelBuilder.Entity<UsuarioRol>().ToTable("UsuariosRoles");
+        modelBuilder.Entity<UsuarioSedeSupervisada>().ToTable("UsuariosSedesSupervisadas");
         modelBuilder.Entity<RefreshToken>().ToTable("RefreshTokens");
         modelBuilder.Entity<Cliente>().ToTable("Clientes");
         modelBuilder.Entity<Prospecto>().ToTable("Prospectos");
@@ -85,6 +87,10 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
         modelBuilder.Entity<Usuario>().HasOne(x => x.PuntoVenta).WithMany().HasForeignKey(x => x.PuntoVentaId).OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<Rol>().HasIndex(x => new { x.EmpresaId, x.Nombre }).IsUnique();
         modelBuilder.Entity<UsuarioRol>().HasIndex(x => new { x.EmpresaId, x.UsuarioId, x.RolId }).IsUnique();
+        modelBuilder.Entity<UsuarioSedeSupervisada>().HasIndex(x => new { x.EmpresaId, x.UsuarioId, x.PuntoVentaId }).IsUnique();
+        modelBuilder.Entity<UsuarioSedeSupervisada>().HasIndex(x => new { x.EmpresaId, x.PuntoVentaId });
+        modelBuilder.Entity<UsuarioSedeSupervisada>().HasOne(x => x.Usuario).WithMany(x => x.SedesSupervisadas).HasForeignKey(x => x.UsuarioId).OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<UsuarioSedeSupervisada>().HasOne(x => x.PuntoVenta).WithMany().HasForeignKey(x => x.PuntoVentaId).OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<Cliente>().HasIndex(x => new { x.EmpresaId, x.Email });
         modelBuilder.Entity<Prospecto>().HasIndex(x => new { x.EmpresaId, x.Email });
         modelBuilder.Entity<Negocio>().Property(x => x.Valor).HasPrecision(18, 2);
@@ -259,6 +265,7 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
         modelBuilder.Entity<Usuario>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<Rol>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<UsuarioRol>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
+        modelBuilder.Entity<UsuarioSedeSupervisada>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<RefreshToken>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<Cliente>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<Prospecto>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);

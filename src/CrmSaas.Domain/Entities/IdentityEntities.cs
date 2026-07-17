@@ -11,6 +11,7 @@ public sealed class Usuario : AuditableTenantEntity
     public PuntoVenta? PuntoVenta { get; set; }
     public bool Activo { get; set; } = true;
     public ICollection<UsuarioRol> UsuarioRoles { get; set; } = new List<UsuarioRol>();
+    public ICollection<UsuarioSedeSupervisada> SedesSupervisadas { get; set; } = new List<UsuarioSedeSupervisada>();
     public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
 }
 
@@ -27,6 +28,14 @@ public sealed class UsuarioRol : AuditableTenantEntity
     public Usuario? Usuario { get; set; }
     public Guid RolId { get; set; }
     public Rol? Rol { get; set; }
+}
+
+public sealed class UsuarioSedeSupervisada : AuditableTenantEntity
+{
+    public Guid UsuarioId { get; set; }
+    public Usuario? Usuario { get; set; }
+    public Guid PuntoVentaId { get; set; }
+    public PuntoVenta? PuntoVenta { get; set; }
 }
 
 public sealed class RefreshToken : AuditableTenantEntity

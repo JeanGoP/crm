@@ -8,6 +8,8 @@ export interface User {
   companyId: string;
   salesPointId?: string;
   salesPointName?: string;
+  supervisedSalesPointIds: string[];
+  supervisedSalesPointNames: string[];
 }
 
 export interface Company {
