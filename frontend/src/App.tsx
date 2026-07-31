@@ -115,7 +115,28 @@ const theme = createTheme({
       styleOverrides: {
         root: {
           '& .MuiOutlinedInput-root': {
-            backgroundColor: '#fff'
+            backgroundColor: '#fff',
+            borderRadius: 10,
+            transition: 'box-shadow .16s ease, border-color .16s ease',
+            '& fieldset': {
+              borderColor: '#cfd9e5'
+            },
+            '&:hover fieldset': {
+              borderColor: '#8fb9c4'
+            },
+            '&.Mui-focused': {
+              boxShadow: '0 0 0 3px rgba(21, 94, 117, .10)'
+            },
+            '&.Mui-focused fieldset': {
+              borderColor: uiPrimary
+            }
+          },
+          '& .MuiInputLabel-root': {
+            fontWeight: 700,
+            color: '#64748b'
+          },
+          '& .MuiFormHelperText-root': {
+            marginLeft: 0
           }
         }
       }
@@ -136,7 +157,9 @@ const theme = createTheme({
     MuiDialog: {
       styleOverrides: {
         paper: {
-          borderRadius: 12
+          borderRadius: 14,
+          boxShadow: '0 30px 90px rgba(15, 23, 42, .24)',
+          border: `1px solid ${uiBorder}`
         }
       }
     },
@@ -4386,13 +4409,17 @@ function FieldGrid({ children, columns = 2 }: { children: ReactNode; columns?: 2
   return <Box sx={{
     display: 'grid',
     gridTemplateColumns: { xs: '1fr', sm: `repeat(${columns}, minmax(0, 1fr))` },
-    gap: 2,
-    width: '100%'
+    gap: { xs: 1.35, sm: 1.75 },
+    width: '100%',
+    '& > *': { minWidth: 0 }
   }}>{children}</Box>;
 }
 
 function SectionTitle({ title }: { title: string }) {
-  return <Typography variant="subtitle2" fontWeight={900} color="primary" sx={{ mt: 1 }}>{title}</Typography>;
+  return <Stack direction="row" alignItems="center" gap={1} sx={{ mt: 1.5, mb: -.25 }}>
+    <Box sx={{ width: 8, height: 24, borderRadius: 999, bgcolor: uiAccent }} />
+    <Typography variant="subtitle2" fontWeight={900} color="#0f172a" sx={{ textTransform: 'uppercase', fontSize: 12, letterSpacing: 0 }}>{title}</Typography>
+  </Stack>;
 }
 
 function FormDialog<T extends Record<string, unknown>>({ title, open, initial, children, onClose, onSave, maxWidth = 'sm' }: { title: string; open: boolean; initial: T; children: (value: T, set: (patch: Partial<T>) => void) => ReactNode; onClose: () => void; onSave: (payload: T) => Promise<void>; maxWidth?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' }) {
@@ -4422,9 +4449,26 @@ function FormDialog<T extends Record<string, unknown>>({ title, open, initial, c
   };
 
   return <Dialog open={open} onClose={saving ? undefined : onClose} fullWidth maxWidth={maxWidth} fullScreen={fullScreen}>
-    <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1, pb: 1.25, borderBottom: `1px solid ${uiBorder}`, fontWeight: 900 }}>{title}<IconButton onClick={onClose}><Close /></IconButton></DialogTitle>
-    <DialogContent sx={{ px: { xs: 2, sm: 3 }, bgcolor: '#fbfcfe' }}><Stack spacing={2} sx={{ pt: 2 }}>{error && <Alert severity="error">{error}</Alert>}{children(value, (patch) => setValue((prev) => ({ ...prev, ...patch })))}</Stack></DialogContent>
-    <DialogActions sx={{ px: { xs: 2, sm: 3 }, py: 2, flexWrap: 'wrap', borderTop: `1px solid ${uiBorder}` }}><Button onClick={onClose} disabled={saving}>Cancelar</Button><Button variant="contained" onClick={save} disabled={saving}>{saving ? 'Guardando...' : 'Guardar'}</Button></DialogActions>
+    <DialogTitle sx={{ p: 0 }}>
+      <Box sx={{ px: { xs: 2, sm: 3 }, py: 2.25, color: '#fff', background: 'linear-gradient(135deg, #155e75 0%, #0f766e 72%, #334155 100%)' }}>
+        <Stack direction="row" justifyContent="space-between" alignItems="center" gap={1.5}>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography variant="h6" fontWeight={900} sx={{ color: '#fff', lineHeight: 1.15, overflowWrap: 'anywhere' }}>{title}</Typography>
+            <Typography fontSize={13} sx={{ color: 'rgba(255,255,255,.76)', mt: .35 }}>Complete la informacion y guarde los cambios.</Typography>
+          </Box>
+          <IconButton onClick={onClose} disabled={saving} sx={{ color: '#fff', bgcolor: 'rgba(255,255,255,.12)', '&:hover': { bgcolor: 'rgba(255,255,255,.2)' } }}><Close /></IconButton>
+        </Stack>
+      </Box>
+    </DialogTitle>
+    <DialogContent sx={{ px: { xs: 1.5, sm: 2.5 }, py: { xs: 1.5, sm: 2.25 }, bgcolor: '#f4f7fb' }}>
+      <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 }, bgcolor: '#fff', borderColor: '#dbe4ee' }}>
+        <Stack spacing={1.75}>{error && <Alert severity="error">{error}</Alert>}{children(value, (patch) => setValue((prev) => ({ ...prev, ...patch })))}</Stack>
+      </Paper>
+    </DialogContent>
+    <DialogActions sx={{ px: { xs: 2, sm: 3 }, py: 1.75, flexWrap: 'wrap', borderTop: `1px solid ${uiBorder}`, bgcolor: '#fff' }}>
+      <Button onClick={onClose} disabled={saving} variant="outlined">Cancelar</Button>
+      <Button variant="contained" onClick={save} disabled={saving}>{saving ? 'Guardando...' : 'Guardar'}</Button>
+    </DialogActions>
   </Dialog>;
 }
 
