@@ -145,6 +145,22 @@ export interface ProductSalesPointPrice {
   active: boolean;
 }
 
+export interface ExternalInventoryItem {
+  warehouseCode: string;
+  warehouseName: string;
+  code: string;
+  name: string;
+  presentation?: string;
+  serialNumber?: string;
+  engineNumber?: string;
+  chassisNumber?: string;
+  quantity: number;
+  productId?: string;
+  productName?: string;
+  productPrice?: number;
+  isInCatalog: boolean;
+}
+
 export interface CommercialInventory {
   id: string;
   productId: string;

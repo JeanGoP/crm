@@ -37,7 +37,7 @@ import ChevronRight from '@mui/icons-material/ChevronRight';
 import { AxiosError } from 'axios';
 import { api } from './api';
 import { useAuthStore } from './store';
-import { Activity, ColombianIdentityLookup, CollectionOrder, CommercialInventory, CommercialInventorySummary, CommercialReports, Company, CreditApplication, CreditDocument, Customer, Customer360, CustomerAiAnalysis, CustomerTimelineItem, Dashboard, Deal, DealStage, FinancialSettings, Lead, MotorcycleDelivery, Procedure, Product, ProductCategory, ProductPhoto, Promotion, Quote, QuoteSimulationResult, RequirementProfile, SalesPoint, User } from './types';
+import { Activity, ColombianIdentityLookup, CollectionOrder, CommercialInventory, CommercialInventorySummary, CommercialReports, Company, CreditApplication, CreditDocument, Customer, Customer360, CustomerAiAnalysis, CustomerTimelineItem, Dashboard, Deal, DealStage, ExternalInventoryItem, FinancialSettings, Lead, MotorcycleDelivery, Procedure, Product, ProductCategory, ProductPhoto, Promotion, Quote, QuoteSimulationResult, RequirementProfile, SalesPoint, User } from './types';
 
 const drawerWidth = 272;
 const today = new Date().toISOString().slice(0, 10);
@@ -3959,11 +3959,21 @@ function QuoteDialog({ form, products, productCategories, requirementProfiles, o
   const initial = { ...emptyQuote, requirementProfileId: requirementProfiles[0]?.id ?? '', productId: initialItem.productId, items: [initialItem] };
   const [identityLoading, setIdentityLoading] = useState(false);
   const [identityNotice, setIdentityNotice] = useState<Notice>();
+  const [inventorySearch, setInventorySearch] = useState('');
+  const [inventoryItems, setInventoryItems] = useState<ExternalInventoryItem[]>([]);
+  const [inventoryLoading, setInventoryLoading] = useState(false);
+  const [inventoryError, setInventoryError] = useState('');
+  const [inventoryTargetIndex, setInventoryTargetIndex] = useState(0);
 
   useEffect(() => {
     if (!form.open) {
       setIdentityLoading(false);
       setIdentityNotice(undefined);
+      setInventorySearch('');
+      setInventoryItems([]);
+      setInventoryError('');
+      setInventoryLoading(false);
+      setInventoryTargetIndex(0);
     }
   }, [form.open]);
 
@@ -4002,6 +4012,32 @@ function QuoteDialog({ form, products, productCategories, requirementProfiles, o
       setIdentityNotice({ type: 'error', text: apiError(err) });
     } finally {
       setIdentityLoading(false);
+    }
+  };
+
+  const searchExternalInventory = async () => {
+    const term = inventorySearch.trim();
+    if (term.length < 2) {
+      setInventoryError('Digite al menos 2 caracteres para buscar en inventario.');
+      setInventoryItems([]);
+      return;
+    }
+
+    setInventoryLoading(true);
+    setInventoryError('');
+    try {
+      const { data } = await api.get<ExternalInventoryItem[]>('/api/external-inventory', {
+        params: { search: term, take: 40 }
+      });
+      setInventoryItems(data);
+      if (!data.length) {
+        setInventoryError('No se encontraron existencias con ese criterio.');
+      }
+    } catch (err) {
+      setInventoryItems([]);
+      setInventoryError(apiError(err));
+    } finally {
+      setInventoryLoading(false);
     }
   };
 
@@ -4100,6 +4136,72 @@ function QuoteDialog({ form, products, productCategories, requirementProfiles, o
             </Box>
             <Button variant="outlined" startIcon={<Add />} disabled={quoteItems.length >= 4 || !products.length} onClick={addItem}>Agregar articulo</Button>
           </Stack>
+          <Paper variant="outlined" sx={{ p: 1.5, bgcolor: '#fbfdff' }}>
+            <Stack spacing={1.25}>
+              <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.25} alignItems={{ xs: 'stretch', md: 'center' }}>
+                <TextField
+                  fullWidth
+                  label="Buscar inventario en tiempo real"
+                  placeholder="Codigo, nombre, serial, chasis o bodega"
+                  value={inventorySearch}
+                  onChange={(e) => setInventorySearch(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      void searchExternalInventory();
+                    }
+                  }}
+                  InputProps={{ startAdornment: <InputAdornment position="start"><Search fontSize="small" /></InputAdornment> }}
+                />
+                <TextField
+                  select
+                  label="Aplicar a"
+                  value={Math.min(inventoryTargetIndex, Math.max(quoteItems.length - 1, 0))}
+                  onChange={(e) => setInventoryTargetIndex(Number(e.target.value))}
+                  sx={{ minWidth: { md: 150 } }}
+                >
+                  {quoteItems.map((_, index) => <MenuItem key={index} value={index}>Articulo {index + 1}</MenuItem>)}
+                </TextField>
+                <Button variant="contained" startIcon={<Search />} disabled={inventoryLoading} onClick={() => void searchExternalInventory()}>
+                  {inventoryLoading ? 'Buscando...' : 'Buscar'}
+                </Button>
+              </Stack>
+              {inventoryLoading && <LinearProgress />}
+              {inventoryError && <Alert severity={inventoryItems.length ? 'info' : 'warning'}>{inventoryError}</Alert>}
+              {!!inventoryItems.length && <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' }, gap: 1 }}>
+                {inventoryItems.map((item, index) => (
+                  <Paper key={`${item.warehouseCode}-${item.code}-${item.serialNumber ?? index}`} variant="outlined" sx={{ p: 1.25, bgcolor: '#fff' }}>
+                    <Stack spacing={1}>
+                      <Stack direction="row" justifyContent="space-between" alignItems="flex-start" gap={1}>
+                        <Box sx={{ minWidth: 0 }}>
+                          <Typography fontWeight={900} noWrap>{item.name}</Typography>
+                          <Typography variant="caption" color="text.secondary">{item.code}{item.presentation ? ` - ${item.presentation}` : ''}</Typography>
+                        </Box>
+                        <Chip size="small" color={item.quantity > 0 ? 'success' : 'default'} label={`${item.quantity} disp.`} />
+                      </Stack>
+                      <Typography variant="caption" color="text.secondary">{item.warehouseName || 'Bodega sin nombre'} ({item.warehouseCode || 'N/A'})</Typography>
+                      {(item.engineNumber || item.chassisNumber) && <Typography variant="caption" color="text.secondary">
+                        {item.engineNumber ? `Motor: ${item.engineNumber}` : ''}{item.engineNumber && item.chassisNumber ? ' · ' : ''}{item.chassisNumber ? `Chasis: ${item.chassisNumber}` : ''}
+                      </Typography>}
+                      <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
+                        {item.isInCatalog && item.productId
+                          ? <Typography variant="caption" color="success.main" fontWeight={800}>Catalogo CRM: {money(item.productPrice ?? 0)}</Typography>
+                          : <Typography variant="caption" color="warning.main" fontWeight={800}>Sin producto/precio CRM</Typography>}
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          disabled={!item.isInCatalog || !item.productId}
+                          onClick={() => item.productId && updateItemProduct(Math.min(inventoryTargetIndex, quoteItems.length - 1), item.productId)}
+                        >
+                          Usar
+                        </Button>
+                      </Stack>
+                    </Stack>
+                  </Paper>
+                ))}
+              </Box>}
+            </Stack>
+          </Paper>
           {quoteItems.map((item, index) => {
             const selectedProduct = products.find((product) => product.id === item.productId);
             return <Paper key={index} variant="outlined" sx={{ p: 2, bgcolor: '#f8fafc' }}>

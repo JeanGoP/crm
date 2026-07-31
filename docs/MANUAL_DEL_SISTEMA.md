@@ -1,7 +1,7 @@
 # Manual de usuario - EnMarcha CRM
 
 Ultima actualizacion: 2026-07-31  
-Version del manual: 9.1
+Version del manual: 9.2
 Sistema: EnMarcha CRM para gestion comercial y ventas a credito  
 
 ## 1. Bienvenida
@@ -263,6 +263,8 @@ El formulario esta organizado en una vista amplia: primero se capturan los datos
 
 La cotizacion usa automaticamente la sede principal del asesor conectado. Esa sede define logo de marca, tasa factor mensual, plazo maximo, vigencia y condiciones comerciales impresas en el PDF.
 
+Cuando la empresa tiene inventario conectado, el asesor puede buscar existencias en tiempo real por codigo, nombre, serial, chasis o bodega. El resultado muestra disponibilidad y punto de inventario. Para poder usar un articulo en la cotizacion, el codigo del inventario debe tener su producto equivalente creado en el catalogo del CRM, porque desde alli se toman precio, fotos, categoria y reglas comerciales.
+
 Tambien permite seleccionar un **perfil de requisitos**, por ejemplo Empleado, Independiente, Pensionado o Contado. Ese perfil indica que documentos se deben pedir si el cliente continua hacia solicitud de credito.
 
 Si existe una promocion vigente para el producto, marca, color o sede, la cotizacion aplica el descuento automaticamente antes de calcular el valor financiado y la cuota aproximada.
@@ -277,11 +279,12 @@ Si existe una promocion vigente para el producto, marca, color o sede, la cotiza
 6. Complete primer nombre, segundo nombre, primer apellido y segundo apellido.
 7. Ingrese indicativo y telefono. Por defecto se usa el indicativo de Colombia **+57**.
 8. Seleccione el **perfil de requisitos** que corresponda al cliente o a la forma de pago.
-9. Seleccione el producto que desea cotizar.
-10. Digite la cuota inicial y el numero de cuotas.
-11. Si desea comparar varias opciones, presione **Agregar articulo** y seleccione otro producto.
-12. Revise la cuota aproximada de cada articulo.
-13. Guarde la cotizacion.
+9. Si desea validar disponibilidad, use **Buscar inventario en tiempo real** y presione **Usar** sobre el articulo encontrado.
+10. Si no usa la busqueda de inventario, seleccione manualmente el producto que desea cotizar.
+11. Digite la cuota inicial y el numero de cuotas.
+12. Si desea comparar varias opciones, presione **Agregar articulo** y seleccione otro producto.
+13. Revise la cuota aproximada de cada articulo.
+14. Guarde la cotizacion.
 
 ### Que ocurre al guardar
 
@@ -753,6 +756,7 @@ El sistema muestra mensajes cuando algo no puede completarse.
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-07-31 | 9.2 | Se agrega busqueda de inventario externo en tiempo real dentro de Cotizaciones para validar disponibilidad por bodega antes de seleccionar el articulo. |
 | 2026-07-31 | 9.1 | Se reorganiza el menu lateral en grupos expandibles para Comercial, Credito, Operacion, Catalogos, Reportes y Administracion. |
 | 2026-07-31 | 9.0 | Se mejora la adaptacion del sistema en tablet y celular para menu, encabezados, formularios, tablas, modales y galerias de imagenes. |
 | 2026-07-31 | 8.9 | Se mejora Cliente 360 con ficha comercial moderna, resumen superior, acciones rapidas, indicadores, timeline y secciones de proceso mas ordenadas. |

@@ -77,6 +77,7 @@ public sealed record ProductSalesPointPriceDto(Guid SalesPointId, string? SalesP
 public sealed record UpsertProductSalesPointPriceDto(Guid SalesPointId, decimal Price, DateTime? PriceValidFrom, bool Active);
 public sealed record ProductDto(Guid Id, string Name, string Category, string Brand, string Model, string? Line, string? Version, string Reference, string? Description, int? EngineCc, int? Year, string? Color, decimal Price, decimal Soat, decimal RegistrationFee, decimal Taxes, string? TechnicalSheet, DateTime? PriceValidFrom, bool Active, IReadOnlyCollection<ProductPhotoDto> Photos, IReadOnlyCollection<ProductSalesPointPriceDto> SalesPointPrices);
 public sealed record UpsertProductDto(string Name, string Category, string Brand, string Model, string? Line, string? Version, string Reference, string? Description, int? EngineCc, int? Year, string? Color, decimal Price, decimal Soat, decimal RegistrationFee, decimal Taxes, string? TechnicalSheet, DateTime? PriceValidFrom, bool Active, IReadOnlyCollection<UpsertProductSalesPointPriceDto>? SalesPointPrices);
+public sealed record ExternalInventoryItemDto(string WarehouseCode, string WarehouseName, string Code, string Name, string? Presentation, string? SerialNumber, string? EngineNumber, string? ChassisNumber, int Quantity, Guid? ProductId, string? ProductName, decimal? ProductPrice, bool IsInCatalog);
 
 public sealed record CommercialInventoryDto(
     Guid Id,
