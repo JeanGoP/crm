@@ -1,5 +1,5 @@
 ﻿import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Navigate, NavLink, Route, Routes, useNavigate, useParams } from 'react-router-dom';
+import { Navigate, NavLink, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   Alert, AppBar, Box, Button, Card, CardContent, Checkbox, Chip, CssBaseline, Dialog, DialogActions,
   DialogContent, DialogTitle, Divider, Drawer, Grid, IconButton, LinearProgress, MenuItem,
@@ -32,6 +32,8 @@ import WhatsApp from '@mui/icons-material/WhatsApp';
 import Assessment from '@mui/icons-material/Assessment';
 import AutoAwesome from '@mui/icons-material/AutoAwesome';
 import Search from '@mui/icons-material/Search';
+import ExpandMore from '@mui/icons-material/ExpandMore';
+import ChevronRight from '@mui/icons-material/ChevronRight';
 import { AxiosError } from 'axios';
 import { api } from './api';
 import { useAuthStore } from './store';
@@ -178,22 +180,65 @@ const theme = createTheme({
 });
 
 type NavItem = { to: string; label: string; icon: ReactNode; locked?: boolean };
+type NavGroup = { key: string; label: string; icon: ReactNode; items: NavItem[] };
 
-const nav: NavItem[] = [
-  { to: '/', label: 'Dashboard', icon: <DashboardIcon /> },
-  { to: '/cotizaciones', label: 'Cotizaciones', icon: <ReceiptLong /> },
-  { to: '/clientes', label: 'Clientes', icon: <Groups /> },
-  { to: '/solicitudes-credito', label: 'Solicitudes credito', icon: <Assignment /> },
-  { to: '/ordenes-recaudo', label: 'Ordenes recaudo', icon: <ReceiptLong /> },
-  { to: '/tramites', label: 'Tramites', icon: <Assignment /> },
-  { to: '/entregas', label: 'Entregas', icon: <LocalShipping /> },
-  { to: '/pipeline', label: 'Pipeline', icon: <ViewKanban /> },
-  { to: '/actividades', label: 'Actividades', icon: <EventNote /> },
-  { to: '/productos', label: 'Productos', icon: <Inventory2 /> },
-  { to: '/inventario', label: 'Inventario', icon: <Inventory2 /> },
-  { to: '/prospectos', label: 'Prospectos', icon: <Handshake /> },
-  { to: '/reportes', label: 'Reportes', icon: <Assessment /> },
-  { to: '/configuracion', label: 'Configuracion', icon: <Settings /> }
+const navGroups: NavGroup[] = [
+  {
+    key: 'comercial',
+    label: 'Comercial',
+    icon: <Handshake />,
+    items: [
+      { to: '/', label: 'Dashboard', icon: <DashboardIcon /> },
+      { to: '/clientes', label: 'Clientes', icon: <Groups /> },
+      { to: '/prospectos', label: 'Prospectos', icon: <Handshake /> },
+      { to: '/cotizaciones', label: 'Cotizaciones', icon: <ReceiptLong /> },
+      { to: '/pipeline', label: 'Pipeline', icon: <ViewKanban /> },
+      { to: '/actividades', label: 'Actividades', icon: <EventNote /> }
+    ]
+  },
+  {
+    key: 'credito',
+    label: 'Credito',
+    icon: <Assignment />,
+    items: [
+      { to: '/solicitudes-credito', label: 'Solicitudes', icon: <Assignment /> },
+      { to: '/ordenes-recaudo', label: 'Ordenes recaudo', icon: <ReceiptLong /> }
+    ]
+  },
+  {
+    key: 'operacion',
+    label: 'Operacion',
+    icon: <LocalShipping />,
+    items: [
+      { to: '/inventario', label: 'Inventario', icon: <Inventory2 /> },
+      { to: '/tramites', label: 'Tramites', icon: <Assignment /> },
+      { to: '/entregas', label: 'Entregas', icon: <LocalShipping /> }
+    ]
+  },
+  {
+    key: 'catalogos',
+    label: 'Catalogos',
+    icon: <Inventory2 />,
+    items: [
+      { to: '/productos', label: 'Productos', icon: <Inventory2 /> }
+    ]
+  },
+  {
+    key: 'reportes',
+    label: 'Reportes',
+    icon: <Assessment />,
+    items: [
+      { to: '/reportes', label: 'Reportes comerciales', icon: <Assessment /> }
+    ]
+  },
+  {
+    key: 'administracion',
+    label: 'Administracion',
+    icon: <Settings />,
+    items: [
+      { to: '/configuracion', label: 'Configuracion', icon: <Settings /> }
+    ]
+  }
 ];
 
 type Notice = { type: 'success' | 'error' | 'info'; text: string };
@@ -306,14 +351,28 @@ function normalizeSearch(value?: string | null) {
   return (value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
 }
 
+function isNavItemActive(item: NavItem, pathname: string) {
+  return item.to === '/' ? pathname === '/' : pathname === item.to || pathname.startsWith(`${item.to}/`);
+}
+
+function isNavGroupActive(group: NavGroup, pathname: string) {
+  return group.items.some((item) => isNavItemActive(item, pathname));
+}
+
 function Layout() {
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
+  const location = useLocation();
   const muiTheme = useTheme();
   const isDesktop = useMediaQuery(muiTheme.breakpoints.up('md'));
   const [mobileOpen, setMobileOpen] = useState(false);
+  const activeGroupKey = navGroups.find((group) => isNavGroupActive(group, location.pathname))?.key ?? 'comercial';
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => Object.fromEntries(navGroups.map((group) => [group.key, group.key === activeGroupKey])));
+  useEffect(() => {
+    setOpenGroups((current) => ({ ...current, [activeGroupKey]: true }));
+  }, [activeGroupKey]);
   const closeMobileNav = () => setMobileOpen(false);
-  const navButtonSx = {
+  const navButtonSx = (active = false) => ({
     justifyContent: 'flex-start',
     my: .18,
     width: '100%',
@@ -323,17 +382,35 @@ function Layout() {
     color: '#475569',
     borderRadius: 2,
     fontWeight: 800,
-    '& .MuiButton-startIcon': { color: 'inherit', minWidth: 26 },
-    '&.active': {
+    fontSize: 13.5,
+    textAlign: 'left',
+    '& .MuiButton-startIcon': { color: 'inherit', minWidth: 24 },
+    ...(active ? {
       bgcolor: uiPrimary,
       color: '#fff',
       boxShadow: '0 12px 26px rgba(21, 94, 117, .22)'
-    },
+    } : {}),
     '&:hover': {
-      bgcolor: '#e8f5f7',
-      color: uiPrimary
+      bgcolor: active ? uiPrimary : '#e8f5f7',
+      color: active ? '#fff' : uiPrimary
     }
-  };
+  });
+  const navGroupSx = (active = false) => ({
+    justifyContent: 'flex-start',
+    width: '100%',
+    px: 1.25,
+    py: .95,
+    minHeight: 40,
+    borderRadius: 2,
+    color: active ? uiPrimary : '#334155',
+    bgcolor: active ? '#ecfeff' : 'transparent',
+    border: active ? '1px solid #bae6fd' : '1px solid transparent',
+    fontWeight: 900,
+    textAlign: 'left',
+    '& .MuiButton-startIcon': { color: 'inherit', minWidth: 26 },
+    '& .MuiButton-endIcon': { ml: 'auto', color: 'inherit' },
+    '&:hover': { bgcolor: '#f1f9fb', color: uiPrimary }
+  });
   const drawerContent = <>
     <Toolbar sx={{ px: 2, minHeight: 92 }}>
       <Stack direction="row" alignItems="center" gap={1.25} sx={{ minWidth: 0, width: '100%', p: 1.25, borderRadius: 2, bgcolor: '#ecfeff', border: '1px solid #bae6fd' }}>
@@ -356,20 +433,39 @@ function Layout() {
       </Stack>
     </Toolbar>
     <Divider sx={{ borderColor: '#e2e8f0' }} />
-    <Stack sx={{ px: 1.25, py: 1.5, flex: 1, overflowY: 'auto' }}>
-      {nav.map((item) => item.locked ? (
-        <Tooltip key={item.to} title="Disponible en la siguiente fase de la demostracion" placement="right">
-          <span>
-            <Button disabled startIcon={item.icon} sx={{ ...navButtonSx, opacity: .42, color: '#94a3b8' }}>
-              {item.label}
-            </Button>
-          </span>
-        </Tooltip>
-      ) : (
-        <Button key={item.to} component={NavLink} to={item.to} startIcon={item.icon} onClick={closeMobileNav} sx={navButtonSx}>
-          {item.label}
-        </Button>
-      ))}
+    <Stack sx={{ px: 1.1, py: 1.35, flex: 1, overflowY: 'auto' }}>
+      {navGroups.map((group) => {
+        const active = isNavGroupActive(group, location.pathname);
+        const open = openGroups[group.key] ?? false;
+        return <Box key={group.key} sx={{ mb: .45 }}>
+          <Button
+            startIcon={group.icon}
+            endIcon={open ? <ExpandMore fontSize="small" /> : <ChevronRight fontSize="small" />}
+            onClick={() => setOpenGroups((current) => ({ ...current, [group.key]: !open }))}
+            sx={navGroupSx(active)}
+          >
+            {group.label}
+          </Button>
+          {open && <Stack sx={{ mt: .25, ml: 1.1, pl: .9, borderLeft: `1px solid ${active ? '#bae6fd' : '#e2e8f0'}` }}>
+            {group.items.map((item) => {
+              const itemActive = isNavItemActive(item, location.pathname);
+              return item.locked ? (
+                <Tooltip key={item.to} title="Disponible en la siguiente fase de la demostracion" placement="right">
+                  <span>
+                    <Button disabled startIcon={item.icon} sx={{ ...navButtonSx(false), opacity: .42, color: '#94a3b8' }}>
+                      {item.label}
+                    </Button>
+                  </span>
+                </Tooltip>
+              ) : (
+                <Button key={item.to} component={NavLink} to={item.to} startIcon={item.icon} onClick={closeMobileNav} sx={navButtonSx(itemActive)}>
+                  {item.label}
+                </Button>
+              );
+            })}
+          </Stack>}
+        </Box>;
+      })}
     </Stack>
     <Box sx={{ m: 1.5, p: 1.5, borderRadius: 2, bgcolor: uiSidebarSoft, border: '1px solid #e2e8f0' }}>
       <Typography variant="caption" color="#64748b">Sesion activa</Typography>

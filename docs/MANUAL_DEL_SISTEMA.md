@@ -1,7 +1,7 @@
 # Manual de usuario - EnMarcha CRM
 
 Ultima actualizacion: 2026-07-31  
-Version del manual: 9.0
+Version del manual: 9.1
 Sistema: EnMarcha CRM para gestion comercial y ventas a credito  
 
 ## 1. Bienvenida
@@ -58,22 +58,16 @@ Revise que el usuario y la contrasena esten escritos correctamente. Si el proble
 
 ## 5. Menu principal
 
-El menu lateral permite moverse por las opciones principales:
+El menu lateral permite moverse por las opciones principales. Para que sea mas facil de usar, las opciones estan organizadas por grupos que se pueden abrir o cerrar.
 
-- **Dashboard:** resumen general de la gestion comercial.
-- **Cotizaciones:** creacion y consulta de propuestas comerciales.
-- **Clientes:** maestro de clientes y vista Cliente 360.
-- **Solicitudes de credito:** gestion de documentos, codeudor, referencias y decision.
-- **Ordenes de recaudo:** emision y seguimiento de cobros por vehiculo, documentos y anticipo.
-- **Tramites:** seguimiento de SOAT, matricula, placas y terceros.
-- **Entregas:** control de entrega del producto al cliente.
-- **Pipeline:** seguimiento visual de negocios por etapa.
-- **Actividades:** agenda de tareas, llamadas y reuniones.
-- **Productos:** catalogo de productos disponibles para cotizar.
-- **Inventario:** unidades disponibles por sede, seriales, separaciones y motos usadas.
-- **Prospectos:** interesados que pueden convertirse en clientes.
-- **Reportes:** indicadores comerciales.
-- **Configuracion:** empresas, sedes, usuarios, roles y parametros generales.
+- **Comercial:** Dashboard, Clientes, Prospectos, Cotizaciones, Pipeline y Actividades.
+- **Credito:** Solicitudes de credito y Ordenes de recaudo.
+- **Operacion:** Inventario, Tramites y Entregas.
+- **Catalogos:** Productos.
+- **Reportes:** reportes comerciales.
+- **Administracion:** Configuracion de empresas, sedes, usuarios, roles y parametros generales.
+
+El grupo donde se encuentra la pantalla actual se abre automaticamente. Si necesita ver menos opciones, puede cerrar los grupos que no este usando.
 
 En la parte superior se muestra el usuario conectado y la opcion **Salir** para cerrar sesion.
 
@@ -759,6 +753,7 @@ El sistema muestra mensajes cuando algo no puede completarse.
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-07-31 | 9.1 | Se reorganiza el menu lateral en grupos expandibles para Comercial, Credito, Operacion, Catalogos, Reportes y Administracion. |
 | 2026-07-31 | 9.0 | Se mejora la adaptacion del sistema en tablet y celular para menu, encabezados, formularios, tablas, modales y galerias de imagenes. |
 | 2026-07-31 | 8.9 | Se mejora Cliente 360 con ficha comercial moderna, resumen superior, acciones rapidas, indicadores, timeline y secciones de proceso mas ordenadas. |
 | 2026-07-31 | 8.8 | Se mejora el dashboard con resumen ejecutivo, salud de seguimiento, bandeja de atencion y actividad reciente mas clara. |
