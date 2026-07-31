@@ -508,30 +508,89 @@ function LoginPage() {
 function DashboardPage() {
   const { data, loading, error, reload } = useResource<Dashboard>('/api/dashboard');
   const navigate = useNavigate();
-  const cards: { label: string; value: ReactNode }[] = [
-    { label: 'Pipeline abierto', value: money(data?.openPipelineValue) },
-    { label: 'Pipeline ponderado', value: money(data?.weightedPipelineValue) },
-    { label: 'Clientes activos', value: data?.activeCustomers ?? 0 },
-    { label: 'Prospectos abiertos', value: data?.openLeads ?? 0 },
-    { label: 'Actividades pendientes', value: data?.pendingActivities ?? 0 },
-    { label: 'Vencidas', value: data?.overdueActivities ?? 0 },
-    { label: 'Para hoy', value: data?.todayActivities ?? 0 }
-  ];
+  const openPipeline = data?.openPipelineValue ?? 0;
+  const weightedPipeline = data?.weightedPipelineValue ?? 0;
+  const pendingActivities = data?.pendingActivities ?? 0;
+  const overdueActivities = data?.overdueActivities ?? 0;
+  const todayActivities = data?.todayActivities ?? 0;
+  const alertCount = data?.alerts?.length ?? 0;
+  const criticalAlerts = data?.alerts?.filter((alert) => alert.severity === 'error').length ?? 0;
+  const pipelineCoverage = openPipeline > 0 ? Math.min(100, Math.round((weightedPipeline / openPipeline) * 100)) : 0;
+  const followUpPressure = pendingActivities > 0 ? Math.min(100, Math.round((overdueActivities / pendingActivities) * 100)) : 0;
+  const attentionTone = criticalAlerts || overdueActivities ? 'error' : alertCount ? 'warning' : 'success';
   return <Stack spacing={3}>
     <Header title="Dashboard" onRefresh={reload} />
     <StatusBar loading={loading} error={error} />
-    <Grid container spacing={2}>{cards.map((card) => <Grid item xs={12} md={card.label.length > 12 ? 2.4 : 1.7} key={card.label}><Metric label={card.label} value={card.value} /></Grid>)}</Grid>
+    <Grid container spacing={2}>
+      <Grid item xs={12} lg={7}>
+        <Card sx={{ height: '100%', background: 'linear-gradient(135deg, #0f172a 0%, #155e75 62%, #0f766e 100%)', color: '#fff' }}>
+          <CardContent sx={{ p: { xs: 2, md: 3 } }}>
+            <Stack spacing={2.25}>
+              <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" gap={1.5}>
+                <Box>
+                  <Typography color="rgba(255,255,255,.72)" fontWeight={800} fontSize={13}>Resumen ejecutivo</Typography>
+                  <Typography variant="h4" fontWeight={900} sx={{ color: '#fff', mt: .5, overflowWrap: 'anywhere' }}>{money(openPipeline)}</Typography>
+                  <Typography color="rgba(255,255,255,.76)">Pipeline abierto actual</Typography>
+                </Box>
+                <StatusChip label={attentionTone === 'success' ? 'Operacion estable' : attentionTone === 'warning' ? 'Requiere seguimiento' : 'Atencion inmediata'} tone={attentionTone} />
+              </Stack>
+              <Grid container spacing={1.5}>
+                <Grid item xs={12} sm={4}><DashboardMiniStat label="Ponderado" value={money(weightedPipeline)} /></Grid>
+                <Grid item xs={12} sm={4}><DashboardMiniStat label="Clientes activos" value={data?.activeCustomers ?? 0} /></Grid>
+                <Grid item xs={12} sm={4}><DashboardMiniStat label="Prospectos abiertos" value={data?.openLeads ?? 0} /></Grid>
+              </Grid>
+              <Box>
+                <Stack direction="row" justifyContent="space-between" gap={1} sx={{ mb: .75 }}>
+                  <Typography fontSize={13} color="rgba(255,255,255,.74)">Calidad ponderada del pipeline</Typography>
+                  <Typography fontSize={13} fontWeight={900} color="#fff">{pipelineCoverage}%</Typography>
+                </Stack>
+                <Box sx={{ height: 10, borderRadius: 999, bgcolor: 'rgba(255,255,255,.16)', overflow: 'hidden' }}>
+                  <Box sx={{ width: `${pipelineCoverage}%`, height: '100%', bgcolor: uiAccent }} />
+                </Box>
+              </Box>
+            </Stack>
+          </CardContent>
+        </Card>
+      </Grid>
+      <Grid item xs={12} lg={5}>
+        <Card sx={{ height: '100%' }}><CardContent sx={{ p: { xs: 2, md: 2.5 } }}>
+          <Stack spacing={2}>
+            <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1}>
+              <Box>
+                <Typography variant="h6" fontWeight={900}>Salud del seguimiento</Typography>
+                <Typography color="text.secondary" fontSize={13}>Actividades pendientes, vencidas y para hoy.</Typography>
+              </Box>
+              <StatusChip label={`${pendingActivities} pendientes`} tone={pendingActivities ? 'warning' : 'success'} />
+            </Stack>
+            <Grid container spacing={1.5}>
+              <Grid item xs={4}><DashboardMiniStat light label="Pendientes" value={pendingActivities} /></Grid>
+              <Grid item xs={4}><DashboardMiniStat light label="Vencidas" value={overdueActivities} tone="error" /></Grid>
+              <Grid item xs={4}><DashboardMiniStat light label="Hoy" value={todayActivities} tone="success" /></Grid>
+            </Grid>
+            <Box>
+              <Stack direction="row" justifyContent="space-between" gap={1} sx={{ mb: .75 }}>
+                <Typography fontSize={13} color="text.secondary">Presion por vencimientos</Typography>
+                <Typography fontSize={13} fontWeight={900}>{followUpPressure}%</Typography>
+              </Stack>
+              <Box sx={{ height: 10, borderRadius: 999, bgcolor: '#e2e8f0', overflow: 'hidden' }}>
+                <Box sx={{ width: `${followUpPressure}%`, height: '100%', bgcolor: overdueActivities ? '#dc2626' : '#16a34a' }} />
+              </Box>
+            </Box>
+          </Stack>
+        </CardContent></Card>
+      </Grid>
+    </Grid>
     <Grid container spacing={2}>
       <Grid item xs={12} md={7}>
-        <Card><CardContent>
+        <Card><CardContent sx={{ p: { xs: 2, md: 2.5 } }}>
           <Stack direction={{ xs: 'column', sm: 'row' }} alignItems={{ xs: 'flex-start', sm: 'center' }} justifyContent="space-between" gap={1} sx={{ mb: 1 }}>
             <Box>
-              <Typography variant="h6" fontWeight={900}>Notificaciones internas</Typography>
+              <Typography variant="h6" fontWeight={900}>Bandeja de atencion</Typography>
               <Typography variant="body2" color="text.secondary">Documentos, creditos, actividades y clientes que necesitan accion.</Typography>
             </Box>
-            <Chip size="small" label={`${data?.alerts?.length ?? 0} pendientes`} color={data?.alerts?.some((alert) => alert.severity === 'error') ? 'error' : 'default'} variant="outlined" />
+            <StatusChip label={`${alertCount} pendiente${alertCount === 1 ? '' : 's'}`} tone={criticalAlerts ? 'error' : alertCount ? 'warning' : 'success'} />
           </Stack>
-          {data?.alerts?.length ? data.alerts.map((alert) => <Stack key={`${alert.type}${alert.title}${alert.createdAt}`} direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" gap={1.5} sx={{ py: 1.25, borderBottom: '1px solid #edf1f5' }}>
+          {data?.alerts?.length ? data.alerts.map((alert) => <Stack key={`${alert.type}${alert.title}${alert.createdAt}`} direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" gap={1.5} sx={{ py: 1.25, borderBottom: '1px solid #edf1f5', '&:last-of-type': { borderBottom: 0 } }}>
             <Stack spacing={.5} sx={{ minWidth: 0 }}>
               <Stack direction="row" gap={1} alignItems="center" flexWrap="wrap">
                 <StatusChip label={alert.type} tone={alertSeverityTone(alert.severity)} />
@@ -545,10 +604,39 @@ function DashboardPage() {
         </CardContent></Card>
       </Grid>
       <Grid item xs={12} md={5}>
-        <Card><CardContent><Typography variant="h6" fontWeight={900}>Actividad reciente</Typography>{data?.recentActivities?.length ? data.recentActivities.map((a) => <Row key={`${a.title}${a.scheduledAt}`} primary={a.title} secondary={new Date(a.scheduledAt).toLocaleString()} />) : <EmptyState text="Sin actividad reciente" />}</CardContent></Card>
+        <Card><CardContent sx={{ p: { xs: 2, md: 2.5 } }}>
+          <Stack direction="row" justifyContent="space-between" alignItems="center" gap={1} sx={{ mb: 1 }}>
+            <Box>
+              <Typography variant="h6" fontWeight={900}>Actividad reciente</Typography>
+              <Typography variant="body2" color="text.secondary">Ultimos movimientos de seguimiento.</Typography>
+            </Box>
+            <Button variant="outlined" size="small" onClick={() => navigate('/actividades')}>Ver agenda</Button>
+          </Stack>
+          {data?.recentActivities?.length ? data.recentActivities.map((a) => <Stack key={`${a.title}${a.scheduledAt}`} direction="row" gap={1.25} sx={{ py: 1.1, borderBottom: '1px solid #edf1f5', '&:last-of-type': { borderBottom: 0 } }}>
+            <Box sx={{ width: 10, mt: .8, flexShrink: 0, height: 10, borderRadius: '50%', bgcolor: a.status === 3 ? '#16a34a' : a.status === 4 ? '#94a3b8' : '#f59e0b' }} />
+            <Box sx={{ minWidth: 0, flex: 1 }}>
+              <Typography fontWeight={800} sx={{ overflowWrap: 'anywhere' }}>{a.title}</Typography>
+              <Typography color="text.secondary" fontSize={13}>{activityStatus(a.status)} - {new Date(a.scheduledAt).toLocaleString()}</Typography>
+            </Box>
+          </Stack>) : <EmptyState text="Sin actividad reciente" />}
+        </CardContent></Card>
       </Grid>
     </Grid>
   </Stack>;
+}
+
+function DashboardMiniStat({ label, value, light = false, tone = 'default' }: { label: string; value: ReactNode; light?: boolean; tone?: 'success' | 'warning' | 'error' | 'default' }) {
+  const toneColor = tone === 'error' ? '#dc2626' : tone === 'success' ? '#16a34a' : tone === 'warning' ? '#f59e0b' : uiPrimary;
+  return <Box sx={{
+    p: 1.5,
+    minHeight: 86,
+    borderRadius: 2,
+    border: light ? `1px solid ${uiBorder}` : '1px solid rgba(255,255,255,.16)',
+    bgcolor: light ? '#fbfdff' : 'rgba(255,255,255,.10)'
+  }}>
+    <Typography fontSize={12} fontWeight={800} color={light ? 'text.secondary' : 'rgba(255,255,255,.72)'}>{label}</Typography>
+    <Typography fontWeight={900} sx={{ color: light ? toneColor : '#fff', mt: .45, overflowWrap: 'anywhere' }}>{value}</Typography>
+  </Box>;
 }
 
 function CustomersPage() {
