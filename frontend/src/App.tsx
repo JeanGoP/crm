@@ -123,12 +123,13 @@ const theme = createTheme({
     MuiTableCell: {
       styleOverrides: {
         root: {
-          borderBottom: `1px solid ${uiBorder}`
+          borderBottom: `1px solid ${uiBorder}`,
+          fontSize: 13.5
         },
         head: {
           color: '#243041',
           backgroundColor: '#f7fafc',
-          fontSize: 13
+          fontSize: 11.5
         }
       }
     },
@@ -4468,20 +4469,31 @@ function Header({ title, action, onAction, onRefresh, secondaryAction }: { title
 
 function EntityTable({ headers, rows, empty, compact = false }: { headers: string[]; rows: ReactNode[][]; empty: string; compact?: boolean }) {
   return <Card sx={{ width: '100%', overflow: 'hidden', borderColor: '#dbe4ee' }}>
+    <Stack direction={{ xs: 'column', sm: 'row' }} alignItems={{ xs: 'stretch', sm: 'center' }} justifyContent="space-between" gap={1} sx={{ px: 1.5, py: 1, bgcolor: '#fbfdff', borderBottom: `1px solid ${uiBorder}` }}>
+      <Typography fontWeight={900} color="#0f172a" fontSize={13}>{rows.length} registro{rows.length === 1 ? '' : 's'}</Typography>
+      <Typography color="text.secondary" fontSize={12}>Desplace horizontalmente si hay mas columnas.</Typography>
+    </Stack>
     <TableContainer sx={{ width: '100%', overflowX: 'auto' }}>
       <Table size="small" sx={{
         minWidth: tableMinWidth(headers, compact),
         tableLayout: 'fixed',
-        '& .MuiTableHead-root .MuiTableCell-root': { textTransform: 'uppercase', letterSpacing: 0, fontSize: compact ? 11 : 11.5 },
+        borderCollapse: 'separate',
+        borderSpacing: 0,
+        '& .MuiTableHead-root .MuiTableCell-root': { textTransform: 'uppercase', letterSpacing: 0, fontSize: compact ? 10.5 : 11, bgcolor: '#eef6f8', color: '#155e75' },
         ...(compact ? {
-          '& .MuiTableCell-root': { fontSize: 12.5 },
+          '& .MuiTableCell-root': { borderColor: '#e4ebf2', fontSize: 12.25 },
           '& .MuiChip-root': { height: 22, fontSize: 11.25 },
           '& .MuiIconButton-root': { p: .45 },
           '& .MuiSvgIcon-root': { fontSize: 18 }
-        } : {})
+        } : {
+          '& .MuiTableCell-root': { borderColor: '#e4ebf2' },
+          '& .MuiChip-root': { height: 24, fontSize: 11.5 },
+          '& .MuiIconButton-root': { p: .55 },
+          '& .MuiSvgIcon-root': { fontSize: 18 }
+        })
       }}>
-        <TableHead><TableRow>{headers.map((h) => <TableCell key={h} sx={{ ...tableColumnSx(h, compact), whiteSpace: 'nowrap', fontWeight: 900, py: compact ? .8 : 1.35 }}>{h}</TableCell>)}</TableRow></TableHead>
-        <TableBody>{rows.length ? rows.map((row, i) => <TableRow key={i} sx={{ transition: 'background-color .15s ease', '&:hover': { bgcolor: '#f8fbfd' } }}>{row.map((c, j) => <TableCell key={j} sx={{ ...tableColumnSx(headers[j], compact), verticalAlign: 'middle', py: compact ? .65 : 1.5 }}>{c ?? '-'}</TableCell>)}</TableRow>) : <TableRow><TableCell colSpan={headers.length}><EmptyState text={empty} /></TableCell></TableRow>}</TableBody>
+        <TableHead><TableRow>{headers.map((h, index) => <TableCell key={h} sx={{ ...tableColumnSx(h, compact), whiteSpace: 'nowrap', fontWeight: 900, py: compact ? .75 : .95, pl: index === 0 ? 2 : undefined }}>{h}</TableCell>)}</TableRow></TableHead>
+        <TableBody>{rows.length ? rows.map((row, i) => <TableRow key={i} sx={{ bgcolor: i % 2 === 0 ? '#fff' : '#fbfdff', transition: 'background-color .15s ease, box-shadow .15s ease', '&:hover': { bgcolor: '#eef9fb', boxShadow: 'inset 3px 0 0 #155e75' } }}>{row.map((c, j) => <TableCell key={j} sx={{ ...tableColumnSx(headers[j], compact), verticalAlign: 'middle', py: compact ? .55 : .85, pl: j === 0 ? 2 : undefined }}>{c ?? '-'}</TableCell>)}</TableRow>) : <TableRow><TableCell colSpan={headers.length}><EmptyState text={empty} /></TableCell></TableRow>}</TableBody>
       </Table>
     </TableContainer>
   </Card>;
@@ -4489,9 +4501,9 @@ function EntityTable({ headers, rows, empty, compact = false }: { headers: strin
 
 function ReportTable({ headers, rows, empty }: { headers: string[]; rows: ReactNode[][]; empty: string }) {
   return <TableContainer sx={{ width: '100%', overflowX: 'auto', border: `1px solid ${uiBorder}`, borderRadius: 2, bgcolor: '#fff', boxShadow: '0 10px 28px rgba(15, 23, 42, .045)' }}>
-    <Table size="small" sx={{ minWidth: 520 }}>
-      <TableHead><TableRow>{headers.map((h) => <TableCell key={h} sx={{ whiteSpace: 'nowrap', fontWeight: 900 }}>{h}</TableCell>)}</TableRow></TableHead>
-      <TableBody>{rows.length ? rows.map((row, i) => <TableRow key={i} sx={{ '&:hover': { bgcolor: '#f9fafb' } }}>{row.map((c, j) => <TableCell key={j} sx={{ verticalAlign: 'top' }}>{c ?? '-'}</TableCell>)}</TableRow>) : <TableRow><TableCell colSpan={headers.length}><EmptyState text={empty} /></TableCell></TableRow>}</TableBody>
+    <Table size="small" sx={{ minWidth: 560, borderCollapse: 'separate', borderSpacing: 0 }}>
+      <TableHead><TableRow>{headers.map((h) => <TableCell key={h} sx={{ whiteSpace: 'nowrap', fontWeight: 900, py: .9, bgcolor: '#eef6f8', color: '#155e75', textTransform: 'uppercase', fontSize: 11 }}>{h}</TableCell>)}</TableRow></TableHead>
+      <TableBody>{rows.length ? rows.map((row, i) => <TableRow key={i} sx={{ bgcolor: i % 2 === 0 ? '#fff' : '#fbfdff', '&:hover': { bgcolor: '#eef9fb' } }}>{row.map((c, j) => <TableCell key={j} sx={{ verticalAlign: 'top', py: .85 }}>{c ?? '-'}</TableCell>)}</TableRow>) : <TableRow><TableCell colSpan={headers.length}><EmptyState text={empty} /></TableCell></TableRow>}</TableBody>
     </Table>
   </TableContainer>;
 }
@@ -4528,7 +4540,7 @@ function tableColumnSx(header: string, compact = false) {
     Documentos: 410,
     Aprobacion: 220,
     Plantillas: 170,
-    Acciones: compact ? 120 : 220
+    Acciones: compact ? 120 : 165
   };
   return {
     width: widths[header] ?? 180,
@@ -4605,19 +4617,27 @@ function AiAnalysisDialog({ analysis, phone, onClose }: { analysis?: CustomerAiA
 }
 
 function Actions({ onView, onEdit, onDelete, onConvert, onDownload, onActivity, onWhatsapp, onAi, onStart, onComplete, onReschedule, onCancel, compact }: { onView?: () => void; onEdit?: () => void; onDelete?: () => void; onConvert?: () => void; onDownload?: () => void; onActivity?: () => void; onWhatsapp?: () => void; onAi?: () => void; onStart?: () => void; onComplete?: () => void; onReschedule?: () => void; onCancel?: () => void; compact?: boolean }) {
-  return <Stack direction="row" gap={compact ? .5 : .75} sx={{ mt: compact ? 1 : 0, flexWrap: 'wrap', '& .MuiIconButton-root': { bgcolor: '#f8fafc', border: `1px solid ${uiBorder}` }, '& .MuiIconButton-root:hover': { bgcolor: '#eef6f8' } }}>
-    {onView && <Tooltip title="Ver cliente 360"><IconButton size="small" onClick={onView}><Visibility fontSize="small" /></IconButton></Tooltip>}
-    {onAi && <Tooltip title="Analizar con IA"><IconButton size="small" color="primary" onClick={onAi}><AutoAwesome fontSize="small" /></IconButton></Tooltip>}
-    {onWhatsapp && <Tooltip title="Abrir WhatsApp"><IconButton size="small" onClick={onWhatsapp}><WhatsApp fontSize="small" /></IconButton></Tooltip>}
-    {onActivity && <Tooltip title="Registrar actividad"><IconButton size="small" onClick={onActivity}><AddTask fontSize="small" /></IconButton></Tooltip>}
-    {onStart && <Tooltip title="Marcar en proceso"><IconButton size="small" onClick={onStart}><SyncAlt fontSize="small" /></IconButton></Tooltip>}
-    {onComplete && <Tooltip title="Completar"><IconButton size="small" color="success" onClick={onComplete}><CheckCircle fontSize="small" /></IconButton></Tooltip>}
-    {onReschedule && <Tooltip title="Reprogramar"><IconButton size="small" onClick={onReschedule}><EventNote fontSize="small" /></IconButton></Tooltip>}
-    {onCancel && <Tooltip title="Cancelar"><IconButton size="small" color="warning" onClick={onCancel}><Close fontSize="small" /></IconButton></Tooltip>}
-    {onEdit && <Tooltip title="Editar"><IconButton size="small" onClick={onEdit}><Edit fontSize="small" /></IconButton></Tooltip>}
-    {onConvert && <Tooltip title="Convertir a cliente"><IconButton size="small" onClick={onConvert}><SyncAlt fontSize="small" /></IconButton></Tooltip>}
-    {onDownload && <Tooltip title="Descargar PDF"><IconButton size="small" onClick={onDownload}><Download fontSize="small" /></IconButton></Tooltip>}
-    {onDelete && <Tooltip title="Eliminar"><IconButton size="small" color="error" onClick={onDelete}><Delete fontSize="small" /></IconButton></Tooltip>}
+  const actionSx = {
+    width: compact ? 28 : 30,
+    height: compact ? 28 : 30,
+    bgcolor: '#fff',
+    border: `1px solid ${uiBorder}`,
+    boxShadow: '0 5px 12px rgba(15, 23, 42, .06)',
+    '&:hover': { bgcolor: '#eef6f8', borderColor: '#b6dbe3' }
+  };
+  return <Stack direction="row" gap={compact ? .45 : .55} sx={{ mt: compact ? .75 : 0, flexWrap: 'wrap', alignItems: 'center' }}>
+    {onView && <Tooltip title="Ver cliente 360"><IconButton size="small" onClick={onView} sx={actionSx}><Visibility fontSize="small" /></IconButton></Tooltip>}
+    {onAi && <Tooltip title="Analizar con IA"><IconButton size="small" color="primary" onClick={onAi} sx={actionSx}><AutoAwesome fontSize="small" /></IconButton></Tooltip>}
+    {onWhatsapp && <Tooltip title="Abrir WhatsApp"><IconButton size="small" onClick={onWhatsapp} sx={actionSx}><WhatsApp fontSize="small" /></IconButton></Tooltip>}
+    {onActivity && <Tooltip title="Registrar actividad"><IconButton size="small" onClick={onActivity} sx={actionSx}><AddTask fontSize="small" /></IconButton></Tooltip>}
+    {onStart && <Tooltip title="Marcar en proceso"><IconButton size="small" onClick={onStart} sx={actionSx}><SyncAlt fontSize="small" /></IconButton></Tooltip>}
+    {onComplete && <Tooltip title="Completar"><IconButton size="small" color="success" onClick={onComplete} sx={actionSx}><CheckCircle fontSize="small" /></IconButton></Tooltip>}
+    {onReschedule && <Tooltip title="Reprogramar"><IconButton size="small" onClick={onReschedule} sx={actionSx}><EventNote fontSize="small" /></IconButton></Tooltip>}
+    {onCancel && <Tooltip title="Cancelar"><IconButton size="small" color="warning" onClick={onCancel} sx={actionSx}><Close fontSize="small" /></IconButton></Tooltip>}
+    {onEdit && <Tooltip title="Editar"><IconButton size="small" onClick={onEdit} sx={actionSx}><Edit fontSize="small" /></IconButton></Tooltip>}
+    {onConvert && <Tooltip title="Convertir a cliente"><IconButton size="small" onClick={onConvert} sx={actionSx}><SyncAlt fontSize="small" /></IconButton></Tooltip>}
+    {onDownload && <Tooltip title="Descargar PDF"><IconButton size="small" onClick={onDownload} sx={actionSx}><Download fontSize="small" /></IconButton></Tooltip>}
+    {onDelete && <Tooltip title="Eliminar"><IconButton size="small" color="error" onClick={onDelete} sx={{ ...actionSx, '&:hover': { bgcolor: '#fef2f2', borderColor: '#fecaca' } }}><Delete fontSize="small" /></IconButton></Tooltip>}
   </Stack>;
 }
 
@@ -4652,7 +4672,13 @@ function StatusBar({ loading, error }: { loading?: boolean; error?: string }) {
 }
 
 function StatusChip({ label, tone }: { label: string; tone: 'success' | 'warning' | 'error' | 'default' }) {
-  return <Chip size="small" label={label} color={tone === 'default' ? undefined : tone} variant={tone === 'default' ? 'outlined' : 'filled'} />;
+  const colors = {
+    success: { bg: '#dcfce7', fg: '#166534', border: '#86efac' },
+    warning: { bg: '#fef3c7', fg: '#92400e', border: '#fcd34d' },
+    error: { bg: '#fee2e2', fg: '#991b1b', border: '#fca5a5' },
+    default: { bg: '#f1f5f9', fg: '#475569', border: '#cbd5e1' }
+  }[tone];
+  return <Chip size="small" label={label} variant="outlined" sx={{ bgcolor: colors.bg, color: colors.fg, borderColor: colors.border, fontWeight: 900, '& .MuiChip-label': { px: 1 } }} />;
 }
 
 function Notice({ notice, onClose }: { notice?: Notice; onClose: () => void }) {
