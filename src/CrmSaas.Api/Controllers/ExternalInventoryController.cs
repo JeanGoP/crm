@@ -17,7 +17,8 @@ namespace CrmSaas.Api.Controllers;
 public sealed class ExternalInventoryController(IConfiguration configuration, CrmDbContext db, ITenantContext tenantContext) : ControllerBase
 {
     private const int MaxTake = 200;
-    private const string InventoryView = "[Inventariomotosycarros].[dbo].[INVENTARIO_EXISTENCIA]";
+    private const string InventorySchema = "dbo";
+    private const string InventoryView = "INVENTARIO_EXISTENCIA";
 
     [HttpGet]
     public async Task<ActionResult<IReadOnlyCollection<ExternalInventoryItemDto>>> Get(
@@ -27,13 +28,13 @@ public sealed class ExternalInventoryController(IConfiguration configuration, Cr
         [FromQuery] int take = 80,
         CancellationToken cancellationToken = default)
     {
-        var allowedWarehouses = await GetCompanyWarehousesAsync(cancellationToken);
-        if (allowedWarehouses.Count == 0)
+        var inventoryConfig = await GetCompanyInventoryConfigAsync(cancellationToken);
+        if (inventoryConfig.AllowedWarehouses.Count == 0 || string.IsNullOrWhiteSpace(inventoryConfig.DatabaseName))
         {
             return Ok(Array.Empty<ExternalInventoryItemDto>());
         }
 
-        var rows = await ReadExternalInventoryAsync(search, warehouse, availableOnly, Math.Clamp(take, 1, MaxTake), allowedWarehouses, cancellationToken);
+        var rows = await ReadExternalInventoryAsync(search, warehouse, availableOnly, Math.Clamp(take, 1, MaxTake), inventoryConfig, cancellationToken);
         var productReferences = rows
             .Select(x => x.Code)
             .Where(x => !string.IsNullOrWhiteSpace(x))
@@ -70,13 +71,13 @@ public sealed class ExternalInventoryController(IConfiguration configuration, Cr
     [HttpGet("warehouses")]
     public async Task<ActionResult<IReadOnlyCollection<object>>> Warehouses(CancellationToken cancellationToken)
     {
-        var allowedWarehouses = await GetCompanyWarehousesAsync(cancellationToken);
-        if (allowedWarehouses.Count == 0)
+        var inventoryConfig = await GetCompanyInventoryConfigAsync(cancellationToken);
+        if (inventoryConfig.AllowedWarehouses.Count == 0 || string.IsNullOrWhiteSpace(inventoryConfig.DatabaseName))
         {
             return Ok(Array.Empty<object>());
         }
 
-        var rows = await ReadExternalInventoryAsync(null, null, false, MaxTake, allowedWarehouses, cancellationToken);
+        var rows = await ReadExternalInventoryAsync(null, null, false, MaxTake, inventoryConfig, cancellationToken);
         return Ok(rows
             .GroupBy(x => new { x.WarehouseCode, x.WarehouseName })
             .Select(x => new { code = x.Key.WarehouseCode, name = x.Key.WarehouseName, quantity = x.Sum(row => row.Quantity) })
@@ -84,7 +85,7 @@ public sealed class ExternalInventoryController(IConfiguration configuration, Cr
             .ToList());
     }
 
-    private async Task<IReadOnlyCollection<ExternalInventoryRow>> ReadExternalInventoryAsync(string? search, string? warehouse, bool availableOnly, int take, IReadOnlyCollection<string> allowedWarehouses, CancellationToken cancellationToken)
+    private async Task<IReadOnlyCollection<ExternalInventoryRow>> ReadExternalInventoryAsync(string? search, string? warehouse, bool availableOnly, int take, ExternalInventoryConfig inventoryConfig, CancellationToken cancellationToken)
     {
         var connectionString = configuration.GetConnectionString("ExternalInventoryConnection");
         if (string.IsNullOrWhiteSpace(connectionString))
@@ -98,7 +99,8 @@ public sealed class ExternalInventoryController(IConfiguration configuration, Cr
 
         var normalizedSearch = Normalize(search);
         var normalizedWarehouse = Normalize(warehouse);
-        var warehouseParameters = allowedWarehouses.Select((_, index) => $"@AllowedWarehouse{index}").ToArray();
+        var warehouseParameters = inventoryConfig.AllowedWarehouses.Select((_, index) => $"@AllowedWarehouse{index}").ToArray();
+        var inventoryView = BuildInventoryViewName(inventoryConfig.DatabaseName);
         var rows = new List<ExternalInventoryRow>();
         await using var connection = new SqlConnection(connectionString);
         await connection.OpenAsync(cancellationToken);
@@ -113,7 +115,7 @@ public sealed class ExternalInventoryController(IConfiguration configuration, Cr
                 NumerodeSerie,
                 Existencias,
                 NombreBodega
-            FROM {InventoryView}
+            FROM {inventoryView}
             WHERE (@AvailableOnly = 0 OR ISNULL(Existencias, 0) > 0)
               AND Bodega IN ({string.Join(", ", warehouseParameters)})
               AND (@Warehouse = '' OR Bodega = @Warehouse OR NombreBodega LIKE @WarehouseLike)
@@ -133,7 +135,7 @@ public sealed class ExternalInventoryController(IConfiguration configuration, Cr
         command.Parameters.Add(new SqlParameter("@Like", SqlDbType.VarChar, 140) { Value = $"%{normalizedSearch}%" });
         command.Parameters.Add(new SqlParameter("@Warehouse", SqlDbType.VarChar, 40) { Value = normalizedWarehouse });
         command.Parameters.Add(new SqlParameter("@WarehouseLike", SqlDbType.VarChar, 140) { Value = $"%{normalizedWarehouse}%" });
-        foreach (var (allowedWarehouse, index) in allowedWarehouses.Select((value, index) => (value, index)))
+        foreach (var (allowedWarehouse, index) in inventoryConfig.AllowedWarehouses.Select((value, index) => (value, index)))
         {
             command.Parameters.Add(new SqlParameter($"@AllowedWarehouse{index}", SqlDbType.VarChar, 40) { Value = allowedWarehouse });
         }
@@ -154,20 +156,22 @@ public sealed class ExternalInventoryController(IConfiguration configuration, Cr
         return rows;
     }
 
-    private async Task<IReadOnlyCollection<string>> GetCompanyWarehousesAsync(CancellationToken cancellationToken)
+    private async Task<ExternalInventoryConfig> GetCompanyInventoryConfigAsync(CancellationToken cancellationToken)
     {
         if (tenantContext.EmpresaId is not Guid companyId)
         {
-            return Array.Empty<string>();
+            return new ExternalInventoryConfig(null, []);
         }
 
-        var rawCodes = await db.Empresas
+        var config = await db.Empresas
             .IgnoreQueryFilters()
             .Where(x => x.Id == companyId)
-            .Select(x => x.BodegasInventarioExterno)
+            .Select(x => new { x.BaseDatosInventarioExterno, x.BodegasInventarioExterno })
             .FirstOrDefaultAsync(cancellationToken);
 
-        return ParseWarehouseCodes(rawCodes);
+        return config is null
+            ? new ExternalInventoryConfig(null, [])
+            : new ExternalInventoryConfig(NormalizeDatabaseName(config.BaseDatosInventarioExterno), ParseWarehouseCodes(config.BodegasInventarioExterno));
     }
 
     private static string ReadString(IDataRecord reader, string name) =>
@@ -180,6 +184,33 @@ public sealed class ExternalInventoryController(IConfiguration configuration, Cr
     }
 
     private static string Normalize(string? value) => string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
+
+    private static string BuildInventoryViewName(string? databaseName)
+    {
+        var normalizedDatabase = NormalizeDatabaseName(databaseName);
+        if (string.IsNullOrWhiteSpace(normalizedDatabase))
+        {
+            throw new InvalidOperationException("No hay base de datos de inventario configurada para la empresa.");
+        }
+
+        return $"[{normalizedDatabase}].[{InventorySchema}].[{InventoryView}]";
+    }
+
+    private static string? NormalizeDatabaseName(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var name = value.Trim();
+        if (name.Length > 128 || !name.All(c => char.IsLetterOrDigit(c) || c == '_'))
+        {
+            throw new InvalidOperationException("La base de datos de inventario configurada para la empresa no es valida.");
+        }
+
+        return name;
+    }
 
     private static IReadOnlyCollection<string> ParseWarehouseCodes(string? value)
     {
@@ -210,4 +241,5 @@ public sealed class ExternalInventoryController(IConfiguration configuration, Cr
     }
 
     private sealed record ExternalInventoryRow(string WarehouseCode, string WarehouseName, string Code, string Name, string? Presentation, string? SerialNumber, int Quantity);
+    private sealed record ExternalInventoryConfig(string? DatabaseName, IReadOnlyCollection<string> AllowedWarehouses);
 }

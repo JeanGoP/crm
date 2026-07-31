@@ -82,6 +82,7 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
 
         modelBuilder.Entity<Empresa>().HasIndex(x => x.Subdominio).IsUnique();
         modelBuilder.Entity<Empresa>().Property(x => x.LogoDataUrl).HasMaxLength(300000);
+        modelBuilder.Entity<Empresa>().Property(x => x.BaseDatosInventarioExterno).HasMaxLength(128);
         modelBuilder.Entity<Empresa>().Property(x => x.BodegasInventarioExterno).HasMaxLength(800);
         modelBuilder.Entity<Usuario>().Property(x => x.Login).HasMaxLength(80);
         modelBuilder.Entity<Usuario>().HasIndex(x => x.Login).IsUnique();

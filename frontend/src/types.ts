@@ -19,6 +19,7 @@ export interface Company {
   subdomain: string;
   customDomain?: string;
   logoDataUrl?: string;
+  externalInventoryDatabaseName?: string;
   externalInventoryWarehouseCodes?: string;
   active: boolean;
 }
