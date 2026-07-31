@@ -1,7 +1,7 @@
 # Manual de usuario - EnMarcha CRM
 
 Ultima actualizacion: 2026-07-31  
-Version del manual: 8.8
+Version del manual: 8.9
 Sistema: EnMarcha CRM para gestion comercial y ventas a credito  
 
 ## 1. Bienvenida
@@ -147,25 +147,26 @@ Cuando se digita una identificacion, el boton **Consultar** busca primero si el 
 
 ### Para que sirve
 
-Cliente 360 muestra toda la informacion importante de un cliente en una sola pantalla.
+Cliente 360 muestra toda la informacion importante de un cliente en una sola ficha comercial. Esta vista ayuda a saber rapidamente quien es el cliente, en que etapa esta, que se le ha cotizado, si tiene solicitud de credito y cual debe ser el siguiente seguimiento.
 
 ### Que puede revisar
 
-- Encabezado con estado, identificacion y acciones rapidas.
-- Indicadores de cotizaciones, valor cotizado, solicitudes, pipeline y pendientes.
-- Datos personales y de contacto.
-- Resumen comercial del cliente.
-- Siguiente seguimiento programado.
+- Encabezado comercial con estado, identificacion, ciudad, etiquetas y acciones rapidas.
+- Accesos para escribir por WhatsApp, enviar email o crear un nuevo seguimiento.
+- Resumen rapido de ultima cotizacion, credito actual, pipeline abierto y siguiente accion.
+- Indicadores de cotizaciones, valor cotizado, solicitudes, seguimientos y pendientes.
+- Datos personales, datos de contacto y resumen comercial.
+- Siguiente seguimiento programado y ultimo movimiento registrado.
+- Timeline comercial con el historial de eventos del cliente.
 - Cotizaciones asociadas.
-- Solicitudes de credito.
-- Negocios en pipeline.
-- Actividades y seguimientos.
-- Historial de interacciones.
+- Solicitudes de credito y estado de documentos.
+- Negocios en pipeline con avance y probabilidad.
+- Actividades y seguimientos recientes.
 - Documentos, archivos, notas y entregas relacionados.
 
 ### Recomendacion de uso
 
-Antes de llamar o escribir a un cliente, abra Cliente 360. Asi puede ver que se ha hablado, que documentos faltan y cual es el siguiente paso.
+Antes de llamar o escribir a un cliente, abra Cliente 360. La parte superior le muestra el estado del caso y el siguiente paso; el timeline le permite revisar el historial antes de contactar al cliente.
 
 ## 9. Productos
 
@@ -756,6 +757,7 @@ El sistema muestra mensajes cuando algo no puede completarse.
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-07-31 | 8.9 | Se mejora Cliente 360 con ficha comercial moderna, resumen superior, acciones rapidas, indicadores, timeline y secciones de proceso mas ordenadas. |
 | 2026-07-31 | 8.8 | Se mejora el dashboard con resumen ejecutivo, salud de seguimiento, bandeja de atencion y actividad reciente mas clara. |
 | 2026-07-31 | 8.7 | Se modernizan formularios y modales con encabezado visual, cuerpo en panel claro, campos mas limpios, secciones destacadas y botones consistentes. |
 | 2026-07-31 | 8.6 | Se unifica el estilo de tablas con filas mas compactas, contador de registros, encabezados claros, acciones consistentes y chips de estado personalizados. |

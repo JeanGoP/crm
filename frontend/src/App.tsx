@@ -809,6 +809,14 @@ function Customer360Page() {
   const activeCredit = [...creditApplications].sort((a, b) => new Date(b.submittedAt ?? '').getTime() - new Date(a.submittedAt ?? '').getTime())[0];
   const pendingDocuments = creditApplications.reduce((sum, application) => sum + (application.documents?.filter((document) => document.status === 1).length ?? 0), 0);
   const latestTimeline = timeline[0];
+  const completedActivities = activities.filter((activity) => activity.status === 3).length;
+  const commercialHealthTone = overdueActivities.length || pendingDocuments ? 'warning' : 'success';
+  const primaryDeal = openDeals[0] ?? deals[0];
+  const quoteLabel = latestQuote ? `${latestQuote.number} - ${money(latestQuote.productPrice)}` : 'Sin cotizacion';
+  const creditLabel = activeCredit ? `${activeCredit.number} - ${creditStatus(activeCredit.status)}` : 'Sin solicitud';
+  const nextActionLabel = nextActivity
+    ? `${nextActivity.title} - ${new Date(nextActivity.scheduledAt).toLocaleString()}`
+    : 'Programar seguimiento';
 
   return <Stack spacing={3}>
     <Header
@@ -817,39 +825,73 @@ function Customer360Page() {
       secondaryAction={{ label: 'Volver', onClick: () => navigate('/clientes') }}
     />
     <StatusBar loading={loading} error={error} />
-    {customer && <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, bgcolor: '#fbfdff' }}>
-      <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', md: 'center' }} gap={2}>
-        <Stack direction="row" spacing={2} alignItems="center">
-          <Box sx={{ width: 58, height: 58, borderRadius: '50%', bgcolor: '#155e75', color: '#fff', display: 'grid', placeItems: 'center', fontSize: 22, fontWeight: 900, flexShrink: 0 }}>
-            {(customer.firstName?.[0] || customer.firstNames?.[0] || customer.name?.[0] || 'C').toUpperCase()}
-          </Box>
-          <Box sx={{ minWidth: 0 }}>
-            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-              <Typography variant="h5" fontWeight={900}>{customerName}</Typography>
-              <StatusChip label={statusLabel(customer.status)} tone={customer.status === 1 ? 'success' : 'default'} />
-            </Stack>
-            <Typography color="text.secondary">{identificationLabel(customer.identificationType ?? 1)} {customer.identificationNumber || 'sin identificacion'}</Typography>
-            {customer.tags && <Typography variant="body2" color="text.secondary">{customer.tags}</Typography>}
-          </Box>
+    {customer && <Paper
+      variant="outlined"
+      sx={{
+        overflow: 'hidden',
+        border: 'none',
+        bgcolor: '#0f172a',
+        color: '#fff',
+        background: 'linear-gradient(135deg, #155e75 0%, #0f766e 52%, #0f172a 100%)',
+        boxShadow: '0 24px 70px rgba(15,23,42,.18)'
+      }}
+    >
+      <Box sx={{ p: { xs: 2.25, md: 3 }, background: 'linear-gradient(90deg, rgba(255,255,255,.12), transparent)' }}>
+        <Stack direction={{ xs: 'column', lg: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', lg: 'center' }} gap={2.5}>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ xs: 'flex-start', sm: 'center' }} sx={{ minWidth: 0 }}>
+            <Box sx={{
+              width: 72,
+              height: 72,
+              borderRadius: 3,
+              bgcolor: 'rgba(255,255,255,.16)',
+              border: '1px solid rgba(255,255,255,.22)',
+              color: '#fff',
+              display: 'grid',
+              placeItems: 'center',
+              fontSize: 28,
+              fontWeight: 900,
+              flexShrink: 0
+            }}>
+              {(customer.firstName?.[0] || customer.firstNames?.[0] || customer.name?.[0] || 'C').toUpperCase()}
+            </Box>
+            <Box sx={{ minWidth: 0 }}>
+              <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+                <Typography variant="h4" fontWeight={900} sx={{ color: '#fff', overflowWrap: 'anywhere' }}>{customerName}</Typography>
+                <StatusChip label={statusLabel(customer.status)} tone={customer.status === 1 ? 'success' : 'default'} />
+                <StatusChip label={commercialHealthTone === 'success' ? 'Gestion al dia' : 'Requiere atencion'} tone={commercialHealthTone} />
+              </Stack>
+              <Stack direction="row" spacing={1.2} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mt: 1 }}>
+                <Typography color="rgba(255,255,255,.78)" fontWeight={800}>{identificationLabel(customer.identificationType ?? 1)} {customer.identificationNumber || 'sin identificacion'}</Typography>
+                {customer.city && <Chip size="small" label={customer.city} sx={{ bgcolor: 'rgba(255,255,255,.14)', color: '#fff', border: '1px solid rgba(255,255,255,.20)' }} />}
+                {customer.tags?.split(',').map((tag) => tag.trim()).filter(Boolean).slice(0, 4).map((tag) => <Chip key={tag} size="small" label={tag} sx={{ bgcolor: 'rgba(245,158,11,.22)', color: '#fff', border: '1px solid rgba(245,158,11,.35)' }} />)}
+              </Stack>
+            </Box>
+          </Stack>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ xs: 'stretch', sm: 'center' }} sx={{ flexShrink: 0 }}>
+            {customer.phone && <Button variant="contained" color="secondary" startIcon={<WhatsApp />} href={whatsappUrl(customer.phone)} target="_blank" rel="noreferrer">WhatsApp</Button>}
+            {customer.email && <Button variant="outlined" href={`mailto:${customer.email}`} sx={{ color: '#fff', borderColor: 'rgba(255,255,255,.42)', '&:hover': { borderColor: '#fff', bgcolor: 'rgba(255,255,255,.08)' } }}>Email</Button>}
+            <Button variant="contained" startIcon={<AddTask />} onClick={() => setActivityForm({ open: true, item: { ...emptyActivity, title: `Seguimiento: ${customer.name}`, customerId: customer.id } as Activity })} sx={{ bgcolor: '#fff', color: uiPrimary, '&:hover': { bgcolor: '#eef6f7' } }}>Nuevo seguimiento</Button>
+          </Stack>
         </Stack>
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ xs: 'stretch', sm: 'center' }}>
-          {customer.phone && <Button variant="contained" startIcon={<WhatsApp />} href={whatsappUrl(customer.phone)} target="_blank" rel="noreferrer">WhatsApp</Button>}
-          {customer.email && <Button variant="outlined" href={`mailto:${customer.email}`}>Email</Button>}
-          <Button variant="outlined" startIcon={<AddTask />} onClick={() => setActivityForm({ open: true, item: { ...emptyActivity, title: `Seguimiento: ${customer.name}`, customerId: customer.id } as Activity })}>Seguimiento</Button>
-        </Stack>
-      </Stack>
+        <Grid container spacing={1.5} sx={{ mt: 2 }}>
+          <Grid item xs={12} sm={6} md={3}><DashboardMiniStat label="Ultima cotizacion" value={quoteLabel} /></Grid>
+          <Grid item xs={12} sm={6} md={3}><DashboardMiniStat label="Credito actual" value={creditLabel} /></Grid>
+          <Grid item xs={12} sm={6} md={3}><DashboardMiniStat label="Pipeline abierto" value={money(openPipelineValue)} /></Grid>
+          <Grid item xs={12} sm={6} md={3}><DashboardMiniStat label="Siguiente accion" value={nextActionLabel} /></Grid>
+        </Grid>
+      </Box>
     </Paper>}
     {customer && <Grid container spacing={2}>
-      <Grid item xs={12} sm={6} md={2.4}><Metric label="Cotizaciones" value={quotes.length} /></Grid>
-      <Grid item xs={12} sm={6} md={2.4}><Metric label="Valor cotizado" value={money(totalQuoted)} /></Grid>
-      <Grid item xs={12} sm={6} md={2.4}><Metric label="Solicitudes" value={creditApplications.length} /></Grid>
-      <Grid item xs={12} sm={6} md={2.4}><Metric label="Pipeline abierto" value={money(openPipelineValue)} /></Grid>
-      <Grid item xs={12} sm={6} md={2.4}><Metric label="Pendientes" value={pendingActivities.length + pendingDocuments} /></Grid>
+      <Grid item xs={6} md={2.4}><Metric label="Cotizaciones" value={quotes.length} /></Grid>
+      <Grid item xs={6} md={2.4}><Metric label="Valor cotizado" value={money(totalQuoted)} /></Grid>
+      <Grid item xs={6} md={2.4}><Metric label="Solicitudes" value={creditApplications.length} /></Grid>
+      <Grid item xs={6} md={2.4}><Metric label="Seguimientos" value={`${completedActivities}/${activities.length}`} /></Grid>
+      <Grid item xs={12} md={2.4}><Metric label="Pendientes" value={pendingActivities.length + pendingDocuments} /></Grid>
     </Grid>}
     {customer && <Grid container spacing={2}>
       <Grid item xs={12} lg={4}>
         <Card sx={{ height: '100%' }}><CardContent>
-          <Typography variant="h6" fontWeight={900} sx={{ mb: 1.5 }}>Datos del cliente</Typography>
+          <Customer360SectionHeader title="Datos del cliente" subtitle="Informacion principal" />
           <Stack spacing={1}>
             <InfoLine label="Telefono" value={customer.phone ? `${customer.phoneCountryCode ?? ''} ${customer.phone}` : '-'} />
             <InfoLine label="Email" value={customer.email || '-'} />
@@ -862,10 +904,10 @@ function Customer360Page() {
       </Grid>
       <Grid item xs={12} lg={4}>
         <Card sx={{ height: '100%' }}><CardContent>
-          <Typography variant="h6" fontWeight={900} sx={{ mb: 1.5 }}>Resumen comercial</Typography>
+          <Customer360SectionHeader title="Resumen comercial" subtitle="Estado del proceso" />
           <Stack spacing={1}>
-            <InfoLine label="Ultima cotizacion" value={latestQuote ? `${latestQuote.number} - ${money(latestQuote.productPrice)}` : 'Sin cotizaciones'} />
-            <InfoLine label="Credito actual" value={activeCredit ? `${activeCredit.number} - ${creditStatus(activeCredit.status)}` : 'Sin solicitud'} />
+            <InfoLine label="Ultima cotizacion" value={quoteLabel} />
+            <InfoLine label="Credito actual" value={creditLabel} />
             <InfoLine label="Negocios abiertos" value={`${openDeals.length} por ${money(openPipelineValue)}`} />
             <InfoLine label="Documentos pendientes" value={pendingDocuments} />
             <InfoLine label="Actividades vencidas" value={overdueActivities.length} />
@@ -874,7 +916,7 @@ function Customer360Page() {
       </Grid>
       <Grid item xs={12} lg={4}>
         <Card sx={{ height: '100%' }}><CardContent>
-          <Typography variant="h6" fontWeight={900} sx={{ mb: 1.5 }}>Siguiente paso</Typography>
+          <Customer360SectionHeader title="Siguiente paso" subtitle="Proxima gestion sugerida" />
           {nextActivity ? <Stack spacing={1}>
             <StatusChip label={activityStatus(nextActivity.status)} tone={new Date(nextActivity.scheduledAt).getTime() < Date.now() ? 'warning' : 'default'} />
             <Typography fontWeight={900}>{nextActivity.title}</Typography>
@@ -890,37 +932,61 @@ function Customer360Page() {
       </Grid>
     </Grid>}
     <Grid container spacing={2}>
-      <Grid item xs={12} lg={7}>
-        <Card><CardContent>
-          <Stack direction="row" alignItems="center" justifyContent="space-between" gap={2} sx={{ mb: 2 }}>
-            <Typography variant="h6" fontWeight={900}>Timeline comercial</Typography>
-            <Chip size="small" label={`${timeline.length} eventos`} variant="outlined" />
-          </Stack>
+      <Grid item xs={12} xl={7}>
+        <Card sx={{ height: '100%' }}><CardContent>
+          <Customer360SectionHeader title="Timeline comercial" subtitle="Todo lo que ha pasado con el cliente" action={<Chip size="small" label={`${timeline.length} eventos`} variant="outlined" />} />
           <CustomerTimeline items={timeline} />
         </CardContent></Card>
       </Grid>
-      <Grid item xs={12} lg={5}>
+      <Grid item xs={12} xl={5}>
         <Stack spacing={2}>
           <Card><CardContent>
-            <Typography variant="h6" fontWeight={900}>Cotizaciones</Typography>
-            {quotes.length ? quotes.slice(0, 4).map((q) => <Row key={q.id} primary={`${q.number} - ${q.productName}`} secondary={`Financiado ${money(q.financedAmount)} - cuota aprox. ${money(q.estimatedMonthlyPayment)} x ${q.termMonths} - ${new Date(q.quoteDate).toLocaleDateString()}`} />) : <EmptyState text="Sin cotizaciones" />}
+            <Customer360SectionHeader title="Cotizaciones" subtitle="Propuestas realizadas" action={<Button size="small" onClick={() => navigate('/cotizaciones')}>Ver todas</Button>} />
+            {quotes.length ? quotes.slice(0, 5).map((q) => <Customer360ListItem
+              key={q.id}
+              title={`${q.number} - ${q.productName}`}
+              description={`${new Date(q.quoteDate).toLocaleDateString()} - valida hasta ${new Date(q.validUntil).toLocaleDateString()}`}
+              meta={`${money(q.financedAmount)} / ${money(q.estimatedMonthlyPayment)} x ${q.termMonths}`}
+            />) : <EmptyState text="Sin cotizaciones" />}
           </CardContent></Card>
           <Card><CardContent>
-            <Typography variant="h6" fontWeight={900}>Solicitudes de credito</Typography>
-            {creditApplications.length ? creditApplications.slice(0, 4).map((s) => <Row key={s.id} primary={`${s.number} - ${s.productName}`} secondary={`${creditStatus(s.status)} - ${money(s.motorcycleValue)}`} />) : <EmptyState text="Sin solicitudes" />}
+            <Customer360SectionHeader title="Solicitudes de credito" subtitle="Estudio y documentos" action={<Button size="small" onClick={() => navigate('/solicitudes-credito')}>Ver solicitudes</Button>} />
+            {creditApplications.length ? creditApplications.slice(0, 5).map((s) => <Customer360ListItem
+              key={s.id}
+              title={`${s.number} - ${s.productName}`}
+              description={`${creditStatus(s.status)} - perfil ${s.requirementProfileName || 'sin perfil'}`}
+              meta={money(s.motorcycleValue)}
+              tone={s.status === 3 ? 'success' : s.status === 4 ? 'error' : 'warning'}
+            />) : <EmptyState text="Sin solicitudes" />}
           </CardContent></Card>
         </Stack>
       </Grid>
       <Grid item xs={12} lg={6}>
         <Card><CardContent>
-          <Typography variant="h6" fontWeight={900}>Pipeline</Typography>
-          {deals.length ? deals.map((d) => <Row key={d.id} primary={d.title} secondary={`${dealStatus(d.status)} - ${money(d.value)} - ${d.closeProbability}%`} />) : <EmptyState text="Sin negocios" />}
+          <Customer360SectionHeader title="Pipeline" subtitle="Negocios asociados" action={<Button size="small" onClick={() => navigate('/pipeline')}>Abrir pipeline</Button>} />
+          {primaryDeal && <Box sx={{ mb: 2, p: 1.5, borderRadius: 2, bgcolor: '#f8fafc', border: `1px solid ${uiBorder}` }}>
+            <Stack direction="row" justifyContent="space-between" gap={1} alignItems="center">
+              <Box sx={{ minWidth: 0 }}>
+                <Typography fontWeight={900} sx={{ overflowWrap: 'anywhere' }}>{primaryDeal.title}</Typography>
+                <Typography variant="body2" color="text.secondary">{dealStatus(primaryDeal.status)} - {money(primaryDeal.value)}</Typography>
+              </Box>
+              <Typography fontWeight={900} color={uiPrimary}>{primaryDeal.closeProbability}%</Typography>
+            </Stack>
+            <LinearProgress variant="determinate" value={Math.min(100, Math.max(0, primaryDeal.closeProbability))} sx={{ mt: 1, height: 8, borderRadius: 999 }} />
+          </Box>}
+          {deals.length ? deals.map((d) => <Customer360ListItem key={d.id} title={d.title} description={dealStatus(d.status)} meta={`${money(d.value)} - ${d.closeProbability}%`} />) : <EmptyState text="Sin negocios" />}
         </CardContent></Card>
       </Grid>
       <Grid item xs={12} lg={6}>
         <Card><CardContent>
-          <Typography variant="h6" fontWeight={900}>Actividades</Typography>
-          {activities.length ? activities.map((a) => <Row key={a.id} primary={a.title} secondary={`${activityStatus(a.status)} - ${new Date(a.scheduledAt).toLocaleString()}`} />) : <EmptyState text="Sin actividades" />}
+          <Customer360SectionHeader title="Actividades" subtitle="Seguimiento comercial" action={<Button size="small" onClick={() => navigate('/actividades')}>Ver agenda</Button>} />
+          {activities.length ? activities.slice(0, 8).map((a) => <Customer360ListItem
+            key={a.id}
+            title={a.title}
+            description={new Date(a.scheduledAt).toLocaleString()}
+            meta={activityStatus(a.status)}
+            tone={a.status === 3 ? 'success' : new Date(a.scheduledAt).getTime() < Date.now() ? 'warning' : 'default'}
+          />) : <EmptyState text="Sin actividades" />}
         </CardContent></Card>
       </Grid>
     </Grid>
@@ -929,13 +995,41 @@ function Customer360Page() {
   </Stack>;
 }
 
+function Customer360SectionHeader({ title, subtitle, action }: { title: string; subtitle?: string; action?: ReactNode }) {
+  return <Stack direction="row" alignItems="flex-start" justifyContent="space-between" gap={2} sx={{ mb: 1.5 }}>
+    <Box>
+      <Typography variant="h6" fontWeight={900}>{title}</Typography>
+      {subtitle && <Typography variant="body2" color="text.secondary">{subtitle}</Typography>}
+    </Box>
+    {action}
+  </Stack>;
+}
+
+function Customer360ListItem({ title, description, meta, tone = 'default' }: { title: string; description: string; meta: string; tone?: 'success' | 'warning' | 'error' | 'default' }) {
+  const colors = {
+    success: '#16a34a',
+    warning: '#f59e0b',
+    error: '#dc2626',
+    default: uiPrimary
+  }[tone];
+  return <Box sx={{ py: 1.15, borderBottom: `1px solid ${uiBorder}`, '&:last-of-type': { borderBottom: 0 } }}>
+    <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" gap={1}>
+      <Box sx={{ minWidth: 0 }}>
+        <Typography fontWeight={900} sx={{ overflowWrap: 'anywhere' }}>{title}</Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ overflowWrap: 'anywhere' }}>{description}</Typography>
+      </Box>
+      <Typography fontWeight={900} sx={{ color: colors, flexShrink: 0, textAlign: { xs: 'left', sm: 'right' } }}>{meta}</Typography>
+    </Stack>
+  </Box>;
+}
+
 function CustomerTimeline({ items }: { items: CustomerTimelineItem[] }) {
   if (!items.length) return <EmptyState text="Sin historial registrado" />;
-  return <Stack spacing={0}>
+  return <Stack spacing={0} sx={{ maxHeight: 650, overflow: 'auto', pr: { md: 1 } }}>
     {items.map((item, index) => <Stack key={`${item.type}-${item.relatedId ?? index}-${item.occurredAt}`} direction="row" gap={2} sx={{ position: 'relative', pb: 2 }}>
       <Box sx={{ width: 16, display: 'flex', justifyContent: 'center', position: 'relative' }}>
-        <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: timelineColor(item.tone), mt: .9, zIndex: 1 }} />
-        {index < items.length - 1 && <Box sx={{ position: 'absolute', top: 20, bottom: 0, width: 2, bgcolor: '#e5eaf0' }} />}
+        <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: timelineColor(item.tone), mt: .9, zIndex: 1, boxShadow: `0 0 0 4px ${timelineColor(item.tone)}22` }} />
+        {index < items.length - 1 && <Box sx={{ position: 'absolute', top: 22, bottom: 0, width: 2, bgcolor: '#e5eaf0' }} />}
       </Box>
       <Box sx={{ flex: 1, minWidth: 0, borderBottom: index < items.length - 1 ? '1px solid #edf1f5' : 'none', pb: 1.5 }}>
         <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap">
