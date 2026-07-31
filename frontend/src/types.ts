@@ -3,6 +3,7 @@ export type Status = 'Activo' | 'Inactivo' | 'Suspendido';
 export interface User {
   id: string;
   fullName: string;
+  login: string;
   email: string;
   roles: string[];
   companyId: string;

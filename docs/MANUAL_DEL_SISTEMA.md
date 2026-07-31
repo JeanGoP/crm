@@ -1,7 +1,7 @@
 # Manual de usuario - EnMarcha CRM
 
-Ultima actualizacion: 2026-07-16  
-Version del manual: 8.2
+Ultima actualizacion: 2026-07-31  
+Version del manual: 8.3
 Sistema: EnMarcha CRM para gestion comercial y ventas a credito  
 
 ## 1. Bienvenida
@@ -44,18 +44,17 @@ Puede crear clientes, cotizaciones, actividades, solicitudes y hacer seguimiento
 
 ### Para que sirve
 
-La pantalla de ingreso permite entrar al CRM con el usuario asignado por la empresa.
+La pantalla de ingreso permite entrar al CRM con el usuario o login asignado por el administrador. El correo se conserva en la ficha del usuario, pero el ingreso se realiza con el campo **Usuario**.
 
 ### Paso a paso
 
-1. Escriba la empresa o identificador indicado por el administrador.
-2. Escriba su correo electronico.
-3. Escriba su contrasena.
-4. Presione **Ingresar**.
+1. Escriba su **Usuario**.
+2. Escriba su contrasena.
+3. Presione **Ingresar**.
 
 ### Si no puede ingresar
 
-Revise que la empresa, el correo y la contrasena esten escritos correctamente. Si el problema continua, solicite al administrador que valide si su usuario esta activo.
+Revise que el usuario y la contrasena esten escritos correctamente. Si el problema continua, solicite al administrador que valide si su usuario esta activo.
 
 ## 5. Menu principal
 
@@ -630,7 +629,7 @@ Configuracion permite administrar datos generales del sistema. Esta opcion norma
 
 - **Empresas:** crear y actualizar empresas. Al crear una empresa se puede cargar su logo.
 - **Sedes / puntos de venta:** registrar puntos de venta, ciudad, marca principal, logo de marca, modalidad de entrega, tasa y tiempos de tramite.
-- **Usuarios:** crear usuarios y asignarlos a una empresa.
+- **Usuarios:** crear y actualizar usuarios, asignarlos a una empresa, definir su login de ingreso, correo, rol y sede cuando aplique.
 - **Roles:** administrar permisos segun el perfil del usuario.
 - **Etapas del pipeline:** configurar las columnas comerciales.
 - **Configuracion financiera:** definir las condiciones usadas por la empresa para calcular cuotas en las cotizaciones.
@@ -692,11 +691,14 @@ Los cambios aplican a las nuevas cotizaciones de la empresa. Las cotizaciones ya
 1. Entre a **Configuracion**.
 2. Abra la seccion de usuarios.
 3. Presione **Nuevo usuario**.
-4. Complete nombres, correo y datos requeridos.
+4. Complete nombre, **Usuario / Login**, correo y contrasena temporal.
 5. Seleccione la empresa a la que pertenece.
-6. Seleccione la sede principal del usuario.
-7. Asigne el rol.
-8. Guarde.
+6. Asigne el rol.
+7. Si el rol es **Vendedor**, seleccione la sede principal.
+8. Si el rol es **Supervisor**, seleccione una o varias sedes a supervisar.
+9. Guarde.
+
+El usuario administrador puede editar usuarios desde la misma tabla con el boton de acciones. Al editar, puede cambiar nombre, login, correo, empresa, rol, sede o sedes supervisadas. La contrasena solo cambia si se escribe una nueva; si se deja vacia, se conserva la actual.
 
 La sede principal permite que el sistema pueda separar la informacion comercial por punto de venta. Esta configuracion se usara en cotizaciones, reportes, tramites y entregas.
 
@@ -754,6 +756,8 @@ El sistema muestra mensajes cuando algo no puede completarse.
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-07-31 | 8.3 | Se actualiza el ingreso por Usuario/Login y la administracion de usuarios permite editar login, correo, roles, empresa y sedes segun permisos. |
+| 2026-07-16 | 8.2 | Se agrega carga masiva de productos desde Excel para administradores, con descarga de plantilla y validacion por fila. |
 | 2026-06-23 | 8.1 | Se renombra Paso 0 como Validacion inicial y se documenta el checklist de RUNT, SIMIT, identidad y observaciones. |
 | 2026-06-23 | 8.0 | Se agrega Inventario comercial con stock por sede, seriales, separaciones contra disponibilidad y control de motos usadas. |
 | 2026-06-23 | 7.9 | Se fortalece Entregas con protocolo digital, foto de entrega, checklist obligatorio, acta firmada y agendamiento automatico de primera revision. |

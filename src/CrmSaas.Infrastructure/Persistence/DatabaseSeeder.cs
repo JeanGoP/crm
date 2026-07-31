@@ -47,6 +47,7 @@ public static class DatabaseSeeder
             {
                 EmpresaId = empresa.Id,
                 NombreCompleto = "Administrador Demo",
+                Login = "admin@demo.com",
                 Email = "admin@demo.com",
                 PasswordHash = passwordHasher.Hash(adminPassword),
                 PuntoVentaId = defaultSalesPointId,
@@ -58,6 +59,11 @@ public static class DatabaseSeeder
         else if (!admin.UsuarioRoles.Any(x => x.RolId == adminRole.Id))
         {
             admin.UsuarioRoles.Add(new UsuarioRol { EmpresaId = empresa.Id, UsuarioId = admin.Id, RolId = adminRole.Id });
+        }
+
+        if (string.IsNullOrWhiteSpace(admin.Login))
+        {
+            admin.Login = admin.Email.ToLowerInvariant();
         }
 
         if (admin.PuntoVentaId is null)

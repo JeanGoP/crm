@@ -17,11 +17,12 @@ public sealed class AuthService(CrmSaas.Infrastructure.Persistence.CrmDbContext 
 
     public async Task<AuthResponseDto> LoginAsync(LoginRequestDto request, CancellationToken cancellationToken)
     {
+        var credential = NormalizeLogin(request.Login ?? request.Email ?? string.Empty);
         var candidates = await db.Usuarios.IgnoreQueryFilters()
             .Include(x => x.UsuarioRoles).ThenInclude(x => x.Rol)
             .Include(x => x.PuntoVenta)
             .Include(x => x.SedesSupervisadas).ThenInclude(x => x.PuntoVenta)
-            .Where(x => x.Email == request.Email && x.Activo)
+            .Where(x => x.Activo && (x.Login == credential || x.Email == credential))
             .ToListAsync(cancellationToken);
 
         var validUsers = candidates
@@ -35,7 +36,7 @@ public sealed class AuthService(CrmSaas.Infrastructure.Persistence.CrmDbContext 
 
         if (validUsers.Count > 1)
         {
-            throw new UnauthorizedAccessException("El correo existe en mas de una empresa. Solicite usar un correo unico para ingresar sin seleccionar empresa.");
+            throw new UnauthorizedAccessException("El usuario existe en mas de una empresa. Solicite al administrador asignar un login unico.");
         }
 
         var user = validUsers[0];
@@ -71,6 +72,7 @@ public sealed class AuthService(CrmSaas.Infrastructure.Persistence.CrmDbContext 
             new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
             new(JwtRegisteredClaimNames.Email, user.Email),
             new(ClaimTypes.NameIdentifier, user.Id.ToString()),
+            new(ClaimTypes.Name, user.Login),
             new(ClaimTypes.Email, user.Email),
             new("empresa_id", user.EmpresaId.ToString())
         };
@@ -101,6 +103,7 @@ public sealed class AuthService(CrmSaas.Infrastructure.Persistence.CrmDbContext 
             new UserDto(
                 user.Id,
                 user.NombreCompleto,
+                user.Login,
                 user.Email,
                 roles,
                 user.EmpresaId,
@@ -115,4 +118,6 @@ public sealed class AuthService(CrmSaas.Infrastructure.Persistence.CrmDbContext 
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(token));
         return Convert.ToHexString(bytes);
     }
+
+    private static string NormalizeLogin(string value) => value.Trim().ToLowerInvariant();
 }

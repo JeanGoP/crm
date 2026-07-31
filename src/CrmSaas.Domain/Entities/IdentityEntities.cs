@@ -5,6 +5,7 @@ namespace CrmSaas.Domain.Entities;
 public sealed class Usuario : AuditableTenantEntity
 {
     public string NombreCompleto { get; set; } = string.Empty;
+    public string Login { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;
     public string PasswordHash { get; set; } = string.Empty;
     public Guid? PuntoVentaId { get; set; }

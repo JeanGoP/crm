@@ -7,7 +7,9 @@ public sealed class LoginRequestValidator : AbstractValidator<LoginRequestDto>
 {
     public LoginRequestValidator()
     {
-        RuleFor(x => x.Email).NotEmpty().EmailAddress();
+        RuleFor(x => x)
+            .Must(x => !string.IsNullOrWhiteSpace(x.Login) || !string.IsNullOrWhiteSpace(x.Email))
+            .WithMessage("El usuario es obligatorio.");
         RuleFor(x => x.Password).NotEmpty().MinimumLength(8);
     }
 }

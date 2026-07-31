@@ -176,7 +176,7 @@ const emptyLead = { firstNames: '', lastNames: '', firstName: '', middleName: ''
 const emptyDeal = { title: '', customerId: '', stageId: '', value: 0, closeProbability: 10, estimatedCloseDate: today, status: 1 };
 const emptyActivity = { title: '', description: '', type: 1, status: 1, scheduledAt: `${today}T09:00`, reminderAt: '', customerId: '', dealId: '', assignedUserId: '' };
 const emptyCompany = { name: '', subdomain: '', customDomain: '', logoDataUrl: '', active: true };
-const emptyUser = { fullName: '', email: '', password: '', companyId: '', salesPointId: '', roles: ['Vendedor'], supervisedSalesPointIds: [] as string[] };
+const emptyUser = { fullName: '', login: '', email: '', password: '', companyId: '', salesPointId: '', roles: ['Vendedor'], supervisedSalesPointIds: [] as string[] };
 const emptyProduct = { name: '', category: 'Moto', brand: '', model: '', line: '', version: '', reference: '', description: '', engineCc: '', year: '', color: '', price: 0, soat: 0, registrationFee: 0, taxes: 0, technicalSheet: '', priceValidFrom: today, active: true, salesPointPrices: [] as { salesPointId: string; price: number | ''; priceValidFrom: string; active: boolean }[] };
 const emptyCommercialInventory = { productId: '', salesPointId: '', vin: '', chassisNumber: '', engineNumber: '', plate: '', color: '', isUsed: false, mileage: '', status: 1, notes: '' };
 const emptyProductCategory = { name: '', description: '', quoteAsBundle: false, active: true };
@@ -392,7 +392,7 @@ function LockedModulePage() {
 }
 
 function LoginPage() {
-  const [email, setEmail] = useState('admin@demo.com');
+  const [loginName, setLoginName] = useState('admin@demo.com');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -403,7 +403,7 @@ function LoginPage() {
     setLoading(true);
     setError('');
     try {
-      const { data } = await api.post('/api/auth/login', { email, password });
+      const { data } = await api.post('/api/auth/login', { login: loginName, password });
       setSession(data.accessToken, data.refreshToken, data.user);
       navigate('/');
     } catch (err) {
@@ -435,7 +435,7 @@ function LoginPage() {
           </Box>
         </Stack>
         <Stack spacing={2}>
-          <TextField label="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
+          <TextField label="Usuario" value={loginName} onChange={(e) => setLoginName(e.target.value)} />
           <TextField label="Contrasena" type="password" value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && login()} />
           {error && <Alert severity="error">{error}</Alert>}
           {loading && <LinearProgress />}
@@ -2586,14 +2586,19 @@ function SettingsPage() {
     const isAdministrator = payload.roles.includes('Administrador');
     const isSupervisor = payload.roles.includes('Supervisor');
     const companyId = isGlobalAdmin ? payload.companyId : user?.companyId ?? payload.companyId;
-    const { data } = await api.post<User>('/api/users', {
+    const body = {
       ...payload,
       companyId,
       salesPointId: isAdministrator || isSupervisor ? null : payload.salesPointId || null,
       supervisedSalesPointIds: isSupervisor ? payload.supervisedSalesPointIds : []
-    });
-    setUsers([...users, data].sort((a, b) => a.fullName.localeCompare(b.fullName)));
-    setNotice({ type: 'success', text: 'Usuario creado.' });
+    };
+    const { data } = userForm.item
+      ? await api.put<User>(`/api/users/${userForm.item.id}`, body)
+      : await api.post<User>('/api/users', body);
+    setUsers(userForm.item
+      ? users.map((x) => x.id === data.id ? data : x).sort((a, b) => a.fullName.localeCompare(b.fullName))
+      : [...users, data].sort((a, b) => a.fullName.localeCompare(b.fullName)));
+    setNotice({ type: 'success', text: userForm.item ? 'Usuario actualizado.' : 'Usuario creado.' });
     setUserForm({ open: false });
   };
 
@@ -2865,16 +2870,18 @@ function SettingsPage() {
       </Stack>
       <StatusBar loading={loadingUsers} error={usersError} />
       <EntityTable
-        headers={['Nombre', 'Email', 'Empresa', 'Sede', 'Roles']}
+        headers={['Nombre', 'Usuario', 'Email', 'Empresa', 'Sede', 'Roles', 'Acciones']}
         empty="No hay usuarios registrados"
         rows={users.map((u) => [
           u.fullName,
+          u.login,
           u.email,
           companies.find((c) => c.id === u.companyId)?.name ?? u.companyId,
           u.roles.includes('Supervisor')
             ? (u.supervisedSalesPointNames?.join(', ') || '-')
             : (u.salesPointName ?? salesPoints.find((p) => p.id === u.salesPointId)?.name ?? '-'),
-          u.roles.join(', ')
+          u.roles.join(', '),
+          <Actions onEdit={() => setUserForm({ open: true, item: u })} />
         ])}
       />
     </>}
@@ -3145,8 +3152,17 @@ function PromotionDialog({ form, products, salesPoints, onClose, onSave }: Dialo
 
 function UserDialog({ form, companies, salesPoints, defaultCompanyId, onClose, onSave }: DialogProps<User, typeof emptyUser> & { companies: Company[]; salesPoints: SalesPoint[]; defaultCompanyId?: string }) {
   const initialCompanyId = defaultCompanyId && companies.some((company) => company.id === defaultCompanyId) ? defaultCompanyId : companies[0]?.id ?? '';
-  const initial = { ...emptyUser, companyId: initialCompanyId, salesPointId: salesPoints[0]?.id ?? '', supervisedSalesPointIds: [] as string[] };
-  return <FormDialog title="Nuevo usuario" open={form.open} initial={initial} onClose={onClose} onSave={onSave}>
+  const initial = form.item ? {
+    fullName: form.item.fullName,
+    login: form.item.login,
+    email: form.item.email,
+    password: '',
+    companyId: form.item.companyId,
+    salesPointId: form.item.salesPointId ?? '',
+    roles: form.item.roles.length ? form.item.roles : ['Vendedor'],
+    supervisedSalesPointIds: form.item.supervisedSalesPointIds ?? []
+  } : { ...emptyUser, companyId: initialCompanyId, salesPointId: salesPoints[0]?.id ?? '', supervisedSalesPointIds: [] as string[] };
+  return <FormDialog title={form.item ? 'Editar usuario' : 'Nuevo usuario'} open={form.open} initial={initial} onClose={onClose} onSave={onSave}>
     {(v, set) => {
       const currentSalesPoints = salesPoints;
       const selectedRole = v.roles[0] ?? 'Vendedor';
@@ -3155,8 +3171,9 @@ function UserDialog({ form, companies, salesPoints, defaultCompanyId, onClose, o
       const defaultSalesPointId = currentSalesPoints[0]?.id ?? '';
       return <>
       <TextField required label="Nombre completo" value={v.fullName} onChange={(e) => set({ fullName: e.target.value })} />
+      <TextField required label="Usuario / Login" value={v.login} onChange={(e) => set({ login: e.target.value.toLowerCase().replace(/\s/g, '').slice(0, 80) })} helperText="Este es el usuario con el que ingresa al sistema." />
       <TextField required label="Email" value={v.email} onChange={(e) => set({ email: e.target.value })} />
-      <TextField required label="Contrasena temporal" type="password" value={v.password} onChange={(e) => set({ password: e.target.value })} />
+      <TextField required={!form.item} label={form.item ? 'Nueva contrasena (opcional)' : 'Contrasena temporal'} type="password" value={v.password} onChange={(e) => set({ password: e.target.value })} />
       <TextField required select label="Empresa" value={v.companyId} onChange={(e) => set({ companyId: e.target.value, salesPointId: isAdministrator ? '' : defaultSalesPointId })}>{companies.map((c) => <MenuItem key={c.id} value={c.id}>{c.name} ({c.subdomain})</MenuItem>)}</TextField>
       <TextField select label="Rol" value={selectedRole} onChange={(e) => {
         const role = e.target.value;
