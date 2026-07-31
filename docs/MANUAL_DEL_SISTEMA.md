@@ -1,7 +1,7 @@
 # Manual de usuario - EnMarcha CRM
 
 Ultima actualizacion: 2026-07-31  
-Version del manual: 8.9
+Version del manual: 9.0
 Sistema: EnMarcha CRM para gestion comercial y ventas a credito  
 
 ## 1. Bienvenida
@@ -76,6 +76,8 @@ El menu lateral permite moverse por las opciones principales:
 - **Configuracion:** empresas, sedes, usuarios, roles y parametros generales.
 
 En la parte superior se muestra el usuario conectado y la opcion **Salir** para cerrar sesion.
+
+El sistema se adapta a computador, tablet y celular. En pantallas pequenas el menu se abre desde el boton superior, los formularios se muestran en una sola columna cuando es necesario y las tablas amplias se pueden desplazar horizontalmente para conservar el orden de la informacion.
 
 ## 6. Dashboard
 
@@ -757,6 +759,7 @@ El sistema muestra mensajes cuando algo no puede completarse.
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-07-31 | 9.0 | Se mejora la adaptacion del sistema en tablet y celular para menu, encabezados, formularios, tablas, modales y galerias de imagenes. |
 | 2026-07-31 | 8.9 | Se mejora Cliente 360 con ficha comercial moderna, resumen superior, acciones rapidas, indicadores, timeline y secciones de proceso mas ordenadas. |
 | 2026-07-31 | 8.8 | Se mejora el dashboard con resumen ejecutivo, salud de seguimiento, bandeja de atencion y actividad reciente mas clara. |
 | 2026-07-31 | 8.7 | Se modernizan formularios y modales con encabezado visual, cuerpo en panel claro, campos mas limpios, secciones destacadas y botones consistentes. |

@@ -9,6 +9,10 @@ html, body, #root {
   box-sizing: border-box;
 }
 
+img, svg, video, canvas {
+  max-width: 100%;
+}
+
 a {
   color: inherit;
   text-decoration: none;
@@ -116,7 +120,49 @@ a {
   background: #eef3f7;
 }
 
+.responsiveTableScroll {
+  scrollbar-width: thin;
+  scrollbar-color: #94a3b8 #eef2f7;
+}
+
+.responsiveTableScroll::-webkit-scrollbar {
+  height: 10px;
+}
+
+.responsiveTableScroll::-webkit-scrollbar-track {
+  background: #eef2f7;
+  border-radius: 999px;
+}
+
+.responsiveTableScroll::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 999px;
+}
+
+@media (max-width: 900px) {
+  .kanban {
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  }
+
+  .kanbanColumn {
+    min-height: 340px;
+  }
+
+  .productPhotoGrid {
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  }
+}
+
 @media (max-width: 700px) {
+  .loginShell {
+    padding: 12px;
+    align-items: start;
+  }
+
+  .loginPanel {
+    width: min(100%, calc(100vw - 16px));
+  }
+
   .loginPanel {
     grid-template-columns: 1fr;
   }
@@ -132,5 +178,15 @@ a {
   .kanbanColumn {
     min-height: 260px;
     padding: 12px;
+  }
+
+  .productPhotoGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 420px) {
+  .productPhotoGrid {
+    grid-template-columns: 1fr;
   }
 }

@@ -98,7 +98,10 @@ const theme = createTheme({
       styleOverrides: {
         root: {
           borderRadius: 10,
-          minHeight: 38
+          minHeight: 38,
+          whiteSpace: 'normal',
+          textAlign: 'center',
+          lineHeight: 1.15
         },
         containedPrimary: {
           boxShadow: '0 10px 22px rgba(21, 94, 117, .22)'
@@ -159,7 +162,8 @@ const theme = createTheme({
         paper: {
           borderRadius: 14,
           boxShadow: '0 30px 90px rgba(15, 23, 42, .24)',
-          border: `1px solid ${uiBorder}`
+          border: `1px solid ${uiBorder}`,
+          maxHeight: 'calc(100dvh - 32px)'
         }
       }
     },
@@ -380,18 +384,18 @@ function Layout() {
         open={isDesktop || mobileOpen}
         onClose={closeMobileNav}
         ModalProps={{ keepMounted: true }}
-        PaperProps={{ sx: { width: drawerWidth, borderRight: `1px solid ${uiBorder}`, bgcolor: uiSidebar, color: '#0f172a' } }}
+        PaperProps={{ sx: { width: { xs: 'min(88vw, 272px)', md: drawerWidth }, borderRight: `1px solid ${uiBorder}`, bgcolor: uiSidebar, color: '#0f172a' } }}
       >
         {drawerContent}
       </Drawer>
       <Box sx={{ flex: 1, minWidth: 0, ml: { xs: 0, md: `${drawerWidth}px` } }}>
         <AppBar position="sticky" color="inherit" elevation={0} sx={{ borderBottom: `1px solid ${uiBorder}`, bgcolor: 'rgba(255, 255, 255, .92)', backdropFilter: 'blur(16px)' }}>
-          <Toolbar sx={{ justifyContent: 'space-between', gap: 1.5, minHeight: 72, px: { xs: 1.5, sm: 2.5, md: 3 } }}>
+          <Toolbar sx={{ justifyContent: 'space-between', gap: 1.25, minHeight: { xs: 60, sm: 68, md: 72 }, px: { xs: 1, sm: 2.5, md: 3 } }}>
             <Stack direction="row" alignItems="center" gap={1.25} sx={{ minWidth: 0 }}>
               {!isDesktop && <IconButton aria-label="Abrir menu" edge="start" onClick={() => setMobileOpen(true)}><Menu /></IconButton>}
               <Box sx={{ minWidth: 0 }}>
                 <Typography fontWeight={900} noWrap>{user?.fullName ?? 'Equipo comercial'}</Typography>
-                <Typography color="text.secondary" fontSize={13} noWrap>Operacion comercial y credito</Typography>
+                <Typography color="text.secondary" fontSize={13} noWrap sx={{ display: { xs: 'none', sm: 'block' } }}>Operacion comercial y credito</Typography>
               </Box>
             </Stack>
             <Stack direction="row" alignItems="center" gap={1}>
@@ -405,7 +409,7 @@ function Layout() {
             </Stack>
           </Toolbar>
         </AppBar>
-        <Box component="main" sx={{ p: { xs: 1.5, sm: 2.25, md: 3 }, width: '100%', maxWidth: 1760, mx: 'auto', boxSizing: 'border-box' }}>
+        <Box component="main" sx={{ p: { xs: 1, sm: 2, md: 3 }, width: '100%', maxWidth: 1760, mx: 'auto', boxSizing: 'border-box' }}>
           <Routes>
             <Route path="/" element={<DashboardPage />} />
             <Route path="/clientes" element={<CustomersPage />} />
@@ -856,7 +860,7 @@ function Customer360Page() {
             </Box>
             <Box sx={{ minWidth: 0 }}>
               <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
-                <Typography variant="h4" fontWeight={900} sx={{ color: '#fff', overflowWrap: 'anywhere' }}>{customerName}</Typography>
+                <Typography variant="h4" fontWeight={900} sx={{ color: '#fff', fontSize: { xs: 25, sm: 32, md: 34 }, lineHeight: 1.08, overflowWrap: 'anywhere' }}>{customerName}</Typography>
                 <StatusChip label={statusLabel(customer.status)} tone={customer.status === 1 ? 'success' : 'default'} />
                 <StatusChip label={commercialHealthTone === 'success' ? 'Gestion al dia' : 'Requiere atencion'} tone={commercialHealthTone} />
               </Stack>
@@ -1680,12 +1684,14 @@ function CreditApplicationManagementDialog({
   onEdit: (application: CreditApplication) => void;
   onChangeStatus: (application: CreditApplication, status: number) => void;
 }) {
+  const muiTheme = useTheme();
+  const fullScreen = useMediaQuery(muiTheme.breakpoints.down('sm'));
   const [tab, setTab] = useState(0);
   useEffect(() => { if (application) setTab(0); }, [application?.id]);
 
   if (!application) return null;
 
-  return <Dialog open={!!application} onClose={onClose} fullWidth maxWidth="lg">
+  return <Dialog open={!!application} onClose={onClose} fullWidth maxWidth="lg" fullScreen={fullScreen} scroll="paper" sx={{ '& .MuiDialog-paper': { m: { xs: 0, sm: 2 }, width: { xs: '100%', sm: 'calc(100% - 32px)' } } }}>
     <DialogTitle>
       <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" gap={1.5} alignItems={{ xs: 'flex-start', sm: 'center' }}>
         <Box>
@@ -1702,7 +1708,7 @@ function CreditApplicationManagementDialog({
         <Tab label="Plantillas" />
         <Tab label="Acciones" />
       </Tabs>
-      <Box sx={{ p: 2.5 }}>
+      <Box sx={{ p: { xs: 1.5, sm: 2.5 } }}>
         {tab === 0 && <Stack spacing={2}>
           <Stack direction="row" gap={.75} flexWrap="wrap" useFlexGap>
             <CreditApplicationPendingSummary application={application} />
@@ -1738,7 +1744,7 @@ function CreditApplicationManagementDialog({
         }
       </Box>
     </DialogContent>
-    <DialogActions>
+    <DialogActions sx={{ px: { xs: 2, sm: 3 }, py: 1.5, '& .MuiButton-root': { width: { xs: '100%', sm: 'auto' } } }}>
       <Button onClick={onClose}>Cerrar</Button>
     </DialogActions>
   </Dialog>;
@@ -4588,9 +4594,14 @@ function RescheduleActivityDialog({ activity, onClose, onSave }: { activity?: Ac
 type DialogProps<TItem, TPayload> = { form: FormMode<TItem>; onClose: () => void; onSave: (payload: TPayload) => Promise<void> };
 
 function FieldGrid({ children, columns = 2 }: { children: ReactNode; columns?: 2 | 3 | 4 }) {
+  const tabletColumns = Math.min(columns, 2);
   return <Box sx={{
     display: 'grid',
-    gridTemplateColumns: { xs: '1fr', sm: `repeat(${columns}, minmax(0, 1fr))` },
+    gridTemplateColumns: {
+      xs: '1fr',
+      sm: `repeat(${tabletColumns}, minmax(0, 1fr))`,
+      lg: `repeat(${columns}, minmax(0, 1fr))`
+    },
     gap: { xs: 1.35, sm: 1.75 },
     width: '100%',
     '& > *': { minWidth: 0 }
@@ -4630,7 +4641,7 @@ function FormDialog<T extends Record<string, unknown>>({ title, open, initial, c
     }
   };
 
-  return <Dialog open={open} onClose={saving ? undefined : onClose} fullWidth maxWidth={maxWidth} fullScreen={fullScreen}>
+  return <Dialog open={open} onClose={saving ? undefined : onClose} fullWidth maxWidth={maxWidth} fullScreen={fullScreen} scroll="paper" sx={{ '& .MuiDialog-paper': { m: { xs: 0, sm: 2 }, width: { xs: '100%', sm: 'calc(100% - 32px)' } } }}>
     <DialogTitle sx={{ p: 0 }}>
       <Box sx={{ px: { xs: 2, sm: 3 }, py: 2.25, color: '#fff', background: 'linear-gradient(135deg, #155e75 0%, #0f766e 72%, #334155 100%)' }}>
         <Stack direction="row" justifyContent="space-between" alignItems="center" gap={1.5}>
@@ -4647,7 +4658,7 @@ function FormDialog<T extends Record<string, unknown>>({ title, open, initial, c
         <Stack spacing={1.75}>{error && <Alert severity="error">{error}</Alert>}{children(value, (patch) => setValue((prev) => ({ ...prev, ...patch })))}</Stack>
       </Paper>
     </DialogContent>
-    <DialogActions sx={{ px: { xs: 2, sm: 3 }, py: 1.75, flexWrap: 'wrap', borderTop: `1px solid ${uiBorder}`, bgcolor: '#fff' }}>
+    <DialogActions sx={{ px: { xs: 2, sm: 3 }, py: 1.75, flexWrap: 'wrap', borderTop: `1px solid ${uiBorder}`, bgcolor: '#fff', gap: 1, '& .MuiButton-root': { width: { xs: '100%', sm: 'auto' } } }}>
       <Button onClick={onClose} disabled={saving} variant="outlined">Cancelar</Button>
       <Button variant="contained" onClick={save} disabled={saving}>{saving ? 'Guardando...' : 'Guardar'}</Button>
     </DialogActions>
@@ -4678,14 +4689,14 @@ function ConfirmDialog({ open, title, text, onClose, onConfirm, confirmLabel = '
 }
 
 function Header({ title, action, onAction, onRefresh, secondaryAction }: { title: string; action?: string; onAction?: () => void; onRefresh?: () => void; secondaryAction?: { label: string; onClick: () => void } }) {
-  return <Box sx={{ p: { xs: 2, sm: 2.5 }, mb: .5, borderRadius: 2, color: '#fff', background: 'linear-gradient(135deg, #155e75 0%, #0f766e 58%, #334155 100%)', boxShadow: '0 18px 40px rgba(21, 94, 117, .18)' }}>
+  return <Box sx={{ p: { xs: 1.5, sm: 2.5 }, mb: .5, borderRadius: 2, color: '#fff', background: 'linear-gradient(135deg, #155e75 0%, #0f766e 58%, #334155 100%)', boxShadow: '0 18px 40px rgba(21, 94, 117, .18)' }}>
   <Stack direction={{ xs: 'column', sm: 'row' }} alignItems={{ xs: 'stretch', sm: 'center' }} justifyContent="space-between" gap={1.5}>
-    <Box sx={{ pl: 1.5, borderLeft: `4px solid ${uiAccent}`, minWidth: 0 }}>
-      <Typography variant="h4" fontWeight={900} sx={{ fontSize: { xs: 25, sm: 32 }, lineHeight: 1.12, color: '#fff', overflowWrap: 'anywhere' }}>{title}</Typography>
-      <Typography color="rgba(255,255,255,.78)" fontSize={14}>Panel de trabajo comercial</Typography>
+    <Box sx={{ pl: { xs: 1, sm: 1.5 }, borderLeft: `4px solid ${uiAccent}`, minWidth: 0 }}>
+      <Typography variant="h4" fontWeight={900} sx={{ fontSize: { xs: 22, sm: 30, md: 32 }, lineHeight: 1.12, color: '#fff', overflowWrap: 'anywhere' }}>{title}</Typography>
+      <Typography color="rgba(255,255,255,.78)" fontSize={{ xs: 12.5, sm: 14 }}>Panel de trabajo comercial</Typography>
     </Box>
-    <Stack direction={{ xs: 'column', sm: 'row' }} gap={1} sx={{ width: { xs: '100%', sm: 'auto' } }}>
-      {onRefresh && <Button fullWidth={false} variant="outlined" onClick={onRefresh} sx={{ borderColor: 'rgba(255,255,255,.42)', color: '#fff', bgcolor: 'rgba(255,255,255,.08)', '&:hover': { borderColor: '#fff', bgcolor: 'rgba(255,255,255,.14)' } }}>Actualizar</Button>}
+    <Stack direction={{ xs: 'column', sm: 'row' }} gap={1} sx={{ width: { xs: '100%', sm: 'auto' }, '& .MuiButton-root': { width: { xs: '100%', sm: 'auto' } } }}>
+      {onRefresh && <Button variant="outlined" onClick={onRefresh} sx={{ borderColor: 'rgba(255,255,255,.42)', color: '#fff', bgcolor: 'rgba(255,255,255,.08)', '&:hover': { borderColor: '#fff', bgcolor: 'rgba(255,255,255,.14)' } }}>Actualizar</Button>}
       {secondaryAction && <Button variant="outlined" onClick={secondaryAction.onClick} sx={{ borderColor: 'rgba(255,255,255,.42)', color: '#fff', bgcolor: 'rgba(255,255,255,.08)', '&:hover': { borderColor: '#fff', bgcolor: 'rgba(255,255,255,.14)' } }}>{secondaryAction.label}</Button>}
       {action && <Button variant="contained" color="secondary" startIcon={<Add />} onClick={onAction} sx={{ color: '#111827' }}>{action}</Button>}
     </Stack>
@@ -4699,7 +4710,7 @@ function EntityTable({ headers, rows, empty, compact = false }: { headers: strin
       <Typography fontWeight={900} color="#0f172a" fontSize={13}>{rows.length} registro{rows.length === 1 ? '' : 's'}</Typography>
       <Typography color="text.secondary" fontSize={12}>Desplace horizontalmente si hay mas columnas.</Typography>
     </Stack>
-    <TableContainer sx={{ width: '100%', overflowX: 'auto' }}>
+    <TableContainer className="responsiveTableScroll" sx={{ width: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
       <Table size="small" sx={{
         minWidth: tableMinWidth(headers, compact),
         tableLayout: 'fixed',
@@ -4726,7 +4737,7 @@ function EntityTable({ headers, rows, empty, compact = false }: { headers: strin
 }
 
 function ReportTable({ headers, rows, empty }: { headers: string[]; rows: ReactNode[][]; empty: string }) {
-  return <TableContainer sx={{ width: '100%', overflowX: 'auto', border: `1px solid ${uiBorder}`, borderRadius: 2, bgcolor: '#fff', boxShadow: '0 10px 28px rgba(15, 23, 42, .045)' }}>
+  return <TableContainer className="responsiveTableScroll" sx={{ width: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch', border: `1px solid ${uiBorder}`, borderRadius: 2, bgcolor: '#fff', boxShadow: '0 10px 28px rgba(15, 23, 42, .045)' }}>
     <Table size="small" sx={{ minWidth: 560, borderCollapse: 'separate', borderSpacing: 0 }}>
       <TableHead><TableRow>{headers.map((h) => <TableCell key={h} sx={{ whiteSpace: 'nowrap', fontWeight: 900, py: .9, bgcolor: '#eef6f8', color: '#155e75', textTransform: 'uppercase', fontSize: 11 }}>{h}</TableCell>)}</TableRow></TableHead>
       <TableBody>{rows.length ? rows.map((row, i) => <TableRow key={i} sx={{ bgcolor: i % 2 === 0 ? '#fff' : '#fbfdff', '&:hover': { bgcolor: '#eef9fb' } }}>{row.map((c, j) => <TableCell key={j} sx={{ verticalAlign: 'top', py: .85 }}>{c ?? '-'}</TableCell>)}</TableRow>) : <TableRow><TableCell colSpan={headers.length}><EmptyState text={empty} /></TableCell></TableRow>}</TableBody>
@@ -4778,6 +4789,8 @@ function tableColumnSx(header: string, compact = false) {
 }
 
 function AiAnalysisDialog({ analysis, phone, onClose }: { analysis?: CustomerAiAnalysis; phone?: string; onClose: () => void }) {
+  const muiTheme = useTheme();
+  const fullScreen = useMediaQuery(muiTheme.breakpoints.down('sm'));
   const [copied, setCopied] = useState(false);
   const [message, setMessage] = useState('');
   useEffect(() => {
@@ -4794,7 +4807,7 @@ function AiAnalysisDialog({ analysis, phone, onClose }: { analysis?: CustomerAiA
     setCopied(true);
     setTimeout(() => setCopied(false), 1800);
   };
-  return <Dialog open={!!analysis} onClose={onClose} fullWidth maxWidth="md">
+  return <Dialog open={!!analysis} onClose={onClose} fullWidth maxWidth="md" fullScreen={fullScreen} scroll="paper" sx={{ '& .MuiDialog-paper': { m: { xs: 0, sm: 2 }, width: { xs: '100%', sm: 'calc(100% - 32px)' } } }}>
     <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1 }}>
       Analisis comercial con IA
       <IconButton onClick={onClose}><Close /></IconButton>
@@ -4833,7 +4846,7 @@ function AiAnalysisDialog({ analysis, phone, onClose }: { analysis?: CustomerAiA
         </Box>
       </Stack>}
     </DialogContent>
-    <DialogActions sx={{ flexWrap: 'wrap' }}>
+    <DialogActions sx={{ flexWrap: 'wrap', gap: 1, '& .MuiButton-root': { width: { xs: '100%', sm: 'auto' } } }}>
       <Button onClick={onClose}>Cerrar</Button>
       <Button variant="contained" startIcon={<WhatsApp />} onClick={sendMessage} disabled={!message.trim()}>
         {phone ? 'Enviar por WhatsApp' : copied ? 'Copiado' : 'Copiar mensaje'}
