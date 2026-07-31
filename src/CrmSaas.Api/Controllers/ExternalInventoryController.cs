@@ -1,5 +1,6 @@
 using System.Data;
 using System.Text.RegularExpressions;
+using CrmSaas.Application.Abstractions;
 using CrmSaas.Application.DTOs;
 using CrmSaas.Domain.Entities;
 using CrmSaas.Infrastructure.Persistence;
@@ -13,7 +14,7 @@ namespace CrmSaas.Api.Controllers;
 [ApiController]
 [Authorize]
 [Route("api/external-inventory")]
-public sealed class ExternalInventoryController(IConfiguration configuration, CrmDbContext db) : ControllerBase
+public sealed class ExternalInventoryController(IConfiguration configuration, CrmDbContext db, ITenantContext tenantContext) : ControllerBase
 {
     private const int MaxTake = 200;
     private const string InventoryView = "[Inventariomotosycarros].[dbo].[INVENTARIO_EXISTENCIA]";
@@ -26,7 +27,13 @@ public sealed class ExternalInventoryController(IConfiguration configuration, Cr
         [FromQuery] int take = 80,
         CancellationToken cancellationToken = default)
     {
-        var rows = await ReadExternalInventoryAsync(search, warehouse, availableOnly, Math.Clamp(take, 1, MaxTake), cancellationToken);
+        var allowedWarehouses = await GetCompanyWarehousesAsync(cancellationToken);
+        if (allowedWarehouses.Count == 0)
+        {
+            return Ok(Array.Empty<ExternalInventoryItemDto>());
+        }
+
+        var rows = await ReadExternalInventoryAsync(search, warehouse, availableOnly, Math.Clamp(take, 1, MaxTake), allowedWarehouses, cancellationToken);
         var productReferences = rows
             .Select(x => x.Code)
             .Where(x => !string.IsNullOrWhiteSpace(x))
@@ -63,7 +70,13 @@ public sealed class ExternalInventoryController(IConfiguration configuration, Cr
     [HttpGet("warehouses")]
     public async Task<ActionResult<IReadOnlyCollection<object>>> Warehouses(CancellationToken cancellationToken)
     {
-        var rows = await ReadExternalInventoryAsync(null, null, false, MaxTake, cancellationToken);
+        var allowedWarehouses = await GetCompanyWarehousesAsync(cancellationToken);
+        if (allowedWarehouses.Count == 0)
+        {
+            return Ok(Array.Empty<object>());
+        }
+
+        var rows = await ReadExternalInventoryAsync(null, null, false, MaxTake, allowedWarehouses, cancellationToken);
         return Ok(rows
             .GroupBy(x => new { x.WarehouseCode, x.WarehouseName })
             .Select(x => new { code = x.Key.WarehouseCode, name = x.Key.WarehouseName, quantity = x.Sum(row => row.Quantity) })
@@ -71,7 +84,7 @@ public sealed class ExternalInventoryController(IConfiguration configuration, Cr
             .ToList());
     }
 
-    private async Task<IReadOnlyCollection<ExternalInventoryRow>> ReadExternalInventoryAsync(string? search, string? warehouse, bool availableOnly, int take, CancellationToken cancellationToken)
+    private async Task<IReadOnlyCollection<ExternalInventoryRow>> ReadExternalInventoryAsync(string? search, string? warehouse, bool availableOnly, int take, IReadOnlyCollection<string> allowedWarehouses, CancellationToken cancellationToken)
     {
         var connectionString = configuration.GetConnectionString("ExternalInventoryConnection");
         if (string.IsNullOrWhiteSpace(connectionString))
@@ -85,6 +98,7 @@ public sealed class ExternalInventoryController(IConfiguration configuration, Cr
 
         var normalizedSearch = Normalize(search);
         var normalizedWarehouse = Normalize(warehouse);
+        var warehouseParameters = allowedWarehouses.Select((_, index) => $"@AllowedWarehouse{index}").ToArray();
         var rows = new List<ExternalInventoryRow>();
         await using var connection = new SqlConnection(connectionString);
         await connection.OpenAsync(cancellationToken);
@@ -101,6 +115,7 @@ public sealed class ExternalInventoryController(IConfiguration configuration, Cr
                 NombreBodega
             FROM {InventoryView}
             WHERE (@AvailableOnly = 0 OR ISNULL(Existencias, 0) > 0)
+              AND Bodega IN ({string.Join(", ", warehouseParameters)})
               AND (@Warehouse = '' OR Bodega = @Warehouse OR NombreBodega LIKE @WarehouseLike)
               AND (
                     @Search = ''
@@ -118,6 +133,10 @@ public sealed class ExternalInventoryController(IConfiguration configuration, Cr
         command.Parameters.Add(new SqlParameter("@Like", SqlDbType.VarChar, 140) { Value = $"%{normalizedSearch}%" });
         command.Parameters.Add(new SqlParameter("@Warehouse", SqlDbType.VarChar, 40) { Value = normalizedWarehouse });
         command.Parameters.Add(new SqlParameter("@WarehouseLike", SqlDbType.VarChar, 140) { Value = $"%{normalizedWarehouse}%" });
+        foreach (var (allowedWarehouse, index) in allowedWarehouses.Select((value, index) => (value, index)))
+        {
+            command.Parameters.Add(new SqlParameter($"@AllowedWarehouse{index}", SqlDbType.VarChar, 40) { Value = allowedWarehouse });
+        }
 
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
@@ -135,6 +154,22 @@ public sealed class ExternalInventoryController(IConfiguration configuration, Cr
         return rows;
     }
 
+    private async Task<IReadOnlyCollection<string>> GetCompanyWarehousesAsync(CancellationToken cancellationToken)
+    {
+        if (tenantContext.EmpresaId is not Guid companyId)
+        {
+            return Array.Empty<string>();
+        }
+
+        var rawCodes = await db.Empresas
+            .IgnoreQueryFilters()
+            .Where(x => x.Id == companyId)
+            .Select(x => x.BodegasInventarioExterno)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return ParseWarehouseCodes(rawCodes);
+    }
+
     private static string ReadString(IDataRecord reader, string name) =>
         reader[name] == DBNull.Value ? string.Empty : Convert.ToString(reader[name])?.Trim() ?? string.Empty;
 
@@ -145,6 +180,20 @@ public sealed class ExternalInventoryController(IConfiguration configuration, Cr
     }
 
     private static string Normalize(string? value) => string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
+
+    private static IReadOnlyCollection<string> ParseWarehouseCodes(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return Array.Empty<string>();
+        }
+
+        return value
+            .Split([',', ';', '|', '\r', '\n', '\t', ' '], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(x => x.ToUpperInvariant())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
 
     private static (string? Engine, string? Chassis) ParseSerial(string? serial)
     {

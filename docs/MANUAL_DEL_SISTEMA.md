@@ -1,7 +1,7 @@
 # Manual de usuario - EnMarcha CRM
 
 Ultima actualizacion: 2026-07-31  
-Version del manual: 9.2
+Version del manual: 9.3
 Sistema: EnMarcha CRM para gestion comercial y ventas a credito  
 
 ## 1. Bienvenida
@@ -627,7 +627,7 @@ Configuracion permite administrar datos generales del sistema. Esta opcion norma
 
 ### Opciones principales
 
-- **Empresas:** crear y actualizar empresas. Al crear una empresa se puede cargar su logo.
+- **Empresas:** crear y actualizar empresas. Al crear una empresa se puede cargar su logo y definir que bodegas externas de inventario puede consultar.
 - **Sedes / puntos de venta:** registrar puntos de venta, ciudad, marca principal, logo de marca, modalidad de entrega, tasa y tiempos de tramite.
 - **Usuarios:** crear y actualizar usuarios, asignarlos a una empresa, definir su login de ingreso, correo, rol y sede cuando aplique.
 - **Roles:** administrar permisos segun el perfil del usuario.
@@ -635,6 +635,17 @@ Configuracion permite administrar datos generales del sistema. Esta opcion norma
 - **Configuracion financiera:** definir las condiciones usadas por la empresa para calcular cuotas en las cotizaciones.
 - **Perfiles de requisitos:** definir listas de documentos para empleado, independiente, pensionado, contado u otros perfiles propios de la empresa.
 - **Promociones / planes tacticos:** configurar descuentos automaticos por producto, marca, color, sede y vigencia.
+
+### Empresas
+
+1. Entre a **Configuracion**.
+2. Busque la seccion **Empresas**.
+3. Presione **Nueva empresa** o edite una empresa existente.
+4. Complete nombre, subdominio, dominio si aplica y logo.
+5. En **Bodegas de inventario permitidas**, escriba los codigos de bodega que pertenecen a esa empresa separados por coma. Ejemplo: **01,03**.
+6. Marque la empresa como activa y guarde.
+
+Este campo controla la busqueda de inventario en cotizaciones. Si una empresa no tiene bodegas configuradas, no vera existencias externas. Si tiene bodegas configuradas, solo vera articulos de esas bodegas.
 
 ### Sedes / puntos de venta
 
@@ -756,6 +767,7 @@ El sistema muestra mensajes cuando algo no puede completarse.
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-07-31 | 9.3 | Se agrega configuracion de bodegas externas por empresa para controlar que inventario puede consultar cada empresa en cotizaciones. |
 | 2026-07-31 | 9.2 | Se agrega busqueda de inventario externo en tiempo real dentro de Cotizaciones para validar disponibilidad por bodega antes de seleccionar el articulo. |
 | 2026-07-31 | 9.1 | Se reorganiza el menu lateral en grupos expandibles para Comercial, Credito, Operacion, Catalogos, Reportes y Administracion. |
 | 2026-07-31 | 9.0 | Se mejora la adaptacion del sistema en tablet y celular para menu, encabezados, formularios, tablas, modales y galerias de imagenes. |

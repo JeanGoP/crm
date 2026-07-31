@@ -32,7 +32,7 @@ public sealed class CompaniesController(CrmDbContext db, ITenantContext tenantCo
 
         var companies = await query
             .OrderBy(x => x.Nombre)
-            .Select(x => new CompanyDto(x.Id, x.Nombre, x.Subdominio, x.DominioPersonalizado, x.LogoDataUrl, x.Activa))
+            .Select(x => new CompanyDto(x.Id, x.Nombre, x.Subdominio, x.DominioPersonalizado, x.LogoDataUrl, x.BodegasInventarioExterno, x.Activa))
             .ToListAsync(cancellationToken);
         return Ok(companies);
     }
@@ -60,6 +60,7 @@ public sealed class CompaniesController(CrmDbContext db, ITenantContext tenantCo
             Subdominio = subdomain,
             DominioPersonalizado = string.IsNullOrWhiteSpace(dto.CustomDomain) ? null : dto.CustomDomain.Trim(),
             LogoDataUrl = NormalizeLogo(dto.LogoDataUrl),
+            BodegasInventarioExterno = NormalizeWarehouseCodes(dto.ExternalInventoryWarehouseCodes),
             Activa = dto.Active
         };
 
@@ -90,6 +91,7 @@ public sealed class CompaniesController(CrmDbContext db, ITenantContext tenantCo
         company.Subdominio = subdomain;
         company.DominioPersonalizado = string.IsNullOrWhiteSpace(dto.CustomDomain) ? null : dto.CustomDomain.Trim();
         company.LogoDataUrl = NormalizeLogo(dto.LogoDataUrl);
+        company.BodegasInventarioExterno = NormalizeWarehouseCodes(dto.ExternalInventoryWarehouseCodes);
         company.Activa = dto.Active;
         await db.SaveChangesAsync(cancellationToken);
 
@@ -97,7 +99,7 @@ public sealed class CompaniesController(CrmDbContext db, ITenantContext tenantCo
     }
 
     private static CompanyDto ToDto(Empresa company) =>
-        new(company.Id, company.Nombre, company.Subdominio, company.DominioPersonalizado, company.LogoDataUrl, company.Activa);
+        new(company.Id, company.Nombre, company.Subdominio, company.DominioPersonalizado, company.LogoDataUrl, company.BodegasInventarioExterno, company.Activa);
 
     private bool IsGlobalAdmin() =>
         string.Equals(User.FindFirstValue(ClaimTypes.Email), GlobalAdminEmail, StringComparison.OrdinalIgnoreCase);
@@ -124,5 +126,21 @@ public sealed class CompaniesController(CrmDbContext db, ITenantContext tenantCo
         }
 
         return logo;
+    }
+
+    private static string? NormalizeWarehouseCodes(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var codes = value
+            .Split([',', ';', '|', '\r', '\n', '\t', ' '], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(x => x.ToUpperInvariant())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        return codes.Length == 0 ? null : string.Join(",", codes);
     }
 }

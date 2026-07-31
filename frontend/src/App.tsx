@@ -269,7 +269,7 @@ const emptyCustomer = {
 const emptyLead = { firstNames: '', lastNames: '', firstName: '', middleName: '', lastName: '', secondLastName: '', email: '', phone: '', source: 'Web', rating: 1 };
 const emptyDeal = { title: '', customerId: '', stageId: '', value: 0, closeProbability: 10, estimatedCloseDate: today, status: 1 };
 const emptyActivity = { title: '', description: '', type: 1, status: 1, scheduledAt: `${today}T09:00`, reminderAt: '', customerId: '', dealId: '', assignedUserId: '' };
-const emptyCompany = { name: '', subdomain: '', customDomain: '', logoDataUrl: '', active: true };
+const emptyCompany = { name: '', subdomain: '', customDomain: '', logoDataUrl: '', externalInventoryWarehouseCodes: '', active: true };
 const emptyUser = { fullName: '', login: '', email: '', password: '', companyId: '', salesPointId: '', roles: ['Vendedor'], supervisedSalesPointIds: [] as string[] };
 const emptyProduct = { name: '', category: 'Moto', brand: '', model: '', line: '', version: '', reference: '', description: '', engineCc: '', year: '', color: '', price: 0, soat: 0, registrationFee: 0, taxes: 0, technicalSheet: '', priceValidFrom: today, active: true, salesPointPrices: [] as { salesPointId: string; price: number | ''; priceValidFrom: string; active: boolean }[] };
 const emptyCommercialInventory = { productId: '', salesPointId: '', vin: '', chassisNumber: '', engineNumber: '', plate: '', color: '', isUsed: false, mileage: '', status: 1, notes: '' };
@@ -2915,6 +2915,7 @@ function SettingsPage() {
       subdomain: payload.subdomain,
       customDomain: payload.customDomain || null,
       logoDataUrl: payload.logoDataUrl || null,
+      externalInventoryWarehouseCodes: payload.externalInventoryWarehouseCodes || null,
       active: Boolean(payload.active)
     };
     const { data } = companyForm.item
@@ -3196,13 +3197,16 @@ function SettingsPage() {
       </Stack>
       <StatusBar loading={loadingCompanies} error={companiesError} />
       <EntityTable
-        headers={['Logo', 'Nombre', 'Subdominio', 'Dominio', 'Estado', 'Acciones']}
+        headers={['Logo', 'Nombre', 'Subdominio', 'Dominio', 'Inventario', 'Estado', 'Acciones']}
         empty="No hay empresas registradas"
         rows={companies.map((c) => [
           c.logoDataUrl ? <Box component="img" src={c.logoDataUrl} alt={`Logo ${c.name}`} sx={{ width: 72, height: 36, objectFit: 'contain', display: 'block' }} /> : <Typography color="text.secondary" fontSize={13}>Sin logo</Typography>,
           c.name,
           c.subdomain,
           c.customDomain,
+          c.externalInventoryWarehouseCodes
+            ? <Chip size="small" label={c.externalInventoryWarehouseCodes} />
+            : <Typography color="text.secondary" fontSize={13}>Sin bodegas</Typography>,
           <StatusChip label={c.active ? 'Activa' : 'Inactiva'} tone={c.active ? 'success' : 'default'} />,
           <Actions onEdit={() => setCompanyForm({ open: true, item: c })} />
         ])}
@@ -3240,13 +3244,19 @@ function SettingsPage() {
 }
 
 function CompanyDialog({ form, onClose, onSave }: DialogProps<Company, typeof emptyCompany>) {
-  const initial = form.item ? { name: form.item.name, subdomain: form.item.subdomain, customDomain: form.item.customDomain ?? '', logoDataUrl: form.item.logoDataUrl ?? '', active: form.item.active } : emptyCompany;
+  const initial = form.item ? { name: form.item.name, subdomain: form.item.subdomain, customDomain: form.item.customDomain ?? '', logoDataUrl: form.item.logoDataUrl ?? '', externalInventoryWarehouseCodes: form.item.externalInventoryWarehouseCodes ?? '', active: form.item.active } : emptyCompany;
   return <FormDialog title={form.item ? 'Editar empresa' : 'Nueva empresa'} open={form.open} initial={initial} onClose={onClose} onSave={onSave}>
     {(v, set) => <>
       <CompanyLogoPicker value={v.logoDataUrl} onChange={(logoDataUrl) => set({ logoDataUrl })} />
       <TextField required label="Nombre" value={v.name} onChange={(e) => set({ name: e.target.value })} />
       <TextField required label="Subdominio" value={v.subdomain} onChange={(e) => set({ subdomain: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') })} />
       <TextField label="Dominio personalizado" value={v.customDomain} onChange={(e) => set({ customDomain: e.target.value })} />
+      <TextField
+        label="Bodegas de inventario permitidas"
+        value={v.externalInventoryWarehouseCodes}
+        onChange={(e) => set({ externalInventoryWarehouseCodes: e.target.value })}
+        helperText="Separe los codigos con coma. Ejemplo: 01,03. Si queda vacio, esta empresa no consultara inventario externo."
+      />
       <TextField select label="Estado" value={String(v.active)} onChange={(e) => set({ active: e.target.value === 'true' })}><MenuItem value="true">Activa</MenuItem><MenuItem value="false">Inactiva</MenuItem></TextField>
     </>}
   </FormDialog>;
