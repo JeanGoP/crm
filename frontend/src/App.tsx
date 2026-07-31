@@ -49,8 +49,8 @@ const deliveryPhotoMaxBytes = 1_000_000;
 const uiBorder = '#d9e2ec';
 const uiSurface = '#ffffff';
 const uiMuted = '#5b6472';
-const uiSidebar = '#0f172a';
-const uiSidebarSoft = '#17233a';
+const uiSidebar = '#ffffff';
+const uiSidebarSoft = '#f1f5f9';
 const uiPrimary = '#155e75';
 const uiAccent = '#f59e0b';
 const uiPage = '#f4f7fb';
@@ -292,23 +292,23 @@ function Layout() {
     px: 1.35,
     py: 1,
     minHeight: 42,
-    color: '#cbd5e1',
+    color: '#475569',
     borderRadius: 2,
     fontWeight: 800,
     '& .MuiButton-startIcon': { color: 'inherit', minWidth: 26 },
     '&.active': {
-      bgcolor: 'rgba(255, 255, 255, .12)',
+      bgcolor: uiPrimary,
       color: '#fff',
-      boxShadow: 'inset 3px 0 0 #f59e0b, 0 12px 28px rgba(0, 0, 0, .18)'
+      boxShadow: '0 12px 26px rgba(21, 94, 117, .22)'
     },
     '&:hover': {
-      bgcolor: 'rgba(255, 255, 255, .09)',
-      color: '#fff'
+      bgcolor: '#e8f5f7',
+      color: uiPrimary
     }
   };
   const drawerContent = <>
-    <Toolbar sx={{ px: 2.25, minHeight: 84 }}>
-      <Stack direction="row" alignItems="center" gap={1.25} sx={{ minWidth: 0 }}>
+    <Toolbar sx={{ px: 2, minHeight: 92 }}>
+      <Stack direction="row" alignItems="center" gap={1.25} sx={{ minWidth: 0, width: '100%', p: 1.25, borderRadius: 2, bgcolor: '#ecfeff', border: '1px solid #bae6fd' }}>
         <Box sx={{
           width: 42,
           height: 42,
@@ -322,17 +322,17 @@ function Layout() {
           boxShadow: '0 16px 32px rgba(14, 147, 132, .28)'
         }}>E</Box>
         <Box sx={{ minWidth: 0 }}>
-          <Typography variant="h6" fontWeight={900} color="#fff" noWrap>EnMarcha CRM</Typography>
-          <Typography variant="caption" color="#98a2b3" noWrap>Gestion comercial SaaS</Typography>
+          <Typography variant="h6" fontWeight={900} color="#0f172a" noWrap>EnMarcha CRM</Typography>
+          <Typography variant="caption" color="#64748b" noWrap>Gestion comercial SaaS</Typography>
         </Box>
       </Stack>
     </Toolbar>
-    <Divider sx={{ borderColor: 'rgba(255, 255, 255, .08)' }} />
+    <Divider sx={{ borderColor: '#e2e8f0' }} />
     <Stack sx={{ px: 1.25, py: 1.5, flex: 1, overflowY: 'auto' }}>
       {nav.map((item) => item.locked ? (
         <Tooltip key={item.to} title="Disponible en la siguiente fase de la demostracion" placement="right">
           <span>
-            <Button disabled startIcon={item.icon} sx={{ ...navButtonSx, opacity: .36, color: '#98a2b3' }}>
+            <Button disabled startIcon={item.icon} sx={{ ...navButtonSx, opacity: .42, color: '#94a3b8' }}>
               {item.label}
             </Button>
           </span>
@@ -343,10 +343,10 @@ function Layout() {
         </Button>
       ))}
     </Stack>
-    <Box sx={{ m: 1.5, p: 1.5, borderRadius: 2, bgcolor: uiSidebarSoft, border: '1px solid rgba(255, 255, 255, .09)', boxShadow: '0 16px 32px rgba(0, 0, 0, .16)' }}>
-      <Typography variant="caption" color="#98a2b3">Sesion activa</Typography>
-      <Typography color="#fff" fontWeight={800} fontSize={13} noWrap>{user?.fullName || user?.email || 'Usuario'}</Typography>
-      <Typography color="#94a3b8" fontSize={12} noWrap>{user?.roles.join(', ')}</Typography>
+    <Box sx={{ m: 1.5, p: 1.5, borderRadius: 2, bgcolor: uiSidebarSoft, border: '1px solid #e2e8f0' }}>
+      <Typography variant="caption" color="#64748b">Sesion activa</Typography>
+      <Typography color="#0f172a" fontWeight={800} fontSize={13} noWrap>{user?.fullName || user?.email || 'Usuario'}</Typography>
+      <Typography color="#64748b" fontSize={12} noWrap>{user?.roles.join(', ')}</Typography>
     </Box>
   </>;
   return (
@@ -356,12 +356,12 @@ function Layout() {
         open={isDesktop || mobileOpen}
         onClose={closeMobileNav}
         ModalProps={{ keepMounted: true }}
-        PaperProps={{ sx: { width: drawerWidth, borderRight: 0, bgcolor: uiSidebar, color: '#fff', backgroundImage: 'linear-gradient(180deg, #0f172a 0%, #111827 54%, #0b1120 100%)' } }}
+        PaperProps={{ sx: { width: drawerWidth, borderRight: `1px solid ${uiBorder}`, bgcolor: uiSidebar, color: '#0f172a' } }}
       >
         {drawerContent}
       </Drawer>
       <Box sx={{ flex: 1, minWidth: 0, ml: { xs: 0, md: `${drawerWidth}px` } }}>
-        <AppBar position="sticky" color="inherit" elevation={0} sx={{ borderBottom: `1px solid ${uiBorder}`, bgcolor: 'rgba(244, 247, 251, .88)', backdropFilter: 'blur(16px)' }}>
+        <AppBar position="sticky" color="inherit" elevation={0} sx={{ borderBottom: `1px solid ${uiBorder}`, bgcolor: 'rgba(255, 255, 255, .92)', backdropFilter: 'blur(16px)' }}>
           <Toolbar sx={{ justifyContent: 'space-between', gap: 1.5, minHeight: 72, px: { xs: 1.5, sm: 2.5, md: 3 } }}>
             <Stack direction="row" alignItems="center" gap={1.25} sx={{ minWidth: 0 }}>
               {!isDesktop && <IconButton aria-label="Abrir menu" edge="start" onClick={() => setMobileOpen(true)}><Menu /></IconButton>}
@@ -442,25 +442,34 @@ function LoginPage() {
   return (
     <Box className="loginShell">
       <Paper className="loginPanel">
-        <Stack direction="row" alignItems="center" gap={1.25} sx={{ mb: 3 }}>
+        <Box className="loginBrand">
           <Box sx={{
-            width: 44,
-            height: 44,
+            width: 52,
+            height: 52,
             borderRadius: 2.5,
             display: 'grid',
             placeItems: 'center',
-            background: 'linear-gradient(135deg, #155e75 0%, #0e9384 100%)',
-            color: '#fff',
+            bgcolor: '#fff',
+            color: uiPrimary,
             fontWeight: 900,
-            fontSize: 22,
-            boxShadow: '0 16px 34px rgba(21, 94, 117, .28)'
+            fontSize: 28,
+            boxShadow: '0 16px 34px rgba(0, 0, 0, .18)'
           }}>E</Box>
           <Box>
-            <Typography variant="h4" fontWeight={900} sx={{ lineHeight: 1 }}>EnMarcha CRM</Typography>
-            <Typography color="text.secondary">Gestion comercial multiempresa</Typography>
+            <Typography variant="h3" fontWeight={900} sx={{ lineHeight: 1.02, color: '#fff', fontSize: { xs: 34, sm: 40 } }}>EnMarcha CRM</Typography>
+            <Typography sx={{ color: 'rgba(255,255,255,.78)', mt: 1 }}>Gestion comercial, credito y seguimiento en una sola plataforma.</Typography>
           </Box>
-        </Stack>
-        <Stack spacing={2}>
+          <Stack direction="row" gap={1} flexWrap="wrap">
+            <Chip label="Multiempresa" sx={{ bgcolor: 'rgba(255,255,255,.14)', color: '#fff', border: '1px solid rgba(255,255,255,.24)' }} />
+            <Chip label="Ventas" sx={{ bgcolor: 'rgba(255,255,255,.14)', color: '#fff', border: '1px solid rgba(255,255,255,.24)' }} />
+            <Chip label="Credito" sx={{ bgcolor: 'rgba(255,255,255,.14)', color: '#fff', border: '1px solid rgba(255,255,255,.24)' }} />
+          </Stack>
+        </Box>
+        <Stack spacing={2.2} className="loginForm">
+          <Box>
+            <Typography variant="h5" fontWeight={900}>Ingresar</Typography>
+            <Typography color="text.secondary" fontSize={14}>Use su usuario asignado para continuar.</Typography>
+          </Box>
           <TextField label="Usuario" value={loginName} onChange={(e) => setLoginName(e.target.value)} />
           <TextField label="Contrasena" type="password" value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && login()} />
           {error && <Alert severity="error">{error}</Alert>}
@@ -4442,19 +4451,19 @@ function ConfirmDialog({ open, title, text, onClose, onConfirm, confirmLabel = '
 }
 
 function Header({ title, action, onAction, onRefresh, secondaryAction }: { title: string; action?: string; onAction?: () => void; onRefresh?: () => void; secondaryAction?: { label: string; onClick: () => void } }) {
-  return <Paper elevation={0} sx={{ p: { xs: 1.75, sm: 2.25 }, mb: .5, border: `1px solid ${uiBorder}`, boxShadow: '0 10px 30px rgba(15, 23, 42, .045)' }}>
+  return <Box sx={{ p: { xs: 2, sm: 2.5 }, mb: .5, borderRadius: 2, color: '#fff', background: 'linear-gradient(135deg, #155e75 0%, #0f766e 58%, #334155 100%)', boxShadow: '0 18px 40px rgba(21, 94, 117, .18)' }}>
   <Stack direction={{ xs: 'column', sm: 'row' }} alignItems={{ xs: 'stretch', sm: 'center' }} justifyContent="space-between" gap={1.5}>
     <Box sx={{ pl: 1.5, borderLeft: `4px solid ${uiAccent}`, minWidth: 0 }}>
-      <Typography variant="h4" fontWeight={900} sx={{ fontSize: { xs: 25, sm: 32 }, lineHeight: 1.12, color: '#0f172a', overflowWrap: 'anywhere' }}>{title}</Typography>
-      <Typography color="text.secondary" fontSize={14}>Panel de trabajo comercial</Typography>
+      <Typography variant="h4" fontWeight={900} sx={{ fontSize: { xs: 25, sm: 32 }, lineHeight: 1.12, color: '#fff', overflowWrap: 'anywhere' }}>{title}</Typography>
+      <Typography color="rgba(255,255,255,.78)" fontSize={14}>Panel de trabajo comercial</Typography>
     </Box>
     <Stack direction={{ xs: 'column', sm: 'row' }} gap={1} sx={{ width: { xs: '100%', sm: 'auto' } }}>
-      {onRefresh && <Button fullWidth={false} variant="outlined" onClick={onRefresh}>Actualizar</Button>}
-      {secondaryAction && <Button variant="outlined" onClick={secondaryAction.onClick}>{secondaryAction.label}</Button>}
-      {action && <Button variant="contained" startIcon={<Add />} onClick={onAction}>{action}</Button>}
+      {onRefresh && <Button fullWidth={false} variant="outlined" onClick={onRefresh} sx={{ borderColor: 'rgba(255,255,255,.42)', color: '#fff', bgcolor: 'rgba(255,255,255,.08)', '&:hover': { borderColor: '#fff', bgcolor: 'rgba(255,255,255,.14)' } }}>Actualizar</Button>}
+      {secondaryAction && <Button variant="outlined" onClick={secondaryAction.onClick} sx={{ borderColor: 'rgba(255,255,255,.42)', color: '#fff', bgcolor: 'rgba(255,255,255,.08)', '&:hover': { borderColor: '#fff', bgcolor: 'rgba(255,255,255,.14)' } }}>{secondaryAction.label}</Button>}
+      {action && <Button variant="contained" color="secondary" startIcon={<Add />} onClick={onAction} sx={{ color: '#111827' }}>{action}</Button>}
     </Stack>
   </Stack>
-  </Paper>;
+  </Box>;
 }
 
 function EntityTable({ headers, rows, empty, compact = false }: { headers: string[]; rows: ReactNode[][]; empty: string; compact?: boolean }) {

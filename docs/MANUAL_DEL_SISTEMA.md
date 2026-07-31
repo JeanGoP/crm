@@ -1,7 +1,7 @@
 # Manual de usuario - EnMarcha CRM
 
 Ultima actualizacion: 2026-07-31  
-Version del manual: 8.4
+Version del manual: 8.5
 Sistema: EnMarcha CRM para gestion comercial y ventas a credito  
 
 ## 1. Bienvenida
@@ -756,6 +756,7 @@ El sistema muestra mensajes cuando algo no puede completarse.
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-07-31 | 8.5 | Se refuerza el rediseño visual con menu lateral claro, encabezados de modulo con banda de color y pantalla de ingreso renovada. |
 | 2026-07-31 | 8.4 | Se moderniza el layout general del frontend con nuevo estilo visual para menu lateral, encabezados, tablas, tarjetas y pantalla de ingreso. |
 | 2026-07-31 | 8.3 | Se actualiza el ingreso por Usuario/Login y la administracion de usuarios permite editar login, correo, roles, empresa y sedes segun permisos. |
 | 2026-07-16 | 8.2 | Se agrega carga masiva de productos desde Excel para administradores, con descarga de plantilla y validacion por fila. |
