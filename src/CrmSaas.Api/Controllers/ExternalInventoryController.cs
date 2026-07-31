@@ -19,6 +19,7 @@ public sealed class ExternalInventoryController(IConfiguration configuration, Cr
     private const int MaxTake = 200;
     private const string InventorySchema = "dbo";
     private const string InventoryView = "INVENTARIO_EXISTENCIA";
+    private const string WarehouseTable = "Bodega";
 
     [HttpGet]
     public async Task<ActionResult<IReadOnlyCollection<ExternalInventoryItemDto>>> Get(
@@ -83,6 +84,21 @@ public sealed class ExternalInventoryController(IConfiguration configuration, Cr
             .Select(x => new { code = x.Key.WarehouseCode, name = x.Key.WarehouseName, quantity = x.Sum(row => row.Quantity) })
             .OrderBy(x => x.name)
             .ToList());
+    }
+
+    [HttpGet("warehouse-catalog")]
+    [Authorize(Roles = "Administrador")]
+    public async Task<ActionResult<IReadOnlyCollection<ExternalInventoryWarehouseDto>>> WarehouseCatalog(
+        [FromQuery] string databaseName,
+        CancellationToken cancellationToken)
+    {
+        var normalizedDatabase = NormalizeDatabaseName(databaseName);
+        if (string.IsNullOrWhiteSpace(normalizedDatabase))
+        {
+            return BadRequest(new { detail = "Digite la base de datos de inventario." });
+        }
+
+        return Ok(await ReadWarehouseCatalogAsync(normalizedDatabase, cancellationToken));
     }
 
     private async Task<IReadOnlyCollection<ExternalInventoryRow>> ReadExternalInventoryAsync(string? search, string? warehouse, bool availableOnly, int take, ExternalInventoryConfig inventoryConfig, CancellationToken cancellationToken)
@@ -156,6 +172,47 @@ public sealed class ExternalInventoryController(IConfiguration configuration, Cr
         return rows;
     }
 
+    private async Task<IReadOnlyCollection<ExternalInventoryWarehouseDto>> ReadWarehouseCatalogAsync(string databaseName, CancellationToken cancellationToken)
+    {
+        var connectionString = configuration.GetConnectionString("ExternalInventoryConnection");
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            connectionString = configuration.GetConnectionString("DefaultConnection");
+        }
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            throw new InvalidOperationException("No hay cadena de conexion configurada para el inventario externo.");
+        }
+
+        var warehouses = new List<ExternalInventoryWarehouseDto>();
+        await using var connection = new SqlConnection(connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandType = CommandType.Text;
+        command.CommandText = $"""
+            SELECT TOP (500)
+                Codigo,
+                Nombre
+            FROM {BuildWarehouseTableName(databaseName)}
+            WHERE Codigo IS NOT NULL
+            ORDER BY Nombre, Codigo;
+            """;
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            var code = ReadString(reader, "Codigo");
+            if (string.IsNullOrWhiteSpace(code))
+            {
+                continue;
+            }
+
+            warehouses.Add(new ExternalInventoryWarehouseDto(code, ReadString(reader, "Nombre")));
+        }
+
+        return warehouses;
+    }
+
     private async Task<ExternalInventoryConfig> GetCompanyInventoryConfigAsync(CancellationToken cancellationToken)
     {
         if (tenantContext.EmpresaId is not Guid companyId)
@@ -194,6 +251,17 @@ public sealed class ExternalInventoryController(IConfiguration configuration, Cr
         }
 
         return $"[{normalizedDatabase}].[{InventorySchema}].[{InventoryView}]";
+    }
+
+    private static string BuildWarehouseTableName(string? databaseName)
+    {
+        var normalizedDatabase = NormalizeDatabaseName(databaseName);
+        if (string.IsNullOrWhiteSpace(normalizedDatabase))
+        {
+            throw new InvalidOperationException("No hay base de datos de inventario configurada para consultar bodegas.");
+        }
+
+        return $"[{normalizedDatabase}].[{InventorySchema}].[{WarehouseTable}]";
     }
 
     private static string? NormalizeDatabaseName(string? value)

@@ -37,7 +37,7 @@ import ChevronRight from '@mui/icons-material/ChevronRight';
 import { AxiosError } from 'axios';
 import { api } from './api';
 import { useAuthStore } from './store';
-import { Activity, ColombianIdentityLookup, CollectionOrder, CommercialInventory, CommercialInventorySummary, CommercialReports, Company, CreditApplication, CreditDocument, Customer, Customer360, CustomerAiAnalysis, CustomerTimelineItem, Dashboard, Deal, DealStage, ExternalInventoryItem, FinancialSettings, Lead, MotorcycleDelivery, Procedure, Product, ProductCategory, ProductPhoto, Promotion, Quote, QuoteSimulationResult, RequirementProfile, SalesPoint, User } from './types';
+import { Activity, ColombianIdentityLookup, CollectionOrder, CommercialInventory, CommercialInventorySummary, CommercialReports, Company, CreditApplication, CreditDocument, Customer, Customer360, CustomerAiAnalysis, CustomerTimelineItem, Dashboard, Deal, DealStage, ExternalInventoryItem, ExternalInventoryWarehouse, FinancialSettings, Lead, MotorcycleDelivery, Procedure, Product, ProductCategory, ProductPhoto, Promotion, Quote, QuoteSimulationResult, RequirementProfile, SalesPoint, User } from './types';
 
 const drawerWidth = 272;
 const today = new Date().toISOString().slice(0, 10);
@@ -3246,27 +3246,104 @@ function SettingsPage() {
 }
 
 function CompanyDialog({ form, onClose, onSave }: DialogProps<Company, typeof emptyCompany>) {
+  const [warehouseOptions, setWarehouseOptions] = useState<ExternalInventoryWarehouse[]>([]);
+  const [warehouseLoading, setWarehouseLoading] = useState(false);
+  const [warehouseError, setWarehouseError] = useState('');
   const initial = form.item ? { name: form.item.name, subdomain: form.item.subdomain, customDomain: form.item.customDomain ?? '', logoDataUrl: form.item.logoDataUrl ?? '', externalInventoryDatabaseName: form.item.externalInventoryDatabaseName ?? '', externalInventoryWarehouseCodes: form.item.externalInventoryWarehouseCodes ?? '', active: form.item.active } : emptyCompany;
+
+  useEffect(() => {
+    if (!form.open) {
+      setWarehouseOptions([]);
+      setWarehouseError('');
+      setWarehouseLoading(false);
+    }
+  }, [form.open]);
+
   return <FormDialog title={form.item ? 'Editar empresa' : 'Nueva empresa'} open={form.open} initial={initial} onClose={onClose} onSave={onSave}>
-    {(v, set) => <>
-      <CompanyLogoPicker value={v.logoDataUrl} onChange={(logoDataUrl) => set({ logoDataUrl })} />
-      <TextField required label="Nombre" value={v.name} onChange={(e) => set({ name: e.target.value })} />
-      <TextField required label="Subdominio" value={v.subdomain} onChange={(e) => set({ subdomain: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') })} />
-      <TextField label="Dominio personalizado" value={v.customDomain} onChange={(e) => set({ customDomain: e.target.value })} />
-      <TextField
-        label="Base de datos de inventario"
-        value={v.externalInventoryDatabaseName}
-        onChange={(e) => set({ externalInventoryDatabaseName: e.target.value.replace(/[^a-zA-Z0-9_]/g, '') })}
-        helperText="Nombre de la base SQL donde esta la vista dbo.INVENTARIO_EXISTENCIA. Ejemplo: Inventariomotosycarros."
-      />
-      <TextField
-        label="Bodegas de inventario permitidas"
-        value={v.externalInventoryWarehouseCodes}
-        onChange={(e) => set({ externalInventoryWarehouseCodes: e.target.value })}
-        helperText="Separe los codigos con coma. Ejemplo: 01,03. Si queda vacio, esta empresa no consultara inventario externo."
-      />
-      <TextField select label="Estado" value={String(v.active)} onChange={(e) => set({ active: e.target.value === 'true' })}><MenuItem value="true">Activa</MenuItem><MenuItem value="false">Inactiva</MenuItem></TextField>
-    </>}
+    {(v, set) => {
+      const selectedWarehouseCodes = parseDelimitedCodes(v.externalInventoryWarehouseCodes);
+      const loadWarehouses = async () => {
+        if (!v.externalInventoryDatabaseName.trim()) {
+          setWarehouseError('Digite primero la base de datos de inventario.');
+          setWarehouseOptions([]);
+          return;
+        }
+
+        setWarehouseLoading(true);
+        setWarehouseError('');
+        try {
+          const { data } = await api.get<ExternalInventoryWarehouse[]>('/api/external-inventory/warehouse-catalog', {
+            params: { databaseName: v.externalInventoryDatabaseName.trim() }
+          });
+          setWarehouseOptions(data);
+          if (!data.length) {
+            setWarehouseError('No se encontraron bodegas en la tabla Bodega.');
+          }
+        } catch (err) {
+          setWarehouseOptions([]);
+          setWarehouseError(apiError(err));
+        } finally {
+          setWarehouseLoading(false);
+        }
+      };
+      const toggleWarehouse = (code: string) => {
+        const normalized = code.trim().toUpperCase();
+        const next = selectedWarehouseCodes.includes(normalized)
+          ? selectedWarehouseCodes.filter((item) => item !== normalized)
+          : [...selectedWarehouseCodes, normalized];
+        set({ externalInventoryWarehouseCodes: next.join(',') });
+      };
+
+      return <>
+        <CompanyLogoPicker value={v.logoDataUrl} onChange={(logoDataUrl) => set({ logoDataUrl })} />
+        <TextField required label="Nombre" value={v.name} onChange={(e) => set({ name: e.target.value })} />
+        <TextField required label="Subdominio" value={v.subdomain} onChange={(e) => set({ subdomain: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') })} />
+        <TextField label="Dominio personalizado" value={v.customDomain} onChange={(e) => set({ customDomain: e.target.value })} />
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25} alignItems={{ xs: 'stretch', sm: 'flex-start' }}>
+          <TextField
+            fullWidth
+            label="Base de datos de inventario"
+            value={v.externalInventoryDatabaseName}
+            onChange={(e) => {
+              set({ externalInventoryDatabaseName: e.target.value.replace(/[^a-zA-Z0-9_]/g, '') });
+              setWarehouseOptions([]);
+              setWarehouseError('');
+            }}
+            helperText="Base SQL donde estan dbo.Bodega y dbo.INVENTARIO_EXISTENCIA. Ejemplo: Inventariomotosycarros."
+          />
+          <Button variant="outlined" disabled={warehouseLoading || !v.externalInventoryDatabaseName.trim()} onClick={() => void loadWarehouses()}>
+            {warehouseLoading ? 'Cargando...' : 'Cargar bodegas'}
+          </Button>
+        </Stack>
+        {warehouseLoading && <LinearProgress />}
+        {warehouseError && <Alert severity="warning">{warehouseError}</Alert>}
+        {!!warehouseOptions.length && <Paper variant="outlined" sx={{ p: 1.5, bgcolor: '#fbfdff' }}>
+          <Stack spacing={1}>
+            <Typography fontWeight={900}>Bodegas disponibles</Typography>
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))' }, gap: 0.75, maxHeight: 220, overflow: 'auto' }}>
+              {warehouseOptions.map((warehouse) => {
+                const code = warehouse.code.trim().toUpperCase();
+                return <FormControlLabel
+                  key={code}
+                  control={<Checkbox checked={selectedWarehouseCodes.includes(code)} onChange={() => toggleWarehouse(code)} />}
+                  label={<Box>
+                    <Typography fontWeight={800} fontSize={13}>{code}</Typography>
+                    <Typography variant="caption" color="text.secondary">{warehouse.name || 'Sin nombre'}</Typography>
+                  </Box>}
+                />;
+              })}
+            </Box>
+          </Stack>
+        </Paper>}
+        <TextField
+          label="Bodegas de inventario permitidas"
+          value={v.externalInventoryWarehouseCodes}
+          onChange={(e) => set({ externalInventoryWarehouseCodes: e.target.value })}
+          helperText="Se llena al seleccionar bodegas. Tambien puede editarlo manualmente separando codigos con coma."
+        />
+        <TextField select label="Estado" value={String(v.active)} onChange={(e) => set({ active: e.target.value === 'true' })}><MenuItem value="true">Activa</MenuItem><MenuItem value="false">Inactiva</MenuItem></TextField>
+      </>;
+    }}
   </FormDialog>;
 }
 
@@ -5172,6 +5249,14 @@ function apiError(err: unknown) {
   if (axiosError.response?.data?.title) return axiosError.response.data.title;
   if (axiosError.message) return axiosError.message;
   return 'Ocurrio un error inesperado.';
+}
+
+function parseDelimitedCodes(value?: string) {
+  if (!value?.trim()) return [];
+  return Array.from(new Set(value
+    .split(/[,\s;|]+/)
+    .map((item) => item.trim().toUpperCase())
+    .filter(Boolean)));
 }
 
 function toInputDateTime(value: string) {

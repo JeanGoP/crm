@@ -163,6 +163,11 @@ export interface ExternalInventoryItem {
   isInCatalog: boolean;
 }
 
+export interface ExternalInventoryWarehouse {
+  code: string;
+  name: string;
+}
+
 export interface CommercialInventory {
   id: string;
   productId: string;

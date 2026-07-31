@@ -1,7 +1,7 @@
 # Manual de usuario - EnMarcha CRM
 
 Ultima actualizacion: 2026-07-31  
-Version del manual: 9.4
+Version del manual: 9.5
 Sistema: EnMarcha CRM para gestion comercial y ventas a credito  
 
 ## 1. Bienvenida
@@ -643,10 +643,11 @@ Configuracion permite administrar datos generales del sistema. Esta opcion norma
 3. Presione **Nueva empresa** o edite una empresa existente.
 4. Complete nombre, subdominio, dominio si aplica y logo.
 5. En **Base de datos de inventario**, escriba el nombre de la base SQL donde esta la vista de inventario. Ejemplo: **Inventariomotosycarros**.
-6. En **Bodegas de inventario permitidas**, escriba los codigos de bodega que pertenecen a esa empresa separados por coma. Ejemplo: **01,03**.
-7. Marque la empresa como activa y guarde.
+6. Presione **Cargar bodegas** para traer las bodegas registradas en la tabla **Bodega** de esa base de datos.
+7. Seleccione las bodegas que pertenecen a la empresa. El sistema guarda sus codigos automaticamente.
+8. Marque la empresa como activa y guarde.
 
-Estos campos controlan la busqueda de inventario en cotizaciones. Si una empresa no tiene base de datos o bodegas configuradas, no vera existencias externas. Si tiene ambos datos configurados, solo vera articulos de esas bodegas dentro de la base indicada para esa empresa.
+Estos campos controlan la busqueda de inventario en cotizaciones. Si una empresa no tiene base de datos o bodegas configuradas, no vera existencias externas. Si tiene ambos datos configurados, solo vera articulos de esas bodegas dentro de la base indicada para esa empresa. La seleccion desde la tabla **Bodega** evita errores al escribir codigos manualmente.
 
 ### Sedes / puntos de venta
 
@@ -768,6 +769,7 @@ El sistema muestra mensajes cuando algo no puede completarse.
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-07-31 | 9.5 | Se agrega carga de bodegas desde la tabla Bodega de la base de inventario para seleccionar codigos correctos en la empresa. |
 | 2026-07-31 | 9.4 | Se agrega configuracion de base de datos de inventario por empresa, ademas de bodegas permitidas, para separar inventarios entre empresas. |
 | 2026-07-31 | 9.3 | Se agrega configuracion de bodegas externas por empresa para controlar que inventario puede consultar cada empresa en cotizaciones. |
 | 2026-07-31 | 9.2 | Se agrega busqueda de inventario externo en tiempo real dentro de Cotizaciones para validar disponibilidad por bodega antes de seleccionar el articulo. |
