@@ -37,7 +37,7 @@ import { api } from './api';
 import { useAuthStore } from './store';
 import { Activity, ColombianIdentityLookup, CollectionOrder, CommercialInventory, CommercialInventorySummary, CommercialReports, Company, CreditApplication, CreditDocument, Customer, Customer360, CustomerAiAnalysis, CustomerTimelineItem, Dashboard, Deal, DealStage, FinancialSettings, Lead, MotorcycleDelivery, Procedure, Product, ProductCategory, ProductPhoto, Promotion, Quote, QuoteSimulationResult, RequirementProfile, SalesPoint, User } from './types';
 
-const drawerWidth = 248;
+const drawerWidth = 272;
 const today = new Date().toISOString().slice(0, 10);
 const currentMonthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
 const simitUrl = 'https://www.fcm.org.co/simit/#/home-public';
@@ -46,40 +46,51 @@ const companyLogoWidth = 320;
 const companyLogoHeight = 160;
 const companyLogoMaxBytes = 1_000_000;
 const deliveryPhotoMaxBytes = 1_000_000;
-const uiBorder = '#eaecf0';
+const uiBorder = '#d9e2ec';
 const uiSurface = '#ffffff';
-const uiMuted = '#667085';
-const uiSidebar = '#101828';
-const uiSidebarSoft = '#1d2939';
-const uiPrimary = '#465fff';
+const uiMuted = '#5b6472';
+const uiSidebar = '#0f172a';
+const uiSidebarSoft = '#17233a';
+const uiPrimary = '#155e75';
+const uiAccent = '#f59e0b';
+const uiPage = '#f4f7fb';
 
 const theme = createTheme({
   palette: {
     mode: 'light',
-    primary: { main: uiPrimary, dark: '#3641d8' },
-    secondary: { main: '#0e9384' },
-    background: { default: '#f9fafb', paper: uiSurface },
+    primary: { main: uiPrimary, dark: '#0e4a5f' },
+    secondary: { main: uiAccent, dark: '#b45309' },
+    background: { default: uiPage, paper: uiSurface },
     text: { primary: '#101828', secondary: uiMuted },
     divider: uiBorder,
     success: { main: '#15803d' },
     warning: { main: '#b45309' }
   },
-  shape: { borderRadius: 12 },
-  typography: { fontFamily: '"Inter", "Segoe UI", Arial, sans-serif', button: { textTransform: 'none', fontWeight: 800 } },
+  shape: { borderRadius: 8 },
+  typography: {
+    fontFamily: '"Inter", "Segoe UI", Arial, sans-serif',
+    button: { textTransform: 'none', fontWeight: 800 },
+    h4: { letterSpacing: 0 },
+    h5: { letterSpacing: 0 },
+    h6: { letterSpacing: 0 }
+  },
   components: {
     MuiCard: {
       styleOverrides: {
         root: {
           border: `1px solid ${uiBorder}`,
-          boxShadow: '0 1px 3px rgba(16, 24, 40, .08)',
-          backgroundImage: 'none'
+          borderRadius: 8,
+          boxShadow: '0 10px 30px rgba(15, 23, 42, .055)',
+          backgroundImage: 'none',
+          overflow: 'hidden'
         }
       }
     },
     MuiPaper: {
       styleOverrides: {
         root: {
-          backgroundImage: 'none'
+          backgroundImage: 'none',
+          borderRadius: 8
         }
       }
     },
@@ -90,13 +101,23 @@ const theme = createTheme({
           minHeight: 38
         },
         containedPrimary: {
-          boxShadow: '0 8px 18px rgba(70, 95, 255, .22)'
+          boxShadow: '0 10px 22px rgba(21, 94, 117, .22)'
+        },
+        outlined: {
+          backgroundColor: '#fff'
         }
       }
     },
     MuiTextField: {
       defaultProps: {
         size: 'small'
+      },
+      styleOverrides: {
+        root: {
+          '& .MuiOutlinedInput-root': {
+            backgroundColor: '#fff'
+          }
+        }
       }
     },
     MuiTableCell: {
@@ -105,8 +126,8 @@ const theme = createTheme({
           borderBottom: `1px solid ${uiBorder}`
         },
         head: {
-          color: '#344054',
-          backgroundColor: '#f9fafb',
+          color: '#243041',
+          backgroundColor: '#f7fafc',
           fontSize: 13
         }
       }
@@ -114,7 +135,7 @@ const theme = createTheme({
     MuiDialog: {
       styleOverrides: {
         paper: {
-          borderRadius: 16
+          borderRadius: 12
         }
       }
     },
@@ -266,35 +287,39 @@ function Layout() {
   const closeMobileNav = () => setMobileOpen(false);
   const navButtonSx = {
     justifyContent: 'flex-start',
-    my: .25,
+    my: .18,
     width: '100%',
-    px: 1.5,
-    py: 1.05,
-    color: '#d0d5dd',
-    '& .MuiButton-startIcon': { color: 'inherit' },
+    px: 1.35,
+    py: 1,
+    minHeight: 42,
+    color: '#cbd5e1',
+    borderRadius: 2,
+    fontWeight: 800,
+    '& .MuiButton-startIcon': { color: 'inherit', minWidth: 26 },
     '&.active': {
-      bgcolor: uiPrimary,
+      bgcolor: 'rgba(255, 255, 255, .12)',
       color: '#fff',
-      boxShadow: '0 10px 24px rgba(70, 95, 255, .28)'
+      boxShadow: 'inset 3px 0 0 #f59e0b, 0 12px 28px rgba(0, 0, 0, .18)'
     },
     '&:hover': {
-      bgcolor: 'rgba(255, 255, 255, .08)',
+      bgcolor: 'rgba(255, 255, 255, .09)',
       color: '#fff'
     }
   };
   const drawerContent = <>
-    <Toolbar sx={{ px: 2.5, minHeight: 76 }}>
+    <Toolbar sx={{ px: 2.25, minHeight: 84 }}>
       <Stack direction="row" alignItems="center" gap={1.25} sx={{ minWidth: 0 }}>
         <Box sx={{
-          width: 38,
-          height: 38,
-          borderRadius: 2,
+          width: 42,
+          height: 42,
+          borderRadius: 2.2,
           display: 'grid',
           placeItems: 'center',
-          bgcolor: uiPrimary,
+          background: 'linear-gradient(135deg, #155e75 0%, #0e9384 100%)',
           color: '#fff',
           fontWeight: 900,
-          boxShadow: '0 12px 28px rgba(70, 95, 255, .32)'
+          fontSize: 20,
+          boxShadow: '0 16px 32px rgba(14, 147, 132, .28)'
         }}>E</Box>
         <Box sx={{ minWidth: 0 }}>
           <Typography variant="h6" fontWeight={900} color="#fff" noWrap>EnMarcha CRM</Typography>
@@ -303,7 +328,7 @@ function Layout() {
       </Stack>
     </Toolbar>
     <Divider sx={{ borderColor: 'rgba(255, 255, 255, .08)' }} />
-    <Stack sx={{ p: 1.25, flex: 1 }}>
+    <Stack sx={{ px: 1.25, py: 1.5, flex: 1, overflowY: 'auto' }}>
       {nav.map((item) => item.locked ? (
         <Tooltip key={item.to} title="Disponible en la siguiente fase de la demostracion" placement="right">
           <span>
@@ -318,9 +343,10 @@ function Layout() {
         </Button>
       ))}
     </Stack>
-    <Box sx={{ m: 1.5, p: 1.5, borderRadius: 3, bgcolor: uiSidebarSoft, border: '1px solid rgba(255, 255, 255, .08)' }}>
+    <Box sx={{ m: 1.5, p: 1.5, borderRadius: 2, bgcolor: uiSidebarSoft, border: '1px solid rgba(255, 255, 255, .09)', boxShadow: '0 16px 32px rgba(0, 0, 0, .16)' }}>
       <Typography variant="caption" color="#98a2b3">Sesion activa</Typography>
       <Typography color="#fff" fontWeight={800} fontSize={13} noWrap>{user?.fullName || user?.email || 'Usuario'}</Typography>
+      <Typography color="#94a3b8" fontSize={12} noWrap>{user?.roles.join(', ')}</Typography>
     </Box>
   </>;
   return (
@@ -330,32 +356,32 @@ function Layout() {
         open={isDesktop || mobileOpen}
         onClose={closeMobileNav}
         ModalProps={{ keepMounted: true }}
-        PaperProps={{ sx: { width: drawerWidth, borderRight: 0, bgcolor: uiSidebar, color: '#fff' } }}
+        PaperProps={{ sx: { width: drawerWidth, borderRight: 0, bgcolor: uiSidebar, color: '#fff', backgroundImage: 'linear-gradient(180deg, #0f172a 0%, #111827 54%, #0b1120 100%)' } }}
       >
         {drawerContent}
       </Drawer>
       <Box sx={{ flex: 1, minWidth: 0, ml: { xs: 0, md: `${drawerWidth}px` } }}>
-        <AppBar position="sticky" color="inherit" elevation={0} sx={{ borderBottom: `1px solid ${uiBorder}`, bgcolor: 'rgba(255, 255, 255, .86)', backdropFilter: 'blur(14px)' }}>
-          <Toolbar sx={{ justifyContent: 'space-between', gap: 1.5, minHeight: 70 }}>
+        <AppBar position="sticky" color="inherit" elevation={0} sx={{ borderBottom: `1px solid ${uiBorder}`, bgcolor: 'rgba(244, 247, 251, .88)', backdropFilter: 'blur(16px)' }}>
+          <Toolbar sx={{ justifyContent: 'space-between', gap: 1.5, minHeight: 72, px: { xs: 1.5, sm: 2.5, md: 3 } }}>
             <Stack direction="row" alignItems="center" gap={1.25} sx={{ minWidth: 0 }}>
               {!isDesktop && <IconButton aria-label="Abrir menu" edge="start" onClick={() => setMobileOpen(true)}><Menu /></IconButton>}
               <Box sx={{ minWidth: 0 }}>
                 <Typography fontWeight={900} noWrap>{user?.fullName ?? 'Equipo comercial'}</Typography>
-                <Typography color="text.secondary" fontSize={13} noWrap>{user?.roles.join(', ')}</Typography>
+                <Typography color="text.secondary" fontSize={13} noWrap>Operacion comercial y credito</Typography>
               </Box>
             </Stack>
             <Stack direction="row" alignItems="center" gap={1}>
-              <Box sx={{ display: { xs: 'none', sm: 'flex' }, alignItems: 'center', gap: 1, px: 1.5, py: .75, border: `1px solid ${uiBorder}`, borderRadius: 999, bgcolor: '#fff' }}>
+              <Box sx={{ display: { xs: 'none', sm: 'flex' }, alignItems: 'center', gap: 1, px: 1.5, py: .75, border: `1px solid ${uiBorder}`, borderRadius: 999, bgcolor: '#fff', boxShadow: '0 8px 22px rgba(15, 23, 42, .04)' }}>
                 <Search fontSize="small" sx={{ color: uiMuted }} />
                 <Typography variant="body2" color="text.secondary">CRM comercial</Typography>
               </Box>
               <Tooltip title="Salir">
-                <IconButton aria-label="Salir" onClick={() => { logout(); navigate('/login'); }} sx={{ border: `1px solid ${uiBorder}`, bgcolor: '#fff' }}><Logout /></IconButton>
+                <IconButton aria-label="Salir" onClick={() => { logout(); navigate('/login'); }} sx={{ border: `1px solid ${uiBorder}`, bgcolor: '#fff', boxShadow: '0 8px 22px rgba(15, 23, 42, .05)' }}><Logout /></IconButton>
               </Tooltip>
             </Stack>
           </Toolbar>
         </AppBar>
-        <Box component="main" sx={{ p: { xs: 1.5, sm: 2, md: 3 }, width: '100%', maxWidth: '100vw', boxSizing: 'border-box' }}>
+        <Box component="main" sx={{ p: { xs: 1.5, sm: 2.25, md: 3 }, width: '100%', maxWidth: 1760, mx: 'auto', boxSizing: 'border-box' }}>
           <Routes>
             <Route path="/" element={<DashboardPage />} />
             <Route path="/clientes" element={<CustomersPage />} />
@@ -423,11 +449,11 @@ function LoginPage() {
             borderRadius: 2.5,
             display: 'grid',
             placeItems: 'center',
-            bgcolor: uiPrimary,
+            background: 'linear-gradient(135deg, #155e75 0%, #0e9384 100%)',
             color: '#fff',
             fontWeight: 900,
             fontSize: 22,
-            boxShadow: '0 14px 28px rgba(70, 95, 255, .28)'
+            boxShadow: '0 16px 34px rgba(21, 94, 117, .28)'
           }}>E</Box>
           <Box>
             <Typography variant="h4" fontWeight={900} sx={{ lineHeight: 1 }}>EnMarcha CRM</Typography>
@@ -4386,9 +4412,9 @@ function FormDialog<T extends Record<string, unknown>>({ title, open, initial, c
   };
 
   return <Dialog open={open} onClose={saving ? undefined : onClose} fullWidth maxWidth={maxWidth} fullScreen={fullScreen}>
-    <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1 }}>{title}<IconButton onClick={onClose}><Close /></IconButton></DialogTitle>
-    <DialogContent sx={{ px: { xs: 2, sm: 3 } }}><Stack spacing={2} sx={{ pt: 1 }}>{error && <Alert severity="error">{error}</Alert>}{children(value, (patch) => setValue((prev) => ({ ...prev, ...patch })))}</Stack></DialogContent>
-    <DialogActions sx={{ px: { xs: 2, sm: 3 }, pb: { xs: 2, sm: 1 }, flexWrap: 'wrap' }}><Button onClick={onClose} disabled={saving}>Cancelar</Button><Button variant="contained" onClick={save} disabled={saving}>{saving ? 'Guardando...' : 'Guardar'}</Button></DialogActions>
+    <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1, pb: 1.25, borderBottom: `1px solid ${uiBorder}`, fontWeight: 900 }}>{title}<IconButton onClick={onClose}><Close /></IconButton></DialogTitle>
+    <DialogContent sx={{ px: { xs: 2, sm: 3 }, bgcolor: '#fbfcfe' }}><Stack spacing={2} sx={{ pt: 2 }}>{error && <Alert severity="error">{error}</Alert>}{children(value, (patch) => setValue((prev) => ({ ...prev, ...patch })))}</Stack></DialogContent>
+    <DialogActions sx={{ px: { xs: 2, sm: 3 }, py: 2, flexWrap: 'wrap', borderTop: `1px solid ${uiBorder}` }}><Button onClick={onClose} disabled={saving}>Cancelar</Button><Button variant="contained" onClick={save} disabled={saving}>{saving ? 'Guardando...' : 'Guardar'}</Button></DialogActions>
   </Dialog>;
 }
 
@@ -4416,9 +4442,10 @@ function ConfirmDialog({ open, title, text, onClose, onConfirm, confirmLabel = '
 }
 
 function Header({ title, action, onAction, onRefresh, secondaryAction }: { title: string; action?: string; onAction?: () => void; onRefresh?: () => void; secondaryAction?: { label: string; onClick: () => void } }) {
-  return <Stack direction={{ xs: 'column', sm: 'row' }} alignItems={{ xs: 'stretch', sm: 'center' }} justifyContent="space-between" gap={1.5} sx={{ mb: .5 }}>
-    <Box>
-      <Typography variant="h4" fontWeight={900} sx={{ fontSize: { xs: 26, sm: 34 }, lineHeight: 1.15, color: '#101828' }}>{title}</Typography>
+  return <Paper elevation={0} sx={{ p: { xs: 1.75, sm: 2.25 }, mb: .5, border: `1px solid ${uiBorder}`, boxShadow: '0 10px 30px rgba(15, 23, 42, .045)' }}>
+  <Stack direction={{ xs: 'column', sm: 'row' }} alignItems={{ xs: 'stretch', sm: 'center' }} justifyContent="space-between" gap={1.5}>
+    <Box sx={{ pl: 1.5, borderLeft: `4px solid ${uiAccent}`, minWidth: 0 }}>
+      <Typography variant="h4" fontWeight={900} sx={{ fontSize: { xs: 25, sm: 32 }, lineHeight: 1.12, color: '#0f172a', overflowWrap: 'anywhere' }}>{title}</Typography>
       <Typography color="text.secondary" fontSize={14}>Panel de trabajo comercial</Typography>
     </Box>
     <Stack direction={{ xs: 'column', sm: 'row' }} gap={1} sx={{ width: { xs: '100%', sm: 'auto' } }}>
@@ -4426,15 +4453,17 @@ function Header({ title, action, onAction, onRefresh, secondaryAction }: { title
       {secondaryAction && <Button variant="outlined" onClick={secondaryAction.onClick}>{secondaryAction.label}</Button>}
       {action && <Button variant="contained" startIcon={<Add />} onClick={onAction}>{action}</Button>}
     </Stack>
-  </Stack>;
+  </Stack>
+  </Paper>;
 }
 
 function EntityTable({ headers, rows, empty, compact = false }: { headers: string[]; rows: ReactNode[][]; empty: string; compact?: boolean }) {
-  return <Card sx={{ width: '100%', overflow: 'hidden' }}>
+  return <Card sx={{ width: '100%', overflow: 'hidden', borderColor: '#dbe4ee' }}>
     <TableContainer sx={{ width: '100%', overflowX: 'auto' }}>
       <Table size="small" sx={{
         minWidth: tableMinWidth(headers, compact),
         tableLayout: 'fixed',
+        '& .MuiTableHead-root .MuiTableCell-root': { textTransform: 'uppercase', letterSpacing: 0, fontSize: compact ? 11 : 11.5 },
         ...(compact ? {
           '& .MuiTableCell-root': { fontSize: 12.5 },
           '& .MuiChip-root': { height: 22, fontSize: 11.25 },
@@ -4443,14 +4472,14 @@ function EntityTable({ headers, rows, empty, compact = false }: { headers: strin
         } : {})
       }}>
         <TableHead><TableRow>{headers.map((h) => <TableCell key={h} sx={{ ...tableColumnSx(h, compact), whiteSpace: 'nowrap', fontWeight: 900, py: compact ? .8 : 1.35 }}>{h}</TableCell>)}</TableRow></TableHead>
-        <TableBody>{rows.length ? rows.map((row, i) => <TableRow key={i} sx={{ '&:hover': { bgcolor: '#f9fafb' } }}>{row.map((c, j) => <TableCell key={j} sx={{ ...tableColumnSx(headers[j], compact), verticalAlign: 'middle', py: compact ? .65 : 1.5 }}>{c ?? '-'}</TableCell>)}</TableRow>) : <TableRow><TableCell colSpan={headers.length}><EmptyState text={empty} /></TableCell></TableRow>}</TableBody>
+        <TableBody>{rows.length ? rows.map((row, i) => <TableRow key={i} sx={{ transition: 'background-color .15s ease', '&:hover': { bgcolor: '#f8fbfd' } }}>{row.map((c, j) => <TableCell key={j} sx={{ ...tableColumnSx(headers[j], compact), verticalAlign: 'middle', py: compact ? .65 : 1.5 }}>{c ?? '-'}</TableCell>)}</TableRow>) : <TableRow><TableCell colSpan={headers.length}><EmptyState text={empty} /></TableCell></TableRow>}</TableBody>
       </Table>
     </TableContainer>
   </Card>;
 }
 
 function ReportTable({ headers, rows, empty }: { headers: string[]; rows: ReactNode[][]; empty: string }) {
-  return <TableContainer sx={{ width: '100%', overflowX: 'auto', border: `1px solid ${uiBorder}`, borderRadius: 3 }}>
+  return <TableContainer sx={{ width: '100%', overflowX: 'auto', border: `1px solid ${uiBorder}`, borderRadius: 2, bgcolor: '#fff', boxShadow: '0 10px 28px rgba(15, 23, 42, .045)' }}>
     <Table size="small" sx={{ minWidth: 520 }}>
       <TableHead><TableRow>{headers.map((h) => <TableCell key={h} sx={{ whiteSpace: 'nowrap', fontWeight: 900 }}>{h}</TableCell>)}</TableRow></TableHead>
       <TableBody>{rows.length ? rows.map((row, i) => <TableRow key={i} sx={{ '&:hover': { bgcolor: '#f9fafb' } }}>{row.map((c, j) => <TableCell key={j} sx={{ verticalAlign: 'top' }}>{c ?? '-'}</TableCell>)}</TableRow>) : <TableRow><TableCell colSpan={headers.length}><EmptyState text={empty} /></TableCell></TableRow>}</TableBody>
@@ -4567,7 +4596,7 @@ function AiAnalysisDialog({ analysis, phone, onClose }: { analysis?: CustomerAiA
 }
 
 function Actions({ onView, onEdit, onDelete, onConvert, onDownload, onActivity, onWhatsapp, onAi, onStart, onComplete, onReschedule, onCancel, compact }: { onView?: () => void; onEdit?: () => void; onDelete?: () => void; onConvert?: () => void; onDownload?: () => void; onActivity?: () => void; onWhatsapp?: () => void; onAi?: () => void; onStart?: () => void; onComplete?: () => void; onReschedule?: () => void; onCancel?: () => void; compact?: boolean }) {
-  return <Stack direction="row" gap={compact ? .5 : 1} sx={{ mt: compact ? 1 : 0, flexWrap: 'wrap' }}>
+  return <Stack direction="row" gap={compact ? .5 : .75} sx={{ mt: compact ? 1 : 0, flexWrap: 'wrap', '& .MuiIconButton-root': { bgcolor: '#f8fafc', border: `1px solid ${uiBorder}` }, '& .MuiIconButton-root:hover': { bgcolor: '#eef6f8' } }}>
     {onView && <Tooltip title="Ver cliente 360"><IconButton size="small" onClick={onView}><Visibility fontSize="small" /></IconButton></Tooltip>}
     {onAi && <Tooltip title="Analizar con IA"><IconButton size="small" color="primary" onClick={onAi}><AutoAwesome fontSize="small" /></IconButton></Tooltip>}
     {onWhatsapp && <Tooltip title="Abrir WhatsApp"><IconButton size="small" onClick={onWhatsapp}><WhatsApp fontSize="small" /></IconButton></Tooltip>}
@@ -4584,9 +4613,8 @@ function Actions({ onView, onEdit, onDelete, onConvert, onDownload, onActivity, 
 }
 
 function Metric({ label, value }: { label: string; value: ReactNode }) {
-  return <Card sx={{ height: '100%', position: 'relative', overflow: 'hidden' }}>
+  return <Card sx={{ height: '100%', position: 'relative', borderTop: `3px solid ${uiPrimary}` }}>
     <CardContent>
-      <Box sx={{ position: 'absolute', top: 16, right: 16, width: 10, height: 10, borderRadius: '50%', bgcolor: uiPrimary, opacity: .24 }} />
       <Typography color="text.secondary" fontSize={13} fontWeight={700}>{label}</Typography>
       <Typography variant="h5" fontWeight={900} sx={{ overflowWrap: 'anywhere', mt: .5 }}>{value}</Typography>
     </CardContent>
@@ -4605,7 +4633,9 @@ function InfoLine({ label, value }: { label: string; value: ReactNode }) {
 }
 
 function EmptyState({ text }: { text: string }) {
-  return <Typography color="text.secondary" sx={{ py: 3, textAlign: 'center', fontWeight: 700 }}>{text}</Typography>;
+  return <Box sx={{ py: 3, px: 2, textAlign: 'center' }}>
+    <Typography color="text.secondary" fontWeight={800}>{text}</Typography>
+  </Box>;
 }
 
 function StatusBar({ loading, error }: { loading?: boolean; error?: string }) {
