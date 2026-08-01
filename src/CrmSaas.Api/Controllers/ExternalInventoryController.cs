@@ -90,13 +90,18 @@ public sealed class ExternalInventoryController(IConfiguration configuration, Cr
     [HttpGet("warehouse-catalog")]
     [Authorize(Roles = "Administrador")]
     public async Task<ActionResult<IReadOnlyCollection<ExternalInventoryWarehouseDto>>> WarehouseCatalog(
-        [FromQuery] string databaseName,
+        [FromQuery] string? databaseName,
         CancellationToken cancellationToken)
     {
         var normalizedDatabase = NormalizeDatabaseName(databaseName);
         if (string.IsNullOrWhiteSpace(normalizedDatabase))
         {
-            return BadRequest(new { detail = "Digite la base de datos de inventario." });
+            normalizedDatabase = await GetCompanyDatabaseNameAsync(cancellationToken);
+        }
+
+        if (string.IsNullOrWhiteSpace(normalizedDatabase))
+        {
+            return BadRequest(new { detail = "Configure primero la base de datos de inventario en la empresa." });
         }
 
         return Ok(await ReadWarehouseCatalogAsync(normalizedDatabase, cancellationToken));
@@ -227,18 +232,29 @@ public sealed class ExternalInventoryController(IConfiguration configuration, Cr
             return new ExternalInventoryConfig(null, []);
         }
 
-        var config = await db.Usuarios
+        var databaseName = await GetCompanyDatabaseNameAsync(cancellationToken);
+        var warehouseCodes = await db.Usuarios
             .Where(x => x.Id == userId && x.EmpresaId == companyId && x.PuntoVentaId.HasValue)
-            .Select(x => new
-            {
-                x.PuntoVenta!.BaseDatosInventarioExterno,
-                x.PuntoVenta.BodegasInventarioExterno
-            })
+            .Select(x => x.PuntoVenta!.BodegasInventarioExterno)
             .FirstOrDefaultAsync(cancellationToken);
 
-        return config is null
-            ? new ExternalInventoryConfig(null, [])
-            : new ExternalInventoryConfig(NormalizeDatabaseName(config.BaseDatosInventarioExterno), ParseWarehouseCodes(config.BodegasInventarioExterno));
+        return new ExternalInventoryConfig(databaseName, ParseWarehouseCodes(warehouseCodes));
+    }
+
+    private async Task<string?> GetCompanyDatabaseNameAsync(CancellationToken cancellationToken)
+    {
+        if (tenantContext.EmpresaId is not Guid companyId)
+        {
+            return null;
+        }
+
+        var databaseName = await db.Empresas
+            .IgnoreQueryFilters()
+            .Where(x => x.Id == companyId)
+            .Select(x => x.BaseDatosInventarioExterno)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return NormalizeDatabaseName(databaseName);
     }
 
     private static string ReadString(IDataRecord reader, string name) =>

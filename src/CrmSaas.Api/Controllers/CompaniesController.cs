@@ -32,7 +32,7 @@ public sealed class CompaniesController(CrmDbContext db, ITenantContext tenantCo
 
         var companies = await query
             .OrderBy(x => x.Nombre)
-            .Select(x => new CompanyDto(x.Id, x.Nombre, x.Subdominio, x.DominioPersonalizado, x.LogoDataUrl, x.Activa))
+            .Select(x => new CompanyDto(x.Id, x.Nombre, x.Subdominio, x.DominioPersonalizado, x.LogoDataUrl, x.BaseDatosInventarioExterno, x.Activa))
             .ToListAsync(cancellationToken);
         return Ok(companies);
     }
@@ -60,6 +60,7 @@ public sealed class CompaniesController(CrmDbContext db, ITenantContext tenantCo
             Subdominio = subdomain,
             DominioPersonalizado = string.IsNullOrWhiteSpace(dto.CustomDomain) ? null : dto.CustomDomain.Trim(),
             LogoDataUrl = NormalizeLogo(dto.LogoDataUrl),
+            BaseDatosInventarioExterno = NormalizeDatabaseName(dto.ExternalInventoryDatabaseName),
             Activa = dto.Active
         };
 
@@ -90,6 +91,7 @@ public sealed class CompaniesController(CrmDbContext db, ITenantContext tenantCo
         company.Subdominio = subdomain;
         company.DominioPersonalizado = string.IsNullOrWhiteSpace(dto.CustomDomain) ? null : dto.CustomDomain.Trim();
         company.LogoDataUrl = NormalizeLogo(dto.LogoDataUrl);
+        company.BaseDatosInventarioExterno = NormalizeDatabaseName(dto.ExternalInventoryDatabaseName);
         company.Activa = dto.Active;
         await db.SaveChangesAsync(cancellationToken);
 
@@ -97,7 +99,7 @@ public sealed class CompaniesController(CrmDbContext db, ITenantContext tenantCo
     }
 
     private static CompanyDto ToDto(Empresa company) =>
-        new(company.Id, company.Nombre, company.Subdominio, company.DominioPersonalizado, company.LogoDataUrl, company.Activa);
+        new(company.Id, company.Nombre, company.Subdominio, company.DominioPersonalizado, company.LogoDataUrl, company.BaseDatosInventarioExterno, company.Activa);
 
     private bool IsGlobalAdmin() =>
         string.Equals(User.FindFirstValue(ClaimTypes.Email), GlobalAdminEmail, StringComparison.OrdinalIgnoreCase);
@@ -124,6 +126,22 @@ public sealed class CompaniesController(CrmDbContext db, ITenantContext tenantCo
         }
 
         return logo;
+    }
+
+    private static string? NormalizeDatabaseName(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var name = value.Trim();
+        if (name.Length > 128 || !name.All(c => char.IsLetterOrDigit(c) || c == '_'))
+        {
+            throw new InvalidOperationException("La base de datos de inventario solo puede contener letras, numeros y guion bajo.");
+        }
+
+        return name;
     }
 
 }

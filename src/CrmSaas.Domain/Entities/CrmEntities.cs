@@ -212,7 +212,6 @@ public sealed class PuntoVenta : AuditableTenantEntity
     public string? ProveedorSoat { get; set; }
     public string? TramitadorMatricula { get; set; }
     public string? CondicionesComerciales { get; set; }
-    public string? BaseDatosInventarioExterno { get; set; }
     public string? BodegasInventarioExterno { get; set; }
     public bool Activa { get; set; } = true;
 }

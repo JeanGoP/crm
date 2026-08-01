@@ -1,7 +1,7 @@
 # Manual de usuario - EnMarcha CRM
 
-Ultima actualizacion: 2026-07-31  
-Version del manual: 9.6
+Ultima actualizacion: 2026-08-01  
+Version del manual: 9.7
 Sistema: EnMarcha CRM para gestion comercial y ventas a credito  
 
 ## 1. Bienvenida
@@ -627,8 +627,8 @@ Configuracion permite administrar datos generales del sistema. Esta opcion norma
 
 ### Opciones principales
 
-- **Empresas:** crear y actualizar empresas. Al crear una empresa se puede cargar su logo y definir datos generales.
-- **Sedes / puntos de venta:** registrar puntos de venta, ciudad, marca principal, logo de marca, modalidad de entrega, tasa, tiempos de tramite, base de inventario y bodegas permitidas.
+- **Empresas:** crear y actualizar empresas. Al crear una empresa se puede cargar su logo, definir datos generales y configurar la base de datos de inventario que pertenece a esa empresa.
+- **Sedes / puntos de venta:** registrar puntos de venta, ciudad, marca principal, logo de marca, modalidad de entrega, tasa, tiempos de tramite y bodegas permitidas.
 - **Usuarios:** crear y actualizar usuarios, asignarlos a una empresa, definir su login de ingreso, correo, rol y sede cuando aplique.
 - **Roles:** administrar permisos segun el perfil del usuario.
 - **Etapas del pipeline:** configurar las columnas comerciales.
@@ -642,9 +642,10 @@ Configuracion permite administrar datos generales del sistema. Esta opcion norma
 2. Busque la seccion **Empresas**.
 3. Presione **Nueva empresa** o edite una empresa existente.
 4. Complete nombre, subdominio, dominio si aplica y logo.
-5. Marque la empresa como activa y guarde.
+5. Si la empresa consulta inventario externo, escriba la base SQL asignada a esa empresa.
+6. Marque la empresa como activa y guarde.
 
-La configuracion de inventario no se realiza en la empresa, sino en cada sede o punto de venta.
+La base de inventario se configura en la empresa porque identifica de donde salen los articulos e inventarios de esa empresa.
 
 ### Sedes / puntos de venta
 
@@ -655,12 +656,11 @@ La configuracion de inventario no se realiza en la empresa, sino en cada sede o 
 5. Indique la marca principal y, si aplica, cargue el logo de marca.
 6. Defina tasa factor mensual, plazo maximo, modalidad de entrega y tiempos estimados de SOAT y matricula.
 7. Registre proveedor SOAT y tramitador de matricula cuando la empresa ya tenga esos responsables definidos.
-8. En **Inventario externo de esta sede**, escriba la base SQL donde estan las tablas **Bodega** y **INVENTARIO_EXISTENCIA**. Ejemplo: **Inventariomotosycarros**.
-9. Presione **Cargar bodegas** para traer codigo y nombre desde la tabla **Bodega**.
-10. Seleccione las bodegas que pertenecen a esa sede.
-11. Marque la sede como activa y guarde.
+8. En **Inventario externo de esta sede**, presione **Cargar bodegas** para traer codigo y nombre desde la tabla **Bodega** de la base configurada en la empresa.
+9. Seleccione las bodegas que pertenecen a esa sede.
+10. Marque la sede como activa y guarde.
 
-La configuracion de inventario por sede controla que existencias puede consultar el usuario. Si un vendedor tiene una sede asociada, el inventario que vera en cotizaciones sera el de la base y bodegas configuradas en esa sede. La seleccion desde la tabla **Bodega** evita errores al escribir codigos manualmente.
+La configuracion de inventario queda separada: la **empresa** define la base de datos de inventario, y cada **sede / punto de venta** define que bodegas de esa base puede usar. Si un vendedor tiene una sede asociada, el inventario que vera en cotizaciones sera el de las bodegas permitidas para esa sede. La seleccion desde la tabla **Bodega** evita errores al escribir codigos manualmente.
 
 ### Perfiles de requisitos
 
@@ -769,7 +769,8 @@ El sistema muestra mensajes cuando algo no puede completarse.
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
-| 2026-08-01 | 9.6 | Se mueve la configuracion de base de inventario y bodegas desde Empresas hacia Sedes / puntos de venta, para que el usuario consulte segun su sede asociada. |
+| 2026-08-01 | 9.7 | Se separa la configuracion de inventario: la base de datos pertenece a Empresas y las bodegas permitidas pertenecen a Sedes / puntos de venta. |
+| 2026-08-01 | 9.6 | Se revisa la configuracion de inventario para que el usuario consulte segun su sede asociada. |
 | 2026-07-31 | 9.5 | Se agrega carga de bodegas desde la tabla Bodega de la base de inventario para seleccionar codigos correctos. |
 | 2026-07-31 | 9.4 | Se agrega configuracion de base de datos de inventario por empresa, ademas de bodegas permitidas, para separar inventarios entre empresas. |
 | 2026-07-31 | 9.3 | Se agrega configuracion de bodegas externas por empresa para controlar que inventario puede consultar cada empresa en cotizaciones. |

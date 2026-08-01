@@ -269,14 +269,14 @@ const emptyCustomer = {
 const emptyLead = { firstNames: '', lastNames: '', firstName: '', middleName: '', lastName: '', secondLastName: '', email: '', phone: '', source: 'Web', rating: 1 };
 const emptyDeal = { title: '', customerId: '', stageId: '', value: 0, closeProbability: 10, estimatedCloseDate: today, status: 1 };
 const emptyActivity = { title: '', description: '', type: 1, status: 1, scheduledAt: `${today}T09:00`, reminderAt: '', customerId: '', dealId: '', assignedUserId: '' };
-const emptyCompany = { name: '', subdomain: '', customDomain: '', logoDataUrl: '', active: true };
+const emptyCompany = { name: '', subdomain: '', customDomain: '', logoDataUrl: '', externalInventoryDatabaseName: '', active: true };
 const emptyUser = { fullName: '', login: '', email: '', password: '', companyId: '', salesPointId: '', roles: ['Vendedor'], supervisedSalesPointIds: [] as string[] };
 const emptyProduct = { name: '', category: 'Moto', brand: '', model: '', line: '', version: '', reference: '', description: '', engineCc: '', year: '', color: '', price: 0, soat: 0, registrationFee: 0, taxes: 0, technicalSheet: '', priceValidFrom: today, active: true, salesPointPrices: [] as { salesPointId: string; price: number | ''; priceValidFrom: string; active: boolean }[] };
 const emptyCommercialInventory = { productId: '', salesPointId: '', vin: '', chassisNumber: '', engineNumber: '', plate: '', color: '', isUsed: false, mileage: '', status: 1, notes: '' };
 const emptyProductCategory = { name: '', description: '', quoteAsBundle: false, active: true };
 const emptyInventoryReservation = { customerId: '', quoteId: '', creditApplicationId: '', reservationExpiresAt: new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10), notes: '' };
 const emptyFinancialSettings = { minimumWage: 1400000, consumerAnnualRate: 29.72, lowAmountAnnualRate: 56.33, factorMonthlyRate: 4.5, maxTermMonths: 30, paymentRounding: 1000, useMontelibanoTable: true, active: true };
-const emptySalesPoint = { name: '', code: '', city: '', address: '', phone: '', mainBrand: 'Honda', brandLogoDataUrl: '', factorMonthlyRate: 4.5, maxTermMonths: 30, quoteValidityDays: 7, deliveryMode: 'ConSoat', soatDays: 14, registrationDays: 20, soatProvider: '', registrationAgent: '', commercialTerms: 'Cotizacion sujeta a disponibilidad del producto, validacion comercial y aprobacion final.', externalInventoryDatabaseName: '', externalInventoryWarehouseCodes: '', active: true };
+const emptySalesPoint = { name: '', code: '', city: '', address: '', phone: '', mainBrand: 'Honda', brandLogoDataUrl: '', factorMonthlyRate: 4.5, maxTermMonths: 30, quoteValidityDays: 7, deliveryMode: 'ConSoat', soatDays: 14, registrationDays: 20, soatProvider: '', registrationAgent: '', commercialTerms: 'Cotizacion sujeta a disponibilidad del producto, validacion comercial y aprobacion final.', externalInventoryWarehouseCodes: '', active: true };
 const emptyRequirementDocument = { type: 5, name: '', description: '', required: true, order: 1 };
 const emptyRequirementProfile = { name: '', code: '', description: '', isCash: false, active: true, documents: [emptyRequirementDocument] };
 const emptyPromotion = { name: '', code: '', discountType: 'Valor', discountValue: 0, productId: '', brand: '', color: '', salesPointId: '', validFrom: today, validUntil: today, active: true };
@@ -2915,6 +2915,7 @@ function SettingsPage() {
       subdomain: payload.subdomain,
       customDomain: payload.customDomain || null,
       logoDataUrl: payload.logoDataUrl || null,
+      externalInventoryDatabaseName: payload.externalInventoryDatabaseName || null,
       active: Boolean(payload.active)
     };
     const { data } = companyForm.item
@@ -2995,7 +2996,6 @@ function SettingsPage() {
       soatProvider: payload.soatProvider || null,
       registrationAgent: payload.registrationAgent || null,
       commercialTerms: payload.commercialTerms || null,
-      externalInventoryDatabaseName: payload.externalInventoryDatabaseName || null,
       externalInventoryWarehouseCodes: payload.externalInventoryWarehouseCodes || null,
       active: Boolean(payload.active)
     };
@@ -3115,8 +3115,8 @@ function SettingsPage() {
             point.deliveryMode === 'Completa' ? 'Completa' : 'Con SOAT',
             `${point.factorMonthlyRate}% / ${point.maxTermMonths} meses`,
             <Box>
-              <Typography fontSize={12.5}>{point.externalInventoryDatabaseName || 'Sin base'}</Typography>
-              <Typography color="text.secondary" fontSize={11.5}>{point.externalInventoryWarehouseCodes || 'Sin bodegas'}</Typography>
+              <Typography fontSize={12.5}>{point.externalInventoryWarehouseCodes || 'Sin bodegas'}</Typography>
+              <Typography color="text.secondary" fontSize={11.5}>Definidas por sede</Typography>
             </Box>,
             `SOAT ${point.soatDays}d · Matricula ${point.registrationDays}d`,
             <StatusChip label={point.active ? 'Activa' : 'Inactiva'} tone={point.active ? 'success' : 'default'} />,
@@ -3202,13 +3202,14 @@ function SettingsPage() {
       </Stack>
       <StatusBar loading={loadingCompanies} error={companiesError} />
         <EntityTable
-        headers={['Logo', 'Nombre', 'Subdominio', 'Dominio', 'Estado', 'Acciones']}
+        headers={['Logo', 'Nombre', 'Subdominio', 'Dominio', 'Base inventario', 'Estado', 'Acciones']}
         empty="No hay empresas registradas"
         rows={companies.map((c) => [
           c.logoDataUrl ? <Box component="img" src={c.logoDataUrl} alt={`Logo ${c.name}`} sx={{ width: 72, height: 36, objectFit: 'contain', display: 'block' }} /> : <Typography color="text.secondary" fontSize={13}>Sin logo</Typography>,
           c.name,
           c.subdomain,
           c.customDomain,
+          c.externalInventoryDatabaseName || 'Sin base',
           <StatusChip label={c.active ? 'Activa' : 'Inactiva'} tone={c.active ? 'success' : 'default'} />,
           <Actions onEdit={() => setCompanyForm({ open: true, item: c })} />
         ])}
@@ -3246,13 +3247,26 @@ function SettingsPage() {
 }
 
 function CompanyDialog({ form, onClose, onSave }: DialogProps<Company, typeof emptyCompany>) {
-  const initial = form.item ? { name: form.item.name, subdomain: form.item.subdomain, customDomain: form.item.customDomain ?? '', logoDataUrl: form.item.logoDataUrl ?? '', active: form.item.active } : emptyCompany;
+  const initial = form.item ? {
+    name: form.item.name,
+    subdomain: form.item.subdomain,
+    customDomain: form.item.customDomain ?? '',
+    logoDataUrl: form.item.logoDataUrl ?? '',
+    externalInventoryDatabaseName: form.item.externalInventoryDatabaseName ?? '',
+    active: form.item.active
+  } : emptyCompany;
   return <FormDialog title={form.item ? 'Editar empresa' : 'Nueva empresa'} open={form.open} initial={initial} onClose={onClose} onSave={onSave}>
     {(v, set) => <>
       <CompanyLogoPicker value={v.logoDataUrl} onChange={(logoDataUrl) => set({ logoDataUrl })} />
       <TextField required label="Nombre" value={v.name} onChange={(e) => set({ name: e.target.value })} />
       <TextField required label="Subdominio" value={v.subdomain} onChange={(e) => set({ subdomain: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') })} />
       <TextField label="Dominio personalizado" value={v.customDomain} onChange={(e) => set({ customDomain: e.target.value })} />
+      <TextField
+        label="Base de datos de inventario"
+        value={v.externalInventoryDatabaseName}
+        onChange={(e) => set({ externalInventoryDatabaseName: e.target.value.replace(/[^a-zA-Z0-9_]/g, '') })}
+        helperText="Base SQL de esta empresa donde existen dbo.Bodega y dbo.INVENTARIO_EXISTENCIA."
+      />
       <TextField select label="Estado" value={String(v.active)} onChange={(e) => set({ active: e.target.value === 'true' })}><MenuItem value="true">Activa</MenuItem><MenuItem value="false">Inactiva</MenuItem></TextField>
     </>}
   </FormDialog>;
@@ -3302,7 +3316,6 @@ function SalesPointDialog({ form, onClose, onSave }: DialogProps<SalesPoint, typ
     soatProvider: form.item.soatProvider ?? '',
     registrationAgent: form.item.registrationAgent ?? '',
     commercialTerms: form.item.commercialTerms ?? '',
-    externalInventoryDatabaseName: form.item.externalInventoryDatabaseName ?? '',
     externalInventoryWarehouseCodes: form.item.externalInventoryWarehouseCodes ?? '',
     active: form.item.active
   } : emptySalesPoint;
@@ -3319,18 +3332,10 @@ function SalesPointDialog({ form, onClose, onSave }: DialogProps<SalesPoint, typ
     {(v, set) => {
       const selectedWarehouseCodes = parseDelimitedCodes(v.externalInventoryWarehouseCodes);
       const loadWarehouses = async () => {
-        if (!v.externalInventoryDatabaseName.trim()) {
-          setWarehouseError('Digite primero la base de datos de inventario.');
-          setWarehouseOptions([]);
-          return;
-        }
-
         setWarehouseLoading(true);
         setWarehouseError('');
         try {
-          const { data } = await api.get<ExternalInventoryWarehouse[]>('/api/external-inventory/warehouse-catalog', {
-            params: { databaseName: v.externalInventoryDatabaseName.trim() }
-          });
+          const { data } = await api.get<ExternalInventoryWarehouse[]>('/api/external-inventory/warehouse-catalog');
           setWarehouseOptions(data);
           if (!data.length) {
             setWarehouseError('No se encontraron bodegas en la tabla Bodega.');
@@ -3381,19 +3386,11 @@ function SalesPointDialog({ form, onClose, onSave }: DialogProps<SalesPoint, typ
       <Paper variant="outlined" sx={{ p: 1.5, bgcolor: '#fbfdff' }}>
         <Stack spacing={1.5}>
           <Typography variant="subtitle2" fontWeight={900} color="primary">Inventario externo de esta sede</Typography>
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25} alignItems={{ xs: 'stretch', sm: 'flex-start' }}>
-            <TextField
-              fullWidth
-              label="Base de datos de inventario"
-              value={v.externalInventoryDatabaseName}
-              onChange={(e) => {
-                set({ externalInventoryDatabaseName: e.target.value.replace(/[^a-zA-Z0-9_]/g, '') });
-                setWarehouseOptions([]);
-                setWarehouseError('');
-              }}
-              helperText="Base SQL donde estan dbo.Bodega y dbo.INVENTARIO_EXISTENCIA."
-            />
-            <Button type="button" variant="outlined" disabled={warehouseLoading || !v.externalInventoryDatabaseName.trim()} onClick={() => void loadWarehouses()}>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25} alignItems={{ xs: 'stretch', sm: 'center' }} justifyContent="space-between">
+            <Typography variant="body2" color="text.secondary">
+              Las bodegas se cargan desde la base de inventario configurada en la empresa.
+            </Typography>
+            <Button type="button" variant="outlined" disabled={warehouseLoading} onClick={() => void loadWarehouses()}>
               {warehouseLoading ? 'Cargando...' : 'Cargar bodegas'}
             </Button>
           </Stack>
