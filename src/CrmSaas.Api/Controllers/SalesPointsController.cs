@@ -45,6 +45,8 @@ public sealed class SalesPointsController(CrmDbContext db) : ControllerBase
                 x.ProveedorSoat,
                 x.TramitadorMatricula,
                 x.CondicionesComerciales,
+                x.BaseDatosInventarioExterno,
+                x.BodegasInventarioExterno,
                 x.Activa))
             .ToListAsync(cancellationToken);
 
@@ -107,6 +109,8 @@ public sealed class SalesPointsController(CrmDbContext db) : ControllerBase
         entity.ProveedorSoat = Normalize(dto.SoatProvider);
         entity.TramitadorMatricula = Normalize(dto.RegistrationAgent);
         entity.CondicionesComerciales = Normalize(dto.CommercialTerms);
+        entity.BaseDatosInventarioExterno = NormalizeDatabaseName(dto.ExternalInventoryDatabaseName);
+        entity.BodegasInventarioExterno = NormalizeWarehouseCodes(dto.ExternalInventoryWarehouseCodes);
         entity.Activa = dto.Active;
     }
 
@@ -140,10 +144,44 @@ public sealed class SalesPointsController(CrmDbContext db) : ControllerBase
         x.ProveedorSoat,
         x.TramitadorMatricula,
         x.CondicionesComerciales,
+        x.BaseDatosInventarioExterno,
+        x.BodegasInventarioExterno,
         x.Activa);
 
     private static string NormalizeCode(string value) => value.Trim().ToUpperInvariant().Replace(" ", "-");
     private static string? Normalize(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    private static string? NormalizeWarehouseCodes(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var codes = value
+            .Split([',', ';', '|', '\r', '\n', '\t', ' '], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(x => x.ToUpperInvariant())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        return codes.Length == 0 ? null : string.Join(",", codes);
+    }
+
+    private static string? NormalizeDatabaseName(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var name = value.Trim();
+        if (name.Length > 128 || !name.All(c => char.IsLetterOrDigit(c) || c == '_'))
+        {
+            throw new InvalidOperationException("La base de datos de inventario solo puede contener letras, numeros y guion bajo.");
+        }
+
+        return name;
+    }
+
     private static string NormalizeDeliveryMode(string value) =>
         string.Equals(value, "Completa", StringComparison.OrdinalIgnoreCase) ? "Completa" : "ConSoat";
 

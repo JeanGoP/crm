@@ -82,8 +82,6 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
 
         modelBuilder.Entity<Empresa>().HasIndex(x => x.Subdominio).IsUnique();
         modelBuilder.Entity<Empresa>().Property(x => x.LogoDataUrl).HasMaxLength(300000);
-        modelBuilder.Entity<Empresa>().Property(x => x.BaseDatosInventarioExterno).HasMaxLength(128);
-        modelBuilder.Entity<Empresa>().Property(x => x.BodegasInventarioExterno).HasMaxLength(800);
         modelBuilder.Entity<Usuario>().Property(x => x.Login).HasMaxLength(80);
         modelBuilder.Entity<Usuario>().HasIndex(x => x.Login).IsUnique();
         modelBuilder.Entity<Usuario>().HasIndex(x => new { x.EmpresaId, x.Email });
@@ -149,6 +147,8 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
         modelBuilder.Entity<PuntoVenta>().Property(x => x.MarcaPrincipal).HasMaxLength(80);
         modelBuilder.Entity<PuntoVenta>().Property(x => x.ModalidadEntrega).HasMaxLength(40);
         modelBuilder.Entity<PuntoVenta>().Property(x => x.LogoMarcaDataUrl).HasMaxLength(300000);
+        modelBuilder.Entity<PuntoVenta>().Property(x => x.BaseDatosInventarioExterno).HasMaxLength(128);
+        modelBuilder.Entity<PuntoVenta>().Property(x => x.BodegasInventarioExterno).HasMaxLength(800);
         modelBuilder.Entity<PuntoVenta>().Property(x => x.TasaFactorMensual).HasPrecision(6, 3);
         modelBuilder.Entity<PuntoVenta>().Property(x => x.CondicionesComerciales).HasMaxLength(1200);
         modelBuilder.Entity<PuntoVenta>().HasIndex(x => new { x.EmpresaId, x.Codigo }).IsUnique();

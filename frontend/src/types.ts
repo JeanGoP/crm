@@ -19,8 +19,6 @@ export interface Company {
   subdomain: string;
   customDomain?: string;
   logoDataUrl?: string;
-  externalInventoryDatabaseName?: string;
-  externalInventoryWarehouseCodes?: string;
   active: boolean;
 }
 
@@ -236,6 +234,8 @@ export interface SalesPoint {
   soatProvider?: string;
   registrationAgent?: string;
   commercialTerms?: string;
+  externalInventoryDatabaseName?: string;
+  externalInventoryWarehouseCodes?: string;
   active: boolean;
 }
 

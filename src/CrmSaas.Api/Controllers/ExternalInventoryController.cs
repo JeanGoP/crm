@@ -1,4 +1,5 @@
 using System.Data;
+using System.Security.Claims;
 using System.Text.RegularExpressions;
 using CrmSaas.Application.Abstractions;
 using CrmSaas.Application.DTOs;
@@ -220,10 +221,19 @@ public sealed class ExternalInventoryController(IConfiguration configuration, Cr
             return new ExternalInventoryConfig(null, []);
         }
 
-        var config = await db.Empresas
-            .IgnoreQueryFilters()
-            .Where(x => x.Id == companyId)
-            .Select(x => new { x.BaseDatosInventarioExterno, x.BodegasInventarioExterno })
+        var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!Guid.TryParse(userIdValue, out var userId))
+        {
+            return new ExternalInventoryConfig(null, []);
+        }
+
+        var config = await db.Usuarios
+            .Where(x => x.Id == userId && x.EmpresaId == companyId && x.PuntoVentaId.HasValue)
+            .Select(x => new
+            {
+                x.PuntoVenta!.BaseDatosInventarioExterno,
+                x.PuntoVenta.BodegasInventarioExterno
+            })
             .FirstOrDefaultAsync(cancellationToken);
 
         return config is null

@@ -1,7 +1,7 @@
 <!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Manual de usuario - EnMarcha CRM</title><style>:root{color-scheme:light;--ink:#111827;--muted:#526071;--line:#d8e0e8;--brand:#155e75;--paper:#fff;--bg:#f5f7fb}body{margin:0;font-family:Inter,Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--ink);line-height:1.65}main{max-width:1040px;margin:0 auto;padding:42px 24px 72px}h1{font-size:38px;line-height:1.1;margin:0 0 18px;color:#0f172a}h2{font-size:26px;margin:44px 0 12px;padding-top:18px;border-top:1px solid var(--line);color:#0f172a}h3{font-size:18px;margin:24px 0 8px;color:var(--brand)}p,li{font-size:15px;color:var(--ink)}p{margin:8px 0}ul{margin:8px 0 14px 24px;padding:0}code{background:#eef5f8;color:#0f4f63;padding:2px 5px;border-radius:4px}figure{margin:18px 0 28px;border:1px solid var(--line);background:var(--paper);border-radius:10px;overflow:hidden;box-shadow:0 8px 22px rgba(15,23,42,.08)}figure img{display:block;width:100%;height:auto}figcaption{font-size:13px;color:var(--muted);padding:10px 14px;background:#fbfdff;border-top:1px solid var(--line)}table{width:100%;border-collapse:collapse;margin:14px 0 24px;background:var(--paper);border:1px solid var(--line)}th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);font-size:14px;vertical-align:top}th{background:#eef5f8;color:#0f4f63}.cover{background:#fff;border:1px solid var(--line);border-radius:10px;padding:24px 28px;margin-bottom:28px;box-shadow:0 8px 22px rgba(15,23,42,.06)}@media print{body{background:white}main{max-width:none;padding:0}figure{break-inside:avoid;box-shadow:none}h2{break-after:avoid}.cover{box-shadow:none}}</style></head><body><main>
 <div class="cover"><h1>Manual de usuario - EnMarcha CRM</h1>
 <p><strong>Ultima actualizacion:</strong> 2026-07-31</p>
-<p><strong>Version del manual:</strong> 9.5</p>
+<p><strong>Version del manual:</strong> 9.6</p>
 <p><strong>Sistema:</strong> EnMarcha CRM para gestion comercial y ventas a credito</p></div>
 <h2>1. Bienvenida</h2>
 <p>Este manual explica como usar el CRM en la operacion diaria. Esta dirigido a vendedores, supervisores y administradores que necesitan registrar clientes, crear cotizaciones, hacer seguimiento comercial, gestionar solicitudes de credito, controlar entregas y revisar reportes.</p>
@@ -438,8 +438,8 @@
 <p>Configuracion permite administrar datos generales del sistema. Esta opcion normalmente es usada por administradores.</p>
 <h3>Opciones principales</h3>
 <ul>
-<li><strong>Empresas:</strong> crear y actualizar empresas. Al crear una empresa se puede cargar su logo, definir a que base de datos de inventario pertenece y que bodegas puede consultar.</li>
-<li><strong>Sedes / puntos de venta:</strong> registrar puntos de venta, ciudad, marca principal, logo de marca, modalidad de entrega, tasa y tiempos de tramite.</li>
+<li><strong>Empresas:</strong> crear y actualizar empresas. Al crear una empresa se puede cargar su logo y definir datos generales.</li>
+<li><strong>Sedes / puntos de venta:</strong> registrar puntos de venta, ciudad, marca principal, logo de marca, modalidad de entrega, tasa, tiempos de tramite, base de inventario y bodegas permitidas.</li>
 <li><strong>Usuarios:</strong> crear y actualizar usuarios, asignarlos a una empresa, definir su login de ingreso, correo, rol y sede cuando aplique.</li>
 <li><strong>Roles:</strong> administrar permisos segun el perfil del usuario.</li>
 <li><strong>Etapas del pipeline:</strong> configurar las columnas comerciales.</li>
@@ -452,11 +452,8 @@
 <p>2. Busque la seccion <strong>Empresas</strong>.</p>
 <p>3. Presione <strong>Nueva empresa</strong> o edite una empresa existente.</p>
 <p>4. Complete nombre, subdominio, dominio si aplica y logo.</p>
-<p>5. En <strong>Base de datos de inventario</strong>, escriba el nombre de la base SQL donde esta la vista de inventario. Ejemplo: <strong>Inventariomotosycarros</strong>.</p>
-<p>6. Presione <strong>Cargar bodegas</strong> para traer las bodegas registradas en la tabla <strong>Bodega</strong> de esa base de datos.</p>
-<p>7. Seleccione las bodegas que pertenecen a la empresa. El sistema guarda sus codigos automaticamente.</p>
-<p>8. Marque la empresa como activa y guarde.</p>
-<p>Estos campos controlan la busqueda de inventario en cotizaciones. Si una empresa no tiene base de datos o bodegas configuradas, no vera existencias externas. Si tiene ambos datos configurados, solo vera articulos de esas bodegas dentro de la base indicada para esa empresa. La seleccion desde la tabla <strong>Bodega</strong> evita errores al escribir codigos manualmente.</p>
+<p>5. Marque la empresa como activa y guarde.</p>
+<p>La configuracion de inventario no se realiza en la empresa, sino en cada sede o punto de venta.</p>
 <h3>Sedes / puntos de venta</h3>
 <p>1. Entre a <strong>Configuracion</strong>.</p>
 <p>2. Busque la tarjeta <strong>Sedes / puntos de venta</strong>.</p>
@@ -465,8 +462,11 @@
 <p>5. Indique la marca principal y, si aplica, cargue el logo de marca.</p>
 <p>6. Defina tasa factor mensual, plazo maximo, modalidad de entrega y tiempos estimados de SOAT y matricula.</p>
 <p>7. Registre proveedor SOAT y tramitador de matricula cuando la empresa ya tenga esos responsables definidos.</p>
-<p>8. Marque la sede como activa y guarde.</p>
-<p>Esta configuracion servira para que proximas funciones puedan usar condiciones por sede en cotizaciones, tramites, promociones, entregas y reportes.</p>
+<p>8. En <strong>Inventario externo de esta sede</strong>, escriba la base SQL donde estan las tablas <strong>Bodega</strong> y <strong>INVENTARIO_EXISTENCIA</strong>. Ejemplo: <strong>Inventariomotosycarros</strong>.</p>
+<p>9. Presione <strong>Cargar bodegas</strong> para traer codigo y nombre desde la tabla <strong>Bodega</strong>.</p>
+<p>10. Seleccione las bodegas que pertenecen a esa sede.</p>
+<p>11. Marque la sede como activa y guarde.</p>
+<p>La configuracion de inventario por sede controla que existencias puede consultar el usuario. Si un vendedor tiene una sede asociada, el inventario que vera en cotizaciones sera el de la base y bodegas configuradas en esa sede. La seleccion desde la tabla <strong>Bodega</strong> evita errores al escribir codigos manualmente.</p>
 <h3>Perfiles de requisitos</h3>
 <p>1. Entre a <strong>Configuracion</strong>.</p>
 <p>2. Busque la tarjeta <strong>Perfiles de requisitos</strong>.</p>
@@ -554,7 +554,8 @@
 <h2>26. Historial del manual</h2>
 <table>
 <thead><tr><th>Fecha</th><th>Version</th><th>Cambio</th></tr></thead><tbody>
-<tr><td>2026-07-31</td><td>9.5</td><td>Se agrega carga de bodegas desde la tabla Bodega de la base de inventario para seleccionar codigos correctos en la empresa.</td></tr>
+<tr><td>2026-08-01</td><td>9.6</td><td>Se mueve la configuracion de base de inventario y bodegas desde Empresas hacia Sedes / puntos de venta, para que el usuario consulte segun su sede asociada.</td></tr>
+<tr><td>2026-07-31</td><td>9.5</td><td>Se agrega carga de bodegas desde la tabla Bodega de la base de inventario para seleccionar codigos correctos.</td></tr>
 <tr><td>2026-07-31</td><td>9.4</td><td>Se agrega configuracion de base de datos de inventario por empresa, ademas de bodegas permitidas, para separar inventarios entre empresas.</td></tr>
 <tr><td>2026-07-31</td><td>9.3</td><td>Se agrega configuracion de bodegas externas por empresa para controlar que inventario puede consultar cada empresa en cotizaciones.</td></tr>
 <tr><td>2026-07-31</td><td>9.2</td><td>Se agrega busqueda de inventario externo en tiempo real dentro de Cotizaciones para validar disponibilidad por bodega antes de seleccionar el articulo.</td></tr>

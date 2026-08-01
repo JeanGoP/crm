@@ -165,6 +165,8 @@ public sealed record SalesPointDto(
     string? SoatProvider,
     string? RegistrationAgent,
     string? CommercialTerms,
+    string? ExternalInventoryDatabaseName,
+    string? ExternalInventoryWarehouseCodes,
     bool Active);
 
 public sealed record UpsertSalesPointDto(
@@ -184,6 +186,8 @@ public sealed record UpsertSalesPointDto(
     string? SoatProvider,
     string? RegistrationAgent,
     string? CommercialTerms,
+    string? ExternalInventoryDatabaseName,
+    string? ExternalInventoryWarehouseCodes,
     bool Active);
 
 public sealed record QuoteSimulationDto(
