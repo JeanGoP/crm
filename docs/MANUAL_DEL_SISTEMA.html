@@ -1,7 +1,7 @@
 <!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Manual de usuario - EnMarcha CRM</title><style>:root{color-scheme:light;--ink:#111827;--muted:#526071;--line:#d8e0e8;--brand:#155e75;--paper:#fff;--bg:#f5f7fb}body{margin:0;font-family:Inter,Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--ink);line-height:1.65}main{max-width:1040px;margin:0 auto;padding:42px 24px 72px}h1{font-size:38px;line-height:1.1;margin:0 0 18px;color:#0f172a}h2{font-size:26px;margin:44px 0 12px;padding-top:18px;border-top:1px solid var(--line);color:#0f172a}h3{font-size:18px;margin:24px 0 8px;color:var(--brand)}p,li{font-size:15px;color:var(--ink)}p{margin:8px 0}ul{margin:8px 0 14px 24px;padding:0}code{background:#eef5f8;color:#0f4f63;padding:2px 5px;border-radius:4px}figure{margin:18px 0 28px;border:1px solid var(--line);background:var(--paper);border-radius:10px;overflow:hidden;box-shadow:0 8px 22px rgba(15,23,42,.08)}figure img{display:block;width:100%;height:auto}figcaption{font-size:13px;color:var(--muted);padding:10px 14px;background:#fbfdff;border-top:1px solid var(--line)}table{width:100%;border-collapse:collapse;margin:14px 0 24px;background:var(--paper);border:1px solid var(--line)}th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);font-size:14px;vertical-align:top}th{background:#eef5f8;color:#0f4f63}.cover{background:#fff;border:1px solid var(--line);border-radius:10px;padding:24px 28px;margin-bottom:28px;box-shadow:0 8px 22px rgba(15,23,42,.06)}@media print{body{background:white}main{max-width:none;padding:0}figure{break-inside:avoid;box-shadow:none}h2{break-after:avoid}.cover{box-shadow:none}}</style></head><body><main>
 <div class="cover"><h1>Manual de usuario - EnMarcha CRM</h1>
 <p><strong>Ultima actualizacion:</strong> 2026-08-01</p>
-<p><strong>Version del manual:</strong> 9.9</p>
+<p><strong>Version del manual:</strong> 10.0</p>
 <p><strong>Sistema:</strong> EnMarcha CRM para gestion comercial y ventas a credito</p></div>
 <h2>1. Bienvenida</h2>
 <p>Este manual explica como usar el CRM en la operacion diaria. Esta dirigido a vendedores, supervisores y administradores que necesitan registrar clientes, crear cotizaciones, hacer seguimiento comercial, gestionar solicitudes de credito, controlar entregas y revisar reportes.</p>
@@ -148,16 +148,16 @@
 <p>8. Revise el mensaje final con productos creados, actualizados y posibles errores por fila.</p>
 <p>La carga masiva crea productos nuevos o actualiza productos existentes usando la <strong>Referencia</strong> como identificador. Solo los usuarios con rol <strong>Administrador</strong> pueden usar esta opcion.</p>
 <h3>Sincronizar productos desde inventario</h3>
-<p>Cuando la empresa tiene inventario conectado y la sede tiene bodegas configuradas, el administrador puede alimentar el catalogo desde los articulos existentes en las bodegas de esa sede.</p>
+<p>Cuando la empresa tiene inventario conectado y la sede del usuario tiene bodegas configuradas, el administrador puede alimentar el catalogo desde los articulos existentes en esas bodegas. No se escoge sede manualmente: el sistema usa la sede asignada al usuario conectado.</p>
 <p>1. Entre a <strong>Productos</strong>.</p>
-<p>2. En <strong>Carga masiva de productos</strong>, seleccione la sede.</p>
-<p>3. Presione <strong>Sincronizar inventario</strong>.</p>
-<p>4. El sistema revisa solo los articulos con existencia en las bodegas configuradas para esa sede.</p>
-<p>5. Si la referencia ya existe en el catalogo, la deja igual.</p>
-<p>6. Si la referencia no existe, crea el producto como <strong>Pendiente precio</strong>.</p>
-<p>7. Edite el producto creado, complete precio, categoria, marca, modelo, cargos o foto si aplica.</p>
-<p>8. Active el producto cuando ya este listo para cotizar.</p>
+<p>2. En <strong>Carga masiva de productos</strong>, presione <strong>Sincronizar inventario</strong>.</p>
+<p>3. El sistema revisa solo los articulos con existencia en las bodegas configuradas para la sede del usuario.</p>
+<p>4. Si la referencia ya existe en el catalogo, la deja igual.</p>
+<p>5. Si la referencia no existe, crea el producto como <strong>Pendiente precio</strong>.</p>
+<p>6. Edite el producto creado, complete precio, categoria, marca, modelo, cargos o foto si aplica.</p>
+<p>7. Active el producto cuando ya este listo para cotizar.</p>
 <p>Los productos sincronizados sin precio no quedan listos para cotizacion hasta que el administrador complete el valor comercial y los active.</p>
+<p>El listado de productos tambien respeta esta regla: cuando hay inventario conectado, se muestran los productos que existen en las bodegas permitidas para la sede correspondiente.</p>
 <h3>Recomendacion de uso</h3>
 <p>Mantenga precios, modelos, cargos, vigencias y estados actualizados. Una cotizacion depende de que el producto tenga informacion correcta.</p>
 <h2>10. Inventario comercial</h2>
@@ -565,6 +565,7 @@
 <h2>26. Historial del manual</h2>
 <table>
 <thead><tr><th>Fecha</th><th>Version</th><th>Cambio</th></tr></thead><tbody>
+<tr><td>2026-08-01</td><td>10.0</td><td>Se elimina el selector de sede en Productos; el catalogo y la sincronizacion usan automaticamente las bodegas de la sede asignada al usuario.</td></tr>
 <tr><td>2026-08-01</td><td>9.9</td><td>Se ajusta la sincronizacion de productos para seleccionar una sede y usar solo las bodegas configuradas en esa sede.</td></tr>
 <tr><td>2026-08-01</td><td>9.8</td><td>Se agrega sincronizacion del catalogo de productos desde inventario externo y estado Pendiente precio para completar valores antes de cotizar.</td></tr>
 <tr><td>2026-08-01</td><td>9.7</td><td>Se separa la configuracion de inventario: la base de datos pertenece a Empresas y las bodegas permitidas pertenecen a Sedes / puntos de venta.</td></tr>

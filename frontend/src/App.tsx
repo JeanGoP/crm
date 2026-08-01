@@ -1154,16 +1154,9 @@ function ProductsPage() {
   const [notice, setNotice] = useState<Notice>();
   const [importing, setImporting] = useState(false);
   const [syncingInventory, setSyncingInventory] = useState(false);
-  const [inventorySalesPointId, setInventorySalesPointId] = useState('');
   const canManage = useCanManage();
   const canBulkImport = roles.includes('Administrador');
   const activeSalesPoints = salesPoints.filter((point) => point.active);
-
-  useEffect(() => {
-    if (!inventorySalesPointId && activeSalesPoints.length) {
-      setInventorySalesPointId(activeSalesPoints[0].id);
-    }
-  }, [activeSalesPoints, inventorySalesPointId]);
 
   const save = async (payload: typeof emptyProduct) => {
     const body = {
@@ -1245,16 +1238,9 @@ function ProductsPage() {
   };
 
   const syncExternalInventory = async () => {
-    if (!inventorySalesPointId) {
-      setNotice({ type: 'error', text: 'Seleccione la sede que tiene las bodegas a sincronizar.' });
-      return;
-    }
-
     setSyncingInventory(true);
     try {
-      const { data } = await api.post<ProductInventorySyncResult>('/api/products/sync-external-inventory', null, {
-        params: { salesPointId: inventorySalesPointId }
-      });
+      const { data } = await api.post<ProductInventorySyncResult>('/api/products/sync-external-inventory');
       await reload();
       const warningText = data.warnings?.length ? ` ${data.warnings.join(' ')}` : '';
       setNotice({
@@ -1274,22 +1260,10 @@ function ProductsPage() {
       <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', md: 'center' }} gap={1.5}>
         <Box>
           <Typography fontWeight={900}>Carga masiva de productos</Typography>
-          <Typography color="text.secondary" fontSize={13}>Descargue la plantilla CSV o sincronice los productos disponibles en las bodegas configuradas.</Typography>
+          <Typography color="text.secondary" fontSize={13}>Descargue la plantilla CSV o sincronice los productos disponibles en las bodegas de la sede asignada.</Typography>
         </Box>
         <Stack direction={{ xs: 'column', sm: 'row' }} gap={1}>
-          <TextField
-            select
-            size="small"
-            label="Sede"
-            value={inventorySalesPointId}
-            onChange={(e) => setInventorySalesPointId(e.target.value)}
-            sx={{ minWidth: { sm: 240 } }}
-          >
-            {activeSalesPoints.length
-              ? activeSalesPoints.map((point) => <MenuItem key={point.id} value={point.id}>{point.name} - {point.city}</MenuItem>)
-              : <MenuItem value="">Sin sedes activas</MenuItem>}
-          </TextField>
-          <Button variant="outlined" startIcon={<Inventory2 />} disabled={syncingInventory || !inventorySalesPointId} onClick={() => void syncExternalInventory()}>
+          <Button variant="outlined" startIcon={<Inventory2 />} disabled={syncingInventory} onClick={() => void syncExternalInventory()}>
             {syncingInventory ? 'Sincronizando...' : 'Sincronizar inventario'}
           </Button>
           <Button variant="outlined" startIcon={<Download />} onClick={() => void downloadImportTemplate()}>Descargar plantilla</Button>

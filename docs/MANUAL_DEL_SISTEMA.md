@@ -1,7 +1,7 @@
 # Manual de usuario - EnMarcha CRM
 
 Ultima actualizacion: 2026-08-01  
-Version del manual: 9.9
+Version del manual: 10.0
 Sistema: EnMarcha CRM para gestion comercial y ventas a credito  
 
 ## 1. Bienvenida
@@ -219,18 +219,19 @@ La carga masiva crea productos nuevos o actualiza productos existentes usando la
 
 ### Sincronizar productos desde inventario
 
-Cuando la empresa tiene inventario conectado y la sede tiene bodegas configuradas, el administrador puede alimentar el catalogo desde los articulos existentes en las bodegas de esa sede.
+Cuando la empresa tiene inventario conectado y la sede del usuario tiene bodegas configuradas, el administrador puede alimentar el catalogo desde los articulos existentes en esas bodegas. No se escoge sede manualmente: el sistema usa la sede asignada al usuario conectado.
 
 1. Entre a **Productos**.
-2. En **Carga masiva de productos**, seleccione la sede.
-3. Presione **Sincronizar inventario**.
-4. El sistema revisa solo los articulos con existencia en las bodegas configuradas para esa sede.
-5. Si la referencia ya existe en el catalogo, la deja igual.
-6. Si la referencia no existe, crea el producto como **Pendiente precio**.
-7. Edite el producto creado, complete precio, categoria, marca, modelo, cargos o foto si aplica.
-8. Active el producto cuando ya este listo para cotizar.
+2. En **Carga masiva de productos**, presione **Sincronizar inventario**.
+3. El sistema revisa solo los articulos con existencia en las bodegas configuradas para la sede del usuario.
+4. Si la referencia ya existe en el catalogo, la deja igual.
+5. Si la referencia no existe, crea el producto como **Pendiente precio**.
+6. Edite el producto creado, complete precio, categoria, marca, modelo, cargos o foto si aplica.
+7. Active el producto cuando ya este listo para cotizar.
 
 Los productos sincronizados sin precio no quedan listos para cotizacion hasta que el administrador complete el valor comercial y los active.
+
+El listado de productos tambien respeta esta regla: cuando hay inventario conectado, se muestran los productos que existen en las bodegas permitidas para la sede correspondiente.
 
 ### Recomendacion de uso
 
@@ -784,6 +785,7 @@ El sistema muestra mensajes cuando algo no puede completarse.
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-08-01 | 10.0 | Se elimina el selector de sede en Productos; el catalogo y la sincronizacion usan automaticamente las bodegas de la sede asignada al usuario. |
 | 2026-08-01 | 9.9 | Se ajusta la sincronizacion de productos para seleccionar una sede y usar solo las bodegas configuradas en esa sede. |
 | 2026-08-01 | 9.8 | Se agrega sincronizacion del catalogo de productos desde inventario externo y estado Pendiente precio para completar valores antes de cotizar. |
 | 2026-08-01 | 9.7 | Se separa la configuracion de inventario: la base de datos pertenece a Empresas y las bodegas permitidas pertenecen a Sedes / puntos de venta. |
