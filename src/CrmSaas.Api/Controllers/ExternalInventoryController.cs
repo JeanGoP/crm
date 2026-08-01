@@ -43,6 +43,7 @@ public sealed class ExternalInventoryController(IConfiguration configuration, Cr
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
         var products = await db.Productos
+            .Include(x => x.PreciosPorSede)
             .Where(x => productReferences.Contains(x.Referencia))
             .ToListAsync(cancellationToken);
         var productsByReference = products
@@ -52,6 +53,8 @@ public sealed class ExternalInventoryController(IConfiguration configuration, Cr
         return Ok(rows.Select(row =>
         {
             productsByReference.TryGetValue(row.Code, out var product);
+            var productPrice = product is null ? (decimal?)null : ResolveProductPrice(product, inventoryConfig.SalesPointId);
+            var isQuoteReady = product is not null && product.Activo && productPrice.GetValueOrDefault() > 0;
             var (engine, chassis) = ParseSerial(row.SerialNumber);
             return new ExternalInventoryItemDto(
                 row.WarehouseCode,
@@ -65,8 +68,9 @@ public sealed class ExternalInventoryController(IConfiguration configuration, Cr
                 row.Quantity,
                 product?.Id,
                 product is null ? null : ProductName(product),
-                product?.Precio,
-                product is not null && product.Activo);
+                productPrice,
+                product?.Activo ?? false,
+                isQuoteReady);
         }).ToList());
     }
 
@@ -223,22 +227,24 @@ public sealed class ExternalInventoryController(IConfiguration configuration, Cr
     {
         if (tenantContext.EmpresaId is not Guid companyId)
         {
-            return new ExternalInventoryConfig(null, []);
+            return new ExternalInventoryConfig(null, [], null);
         }
 
         var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (!Guid.TryParse(userIdValue, out var userId))
         {
-            return new ExternalInventoryConfig(null, []);
+            return new ExternalInventoryConfig(null, [], null);
         }
 
         var databaseName = await GetCompanyDatabaseNameAsync(cancellationToken);
         var warehouseCodes = await db.Usuarios
             .Where(x => x.Id == userId && x.EmpresaId == companyId && x.PuntoVentaId.HasValue)
-            .Select(x => x.PuntoVenta!.BodegasInventarioExterno)
+            .Select(x => new { x.PuntoVentaId, x.PuntoVenta!.BodegasInventarioExterno })
             .FirstOrDefaultAsync(cancellationToken);
 
-        return new ExternalInventoryConfig(databaseName, ParseWarehouseCodes(warehouseCodes));
+        return warehouseCodes is null
+            ? new ExternalInventoryConfig(databaseName, [], null)
+            : new ExternalInventoryConfig(databaseName, ParseWarehouseCodes(warehouseCodes.BodegasInventarioExterno), warehouseCodes.PuntoVentaId);
     }
 
     private async Task<string?> GetCompanyDatabaseNameAsync(CancellationToken cancellationToken)
@@ -334,6 +340,23 @@ public sealed class ExternalInventoryController(IConfiguration configuration, Cr
         return $"{product.Marca} {product.Modelo} {product.Referencia}".Trim();
     }
 
+    private static decimal ResolveProductPrice(Producto product, Guid? salesPointId)
+    {
+        if (salesPointId.HasValue && IsApplianceCategory(product.Categoria))
+        {
+            var salesPointPrice = product.PreciosPorSede
+                .Where(x => x.Activo && x.PuntoVentaId == salesPointId.Value)
+                .OrderByDescending(x => x.VigenteDesde ?? DateTime.MinValue)
+                .FirstOrDefault();
+            if (salesPointPrice is not null) return salesPointPrice.Precio;
+        }
+
+        return product.Precio;
+    }
+
+    private static bool IsApplianceCategory(string category) =>
+        category.Contains("electrodom", StringComparison.OrdinalIgnoreCase);
+
     private sealed record ExternalInventoryRow(string WarehouseCode, string WarehouseName, string Code, string Name, string? Presentation, string? SerialNumber, int Quantity);
-    private sealed record ExternalInventoryConfig(string? DatabaseName, IReadOnlyCollection<string> AllowedWarehouses);
+    private sealed record ExternalInventoryConfig(string? DatabaseName, IReadOnlyCollection<string> AllowedWarehouses, Guid? SalesPointId);
 }

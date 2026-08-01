@@ -1,7 +1,7 @@
 # Manual de usuario - EnMarcha CRM
 
 Ultima actualizacion: 2026-08-01  
-Version del manual: 10.0
+Version del manual: 10.1
 Sistema: EnMarcha CRM para gestion comercial y ventas a credito  
 
 ## 1. Bienvenida
@@ -229,7 +229,7 @@ Cuando la empresa tiene inventario conectado y la sede del usuario tiene bodegas
 6. Edite el producto creado, complete precio, categoria, marca, modelo, cargos o foto si aplica.
 7. Active el producto cuando ya este listo para cotizar.
 
-Los productos sincronizados sin precio no quedan listos para cotizacion hasta que el administrador complete el valor comercial y los active.
+Los productos sincronizados sin precio no quedan listos para cotizacion hasta que el administrador complete el valor comercial. Si el producto venia como **Pendiente precio**, al guardar un precio mayor a cero queda listo para usarse en cotizaciones.
 
 El listado de productos tambien respeta esta regla: cuando hay inventario conectado, se muestran los productos que existen en las bodegas permitidas para la sede correspondiente.
 
@@ -785,6 +785,7 @@ El sistema muestra mensajes cuando algo no puede completarse.
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-08-01 | 10.1 | Se mejora la lectura de precio en inventario externo para usar el precio efectivo de cotizacion y mostrar si falta producto, precio o activacion. |
 | 2026-08-01 | 10.0 | Se elimina el selector de sede en Productos; el catalogo y la sincronizacion usan automaticamente las bodegas de la sede asignada al usuario. |
 | 2026-08-01 | 9.9 | Se ajusta la sincronizacion de productos para seleccionar una sede y usar solo las bodegas configuradas en esa sede. |
 | 2026-08-01 | 9.8 | Se agrega sincronizacion del catalogo de productos desde inventario externo y estado Pendiente precio para completar valores antes de cotizar. |

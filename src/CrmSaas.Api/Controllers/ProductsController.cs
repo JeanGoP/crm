@@ -239,16 +239,19 @@ public sealed class ProductsController(CrmDbContext db, IConfiguration configura
         }
 
         var references = externalProducts.Select(x => x.Code).ToArray();
-        var existingReferences = await db.Productos
+        var existingProducts = await db.Productos
             .Where(x => references.Contains(x.Referencia))
-            .Select(x => x.Referencia)
             .ToListAsync(cancellationToken);
-        var existingSet = existingReferences.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var existingProductsByReference = existingProducts
+            .GroupBy(x => x.Referencia, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(x => x.Key, x => x.First(), StringComparer.OrdinalIgnoreCase);
+        var existingSet = existingProductsByReference.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         var category = await EnsureExternalInventoryCategoryAsync(cancellationToken);
         var created = 0;
         var existing = 0;
         var skipped = 0;
+        var activated = 0;
         foreach (var item in externalProducts)
         {
             if (string.IsNullOrWhiteSpace(item.Code))
@@ -259,6 +262,15 @@ public sealed class ProductsController(CrmDbContext db, IConfiguration configura
 
             if (existingSet.Contains(item.Code))
             {
+                var existingProduct = existingProductsByReference[item.Code];
+                if (!existingProduct.Activo
+                    && existingProduct.Precio > 0
+                    && string.Equals(existingProduct.Categoria, ExternalInventoryCategory, StringComparison.OrdinalIgnoreCase))
+                {
+                    existingProduct.Activo = true;
+                    activated++;
+                }
+
                 existing++;
                 continue;
             }
@@ -284,7 +296,7 @@ public sealed class ProductsController(CrmDbContext db, IConfiguration configura
             created++;
         }
 
-        if (created > 0)
+        if (created > 0 || activated > 0)
         {
             await db.SaveChangesAsync(cancellationToken);
         }
@@ -292,6 +304,10 @@ public sealed class ProductsController(CrmDbContext db, IConfiguration configura
         if (created >= MaxExternalInventorySyncRows)
         {
             warnings.Add("Se alcanzo el limite de sincronizacion. Si faltan productos, revise filtros o bodegas configuradas.");
+        }
+        if (activated > 0)
+        {
+            warnings.Add($"Productos reactivados por tener precio: {activated}.");
         }
 
         return Ok(new ProductInventorySyncResultDto(created, existing, skipped, created, warnings));
@@ -342,6 +358,9 @@ public sealed class ProductsController(CrmDbContext db, IConfiguration configura
             .Include(x => x.PreciosPorSede).ThenInclude(x => x.PuntoVenta)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
             ?? throw new KeyNotFoundException("Producto no encontrado.");
+        var shouldActivateCompletedExternalProduct = product.Precio <= 0
+            && dto.Price > 0
+            && string.Equals(product.Categoria, ExternalInventoryCategory, StringComparison.OrdinalIgnoreCase);
         product.Nombre = dto.Name.Trim();
         product.Categoria = category.Nombre;
         product.Marca = dto.Brand.Trim();
@@ -359,7 +378,7 @@ public sealed class ProductsController(CrmDbContext db, IConfiguration configura
         product.Impuestos = dto.Taxes;
         product.FichaTecnica = NormalizeOptional(dto.TechnicalSheet);
         product.VigenteDesde = dto.PriceValidFrom;
-        product.Activo = dto.Active;
+        product.Activo = dto.Active || shouldActivateCompletedExternalProduct;
         await ApplySalesPointPricesAsync(product, dto, category.Nombre, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         return Ok(ToDto(product));

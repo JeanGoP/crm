@@ -4304,11 +4304,13 @@ function QuoteDialog({ form, products, productCategories, requirementProfiles, o
                       <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
                         {item.isInCatalog && item.productId
                           ? <Typography variant="caption" color="success.main" fontWeight={800}>Catalogo CRM: {money(item.productPrice ?? 0)}</Typography>
-                          : <Typography variant="caption" color="warning.main" fontWeight={800}>Sin producto/precio CRM</Typography>}
+                          : <Typography variant="caption" color="warning.main" fontWeight={800}>
+                            {!item.productId ? 'Sin producto CRM' : !item.productActive ? 'Producto inactivo' : 'Sin precio CRM'}
+                          </Typography>}
                         <Button
                           size="small"
                           variant="outlined"
-                          disabled={!item.isInCatalog || !item.productId}
+                          disabled={!item.isInCatalog || !item.productId || Number(item.productPrice ?? 0) <= 0}
                           onClick={() => item.productId && updateItemProduct(Math.min(inventoryTargetIndex, quoteItems.length - 1), item.productId)}
                         >
                           Usar

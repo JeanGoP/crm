@@ -159,6 +159,7 @@ export interface ExternalInventoryItem {
   productId?: string;
   productName?: string;
   productPrice?: number;
+  productActive: boolean;
   isInCatalog: boolean;
 }
 
