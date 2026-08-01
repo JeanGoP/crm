@@ -1,7 +1,7 @@
 # Manual de usuario - EnMarcha CRM
 
 Ultima actualizacion: 2026-08-01  
-Version del manual: 9.7
+Version del manual: 9.8
 Sistema: EnMarcha CRM para gestion comercial y ventas a credito  
 
 ## 1. Bienvenida
@@ -216,6 +216,20 @@ Esta opcion permite que un administrador suba varios productos al sistema usando
 8. Revise el mensaje final con productos creados, actualizados y posibles errores por fila.
 
 La carga masiva crea productos nuevos o actualiza productos existentes usando la **Referencia** como identificador. Solo los usuarios con rol **Administrador** pueden usar esta opcion.
+
+### Sincronizar productos desde inventario
+
+Cuando la empresa tiene inventario conectado y las sedes tienen bodegas configuradas, el administrador puede alimentar el catalogo desde los articulos existentes en esas bodegas.
+
+1. Entre a **Productos**.
+2. En **Carga masiva de productos**, presione **Sincronizar inventario**.
+3. El sistema revisa los articulos con existencia en las bodegas permitidas.
+4. Si la referencia ya existe en el catalogo, la deja igual.
+5. Si la referencia no existe, crea el producto como **Pendiente precio**.
+6. Edite el producto creado, complete precio, categoria, marca, modelo, cargos o foto si aplica.
+7. Active el producto cuando ya este listo para cotizar.
+
+Los productos sincronizados sin precio no quedan listos para cotizacion hasta que el administrador complete el valor comercial y los active.
 
 ### Recomendacion de uso
 
@@ -769,6 +783,7 @@ El sistema muestra mensajes cuando algo no puede completarse.
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-08-01 | 9.8 | Se agrega sincronizacion del catalogo de productos desde inventario externo y estado Pendiente precio para completar valores antes de cotizar. |
 | 2026-08-01 | 9.7 | Se separa la configuracion de inventario: la base de datos pertenece a Empresas y las bodegas permitidas pertenecen a Sedes / puntos de venta. |
 | 2026-08-01 | 9.6 | Se revisa la configuracion de inventario para que el usuario consulte segun su sede asociada. |
 | 2026-07-31 | 9.5 | Se agrega carga de bodegas desde la tabla Bodega de la base de inventario para seleccionar codigos correctos. |

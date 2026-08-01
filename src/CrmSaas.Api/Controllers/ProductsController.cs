@@ -1,11 +1,14 @@
+using System.Data;
 using System.Globalization;
 using System.Text;
+using CrmSaas.Application.Abstractions;
 using CrmSaas.Application.DTOs;
 using CrmSaas.Domain.Entities;
 using CrmSaas.Infrastructure.Persistence;
 using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 
 namespace CrmSaas.Api.Controllers;
@@ -13,8 +16,12 @@ namespace CrmSaas.Api.Controllers;
 [ApiController]
 [Authorize]
 [Route("api/products")]
-public sealed class ProductsController(CrmDbContext db) : ControllerBase
+public sealed class ProductsController(CrmDbContext db, IConfiguration configuration, ITenantContext tenantContext) : ControllerBase
 {
+    private const string ExternalInventoryCategory = "Inventario externo";
+    private const int MaxExternalInventorySyncRows = 1500;
+    private const string InventorySchema = "dbo";
+    private const string InventoryView = "INVENTARIO_EXISTENCIA";
     private static readonly string[] ImportHeaders =
     [
         "Nombre",
@@ -181,6 +188,87 @@ public sealed class ProductsController(CrmDbContext db) : ControllerBase
         }
 
         return Ok(new { created, updated, errors, totalErrors = errors.Count });
+    }
+
+    [HttpPost("sync-external-inventory")]
+    [Authorize(Roles = "Administrador")]
+    public async Task<ActionResult<ProductInventorySyncResultDto>> SyncExternalInventory(CancellationToken cancellationToken)
+    {
+        var inventoryConfig = await GetCompanyInventoryConfigAsync(cancellationToken);
+        var warnings = new List<string>();
+        if (string.IsNullOrWhiteSpace(inventoryConfig.DatabaseName))
+        {
+            return BadRequest(new { detail = "Configure primero la base de datos de inventario en la empresa." });
+        }
+
+        if (inventoryConfig.AllowedWarehouses.Count == 0)
+        {
+            return BadRequest(new { detail = "Configure bodegas de inventario en las sedes o puntos de venta." });
+        }
+
+        var externalProducts = await ReadExternalInventoryProductsAsync(inventoryConfig, cancellationToken);
+        if (externalProducts.Count == 0)
+        {
+            return Ok(new ProductInventorySyncResultDto(0, 0, 0, 0, ["No se encontraron productos con existencia en las bodegas configuradas."]));
+        }
+
+        var references = externalProducts.Select(x => x.Code).ToArray();
+        var existingReferences = await db.Productos
+            .Where(x => references.Contains(x.Referencia))
+            .Select(x => x.Referencia)
+            .ToListAsync(cancellationToken);
+        var existingSet = existingReferences.ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var category = await EnsureExternalInventoryCategoryAsync(cancellationToken);
+        var created = 0;
+        var existing = 0;
+        var skipped = 0;
+        foreach (var item in externalProducts)
+        {
+            if (string.IsNullOrWhiteSpace(item.Code))
+            {
+                skipped++;
+                continue;
+            }
+
+            if (existingSet.Contains(item.Code))
+            {
+                existing++;
+                continue;
+            }
+
+            var product = new Producto
+            {
+                Nombre = item.Name,
+                Categoria = category.Nombre,
+                Marca = GuessBrand(item.Name),
+                Modelo = item.Name,
+                Referencia = item.Code,
+                Descripcion = NormalizeOptional(item.Presentation),
+                Color = NormalizeOptional(item.Presentation),
+                Precio = 0,
+                Soat = 0,
+                Matricula = 0,
+                Impuestos = 0,
+                FichaTecnica = BuildExternalInventoryTechnicalSheet(item),
+                Activo = false
+            };
+            db.Productos.Add(product);
+            existingSet.Add(item.Code);
+            created++;
+        }
+
+        if (created > 0)
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
+        if (created >= MaxExternalInventorySyncRows)
+        {
+            warnings.Add("Se alcanzo el limite de sincronizacion. Si faltan productos, revise filtros o bodegas configuradas.");
+        }
+
+        return Ok(new ProductInventorySyncResultDto(created, existing, skipped, created, warnings));
     }
 
     [HttpPost]
@@ -471,6 +559,166 @@ public sealed class ProductsController(CrmDbContext db) : ControllerBase
             ?? throw new ValidationException("La categoria no existe o esta inactiva. Creela primero en Configuracion.");
     }
 
+    private async Task<CategoriaProducto> EnsureExternalInventoryCategoryAsync(CancellationToken cancellationToken)
+    {
+        var category = await db.CategoriasProducto.FirstOrDefaultAsync(x => x.Nombre == ExternalInventoryCategory, cancellationToken);
+        if (category is not null)
+        {
+            if (!category.Activa)
+            {
+                category.Activa = true;
+            }
+
+            return category;
+        }
+
+        category = new CategoriaProducto
+        {
+            Nombre = ExternalInventoryCategory,
+            Descripcion = "Productos creados automaticamente desde el inventario externo.",
+            CotizarComoPaquete = false,
+            Activa = true
+        };
+        db.CategoriasProducto.Add(category);
+        return category;
+    }
+
+    private async Task<ExternalInventoryProductConfig> GetCompanyInventoryConfigAsync(CancellationToken cancellationToken)
+    {
+        if (tenantContext.EmpresaId is not Guid companyId)
+        {
+            return new ExternalInventoryProductConfig(null, []);
+        }
+
+        var databaseName = await db.Empresas
+            .IgnoreQueryFilters()
+            .Where(x => x.Id == companyId)
+            .Select(x => x.BaseDatosInventarioExterno)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var warehouseValues = await db.PuntosVenta
+            .Where(x => x.Activa && x.BodegasInventarioExterno != null && x.BodegasInventarioExterno != "")
+            .Select(x => x.BodegasInventarioExterno!)
+            .ToListAsync(cancellationToken);
+
+        return new ExternalInventoryProductConfig(NormalizeDatabaseName(databaseName), ParseWarehouseCodes(warehouseValues));
+    }
+
+    private async Task<IReadOnlyCollection<ExternalInventoryProductRow>> ReadExternalInventoryProductsAsync(ExternalInventoryProductConfig inventoryConfig, CancellationToken cancellationToken)
+    {
+        var connectionString = configuration.GetConnectionString("ExternalInventoryConnection");
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            connectionString = configuration.GetConnectionString("DefaultConnection");
+        }
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            throw new InvalidOperationException("No hay cadena de conexion configurada para el inventario externo.");
+        }
+
+        var warehouseParameters = inventoryConfig.AllowedWarehouses.Select((_, index) => $"@AllowedWarehouse{index}").ToArray();
+        var rows = new List<ExternalInventoryProductRow>();
+        await using var connection = new SqlConnection(connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandType = CommandType.Text;
+        command.CommandText = $"""
+            SELECT TOP (@Take)
+                Codigo,
+                MAX(Nombre) AS Nombre,
+                MAX(Presentacion) AS Presentacion,
+                SUM(ISNULL(Existencias, 0)) AS Existencias
+            FROM {BuildInventoryViewName(inventoryConfig.DatabaseName)}
+            WHERE Codigo IS NOT NULL
+              AND LTRIM(RTRIM(Codigo)) <> ''
+              AND ISNULL(Existencias, 0) > 0
+              AND Bodega IN ({string.Join(", ", warehouseParameters)})
+            GROUP BY Codigo
+            ORDER BY MAX(Nombre), Codigo;
+            """;
+        command.Parameters.Add(new SqlParameter("@Take", SqlDbType.Int) { Value = MaxExternalInventorySyncRows });
+        foreach (var (allowedWarehouse, index) in inventoryConfig.AllowedWarehouses.Select((value, index) => (value, index)))
+        {
+            command.Parameters.Add(new SqlParameter($"@AllowedWarehouse{index}", SqlDbType.VarChar, 40) { Value = allowedWarehouse });
+        }
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            var code = ReadString(reader, "Codigo");
+            if (string.IsNullOrWhiteSpace(code))
+            {
+                continue;
+            }
+
+            var name = ReadString(reader, "Nombre");
+            rows.Add(new ExternalInventoryProductRow(
+                code,
+                string.IsNullOrWhiteSpace(name) ? code : name,
+                ReadNullableString(reader, "Presentacion"),
+                reader["Existencias"] == DBNull.Value ? 0 : Convert.ToInt32(reader["Existencias"])));
+        }
+
+        return rows;
+    }
+
+    private static string BuildInventoryViewName(string? databaseName)
+    {
+        var normalizedDatabase = NormalizeDatabaseName(databaseName);
+        if (string.IsNullOrWhiteSpace(normalizedDatabase))
+        {
+            throw new InvalidOperationException("No hay base de datos de inventario configurada para la empresa.");
+        }
+
+        return $"[{normalizedDatabase}].[{InventorySchema}].[{InventoryView}]";
+    }
+
+    private static string? NormalizeDatabaseName(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var name = value.Trim();
+        if (name.Length > 128 || !name.All(c => char.IsLetterOrDigit(c) || c == '_'))
+        {
+            throw new InvalidOperationException("La base de datos de inventario configurada para la empresa no es valida.");
+        }
+
+        return name;
+    }
+
+    private static IReadOnlyCollection<string> ParseWarehouseCodes(IReadOnlyCollection<string> values) =>
+        values
+            .SelectMany(value => value.Split([',', ';', '|', '\r', '\n', '\t', ' '], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            .Select(x => x.ToUpperInvariant())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+    private static string ReadString(IDataRecord reader, string name) =>
+        reader[name] == DBNull.Value ? string.Empty : Convert.ToString(reader[name])?.Trim() ?? string.Empty;
+
+    private static string? ReadNullableString(IDataRecord reader, string name)
+    {
+        var value = ReadString(reader, name);
+        return string.IsNullOrWhiteSpace(value) ? null : value;
+    }
+
+    private static string GuessBrand(string value)
+    {
+        var first = value.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).FirstOrDefault();
+        return string.IsNullOrWhiteSpace(first) ? "Inventario" : first;
+    }
+
+    private static string? BuildExternalInventoryTechnicalSheet(ExternalInventoryProductRow item)
+    {
+        var parts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(item.Presentation)) parts.Add($"Presentacion: {item.Presentation}");
+        parts.Add($"Existencia al sincronizar: {item.Quantity}");
+        return string.Join(Environment.NewLine, parts);
+    }
+
     private static string NormalizeCategory(string category) => string.IsNullOrWhiteSpace(category) ? "General" : category.Trim();
 
     private static bool IsApplianceCategory(string category) =>
@@ -578,4 +826,7 @@ public sealed class ProductsController(CrmDbContext db) : ControllerBase
         var normalized = value.Trim().ToUpperInvariant();
         return normalized is "SI" or "S" or "TRUE" or "1" or "ACTIVO" or "ACTIVA";
     }
+
+    private sealed record ExternalInventoryProductConfig(string? DatabaseName, IReadOnlyCollection<string> AllowedWarehouses);
+    private sealed record ExternalInventoryProductRow(string Code, string Name, string? Presentation, int Quantity);
 }

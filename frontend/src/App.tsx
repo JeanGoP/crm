@@ -244,6 +244,7 @@ const navGroups: NavGroup[] = [
 type Notice = { type: 'success' | 'error' | 'info'; text: string };
 type FormMode<T> = { open: boolean; item?: T };
 type ProductImportResult = { created: number; updated: number; totalErrors: number; errors: string[] };
+type ProductInventorySyncResult = { created: number; existing: number; skipped: number; pendingPrice: number; warnings: string[] };
 
 const emptyCustomer = {
   identificationType: 1,
@@ -1152,6 +1153,7 @@ function ProductsPage() {
   const [confirm, setConfirm] = useState<Product>();
   const [notice, setNotice] = useState<Notice>();
   const [importing, setImporting] = useState(false);
+  const [syncingInventory, setSyncingInventory] = useState(false);
   const canManage = useCanManage();
   const canBulkImport = roles.includes('Administrador');
 
@@ -1234,15 +1236,35 @@ function ProductsPage() {
     }
   };
 
+  const syncExternalInventory = async () => {
+    setSyncingInventory(true);
+    try {
+      const { data } = await api.post<ProductInventorySyncResult>('/api/products/sync-external-inventory');
+      await reload();
+      const warningText = data.warnings?.length ? ` ${data.warnings.join(' ')}` : '';
+      setNotice({
+        type: data.created > 0 ? 'success' : 'info',
+        text: `Sincronizacion finalizada. Nuevos: ${data.created}. Ya existian: ${data.existing}. Pendientes de precio: ${data.pendingPrice}.${warningText}`
+      });
+    } catch (err) {
+      setNotice({ type: 'error', text: apiError(err) });
+    } finally {
+      setSyncingInventory(false);
+    }
+  };
+
   return <Stack spacing={3}>
     <Header title="Productos" action={canManage ? 'Nuevo producto' : undefined} onAction={() => setForm({ open: true })} onRefresh={reload} />
     {canBulkImport && <Card><CardContent>
       <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', md: 'center' }} gap={1.5}>
         <Box>
           <Typography fontWeight={900}>Carga masiva de productos</Typography>
-          <Typography color="text.secondary" fontSize={13}>Descargue la plantilla CSV, diligenciela en Excel y subala para crear o actualizar por referencia.</Typography>
+          <Typography color="text.secondary" fontSize={13}>Descargue la plantilla CSV o sincronice los productos disponibles en las bodegas configuradas.</Typography>
         </Box>
         <Stack direction={{ xs: 'column', sm: 'row' }} gap={1}>
+          <Button variant="outlined" startIcon={<Inventory2 />} disabled={syncingInventory} onClick={() => void syncExternalInventory()}>
+            {syncingInventory ? 'Sincronizando...' : 'Sincronizar inventario'}
+          </Button>
           <Button variant="outlined" startIcon={<Download />} onClick={() => void downloadImportTemplate()}>Descargar plantilla</Button>
           <Button component="label" variant="contained" startIcon={<UploadFile />} disabled={importing}>
             {importing ? 'Subiendo...' : 'Subir productos'}
@@ -1281,10 +1303,12 @@ function ProductsPage() {
           <Typography color="text.secondary" sx={{ fontSize: 11.5, lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>S {money(r.soat ?? 0)} · M {money(r.registrationFee ?? 0)}</Typography>
         </Stack>,
         <Stack spacing={0.15}>
-          <Typography sx={{ fontSize: 12.5 }}>{money(r.price)}</Typography>
+          <Typography sx={{ fontSize: 12.5 }}>{r.price > 0 ? money(r.price) : 'Sin precio'}</Typography>
           {isApplianceCategoryName(r.category) && (r.salesPointPrices?.length ?? 0) > 0 && <Typography color="text.secondary" sx={{ fontSize: 11.5, lineHeight: 1.2 }}>{r.salesPointPrices.length} sede(s)</Typography>}
         </Stack>,
-        <StatusChip label={r.active ? 'Activa' : 'Inactiva'} tone={r.active ? 'success' : 'default'} />,
+        r.price <= 0
+          ? <StatusChip label="Pendiente precio" tone="warning" />
+          : <StatusChip label={r.active ? 'Activa' : 'Inactiva'} tone={r.active ? 'success' : 'default'} />,
         <Actions compact onEdit={canManage ? () => setForm({ open: true, item: r }) : undefined} onDelete={canManage && r.active ? () => setConfirm(r) : undefined} />
       ])}
     />
