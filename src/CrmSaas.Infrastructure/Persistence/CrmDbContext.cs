@@ -206,6 +206,12 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
         modelBuilder.Entity<CotizacionItem>().Property(x => x.CuotaMensualEstimada).HasPrecision(18, 2);
         modelBuilder.Entity<CotizacionItem>().Property(x => x.TotalPagarEstimado).HasPrecision(18, 2);
         modelBuilder.Entity<CotizacionItem>().Property(x => x.TipoCredito).HasMaxLength(40);
+        modelBuilder.Entity<CotizacionItem>().Property(x => x.CodigoBodegaInventario).HasMaxLength(40);
+        modelBuilder.Entity<CotizacionItem>().Property(x => x.NombreBodegaInventario).HasMaxLength(160);
+        modelBuilder.Entity<CotizacionItem>().Property(x => x.PresentacionInventario).HasMaxLength(240);
+        modelBuilder.Entity<CotizacionItem>().Property(x => x.NumeroSerieInventario).HasMaxLength(240);
+        modelBuilder.Entity<CotizacionItem>().Property(x => x.NumeroMotorInventario).HasMaxLength(80);
+        modelBuilder.Entity<CotizacionItem>().Property(x => x.NumeroChasisInventario).HasMaxLength(80);
         modelBuilder.Entity<CotizacionItem>().HasIndex(x => new { x.EmpresaId, x.CotizacionId });
         modelBuilder.Entity<CotizacionItem>().HasOne(x => x.Cotizacion).WithMany(x => x.Items).HasForeignKey(x => x.CotizacionId).OnDelete(DeleteBehavior.Cascade);
         modelBuilder.Entity<CotizacionItem>().HasOne(x => x.Producto).WithMany().HasForeignKey(x => x.ProductoId).OnDelete(DeleteBehavior.Restrict);

@@ -269,7 +269,13 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
             totalPayment,
             item.TipoCredito,
             item.UsoConfiguracionFinancieraEmpresa,
-            item.Orden);
+            item.Orden,
+            item.CodigoBodegaInventario,
+            item.NombreBodegaInventario,
+            item.PresentacionInventario,
+            item.NumeroSerieInventario,
+            item.NumeroMotorInventario,
+            item.NumeroChasisInventario);
     }
 
     private static CreditApplicationDto ToCreditApplicationDto(SolicitudCredito x)

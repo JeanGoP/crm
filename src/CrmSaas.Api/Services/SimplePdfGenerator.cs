@@ -477,6 +477,7 @@ public static class SimplePdfGenerator
 
     private static void DrawCommercialValues(StringBuilder commands, QuoteDto quote)
     {
+        var inventoryItem = quote.Items.OrderBy(x => x.Order).FirstOrDefault();
         var boxX = 132;
         var boxY = 200;
         var boxW = 435;
@@ -488,7 +489,7 @@ public static class SimplePdfGenerator
         var labels = new[]
         {
             "Forma de pago", "Modelo", "Precio Vehiculo", "Valor Tramites", "Valor Bono",
-            "Valor Dcto", "Accesorios", "Otros", "", "Financiera", "Cuota Inicial",
+            "Valor Dcto", "Chasis", "Motor", "", "Bodega", "Cuota Inicial",
             "Nro de Cuotas", "Valor de Cuotas", "Valor Garantia", "Valor Poliza RC"
         };
         var values = new[]
@@ -499,10 +500,10 @@ public static class SimplePdfGenerator
             Money(quote.AdministrativeFees),
             "-",
             quote.PromotionDiscount > 0 ? Money(quote.PromotionDiscount) : "-",
-            "-",
-            quote.Insurance > 0 ? Money(quote.Insurance) : "-",
+            Value(inventoryItem?.InventoryChassisNumber),
+            Value(inventoryItem?.InventoryEngineNumber),
             "",
-            "-",
+            Value(inventoryItem?.InventoryWarehouseName),
             quote.DownPayment > 0 ? Money(quote.DownPayment) : "-",
             quote.TermMonths > 0 ? quote.TermMonths.ToString(CultureInfo.InvariantCulture) : "-",
             quote.EstimatedMonthlyPayment > 0 ? Money(quote.EstimatedMonthlyPayment) : "-",
@@ -606,6 +607,10 @@ public static class SimplePdfGenerator
         {
             commands.AppendLine($"0.84 0.88 0.92 RG 0.4 w {x + 16} {rowY - 8} 488 24 re S");
             commands.AppendLine($"0.08 0.10 0.14 rg BT /F2 8 Tf {columns[0]} {rowY} Td ({Escape(Shorten(item.ProductName, 26))}) Tj ET");
+            if (!string.IsNullOrWhiteSpace(item.InventoryChassisNumber))
+            {
+                commands.AppendLine($"0.36 0.42 0.48 rg BT /F1 6 Tf {columns[0]} {rowY - 9} Td ({Escape(Shorten("Chasis: " + item.InventoryChassisNumber, 34))}) Tj ET");
+            }
             commands.AppendLine($"0.08 0.10 0.14 rg BT /F1 8 Tf {columns[1]} {rowY} Td ({Escape(Money(item.DiscountedProductPrice))}) Tj ET");
             commands.AppendLine($"0.08 0.10 0.14 rg BT /F1 8 Tf {columns[2]} {rowY} Td ({Escape(Money(item.DownPayment))}) Tj ET");
             commands.AppendLine($"0.08 0.10 0.14 rg BT /F1 8 Tf {columns[3]} {rowY} Td ({Escape(Money(item.FinancedAmount))}) Tj ET");

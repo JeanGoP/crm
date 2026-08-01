@@ -2,6 +2,7 @@ using System.Data;
 using System.Globalization;
 using System.Security.Claims;
 using System.Text;
+using System.Text.RegularExpressions;
 using CrmSaas.Application.Abstractions;
 using CrmSaas.Application.DTOs;
 using CrmSaas.Domain.Entities;
@@ -62,7 +63,7 @@ public sealed class ProductsController(CrmDbContext db, IConfiguration configura
             }
 
             var externalReferences = (await ReadExternalInventoryProductsAsync(inventoryConfig, cancellationToken))
-                .Select(x => x.Code)
+                .Select(x => x.Reference)
                 .Where(x => !string.IsNullOrWhiteSpace(x))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
@@ -238,11 +239,16 @@ public sealed class ProductsController(CrmDbContext db, IConfiguration configura
             return Ok(new ProductInventorySyncResultDto(0, 0, 0, 0, ["No se encontraron productos con existencia en las bodegas configuradas."]));
         }
 
-        var references = externalProducts.Select(x => x.Code).ToArray();
+        var references = externalProducts.Select(x => x.Reference).ToArray();
+        var codeReferences = externalProducts.Select(x => x.Code).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         var existingProducts = await db.Productos
-            .Where(x => references.Contains(x.Referencia))
+            .Where(x => references.Contains(x.Referencia) || codeReferences.Contains(x.Referencia))
             .ToListAsync(cancellationToken);
         var existingProductsByReference = existingProducts
+            .GroupBy(x => x.Referencia, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(x => x.Key, x => x.First(), StringComparer.OrdinalIgnoreCase);
+        var templateProductsByCode = existingProducts
+            .Where(x => codeReferences.Contains(x.Referencia))
             .GroupBy(x => x.Referencia, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(x => x.Key, x => x.First(), StringComparer.OrdinalIgnoreCase);
         var existingSet = existingProductsByReference.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -254,15 +260,15 @@ public sealed class ProductsController(CrmDbContext db, IConfiguration configura
         var activated = 0;
         foreach (var item in externalProducts)
         {
-            if (string.IsNullOrWhiteSpace(item.Code))
+            if (string.IsNullOrWhiteSpace(item.Reference))
             {
                 skipped++;
                 continue;
             }
 
-            if (existingSet.Contains(item.Code))
+            if (existingSet.Contains(item.Reference))
             {
-                var existingProduct = existingProductsByReference[item.Code];
+                var existingProduct = existingProductsByReference[item.Reference];
                 if (!existingProduct.Activo
                     && existingProduct.Precio > 0
                     && string.Equals(existingProduct.Categoria, ExternalInventoryCategory, StringComparison.OrdinalIgnoreCase))
@@ -275,24 +281,29 @@ public sealed class ProductsController(CrmDbContext db, IConfiguration configura
                 continue;
             }
 
+            templateProductsByCode.TryGetValue(item.Code, out var template);
+            var inheritedPrice = template?.Precio ?? 0;
             var product = new Producto
             {
                 Nombre = item.Name,
-                Categoria = category.Nombre,
-                Marca = GuessBrand(item.Name),
-                Modelo = item.Name,
-                Referencia = item.Code,
+                Categoria = string.IsNullOrWhiteSpace(template?.Categoria) ? category.Nombre : template.Categoria,
+                Marca = string.IsNullOrWhiteSpace(template?.Marca) ? GuessBrand(item.Name) : template.Marca,
+                Modelo = string.IsNullOrWhiteSpace(template?.Modelo) ? item.Name : template.Modelo,
+                Linea = template?.Linea,
+                Version = template?.Version,
+                Referencia = item.Reference,
                 Descripcion = NormalizeOptional(item.Presentation),
                 Color = NormalizeOptional(item.Presentation),
-                Precio = 0,
-                Soat = 0,
-                Matricula = 0,
-                Impuestos = 0,
-                FichaTecnica = BuildExternalInventoryTechnicalSheet(item),
-                Activo = false
+                Precio = inheritedPrice,
+                Soat = template?.Soat ?? 0,
+                Matricula = template?.Matricula ?? 0,
+                Impuestos = template?.Impuestos ?? 0,
+                FichaTecnica = BuildExternalInventoryTechnicalSheet(item, template?.FichaTecnica),
+                VigenteDesde = template?.VigenteDesde,
+                Activo = inheritedPrice > 0
             };
             db.Productos.Add(product);
-            existingSet.Add(item.Code);
+            existingSet.Add(item.Reference);
             created++;
         }
 
@@ -694,15 +705,15 @@ public sealed class ProductsController(CrmDbContext db, IConfiguration configura
             SELECT TOP (@Take)
                 Codigo,
                 MAX(Nombre) AS Nombre,
-                MAX(Presentacion) AS Presentacion,
+                Presentacion,
                 SUM(ISNULL(Existencias, 0)) AS Existencias
             FROM {BuildInventoryViewName(inventoryConfig.DatabaseName)}
             WHERE Codigo IS NOT NULL
               AND LTRIM(RTRIM(Codigo)) <> ''
               AND ISNULL(Existencias, 0) > 0
               AND Bodega IN ({string.Join(", ", warehouseParameters)})
-            GROUP BY Codigo
-            ORDER BY MAX(Nombre), Codigo;
+            GROUP BY Codigo, Presentacion
+            ORDER BY MAX(Nombre), Codigo, Presentacion;
             """;
         command.Parameters.Add(new SqlParameter("@Take", SqlDbType.Int) { Value = MaxExternalInventorySyncRows });
         foreach (var (allowedWarehouse, index) in inventoryConfig.AllowedWarehouses.Select((value, index) => (value, index)))
@@ -720,10 +731,12 @@ public sealed class ProductsController(CrmDbContext db, IConfiguration configura
             }
 
             var name = ReadString(reader, "Nombre");
+            var presentation = ReadNullableString(reader, "Presentacion");
             rows.Add(new ExternalInventoryProductRow(
+                InventoryProductReference(code, presentation),
                 code,
                 string.IsNullOrWhiteSpace(name) ? code : name,
-                ReadNullableString(reader, "Presentacion"),
+                presentation,
                 reader["Existencias"] == DBNull.Value ? 0 : Convert.ToInt32(reader["Existencias"])));
         }
 
@@ -789,13 +802,30 @@ public sealed class ProductsController(CrmDbContext db, IConfiguration configura
         return string.IsNullOrWhiteSpace(first) ? "Inventario" : first;
     }
 
-    private static string? BuildExternalInventoryTechnicalSheet(ExternalInventoryProductRow item)
+    private static string? BuildExternalInventoryTechnicalSheet(ExternalInventoryProductRow item, string? templateTechnicalSheet = null)
     {
         var parts = new List<string>();
+        parts.Add($"Codigo inventario: {item.Code}");
         if (!string.IsNullOrWhiteSpace(item.Presentation)) parts.Add($"Presentacion: {item.Presentation}");
         parts.Add($"Existencia al sincronizar: {item.Quantity}");
+        if (!string.IsNullOrWhiteSpace(templateTechnicalSheet))
+        {
+            parts.Add(templateTechnicalSheet.Trim());
+        }
         return string.Join(Environment.NewLine, parts);
     }
+
+    private static string InventoryProductReference(string code, string? presentation)
+    {
+        var normalizedCode = NormalizeReferencePart(code);
+        var normalizedPresentation = NormalizeReferencePart(presentation);
+        return string.IsNullOrWhiteSpace(normalizedPresentation)
+            ? normalizedCode
+            : $"{normalizedCode} | {normalizedPresentation}";
+    }
+
+    private static string NormalizeReferencePart(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? string.Empty : Regex.Replace(value.Trim(), @"\s+", " ");
 
     private static string NormalizeCategory(string category) => string.IsNullOrWhiteSpace(category) ? "General" : category.Trim();
 
@@ -906,5 +936,5 @@ public sealed class ProductsController(CrmDbContext db, IConfiguration configura
     }
 
     private sealed record ExternalInventoryProductConfig(string? DatabaseName, IReadOnlyCollection<string> AllowedWarehouses);
-    private sealed record ExternalInventoryProductRow(string Code, string Name, string? Presentation, int Quantity);
+    private sealed record ExternalInventoryProductRow(string Reference, string Code, string Name, string? Presentation, int Quantity);
 }

@@ -38,7 +38,7 @@ public sealed class ExternalInventoryController(IConfiguration configuration, Cr
 
         var rows = await ReadExternalInventoryAsync(search, warehouse, availableOnly, Math.Clamp(take, 1, MaxTake), inventoryConfig, cancellationToken);
         var productReferences = rows
-            .Select(x => x.Code)
+            .SelectMany(x => new[] { InventoryProductReference(x.Code, x.Presentation), x.Code })
             .Where(x => !string.IsNullOrWhiteSpace(x))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
@@ -52,7 +52,11 @@ public sealed class ExternalInventoryController(IConfiguration configuration, Cr
 
         return Ok(rows.Select(row =>
         {
-            productsByReference.TryGetValue(row.Code, out var product);
+            var reference = InventoryProductReference(row.Code, row.Presentation);
+            if (!productsByReference.TryGetValue(reference, out var product))
+            {
+                productsByReference.TryGetValue(row.Code, out product);
+            }
             var productPrice = product is null ? (decimal?)null : ResolveProductPrice(product, inventoryConfig.SalesPointId);
             var isQuoteReady = product is not null && product.Activo && productPrice.GetValueOrDefault() > 0;
             var (engine, chassis) = ParseSerial(row.SerialNumber);
@@ -333,6 +337,18 @@ public sealed class ExternalInventoryController(IConfiguration configuration, Cr
         var chassis = Regex.Match(serial, @"\bCHA\s+([A-Z0-9]+)", RegexOptions.IgnoreCase).Groups[1].Value;
         return (string.IsNullOrWhiteSpace(engine) ? null : engine, string.IsNullOrWhiteSpace(chassis) ? null : chassis);
     }
+
+    private static string InventoryProductReference(string code, string? presentation)
+    {
+        var normalizedCode = NormalizeReferencePart(code);
+        var normalizedPresentation = NormalizeReferencePart(presentation);
+        return string.IsNullOrWhiteSpace(normalizedPresentation)
+            ? normalizedCode
+            : $"{normalizedCode} | {normalizedPresentation}";
+    }
+
+    private static string NormalizeReferencePart(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? string.Empty : Regex.Replace(value.Trim(), @"\s+", " ");
 
     private static string ProductName(Producto product)
     {

@@ -323,6 +323,12 @@ public sealed class CotizacionItem : AuditableTenantEntity
     public decimal TotalPagarEstimado { get; set; }
     public string? TipoCredito { get; set; }
     public bool UsoConfiguracionFinancieraEmpresa { get; set; }
+    public string? CodigoBodegaInventario { get; set; }
+    public string? NombreBodegaInventario { get; set; }
+    public string? PresentacionInventario { get; set; }
+    public string? NumeroSerieInventario { get; set; }
+    public string? NumeroMotorInventario { get; set; }
+    public string? NumeroChasisInventario { get; set; }
 }
 
 public sealed class SolicitudCredito : AuditableTenantEntity

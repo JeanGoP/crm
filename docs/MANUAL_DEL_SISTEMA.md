@@ -224,10 +224,12 @@ Cuando la empresa tiene inventario conectado y la sede del usuario tiene bodegas
 1. Entre a **Productos**.
 2. En **Carga masiva de productos**, presione **Sincronizar inventario**.
 3. El sistema revisa solo los articulos con existencia en las bodegas configuradas para la sede del usuario.
-4. Si la referencia ya existe en el catalogo, la deja igual.
-5. Si la referencia no existe, crea el producto como **Pendiente precio**.
-6. Edite el producto creado, complete precio, categoria, marca, modelo, cargos o foto si aplica.
-7. Active el producto cuando ya este listo para cotizar.
+4. El sistema identifica cada producto por la combinacion de **codigo y presentacion**.
+5. Si esa referencia ya existe en el catalogo, la deja igual.
+6. Si la referencia no existe, crea el producto como **Pendiente precio**.
+7. Si ya existia un producto con el mismo codigo y precio configurado, el nuevo producto puede tomar ese precio como base.
+8. Edite el producto creado, complete precio, categoria, marca, modelo, cargos o foto si aplica.
+9. Active el producto cuando ya este listo para cotizar.
 
 Los productos sincronizados sin precio no quedan listos para cotizacion hasta que el administrador complete el valor comercial. Si el producto venia como **Pendiente precio**, al guardar un precio mayor a cero queda listo para usarse en cotizaciones.
 
@@ -279,7 +281,9 @@ El formulario esta organizado en una vista amplia: primero se capturan los datos
 
 La cotizacion usa automaticamente la sede principal del asesor conectado. Esa sede define logo de marca, tasa factor mensual, plazo maximo, vigencia y condiciones comerciales impresas en el PDF.
 
-Cuando la empresa tiene inventario conectado, el asesor puede buscar existencias en tiempo real por codigo, nombre, serial, chasis o bodega. El resultado muestra disponibilidad y punto de inventario. Para poder usar un articulo en la cotizacion, el codigo del inventario debe tener su producto equivalente creado en el catalogo del CRM, porque desde alli se toman precio, fotos, categoria y reglas comerciales.
+Cuando la empresa tiene inventario conectado, el asesor puede buscar existencias en tiempo real por codigo, nombre, serial, chasis o bodega. El resultado muestra disponibilidad y punto de inventario. Para poder usar un articulo en la cotizacion, la combinacion de codigo y presentacion debe tener su producto equivalente creado en el catalogo del CRM, porque desde alli se toman precio, fotos, categoria y reglas comerciales.
+
+Al presionar **Usar** sobre una existencia, la cotizacion guarda la unidad seleccionada con su bodega, serial, motor y chasis cuando esa informacion esta disponible.
 
 Tambien permite seleccionar un **perfil de requisitos**, por ejemplo Empleado, Independiente, Pensionado o Contado. Ese perfil indica que documentos se deben pedir si el cliente continua hacia solicitud de credito.
 
@@ -295,7 +299,7 @@ Si existe una promocion vigente para el producto, marca, color o sede, la cotiza
 6. Complete primer nombre, segundo nombre, primer apellido y segundo apellido.
 7. Ingrese indicativo y telefono. Por defecto se usa el indicativo de Colombia **+57**.
 8. Seleccione el **perfil de requisitos** que corresponda al cliente o a la forma de pago.
-9. Si desea validar disponibilidad, use **Buscar inventario en tiempo real** y presione **Usar** sobre el articulo encontrado.
+9. Si desea validar disponibilidad, use **Buscar inventario en tiempo real** y presione **Usar** sobre el articulo encontrado. El sistema asigna el producto y conserva los datos de la unidad seleccionada.
 10. Si no usa la busqueda de inventario, seleccione manualmente el producto que desea cotizar.
 11. Digite la cuota inicial y el numero de cuotas.
 12. Si desea comparar varias opciones, presione **Agregar articulo** y seleccione otro producto.
@@ -785,6 +789,7 @@ El sistema muestra mensajes cuando algo no puede completarse.
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-08-01 | 10.2 | Se ajusta inventario externo para manejar productos por codigo y presentacion, y guardar bodega, serial, motor y chasis al usar una existencia en cotizacion. |
 | 2026-08-01 | 10.1 | Se mejora la lectura de precio en inventario externo para usar el precio efectivo de cotizacion y mostrar si falta producto, precio o activacion. |
 | 2026-08-01 | 10.0 | Se elimina el selector de sede en Productos; el catalogo y la sincronizacion usan automaticamente las bodegas de la sede asignada al usuario. |
 | 2026-08-01 | 9.9 | Se ajusta la sincronizacion de productos para seleccionar una sede y usar solo las bodegas configuradas en esa sede. |

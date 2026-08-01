@@ -313,6 +313,12 @@ export interface QuoteItem {
   creditType?: string;
   usedCompanyFinancialSettings: boolean;
   order: number;
+  inventoryWarehouseCode?: string;
+  inventoryWarehouseName?: string;
+  inventoryPresentation?: string;
+  inventorySerialNumber?: string;
+  inventoryEngineNumber?: string;
+  inventoryChassisNumber?: string;
 }
 
 export interface Quote {

@@ -78,7 +78,7 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             var administrativeFees = item.AdministrativeFees > 0 ? item.AdministrativeFees : product.Matricula + product.Impuestos;
             var promotion = ResolvePromotion(product, salesPoint, promotions, productPrice);
             var simulation = CalculateSimulation(promotion.DiscountedProductPrice, item.DownPayment, insurance, administrativeFees, item.TermMonths, item.MonthlyInterestRate, financialSettings, salesPoint);
-            return new { Product = product, ProductPrice = productPrice, Promotion = promotion, Simulation = simulation, Order = index + 1 };
+            return new { Source = item, Product = product, ProductPrice = productPrice, Promotion = promotion, Simulation = simulation, Order = index + 1 };
         }).ToList();
         var primary = calculatedItems[0];
         var product = primary.Product;
@@ -232,7 +232,13 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
                 CuotaMensualEstimada = item.Simulation.MonthlyPayment,
                 TotalPagarEstimado = item.Simulation.TotalPayment,
                 TipoCredito = item.Simulation.CreditType,
-                UsoConfiguracionFinancieraEmpresa = item.Simulation.UsedCompanyFinancialSettings
+                UsoConfiguracionFinancieraEmpresa = item.Simulation.UsedCompanyFinancialSettings,
+                CodigoBodegaInventario = Clean(item.Source.InventoryWarehouseCode),
+                NombreBodegaInventario = Clean(item.Source.InventoryWarehouseName),
+                PresentacionInventario = Clean(item.Source.InventoryPresentation),
+                NumeroSerieInventario = Clean(item.Source.InventorySerialNumber),
+                NumeroMotorInventario = Clean(item.Source.InventoryEngineNumber),
+                NumeroChasisInventario = Clean(item.Source.InventoryChassisNumber)
             });
         }
         var deal = new Negocio
@@ -523,7 +529,13 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             totalPayment,
             item.TipoCredito,
             item.UsoConfiguracionFinancieraEmpresa,
-            item.Orden);
+            item.Orden,
+            item.CodigoBodegaInventario,
+            item.NombreBodegaInventario,
+            item.PresentacionInventario,
+            item.NumeroSerieInventario,
+            item.NumeroMotorInventario,
+            item.NumeroChasisInventario);
     }
 
     private async Task<ConfiguracionFinancieraEmpresa?> GetFinancialSettingsAsync(CancellationToken cancellationToken) =>

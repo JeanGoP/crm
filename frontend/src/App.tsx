@@ -281,7 +281,7 @@ const emptySalesPoint = { name: '', code: '', city: '', address: '', phone: '', 
 const emptyRequirementDocument = { type: 5, name: '', description: '', required: true, order: 1 };
 const emptyRequirementProfile = { name: '', code: '', description: '', isCash: false, active: true, documents: [emptyRequirementDocument] };
 const emptyPromotion = { name: '', code: '', discountType: 'Valor', discountValue: 0, productId: '', brand: '', color: '', salesPointId: '', validFrom: today, validUntil: today, active: true };
-const emptyQuoteItem = { productId: '', downPayment: 0, insurance: 0, administrativeFees: 0, termMonths: 24, monthlyInterestRate: 2.2 };
+const emptyQuoteItem = { productId: '', downPayment: 0, insurance: 0, administrativeFees: 0, termMonths: 24, monthlyInterestRate: 2.2, inventoryWarehouseCode: '', inventoryWarehouseName: '', inventoryPresentation: '', inventorySerialNumber: '', inventoryEngineNumber: '', inventoryChassisNumber: '' };
 const emptyQuote = { identificationType: 1, identificationNumber: '', customerFirstNames: '', customerLastNames: '', customerFirstName: '', customerMiddleName: '', customerLastName: '', customerSecondLastName: '', phoneCountryCode: '+57', phoneNumber: '', requirementProfileId: '', productId: '', downPayment: 0, insurance: 0, administrativeFees: 0, termMonths: 24, monthlyInterestRate: 2.2, items: [emptyQuoteItem], notes: '' };
 const emptyCreditApplication = {
   customerId: '', productId: '', quoteId: '', dealId: '', requirementProfileId: '', identificationType: 1, identificationNumber: '', birthDate: '', mobile: '', address: '', city: '', occupation: '',
@@ -1468,7 +1468,13 @@ function QuotesPage() {
         insurance: Number(item.insurance),
         administrativeFees: Number(item.administrativeFees),
         termMonths: Number(item.termMonths),
-        monthlyInterestRate: Number(item.monthlyInterestRate)
+        monthlyInterestRate: Number(item.monthlyInterestRate),
+        inventoryWarehouseCode: item.inventoryWarehouseCode || null,
+        inventoryWarehouseName: item.inventoryWarehouseName || null,
+        inventoryPresentation: item.inventoryPresentation || null,
+        inventorySerialNumber: item.inventorySerialNumber || null,
+        inventoryEngineNumber: item.inventoryEngineNumber || null,
+        inventoryChassisNumber: item.inventoryChassisNumber || null
       }));
     if (!quoteItems.length) throw new Error('Debe agregar al menos un producto.');
     const firstItem = quoteItems[0];
@@ -4178,7 +4184,28 @@ function QuoteDialog({ form, products, productCategories, requirementProfiles, o
         updateItem(index, {
           productId,
           insurance: selected?.soat ?? 0,
-          administrativeFees: (selected?.registrationFee ?? 0) + (selected?.taxes ?? 0)
+          administrativeFees: (selected?.registrationFee ?? 0) + (selected?.taxes ?? 0),
+          inventoryWarehouseCode: '',
+          inventoryWarehouseName: '',
+          inventoryPresentation: '',
+          inventorySerialNumber: '',
+          inventoryEngineNumber: '',
+          inventoryChassisNumber: ''
+        });
+      };
+      const useInventoryItem = (index: number, inventoryItem: ExternalInventoryItem) => {
+        if (!inventoryItem.productId) return;
+        const selected = products.find((product) => product.id === inventoryItem.productId);
+        updateItem(index, {
+          productId: inventoryItem.productId,
+          insurance: selected?.soat ?? 0,
+          administrativeFees: (selected?.registrationFee ?? 0) + (selected?.taxes ?? 0),
+          inventoryWarehouseCode: inventoryItem.warehouseCode ?? '',
+          inventoryWarehouseName: inventoryItem.warehouseName ?? '',
+          inventoryPresentation: inventoryItem.presentation ?? '',
+          inventorySerialNumber: inventoryItem.serialNumber ?? '',
+          inventoryEngineNumber: inventoryItem.engineNumber ?? '',
+          inventoryChassisNumber: inventoryItem.chassisNumber ?? ''
         });
       };
       const addItem = () => {
@@ -4311,7 +4338,7 @@ function QuoteDialog({ form, products, productCategories, requirementProfiles, o
                           size="small"
                           variant="outlined"
                           disabled={!item.isInCatalog || !item.productId || Number(item.productPrice ?? 0) <= 0}
-                          onClick={() => item.productId && updateItemProduct(Math.min(inventoryTargetIndex, quoteItems.length - 1), item.productId)}
+                          onClick={() => useInventoryItem(Math.min(inventoryTargetIndex, quoteItems.length - 1), item)}
                         >
                           Usar
                         </Button>
@@ -4342,6 +4369,9 @@ function QuoteDialog({ form, products, productCategories, requirementProfiles, o
                   <TextField select label="Producto" value={item.productId} onChange={(e) => updateItemProduct(index, e.target.value)}>
                     {products.length ? products.map((product) => <MenuItem key={product.id} value={product.id}>{productName(product)} ({product.category}) - {money(product.price)}</MenuItem>) : <MenuItem value="">No hay productos activos</MenuItem>}
                   </TextField>
+                  {(item.inventoryChassisNumber || item.inventoryEngineNumber || item.inventoryWarehouseName) && <Alert severity="info" sx={{ gridColumn: { md: '1 / -1' }, py: 0.5 }}>
+                    Unidad seleccionada: {item.inventoryWarehouseName || 'Bodega'}{item.inventoryChassisNumber ? ` · Chasis ${item.inventoryChassisNumber}` : ''}{item.inventoryEngineNumber ? ` · Motor ${item.inventoryEngineNumber}` : ''}
+                  </Alert>}
                   <TextField fullWidth label="Cuota inicial" type="number" value={item.downPayment} onChange={(e) => updateItem(index, { downPayment: Number(e.target.value) })} />
                   <TextField fullWidth label="Cuotas" type="number" value={item.termMonths} onChange={(e) => updateItem(index, { termMonths: Number(e.target.value) })} />
                   <TextField fullWidth label="Seguro" type="number" value={item.insurance} onChange={(e) => updateItem(index, { insurance: Number(e.target.value) })} />

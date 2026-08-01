@@ -232,7 +232,13 @@ public sealed record QuoteItemDto(
     decimal EstimatedTotalPayment,
     string? CreditType,
     bool UsedCompanyFinancialSettings,
-    int Order);
+    int Order,
+    string? InventoryWarehouseCode = null,
+    string? InventoryWarehouseName = null,
+    string? InventoryPresentation = null,
+    string? InventorySerialNumber = null,
+    string? InventoryEngineNumber = null,
+    string? InventoryChassisNumber = null);
 
 public sealed record CreateQuoteItemDto(
     Guid ProductId,
@@ -240,7 +246,13 @@ public sealed record CreateQuoteItemDto(
     decimal Insurance,
     decimal AdministrativeFees,
     int TermMonths,
-    decimal MonthlyInterestRate);
+    decimal MonthlyInterestRate,
+    string? InventoryWarehouseCode = null,
+    string? InventoryWarehouseName = null,
+    string? InventoryPresentation = null,
+    string? InventorySerialNumber = null,
+    string? InventoryEngineNumber = null,
+    string? InventoryChassisNumber = null);
 
 public sealed record QuoteDto(
     Guid Id,
