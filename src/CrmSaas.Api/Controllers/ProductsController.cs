@@ -23,7 +23,7 @@ public sealed class ProductsController(CrmDbContext db, IConfiguration configura
     private const string ExternalInventoryCategory = "Inventario externo";
     private const int MaxExternalInventorySyncRows = 1500;
     private const string InventorySchema = "dbo";
-    private const string InventoryView = "INVENTARIO_EXISTENCIA";
+    private const string InventoryView = "INVENTARIOCRM";
     private static readonly string[] ImportHeaders =
     [
         "Nombre",

@@ -19,7 +19,7 @@ public sealed class ExternalInventoryController(IConfiguration configuration, Cr
 {
     private const int MaxTake = 200;
     private const string InventorySchema = "dbo";
-    private const string InventoryView = "INVENTARIO_EXISTENCIA";
+    private const string InventoryView = "INVENTARIOCRM";
     private const string WarehouseTable = "Bodega";
 
     [HttpGet]

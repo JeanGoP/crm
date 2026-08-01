@@ -3296,7 +3296,7 @@ function CompanyDialog({ form, onClose, onSave }: DialogProps<Company, typeof em
         label="Base de datos de inventario"
         value={v.externalInventoryDatabaseName}
         onChange={(e) => set({ externalInventoryDatabaseName: e.target.value.replace(/[^a-zA-Z0-9_]/g, '') })}
-        helperText="Base SQL de esta empresa donde existen dbo.Bodega y dbo.INVENTARIO_EXISTENCIA."
+        helperText="Base SQL de esta empresa donde existen dbo.Bodega y dbo.INVENTARIOCRM."
       />
       <TextField select label="Estado" value={String(v.active)} onChange={(e) => set({ active: e.target.value === 'true' })}><MenuItem value="true">Activa</MenuItem><MenuItem value="false">Inactiva</MenuItem></TextField>
     </>}
