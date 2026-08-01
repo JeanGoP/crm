@@ -1154,8 +1154,16 @@ function ProductsPage() {
   const [notice, setNotice] = useState<Notice>();
   const [importing, setImporting] = useState(false);
   const [syncingInventory, setSyncingInventory] = useState(false);
+  const [inventorySalesPointId, setInventorySalesPointId] = useState('');
   const canManage = useCanManage();
   const canBulkImport = roles.includes('Administrador');
+  const activeSalesPoints = salesPoints.filter((point) => point.active);
+
+  useEffect(() => {
+    if (!inventorySalesPointId && activeSalesPoints.length) {
+      setInventorySalesPointId(activeSalesPoints[0].id);
+    }
+  }, [activeSalesPoints, inventorySalesPointId]);
 
   const save = async (payload: typeof emptyProduct) => {
     const body = {
@@ -1237,9 +1245,16 @@ function ProductsPage() {
   };
 
   const syncExternalInventory = async () => {
+    if (!inventorySalesPointId) {
+      setNotice({ type: 'error', text: 'Seleccione la sede que tiene las bodegas a sincronizar.' });
+      return;
+    }
+
     setSyncingInventory(true);
     try {
-      const { data } = await api.post<ProductInventorySyncResult>('/api/products/sync-external-inventory');
+      const { data } = await api.post<ProductInventorySyncResult>('/api/products/sync-external-inventory', null, {
+        params: { salesPointId: inventorySalesPointId }
+      });
       await reload();
       const warningText = data.warnings?.length ? ` ${data.warnings.join(' ')}` : '';
       setNotice({
@@ -1262,7 +1277,19 @@ function ProductsPage() {
           <Typography color="text.secondary" fontSize={13}>Descargue la plantilla CSV o sincronice los productos disponibles en las bodegas configuradas.</Typography>
         </Box>
         <Stack direction={{ xs: 'column', sm: 'row' }} gap={1}>
-          <Button variant="outlined" startIcon={<Inventory2 />} disabled={syncingInventory} onClick={() => void syncExternalInventory()}>
+          <TextField
+            select
+            size="small"
+            label="Sede"
+            value={inventorySalesPointId}
+            onChange={(e) => setInventorySalesPointId(e.target.value)}
+            sx={{ minWidth: { sm: 240 } }}
+          >
+            {activeSalesPoints.length
+              ? activeSalesPoints.map((point) => <MenuItem key={point.id} value={point.id}>{point.name} - {point.city}</MenuItem>)
+              : <MenuItem value="">Sin sedes activas</MenuItem>}
+          </TextField>
+          <Button variant="outlined" startIcon={<Inventory2 />} disabled={syncingInventory || !inventorySalesPointId} onClick={() => void syncExternalInventory()}>
             {syncingInventory ? 'Sincronizando...' : 'Sincronizar inventario'}
           </Button>
           <Button variant="outlined" startIcon={<Download />} onClick={() => void downloadImportTemplate()}>Descargar plantilla</Button>
@@ -1312,7 +1339,7 @@ function ProductsPage() {
         <Actions compact onEdit={canManage ? () => setForm({ open: true, item: r }) : undefined} onDelete={canManage && r.active ? () => setConfirm(r) : undefined} />
       ])}
     />
-    <ProductDialog form={form} categories={categories.filter((category) => category.active)} salesPoints={salesPoints.filter((point) => point.active)} onClose={() => setForm({ open: false })} onSave={save} onChanged={reload} />
+    <ProductDialog form={form} categories={categories.filter((category) => category.active)} salesPoints={activeSalesPoints} onClose={() => setForm({ open: false })} onSave={save} onChanged={reload} />
     <ConfirmDialog title="Inactivar producto" text={`Se inactivara ${confirm ? productName(confirm) : ''}. Las cotizaciones existentes conservaran el historial.`} open={!!confirm} onClose={() => setConfirm(undefined)} onConfirm={remove} confirmLabel="Inactivar" />
     <Notice notice={notice} onClose={() => setNotice(undefined)} />
   </Stack>;

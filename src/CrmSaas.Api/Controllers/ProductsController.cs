@@ -192,9 +192,14 @@ public sealed class ProductsController(CrmDbContext db, IConfiguration configura
 
     [HttpPost("sync-external-inventory")]
     [Authorize(Roles = "Administrador")]
-    public async Task<ActionResult<ProductInventorySyncResultDto>> SyncExternalInventory(CancellationToken cancellationToken)
+    public async Task<ActionResult<ProductInventorySyncResultDto>> SyncExternalInventory([FromQuery] Guid salesPointId, CancellationToken cancellationToken)
     {
-        var inventoryConfig = await GetCompanyInventoryConfigAsync(cancellationToken);
+        if (salesPointId == Guid.Empty)
+        {
+            return BadRequest(new { detail = "Seleccione la sede desde la cual se va a sincronizar el inventario." });
+        }
+
+        var inventoryConfig = await GetCompanyInventoryConfigAsync(salesPointId, cancellationToken);
         var warnings = new List<string>();
         if (string.IsNullOrWhiteSpace(inventoryConfig.DatabaseName))
         {
@@ -203,7 +208,7 @@ public sealed class ProductsController(CrmDbContext db, IConfiguration configura
 
         if (inventoryConfig.AllowedWarehouses.Count == 0)
         {
-            return BadRequest(new { detail = "Configure bodegas de inventario en las sedes o puntos de venta." });
+            return BadRequest(new { detail = "Configure bodegas de inventario en la sede seleccionada." });
         }
 
         var externalProducts = await ReadExternalInventoryProductsAsync(inventoryConfig, cancellationToken);
@@ -583,7 +588,7 @@ public sealed class ProductsController(CrmDbContext db, IConfiguration configura
         return category;
     }
 
-    private async Task<ExternalInventoryProductConfig> GetCompanyInventoryConfigAsync(CancellationToken cancellationToken)
+    private async Task<ExternalInventoryProductConfig> GetCompanyInventoryConfigAsync(Guid salesPointId, CancellationToken cancellationToken)
     {
         if (tenantContext.EmpresaId is not Guid companyId)
         {
@@ -596,12 +601,12 @@ public sealed class ProductsController(CrmDbContext db, IConfiguration configura
             .Select(x => x.BaseDatosInventarioExterno)
             .FirstOrDefaultAsync(cancellationToken);
 
-        var warehouseValues = await db.PuntosVenta
-            .Where(x => x.Activa && x.BodegasInventarioExterno != null && x.BodegasInventarioExterno != "")
-            .Select(x => x.BodegasInventarioExterno!)
-            .ToListAsync(cancellationToken);
+        var warehouseValue = await db.PuntosVenta
+            .Where(x => x.Id == salesPointId && x.EmpresaId == companyId && x.Activa)
+            .Select(x => x.BodegasInventarioExterno)
+            .FirstOrDefaultAsync(cancellationToken);
 
-        return new ExternalInventoryProductConfig(NormalizeDatabaseName(databaseName), ParseWarehouseCodes(warehouseValues));
+        return new ExternalInventoryProductConfig(NormalizeDatabaseName(databaseName), ParseWarehouseCodes(warehouseValue));
     }
 
     private async Task<IReadOnlyCollection<ExternalInventoryProductRow>> ReadExternalInventoryProductsAsync(ExternalInventoryProductConfig inventoryConfig, CancellationToken cancellationToken)
@@ -689,9 +694,11 @@ public sealed class ProductsController(CrmDbContext db, IConfiguration configura
         return name;
     }
 
-    private static IReadOnlyCollection<string> ParseWarehouseCodes(IReadOnlyCollection<string> values) =>
-        values
-            .SelectMany(value => value.Split([',', ';', '|', '\r', '\n', '\t', ' '], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+    private static IReadOnlyCollection<string> ParseWarehouseCodes(string? value) =>
+        string.IsNullOrWhiteSpace(value)
+            ? Array.Empty<string>()
+            : value
+            .Split([',', ';', '|', '\r', '\n', '\t', ' '], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Select(x => x.ToUpperInvariant())
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
