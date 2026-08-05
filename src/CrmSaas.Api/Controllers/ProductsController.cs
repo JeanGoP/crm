@@ -269,8 +269,7 @@ public sealed class ProductsController(CrmDbContext db, IConfiguration configura
             if (existingSet.Contains(item.Reference))
             {
                 var existingProduct = existingProductsByReference[item.Reference];
-                if (!existingProduct.Activo
-                    && string.Equals(existingProduct.Categoria, ExternalInventoryCategory, StringComparison.OrdinalIgnoreCase))
+                if (!existingProduct.Activo)
                 {
                     existingProduct.Activo = true;
                     activated++;

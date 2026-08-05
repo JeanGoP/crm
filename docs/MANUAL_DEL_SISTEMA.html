@@ -153,12 +153,11 @@
 <p>2. En <strong>Carga masiva de productos</strong>, presione <strong>Sincronizar inventario</strong>.</p>
 <p>3. El sistema revisa solo los articulos con existencia en las bodegas configuradas para la sede del usuario.</p>
 <p>4. El sistema identifica cada producto por la combinacion de <strong>codigo y presentacion</strong>.</p>
-<p>5. Si esa referencia ya existe en el catalogo, la deja igual.</p>
-<p>6. Si la referencia no existe, crea el producto como <strong>Pendiente precio</strong>.</p>
+<p>5. Si esa referencia ya existe en el catalogo, la deja activa para que pueda usarse en cotizaciones.</p>
+<p>6. Si la referencia no existe, crea el producto activo aunque quede pendiente completar precio o datos comerciales.</p>
 <p>7. Si ya existia un producto con el mismo codigo y precio configurado, el nuevo producto puede tomar ese precio como base.</p>
 <p>8. Edite el producto creado, complete precio, categoria, marca, modelo, cargos o foto si aplica.</p>
-<p>9. Active el producto cuando ya este listo para cotizar.</p>
-<p>Los productos sincronizados sin precio tambien pueden usarse en cotizacion. En ese caso, el asesor debe digitar el precio comercial al momento de cotizar.</p>
+<p>Los productos sincronizados quedan activos automaticamente. Si un producto no tiene precio, tambien puede usarse en cotizacion; en ese caso, el asesor debe digitar el precio comercial al momento de cotizar.</p>
 <p>El listado de productos tambien respeta esta regla: cuando hay inventario conectado, se muestran los productos que existen en las bodegas permitidas para la sede correspondiente.</p>
 <h3>Recomendacion de uso</h3>
 <p>Mantenga precios, modelos, cargos, vigencias y estados actualizados. Una cotizacion depende de que el producto tenga informacion correcta.</p>
@@ -568,6 +567,7 @@
 <h2>26. Historial del manual</h2>
 <table>
 <thead><tr><th>Fecha</th><th>Version</th><th>Cambio</th></tr></thead><tbody>
+<tr><td>2026-08-05</td><td>10.4</td><td>Los productos existentes y sincronizados desde inventario quedan activos automaticamente para poder cotizarlos con precio editable.</td></tr>
 <tr><td>2026-08-05</td><td>10.3</td><td>Las cotizaciones permiten usar articulos de inventario sin precio y digitar el precio comercial directamente al cotizar.</td></tr>
 <tr><td>2026-08-01</td><td>10.2</td><td>Se ajusta inventario externo para manejar productos por codigo y presentacion, y guardar bodega, serial, motor y chasis al usar una existencia en cotizacion.</td></tr>
 <tr><td>2026-08-01</td><td>10.1</td><td>Se mejora la lectura de precio en inventario externo para usar el precio efectivo de cotizacion y mostrar si falta producto, precio o activacion.</td></tr>

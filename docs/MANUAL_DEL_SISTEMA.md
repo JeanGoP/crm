@@ -225,13 +225,12 @@ Cuando la empresa tiene inventario conectado y la sede del usuario tiene bodegas
 2. En **Carga masiva de productos**, presione **Sincronizar inventario**.
 3. El sistema revisa solo los articulos con existencia en las bodegas configuradas para la sede del usuario.
 4. El sistema identifica cada producto por la combinacion de **codigo y presentacion**.
-5. Si esa referencia ya existe en el catalogo, la deja igual.
-6. Si la referencia no existe, crea el producto como **Pendiente precio**.
+5. Si esa referencia ya existe en el catalogo, la deja activa para que pueda usarse en cotizaciones.
+6. Si la referencia no existe, crea el producto activo aunque quede pendiente completar precio o datos comerciales.
 7. Si ya existia un producto con el mismo codigo y precio configurado, el nuevo producto puede tomar ese precio como base.
 8. Edite el producto creado, complete precio, categoria, marca, modelo, cargos o foto si aplica.
-9. Active el producto cuando ya este listo para cotizar.
 
-Los productos sincronizados sin precio tambien pueden usarse en cotizacion. En ese caso, el asesor debe digitar el precio comercial al momento de cotizar.
+Los productos sincronizados quedan activos automaticamente. Si un producto no tiene precio, tambien puede usarse en cotizacion; en ese caso, el asesor debe digitar el precio comercial al momento de cotizar.
 
 El listado de productos tambien respeta esta regla: cuando hay inventario conectado, se muestran los productos que existen en las bodegas permitidas para la sede correspondiente.
 
@@ -789,6 +788,7 @@ El sistema muestra mensajes cuando algo no puede completarse.
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-08-05 | 10.4 | Los productos existentes y sincronizados desde inventario quedan activos automaticamente para poder cotizarlos con precio editable. |
 | 2026-08-05 | 10.3 | Las cotizaciones permiten usar articulos de inventario sin precio y digitar el precio comercial directamente al cotizar. |
 | 2026-08-01 | 10.2 | Se ajusta inventario externo para manejar productos por codigo y presentacion, y guardar bodega, serial, motor y chasis al usar una existencia en cotizacion. |
 | 2026-08-01 | 10.1 | Se mejora la lectura de precio en inventario externo para usar el precio efectivo de cotizacion y mostrar si falta producto, precio o activacion. |
