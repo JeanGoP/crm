@@ -1,7 +1,7 @@
 ﻿import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Navigate, NavLink, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
-  Alert, AppBar, Box, Button, Card, CardContent, Checkbox, Chip, CssBaseline, Dialog, DialogActions,
+  Alert, AppBar, Autocomplete, Box, Button, Card, CardContent, Checkbox, Chip, CssBaseline, Dialog, DialogActions,
   DialogContent, DialogTitle, Divider, Drawer, Grid, IconButton, LinearProgress, MenuItem,
   FormControlLabel, Paper, Snackbar, Stack, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tabs, TextField, InputAdornment,
   ThemeProvider, Toolbar, Tooltip, Typography, createTheme, useMediaQuery, useTheme
@@ -4373,9 +4373,46 @@ function QuoteDialog({ form, products, productCategories, requirementProfiles, o
                   gap: 1.5,
                   alignItems: 'stretch'
                 }}>
-                  <TextField select label="Producto" value={item.productId} onChange={(e) => updateItemProduct(index, e.target.value)}>
-                    {products.length ? products.map((product) => <MenuItem key={product.id} value={product.id}>{productName(product)} ({product.category}) - {money(product.price)}</MenuItem>) : <MenuItem value="">No hay productos activos</MenuItem>}
-                  </TextField>
+                  <Autocomplete
+                    value={selectedProduct ?? null}
+                    options={products}
+                    autoHighlight
+                    clearOnBlur={false}
+                    noOptionsText="No hay productos activos"
+                    isOptionEqualToValue={(option, value) => option.id === value.id}
+                    getOptionLabel={(product) => productSelectorLabel(product)}
+                    filterOptions={(options, state) => {
+                      const term = normalizeSearch(state.inputValue);
+                      const filtered = term
+                        ? options.filter((product) => productSearchText(product).includes(term))
+                        : options;
+                      return filtered.slice(0, 60);
+                    }}
+                    onChange={(_, product) => updateItemProduct(index, product?.id ?? '')}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        label="Producto"
+                        placeholder="Buscar nombre, codigo, referencia o color"
+                      />
+                    )}
+                    renderOption={(props, product) => (
+                      <Box component="li" {...props} sx={{ display: 'flex', alignItems: 'stretch', gap: 1.25, py: 1.1 }}>
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                          <Typography fontWeight={900} sx={{ fontSize: 13.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {productName(product)}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {[product.reference, product.brand, product.model, product.color].filter(Boolean).join(' · ') || product.category}
+                          </Typography>
+                        </Box>
+                        <Stack spacing={0.25} alignItems="flex-end" sx={{ minWidth: 92 }}>
+                          <Typography fontWeight={900} sx={{ fontSize: 13 }}>{product.price > 0 ? money(product.price) : 'Sin precio'}</Typography>
+                          <Chip size="small" label={product.category || 'Catalogo'} sx={{ maxWidth: 110, height: 20, '& .MuiChip-label': { px: 0.75, fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis' } }} />
+                        </Stack>
+                      </Box>
+                    )}
+                  />
                   {(item.inventoryChassisNumber || item.inventoryEngineNumber || item.inventoryWarehouseName) && <Alert severity="info" sx={{ gridColumn: { md: '1 / -1' }, py: 0.5 }}>
                     Unidad seleccionada: {item.inventoryWarehouseName || 'Bodega'}{item.inventoryChassisNumber ? ` · Chasis ${item.inventoryChassisNumber}` : ''}{item.inventoryEngineNumber ? ` · Motor ${item.inventoryEngineNumber}` : ''}
                   </Alert>}
@@ -5547,6 +5584,22 @@ function alertSeverityTone(severity?: string): 'success' | 'warning' | 'error' |
 }
 function productName(product: Product) {
   return product.name?.trim() || [product.brand, product.model, product.line, product.version, product.reference].filter(Boolean).join(' ').trim() || 'Producto';
+}
+function productSelectorLabel(product: Product) {
+  return [productName(product), product.reference, product.color].filter(Boolean).join(' - ');
+}
+function productSearchText(product: Product) {
+  return normalizeSearch([
+    productName(product),
+    product.reference,
+    product.category,
+    product.brand,
+    product.model,
+    product.line,
+    product.version,
+    product.color,
+    product.year?.toString()
+  ].filter(Boolean).join(' '));
 }
 function isApplianceCategoryName(category?: string) {
   return (category ?? '').toLowerCase().includes('electrodom');
