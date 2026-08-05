@@ -194,6 +194,17 @@ public sealed class ConfiguracionFinancieraEmpresa : AuditableTenantEntity
     public bool Activa { get; set; } = true;
 }
 
+public sealed class ConceptoCotizacion : AuditableTenantEntity
+{
+    public string Nombre { get; set; } = string.Empty;
+    public string Codigo { get; set; } = string.Empty;
+    public string GrupoCalculo { get; set; } = "Gasto";
+    public string FuenteValor { get; set; } = "Manual";
+    public decimal ValorPredeterminado { get; set; }
+    public int Orden { get; set; }
+    public bool Activo { get; set; } = true;
+}
+
 public sealed class PuntoVenta : AuditableTenantEntity
 {
     public string Nombre { get; set; } = string.Empty;

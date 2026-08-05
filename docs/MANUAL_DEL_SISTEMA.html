@@ -203,9 +203,10 @@
 <p>9. Si desea validar disponibilidad, use <strong>Buscar inventario en tiempo real</strong> y presione <strong>Usar</strong> sobre el articulo encontrado. El sistema asigna el producto y conserva los datos de la unidad seleccionada.</p>
 <p>10. Si no usa la busqueda de inventario, busque el producto escribiendo nombre, codigo, referencia, categoria o color y seleccione la opcion correcta.</p>
 <p>11. Revise o digite el precio del articulo, la cuota inicial y el numero de cuotas.</p>
-<p>12. Si desea comparar varias opciones, presione <strong>Agregar articulo</strong> y seleccione otro producto.</p>
-<p>13. Revise la cuota aproximada de cada articulo.</p>
-<p>14. Guarde la cotizacion.</p>
+<p>12. Revise los conceptos configurados por la empresa, como seguro, matricula, impuestos u otros cargos. Puede ajustar el valor si el caso comercial lo requiere.</p>
+<p>13. Si desea comparar varias opciones, presione <strong>Agregar articulo</strong> y seleccione otro producto.</p>
+<p>14. Revise la cuota aproximada de cada articulo.</p>
+<p>15. Guarde la cotizacion.</p>
 <h3>Que ocurre al guardar</h3>
 <ul>
 <li>Se crea o actualiza el cliente con los datos correctos.</li>
@@ -230,15 +231,14 @@
 <p>1. Seleccione el producto que el cliente desea cotizar.</p>
 <p>2. Digite la cuota inicial que el cliente va a entregar.</p>
 <p>3. Indique el numero de cuotas.</p>
-<p>4. Revise seguro y gastos. Si el producto tiene SOAT, matricula o impuestos configurados, el sistema los trae como valores sugeridos.</p>
+<p>4. Revise los conceptos de la cotizacion. La empresa puede configurar campos como seguro, matricula, impuestos u otros cargos, y el sistema los trae como valores sugeridos cuando corresponda.</p>
 <p>5. Revise el total financiado y la cuota aproximada.</p>
 <h3>Campos principales</h3>
 <ul>
 <li><strong>Precio del producto:</strong> valor base del producto.</li>
 <li><strong>Cuota inicial:</strong> dinero que entrega el cliente al inicio.</li>
 <li><strong>Numero de cuotas:</strong> cantidad de pagos que tendra la financiacion.</li>
-<li><strong>Seguro:</strong> valor adicional del seguro o SOAT, si aplica.</li>
-<li><strong>Gastos administrativos:</strong> cobros asociados al proceso, como matricula o impuestos cuando correspondan.</li>
+<li><strong>Conceptos de cotizacion:</strong> campos configurables por empresa, por ejemplo seguro, matricula, impuestos, formulario, accesorios o traspaso.</li>
 <li><strong>Total financiado:</strong> valor que queda pendiente despues de la cuota inicial y cargos.</li>
 <li><strong>Cuota aproximada:</strong> valor estimado de la cuota mensual.</li>
 </ul>
@@ -457,6 +457,7 @@
 <li><strong>Roles:</strong> administrar permisos segun el perfil del usuario.</li>
 <li><strong>Etapas del pipeline:</strong> configurar las columnas comerciales.</li>
 <li><strong>Configuracion financiera:</strong> definir las condiciones usadas por la empresa para calcular cuotas en las cotizaciones.</li>
+<li><strong>Conceptos de cotizacion:</strong> definir los campos de cargos que aparecen al crear una cotizacion.</li>
 <li><strong>Perfiles de requisitos:</strong> definir listas de documentos para empleado, independiente, pensionado, contado u otros perfiles propios de la empresa.</li>
 <li><strong>Promociones / planes tacticos:</strong> configurar descuentos automaticos por producto, marca, color, sede y vigencia.</li>
 </ul>
@@ -500,6 +501,23 @@
 <p>7. Defina fecha inicial y fecha final de vigencia.</p>
 <p>8. Guarde.</p>
 <p>Cuando una cotizacion coincide con una promocion activa y vigente, el sistema descuenta automaticamente el valor antes de calcular la financiacion. Si varias promociones coinciden, se aplica la mas especifica.</p>
+<h3>Conceptos de cotizacion</h3>
+<p>1. Entre a <strong>Configuracion</strong>.</p>
+<p>2. Busque la tarjeta <strong>Conceptos de cotizacion</strong>.</p>
+<p>3. Presione <strong>Nuevo concepto</strong> o edite uno existente.</p>
+<p>4. Escriba el nombre visible, por ejemplo <strong>Matricula</strong>, <strong>Seguro</strong>, <strong>Impuestos</strong>, <strong>Formulario</strong> o <strong>Traspaso</strong>.</p>
+<p>5. Defina el grupo de calculo:</p>
+<p>   - <strong>Seguro:</strong> se suma al valor de seguro de la cotizacion.</p>
+<p>   - <strong>Gasto / tramite:</strong> se suma a gastos, matricula y otros cargos del proceso.</p>
+<p>6. Defina el valor sugerido:</p>
+<p>   - Manual en cero.</p>
+<p>   - SOAT del producto.</p>
+<p>   - Matricula del producto.</p>
+<p>   - Impuestos del producto.</p>
+<p>   - Valor fijo.</p>
+<p>7. Defina el orden en que debe aparecer.</p>
+<p>8. Marque el concepto como activo y guarde.</p>
+<p>Los conceptos activos aparecen automaticamente en <strong>Nueva cotizacion</strong>. El asesor puede ajustar el valor de cada concepto antes de guardar la cotizacion.</p>
 <h3>Configuracion financiera</h3>
 <p>1. Entre a <strong>Configuracion</strong>.</p>
 <p>2. Busque la tarjeta <strong>Configuracion financiera</strong>.</p>
@@ -567,6 +585,7 @@
 <h2>26. Historial del manual</h2>
 <table>
 <thead><tr><th>Fecha</th><th>Version</th><th>Cambio</th></tr></thead><tbody>
+<tr><td>2026-08-05</td><td>10.6</td><td>Se agregan conceptos configurables de cotizacion por empresa para mostrar campos como seguro, matricula, impuestos u otros cargos en Nueva cotizacion.</td></tr>
 <tr><td>2026-08-05</td><td>10.5</td><td>Se mejora el buscador de productos dentro de cotizaciones para encontrar articulos por nombre, codigo, referencia, categoria, marca o color.</td></tr>
 <tr><td>2026-08-05</td><td>10.4</td><td>Los productos existentes y sincronizados desde inventario quedan activos automaticamente para poder cotizarlos con precio editable.</td></tr>
 <tr><td>2026-08-05</td><td>10.3</td><td>Las cotizaciones permiten usar articulos de inventario sin precio y digitar el precio comercial directamente al cotizar.</td></tr>

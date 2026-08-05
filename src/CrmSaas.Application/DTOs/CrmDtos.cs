@@ -148,6 +148,24 @@ public sealed record UpsertFinancialSettingsDto(
     bool UseMontelibanoTable,
     bool Active);
 
+public sealed record QuoteChargeConceptDto(
+    Guid Id,
+    string Name,
+    string Code,
+    string CalculationGroup,
+    string DefaultValueSource,
+    decimal DefaultAmount,
+    int Order,
+    bool Active);
+public sealed record UpsertQuoteChargeConceptDto(
+    string Name,
+    string Code,
+    string CalculationGroup,
+    string DefaultValueSource,
+    decimal DefaultAmount,
+    int Order,
+    bool Active);
+
 public sealed record SalesPointDto(
     Guid Id,
     string Name,

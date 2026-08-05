@@ -26,6 +26,7 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
     public DbSet<ProductoPrecioSede> ProductoPreciosSede => Set<ProductoPrecioSede>();
     public DbSet<InventarioComercial> InventarioComercial => Set<InventarioComercial>();
     public DbSet<ConfiguracionFinancieraEmpresa> ConfiguracionesFinancierasEmpresa => Set<ConfiguracionFinancieraEmpresa>();
+    public DbSet<ConceptoCotizacion> ConceptosCotizacion => Set<ConceptoCotizacion>();
     public DbSet<PuntoVenta> PuntosVenta => Set<PuntoVenta>();
     public DbSet<PerfilRequisito> PerfilesRequisito => Set<PerfilRequisito>();
     public DbSet<DocumentoPerfilRequisito> DocumentosPerfilRequisito => Set<DocumentoPerfilRequisito>();
@@ -60,6 +61,7 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
         modelBuilder.Entity<ProductoPrecioSede>().ToTable("ProductoPreciosSede");
         modelBuilder.Entity<InventarioComercial>().ToTable("InventarioComercial");
         modelBuilder.Entity<ConfiguracionFinancieraEmpresa>().ToTable("ConfiguracionesFinancierasEmpresa");
+        modelBuilder.Entity<ConceptoCotizacion>().ToTable("ConceptosCotizacion");
         modelBuilder.Entity<PuntoVenta>().ToTable("PuntosVenta");
         modelBuilder.Entity<PerfilRequisito>().ToTable("PerfilesRequisito");
         modelBuilder.Entity<DocumentoPerfilRequisito>().ToTable("DocumentosPerfilRequisito");
@@ -141,6 +143,13 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
         modelBuilder.Entity<ConfiguracionFinancieraEmpresa>().Property(x => x.TasaBajoMontoEa).HasPrecision(6, 3);
         modelBuilder.Entity<ConfiguracionFinancieraEmpresa>().Property(x => x.TasaFactorMensual).HasPrecision(6, 3);
         modelBuilder.Entity<ConfiguracionFinancieraEmpresa>().HasIndex(x => x.EmpresaId).IsUnique();
+        modelBuilder.Entity<ConceptoCotizacion>().Property(x => x.Nombre).HasMaxLength(80);
+        modelBuilder.Entity<ConceptoCotizacion>().Property(x => x.Codigo).HasMaxLength(40);
+        modelBuilder.Entity<ConceptoCotizacion>().Property(x => x.GrupoCalculo).HasMaxLength(20);
+        modelBuilder.Entity<ConceptoCotizacion>().Property(x => x.FuenteValor).HasMaxLength(40);
+        modelBuilder.Entity<ConceptoCotizacion>().Property(x => x.ValorPredeterminado).HasPrecision(18, 2);
+        modelBuilder.Entity<ConceptoCotizacion>().HasIndex(x => new { x.EmpresaId, x.Codigo }).IsUnique();
+        modelBuilder.Entity<ConceptoCotizacion>().HasIndex(x => new { x.EmpresaId, x.Activo, x.Orden });
         modelBuilder.Entity<Empresa>().Property(x => x.BaseDatosInventarioExterno).HasMaxLength(128);
         modelBuilder.Entity<PuntoVenta>().Property(x => x.Nombre).HasMaxLength(160);
         modelBuilder.Entity<PuntoVenta>().Property(x => x.Codigo).HasMaxLength(40);
@@ -289,6 +298,7 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
         modelBuilder.Entity<ProductoFoto>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<InventarioComercial>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<ConfiguracionFinancieraEmpresa>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
+        modelBuilder.Entity<ConceptoCotizacion>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<PuntoVenta>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<PerfilRequisito>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<DocumentoPerfilRequisito>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);

@@ -37,7 +37,7 @@ import ChevronRight from '@mui/icons-material/ChevronRight';
 import { AxiosError } from 'axios';
 import { api } from './api';
 import { useAuthStore } from './store';
-import { Activity, ColombianIdentityLookup, CollectionOrder, CommercialInventory, CommercialInventorySummary, CommercialReports, Company, CreditApplication, CreditDocument, Customer, Customer360, CustomerAiAnalysis, CustomerTimelineItem, Dashboard, Deal, DealStage, ExternalInventoryItem, ExternalInventoryWarehouse, FinancialSettings, Lead, MotorcycleDelivery, Procedure, Product, ProductCategory, ProductPhoto, Promotion, Quote, QuoteSimulationResult, RequirementProfile, SalesPoint, User } from './types';
+import { Activity, ColombianIdentityLookup, CollectionOrder, CommercialInventory, CommercialInventorySummary, CommercialReports, Company, CreditApplication, CreditDocument, Customer, Customer360, CustomerAiAnalysis, CustomerTimelineItem, Dashboard, Deal, DealStage, ExternalInventoryItem, ExternalInventoryWarehouse, FinancialSettings, Lead, MotorcycleDelivery, Procedure, Product, ProductCategory, ProductPhoto, Promotion, Quote, QuoteChargeConcept, QuoteSimulationResult, RequirementProfile, SalesPoint, User } from './types';
 
 const drawerWidth = 272;
 const today = new Date().toISOString().slice(0, 10);
@@ -277,11 +277,12 @@ const emptyCommercialInventory = { productId: '', salesPointId: '', vin: '', cha
 const emptyProductCategory = { name: '', description: '', quoteAsBundle: false, active: true };
 const emptyInventoryReservation = { customerId: '', quoteId: '', creditApplicationId: '', reservationExpiresAt: new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10), notes: '' };
 const emptyFinancialSettings = { minimumWage: 1400000, consumerAnnualRate: 29.72, lowAmountAnnualRate: 56.33, factorMonthlyRate: 4.5, maxTermMonths: 30, paymentRounding: 1000, useMontelibanoTable: true, active: true };
+const emptyQuoteChargeConcept = { name: '', code: '', calculationGroup: 'Gasto', defaultValueSource: 'Manual', defaultAmount: 0, order: 1, active: true };
 const emptySalesPoint = { name: '', code: '', city: '', address: '', phone: '', mainBrand: 'Honda', brandLogoDataUrl: '', factorMonthlyRate: 4.5, maxTermMonths: 30, quoteValidityDays: 7, deliveryMode: 'ConSoat', soatDays: 14, registrationDays: 20, soatProvider: '', registrationAgent: '', commercialTerms: 'Cotizacion sujeta a disponibilidad del producto, validacion comercial y aprobacion final.', externalInventoryWarehouseCodes: '', active: true };
 const emptyRequirementDocument = { type: 5, name: '', description: '', required: true, order: 1 };
 const emptyRequirementProfile = { name: '', code: '', description: '', isCash: false, active: true, documents: [emptyRequirementDocument] };
 const emptyPromotion = { name: '', code: '', discountType: 'Valor', discountValue: 0, productId: '', brand: '', color: '', salesPointId: '', validFrom: today, validUntil: today, active: true };
-const emptyQuoteItem = { productId: '', productPrice: 0, downPayment: 0, insurance: 0, administrativeFees: 0, termMonths: 24, monthlyInterestRate: 2.2, inventoryWarehouseCode: '', inventoryWarehouseName: '', inventoryPresentation: '', inventorySerialNumber: '', inventoryEngineNumber: '', inventoryChassisNumber: '' };
+const emptyQuoteItem = { productId: '', productPrice: 0, downPayment: 0, insurance: 0, administrativeFees: 0, chargeValues: {} as Record<string, number>, termMonths: 24, monthlyInterestRate: 2.2, inventoryWarehouseCode: '', inventoryWarehouseName: '', inventoryPresentation: '', inventorySerialNumber: '', inventoryEngineNumber: '', inventoryChassisNumber: '' };
 const emptyQuote = { identificationType: 1, identificationNumber: '', customerFirstNames: '', customerLastNames: '', customerFirstName: '', customerMiddleName: '', customerLastName: '', customerSecondLastName: '', phoneCountryCode: '+57', phoneNumber: '', requirementProfileId: '', productId: '', downPayment: 0, insurance: 0, administrativeFees: 0, termMonths: 24, monthlyInterestRate: 2.2, items: [emptyQuoteItem], notes: '' };
 const emptyCreditApplication = {
   customerId: '', productId: '', quoteId: '', dealId: '', requirementProfileId: '', identificationType: 1, identificationNumber: '', birthDate: '', mobile: '', address: '', city: '', occupation: '',
@@ -1435,6 +1436,7 @@ function QuotesPage() {
   const { data: productCategories = [] } = useResource<ProductCategory[]>('/api/product-categories', []);
   const { data: customers = [] } = useResource<Customer[]>('/api/customers', []);
   const { data: requirementProfiles = [] } = useResource<RequirementProfile[]>('/api/requirement-profiles', []);
+  const { data: quoteChargeConcepts = [] } = useResource<QuoteChargeConcept[]>('/api/quote-charge-concepts', []);
   const [form, setForm] = useState<FormMode<Quote>>({ open: false });
   const [analysis, setAnalysis] = useState<CustomerAiAnalysis>();
   const [analysisPhone, setAnalysisPhone] = useState<string>();
@@ -1460,23 +1462,28 @@ function QuotesPage() {
     if (!customerFirstName) throw new Error('El primer nombre del cliente es obligatorio.');
     if (!customerLastName) throw new Error('El primer apellido del cliente es obligatorio.');
     if (!phoneDigits) throw new Error('El telefono del cliente es obligatorio.');
+    const activeChargeConcepts = normalizedQuoteChargeConcepts(quoteChargeConcepts);
     const quoteItems = (payload.items?.length ? payload.items : [{ ...emptyQuoteItem, productId: payload.productId, productPrice: 0, downPayment: payload.downPayment, insurance: payload.insurance, administrativeFees: payload.administrativeFees, termMonths: payload.termMonths, monthlyInterestRate: payload.monthlyInterestRate }])
       .filter((item) => item.productId)
-      .map((item) => ({
-        productId: item.productId,
-        productPrice: Number(item.productPrice),
-        downPayment: Number(item.downPayment),
-        insurance: Number(item.insurance),
-        administrativeFees: Number(item.administrativeFees),
-        termMonths: Number(item.termMonths),
-        monthlyInterestRate: Number(item.monthlyInterestRate),
-        inventoryWarehouseCode: item.inventoryWarehouseCode || null,
-        inventoryWarehouseName: item.inventoryWarehouseName || null,
-        inventoryPresentation: item.inventoryPresentation || null,
-        inventorySerialNumber: item.inventorySerialNumber || null,
-        inventoryEngineNumber: item.inventoryEngineNumber || null,
-        inventoryChassisNumber: item.inventoryChassisNumber || null
-      }));
+      .map((item) => {
+        const product = products.find((candidate) => candidate.id === item.productId);
+        const chargeTotals = quoteChargeTotals(item, activeChargeConcepts, product);
+        return {
+          productId: item.productId,
+          productPrice: Number(item.productPrice),
+          downPayment: Number(item.downPayment),
+          insurance: chargeTotals.insurance,
+          administrativeFees: chargeTotals.administrativeFees,
+          termMonths: Number(item.termMonths),
+          monthlyInterestRate: Number(item.monthlyInterestRate),
+          inventoryWarehouseCode: item.inventoryWarehouseCode || null,
+          inventoryWarehouseName: item.inventoryWarehouseName || null,
+          inventoryPresentation: item.inventoryPresentation || null,
+          inventorySerialNumber: item.inventorySerialNumber || null,
+          inventoryEngineNumber: item.inventoryEngineNumber || null,
+          inventoryChassisNumber: item.inventoryChassisNumber || null
+        };
+      });
     if (!quoteItems.length) throw new Error('Debe agregar al menos un producto.');
     const firstItem = quoteItems[0];
     const body = {
@@ -1533,7 +1540,7 @@ function QuotesPage() {
         <Actions onAi={() => analyzeCustomer(r.customerId, customers.find((x) => x.id === r.customerId)?.phone)} onDownload={() => setPreviewQuote(r)} />
       ])}
     />
-    <QuoteDialog form={form} products={products.filter((x) => x.active)} productCategories={productCategories.filter((x) => x.active)} requirementProfiles={requirementProfiles.filter((x) => x.active)} onClose={() => setForm({ open: false })} onSave={save} />
+    <QuoteDialog form={form} products={products.filter((x) => x.active)} productCategories={productCategories.filter((x) => x.active)} requirementProfiles={requirementProfiles.filter((x) => x.active)} quoteChargeConcepts={quoteChargeConcepts.filter((x) => x.active)} onClose={() => setForm({ open: false })} onSave={save} />
     <QuotePdfPreviewDialog quote={previewQuote} onClose={() => setPreviewQuote(undefined)} onDownload={downloadPdf} />
     <AiAnalysisDialog analysis={analysis} phone={analysisPhone} onClose={() => { setAnalysis(undefined); setAnalysisPhone(undefined); }} />
     <Notice notice={notice} onClose={() => setNotice(undefined)} />
@@ -2906,6 +2913,7 @@ function SettingsPage() {
   const { data: products = [] } = useResource<Product[]>('/api/products', []);
   const { data: productCategories = [], loading: loadingProductCategories, error: productCategoriesError, reload: reloadProductCategories, setData: setProductCategories } = useResource<ProductCategory[]>('/api/product-categories', []);
   const { data: financialSettings, loading: loadingFinancialSettings, error: financialSettingsError, reload: reloadFinancialSettings, setData: setFinancialSettings } = useResource<FinancialSettings>('/api/financial-settings');
+  const { data: quoteChargeConcepts = [], loading: loadingQuoteChargeConcepts, error: quoteChargeConceptsError, reload: reloadQuoteChargeConcepts, setData: setQuoteChargeConcepts } = useResource<QuoteChargeConcept[]>('/api/quote-charge-concepts', []);
   const { data: salesPoints = [], loading: loadingSalesPoints, error: salesPointsError, reload: reloadSalesPoints, setData: setSalesPoints } = useResource<SalesPoint[]>('/api/sales-points', []);
   const { data: requirementProfiles = [], loading: loadingRequirementProfiles, error: requirementProfilesError, reload: reloadRequirementProfiles, setData: setRequirementProfiles } = useResource<RequirementProfile[]>('/api/requirement-profiles', []);
   const { data: promotions = [], loading: loadingPromotions, error: promotionsError, reload: reloadPromotions, setData: setPromotions } = useResource<Promotion[]>('/api/promotions', []);
@@ -2913,6 +2921,7 @@ function SettingsPage() {
   const [userForm, setUserForm] = useState<FormMode<User>>({ open: false });
   const [productCategoryForm, setProductCategoryForm] = useState<FormMode<ProductCategory>>({ open: false });
   const [financialForm, setFinancialForm] = useState<FormMode<FinancialSettings>>({ open: false });
+  const [quoteChargeConceptForm, setQuoteChargeConceptForm] = useState<FormMode<QuoteChargeConcept>>({ open: false });
   const [salesPointForm, setSalesPointForm] = useState<FormMode<SalesPoint>>({ open: false });
   const [requirementProfileForm, setRequirementProfileForm] = useState<FormMode<RequirementProfile>>({ open: false });
   const [promotionForm, setPromotionForm] = useState<FormMode<Promotion>>({ open: false });
@@ -2931,6 +2940,7 @@ function SettingsPage() {
     reloadUsers();
     reloadProductCategories();
     reloadFinancialSettings();
+    reloadQuoteChargeConcepts();
     reloadSalesPoints();
     reloadRequirementProfiles();
     reloadPromotions();
@@ -3008,6 +3018,26 @@ function SettingsPage() {
     setProductCategories(productCategoryForm.item ? productCategories.map((x) => x.id === data.id ? data : x) : [...productCategories, data].sort((a, b) => a.name.localeCompare(b.name)));
     setNotice({ type: 'success', text: productCategoryForm.item ? 'Categoria actualizada.' : 'Categoria creada.' });
     setProductCategoryForm({ open: false });
+  };
+
+  const saveQuoteChargeConcept = async (payload: typeof emptyQuoteChargeConcept) => {
+    const body = {
+      name: payload.name,
+      code: payload.code,
+      calculationGroup: payload.calculationGroup,
+      defaultValueSource: payload.defaultValueSource,
+      defaultAmount: Number(payload.defaultAmount),
+      order: Number(payload.order),
+      active: Boolean(payload.active)
+    };
+    const { data } = quoteChargeConceptForm.item
+      ? await api.put<QuoteChargeConcept>(`/api/quote-charge-concepts/${quoteChargeConceptForm.item.id}`, body)
+      : await api.post<QuoteChargeConcept>('/api/quote-charge-concepts', body);
+    setQuoteChargeConcepts(quoteChargeConceptForm.item
+      ? quoteChargeConcepts.map((x) => x.id === data.id ? data : x).sort((a, b) => a.order - b.order || a.name.localeCompare(b.name))
+      : [...quoteChargeConcepts, data].sort((a, b) => a.order - b.order || a.name.localeCompare(b.name)));
+    setNotice({ type: 'success', text: quoteChargeConceptForm.item ? 'Concepto actualizado.' : 'Concepto creado.' });
+    setQuoteChargeConceptForm({ open: false });
   };
 
   const saveSalesPoint = async (payload: typeof emptySalesPoint) => {
@@ -3091,7 +3121,7 @@ function SettingsPage() {
   const userDialogCompanies = activeCompanies;
 
   return <Stack spacing={3}>
-    <Header title="Configuracion" onRefresh={() => { reloadCompanies(); reloadUsers(); reloadProductCategories(); reloadFinancialSettings(); reloadSalesPoints(); reloadRequirementProfiles(); reloadPromotions(); }} />
+    <Header title="Configuracion" onRefresh={() => { reloadCompanies(); reloadUsers(); reloadProductCategories(); reloadFinancialSettings(); reloadQuoteChargeConcepts(); reloadSalesPoints(); reloadRequirementProfiles(); reloadPromotions(); }} />
     <Card><CardContent><Grid container spacing={2}>
       <Grid item xs={12} md={6}><TextField fullWidth label="API URL" value={import.meta.env.VITE_API_URL ?? ''} InputProps={{ readOnly: true }} /></Grid>
       <Grid item xs={12} md={6}>{isGlobalAdmin
@@ -3122,6 +3152,30 @@ function SettingsPage() {
           <Grid item xs={6} md={3}><Metric label="Tabla financiera" value={financialSettings.useMontelibanoTable ? 'Activa' : 'Manual'} /></Grid>
           <Grid item xs={6} md={3}><Metric label="Estado" value={financialSettings.active ? 'Activa' : 'Inactiva'} /></Grid>
         </Grid>}
+      </Stack>
+    </CardContent></Card>
+    <Card><CardContent>
+      <Stack spacing={2}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', sm: 'center' }} gap={1}>
+          <Box>
+            <Typography variant="h5" fontWeight={900}>Conceptos de cotizacion</Typography>
+            <Typography color="text.secondary" fontSize={14}>Campos que aparecen en Nueva cotizacion y se suman al calculo financiero.</Typography>
+          </Box>
+          {canManage && <Button variant="contained" startIcon={<Add />} onClick={() => setQuoteChargeConceptForm({ open: true })}>Nuevo concepto</Button>}
+        </Stack>
+        <StatusBar loading={loadingQuoteChargeConcepts} error={quoteChargeConceptsError} />
+        <EntityTable
+          headers={['Orden', 'Concepto', 'Grupo', 'Valor sugerido', 'Estado', 'Acciones']}
+          empty="No hay conceptos de cotizacion configurados"
+          rows={quoteChargeConcepts.map((concept) => [
+            concept.order,
+            <Box><Typography fontWeight={800}>{concept.name}</Typography><Typography color="text.secondary" fontSize={12}>{concept.code}</Typography></Box>,
+            concept.calculationGroup,
+            quoteChargeDefaultSourceLabel(concept.defaultValueSource, concept.defaultAmount),
+            <StatusChip label={concept.active ? 'Activo' : 'Inactivo'} tone={concept.active ? 'success' : 'default'} />,
+            <Actions onEdit={canManage ? () => setQuoteChargeConceptForm({ open: true, item: concept }) : undefined} />
+          ])}
+        />
       </Stack>
     </CardContent></Card>
     <Card><CardContent>
@@ -3270,6 +3324,7 @@ function SettingsPage() {
     <CompanyDialog form={companyForm} onClose={() => setCompanyForm({ open: false })} onSave={saveCompany} />
     <SalesPointDialog form={salesPointForm} onClose={() => setSalesPointForm({ open: false })} onSave={saveSalesPoint} />
     <ProductCategoryDialog form={productCategoryForm} onClose={() => setProductCategoryForm({ open: false })} onSave={saveProductCategory} />
+    <QuoteChargeConceptDialog form={quoteChargeConceptForm} onClose={() => setQuoteChargeConceptForm({ open: false })} onSave={saveQuoteChargeConcept} />
     <RequirementProfileDialog form={requirementProfileForm} onClose={() => setRequirementProfileForm({ open: false })} onSave={saveRequirementProfile} />
     <PromotionDialog form={promotionForm} products={products.filter((x) => x.active)} salesPoints={salesPoints.filter((x) => x.active)} onClose={() => setPromotionForm({ open: false })} onSave={savePromotion} />
     <UserDialog form={userForm} companies={userDialogCompanies} salesPoints={salesPoints.filter((x) => x.active)} defaultCompanyId={currentCompanyId} onClose={() => setUserForm({ open: false })} onSave={saveUser} />
@@ -3324,6 +3379,42 @@ function ProductCategoryDialog({ form, onClose, onSave }: DialogProps<ProductCat
         <MenuItem value="false">Inactiva</MenuItem>
       </TextField>
     </>}
+  </FormDialog>;
+}
+
+function QuoteChargeConceptDialog({ form, onClose, onSave }: DialogProps<QuoteChargeConcept, typeof emptyQuoteChargeConcept>) {
+  const initial = form.item ? {
+    name: form.item.name,
+    code: form.item.code,
+    calculationGroup: form.item.calculationGroup,
+    defaultValueSource: form.item.defaultValueSource,
+    defaultAmount: form.item.defaultAmount,
+    order: form.item.order,
+    active: form.item.active
+  } : emptyQuoteChargeConcept;
+
+  return <FormDialog title={form.item ? 'Editar concepto de cotizacion' : 'Nuevo concepto de cotizacion'} open={form.open} initial={initial} onClose={onClose} onSave={onSave} maxWidth="sm">
+    {(v, set) => <Stack spacing={1.5}>
+      <TextField required label="Nombre visible" value={v.name} onChange={(e) => set({ name: e.target.value })} helperText="Ejemplo: Seguro, Matricula, Impuestos, Formulario, Traspaso." />
+      <TextField required label="Codigo" value={v.code} onChange={(e) => set({ code: e.target.value.toUpperCase().replace(/[^A-Z0-9_ -]/g, '').replace(/\s+/g, '_') })} />
+      <FieldGrid columns={2}>
+        <TextField fullWidth select label="Grupo de calculo" value={v.calculationGroup} onChange={(e) => set({ calculationGroup: e.target.value })}>
+          <MenuItem value="Seguro">Seguro</MenuItem>
+          <MenuItem value="Gasto">Gasto / tramite</MenuItem>
+        </TextField>
+        <TextField fullWidth type="number" label="Orden" value={v.order} onChange={(e) => set({ order: Number(e.target.value) })} />
+      </FieldGrid>
+      <TextField select label="Valor sugerido" value={v.defaultValueSource} onChange={(e) => set({ defaultValueSource: e.target.value })}>
+        <MenuItem value="Manual">Manual en cero</MenuItem>
+        <MenuItem value="SoatProducto">SOAT del producto</MenuItem>
+        <MenuItem value="MatriculaProducto">Matricula del producto</MenuItem>
+        <MenuItem value="ImpuestosProducto">Impuestos del producto</MenuItem>
+        <MenuItem value="ValorFijo">Valor fijo del concepto</MenuItem>
+      </TextField>
+      <TextField type="number" label="Valor fijo" value={v.defaultAmount} onChange={(e) => set({ defaultAmount: Number(e.target.value) })} helperText="Solo se usa cuando el valor sugerido es Valor fijo." />
+      <FormControlLabel control={<Checkbox checked={v.active} onChange={(e) => set({ active: e.target.checked })} />} label="Concepto activo" />
+      <Alert severity="info">Los conceptos tipo Seguro se suman al seguro de la cotizacion. Los tipo Gasto se suman a gastos, matricula y tramites.</Alert>
+    </Stack>}
   </FormDialog>;
 }
 
@@ -4073,14 +4164,18 @@ function ProductPhotosManager({ product, onChanged }: { product: Product; onChan
   </Paper>;
 }
 
-function QuoteDialog({ form, products, productCategories, requirementProfiles, onClose, onSave }: DialogProps<Quote, typeof emptyQuote> & { products: Product[]; productCategories: ProductCategory[]; requirementProfiles: RequirementProfile[] }) {
+function QuoteDialog({ form, products, productCategories, requirementProfiles, quoteChargeConcepts, onClose, onSave }: DialogProps<Quote, typeof emptyQuote> & { products: Product[]; productCategories: ProductCategory[]; requirementProfiles: RequirementProfile[]; quoteChargeConcepts: QuoteChargeConcept[] }) {
   const firstProduct = products[0];
+  const activeChargeConcepts = normalizedQuoteChargeConcepts(quoteChargeConcepts);
+  const initialChargeValues = quoteChargeDefaults(firstProduct, activeChargeConcepts);
+  const initialChargeTotals = quoteChargeTotals({ ...emptyQuoteItem, chargeValues: initialChargeValues }, activeChargeConcepts, firstProduct);
   const initialItem = {
     ...emptyQuoteItem,
     productId: firstProduct?.id ?? '',
     productPrice: firstProduct?.price ?? 0,
-    insurance: firstProduct?.soat ?? 0,
-    administrativeFees: (firstProduct?.registrationFee ?? 0) + (firstProduct?.taxes ?? 0)
+    insurance: initialChargeTotals.insurance,
+    administrativeFees: initialChargeTotals.administrativeFees,
+    chargeValues: initialChargeValues
   };
   const initial = { ...emptyQuote, requirementProfileId: requirementProfiles[0]?.id ?? '', productId: initialItem.productId, items: [initialItem] };
   const [identityLoading, setIdentityLoading] = useState(false);
@@ -4183,11 +4278,14 @@ function QuoteDialog({ form, products, productCategories, requirementProfiles, o
       };
       const updateItemProduct = (index: number, productId: string) => {
         const selected = products.find((product) => product.id === productId);
+        const chargeValues = quoteChargeDefaults(selected, activeChargeConcepts);
+        const chargeTotals = quoteChargeTotals({ ...emptyQuoteItem, chargeValues }, activeChargeConcepts, selected);
         updateItem(index, {
           productId,
           productPrice: selected?.price ?? 0,
-          insurance: selected?.soat ?? 0,
-          administrativeFees: (selected?.registrationFee ?? 0) + (selected?.taxes ?? 0),
+          insurance: chargeTotals.insurance,
+          administrativeFees: chargeTotals.administrativeFees,
+          chargeValues,
           inventoryWarehouseCode: '',
           inventoryWarehouseName: '',
           inventoryPresentation: '',
@@ -4199,11 +4297,14 @@ function QuoteDialog({ form, products, productCategories, requirementProfiles, o
       const useInventoryItem = (index: number, inventoryItem: ExternalInventoryItem) => {
         if (!inventoryItem.productId) return;
         const selected = products.find((product) => product.id === inventoryItem.productId);
+        const chargeValues = quoteChargeDefaults(selected, activeChargeConcepts);
+        const chargeTotals = quoteChargeTotals({ ...emptyQuoteItem, chargeValues }, activeChargeConcepts, selected);
         updateItem(index, {
           productId: inventoryItem.productId,
           productPrice: Number(inventoryItem.productPrice ?? selected?.price ?? 0),
-          insurance: selected?.soat ?? 0,
-          administrativeFees: (selected?.registrationFee ?? 0) + (selected?.taxes ?? 0),
+          insurance: chargeTotals.insurance,
+          administrativeFees: chargeTotals.administrativeFees,
+          chargeValues,
           inventoryWarehouseCode: inventoryItem.warehouseCode ?? '',
           inventoryWarehouseName: inventoryItem.warehouseName ?? '',
           inventoryPresentation: inventoryItem.presentation ?? '',
@@ -4215,12 +4316,15 @@ function QuoteDialog({ form, products, productCategories, requirementProfiles, o
       const addItem = () => {
         if (quoteItems.length >= 4) return;
         const selected = products[0];
+        const chargeValues = quoteChargeDefaults(selected, activeChargeConcepts);
+        const chargeTotals = quoteChargeTotals({ ...emptyQuoteItem, chargeValues }, activeChargeConcepts, selected);
         const items = [...quoteItems, {
           ...emptyQuoteItem,
           productId: selected?.id ?? '',
           productPrice: selected?.price ?? 0,
-          insurance: selected?.soat ?? 0,
-          administrativeFees: (selected?.registrationFee ?? 0) + (selected?.taxes ?? 0)
+          insurance: chargeTotals.insurance,
+          administrativeFees: chargeTotals.administrativeFees,
+          chargeValues
         }];
         set({ items });
       };
@@ -4358,6 +4462,9 @@ function QuoteDialog({ form, products, productCategories, requirementProfiles, o
           </Paper>
           {quoteItems.map((item, index) => {
             const selectedProduct = products.find((product) => product.id === item.productId);
+            const chargeValues = quoteChargeValues(item, activeChargeConcepts, selectedProduct);
+            const chargeTotals = quoteChargeTotals({ ...item, chargeValues }, activeChargeConcepts, selectedProduct);
+            const simulationItem = { ...item, chargeValues, insurance: chargeTotals.insurance, administrativeFees: chargeTotals.administrativeFees };
             return <Paper key={index} variant="outlined" sx={{ p: 2, bgcolor: '#f8fafc' }}>
               <Stack spacing={1.5}>
                 <Stack direction="row" justifyContent="space-between" alignItems="center" gap={1}>
@@ -4368,7 +4475,7 @@ function QuoteDialog({ form, products, productCategories, requirementProfiles, o
                   display: 'grid',
                   gridTemplateColumns: {
                     xs: '1fr',
-                    md: 'minmax(260px, 1.6fr) repeat(5, minmax(108px, 1fr)) minmax(170px, 1fr)'
+                    md: `minmax(260px, 1.5fr) repeat(${Math.max(activeChargeConcepts.length + 3, 4)}, minmax(112px, 1fr)) minmax(170px, 1fr)`
                   },
                   gap: 1.5,
                   alignItems: 'stretch'
@@ -4419,9 +4526,19 @@ function QuoteDialog({ form, products, productCategories, requirementProfiles, o
                   <TextField fullWidth label="Cuota inicial" type="number" value={item.downPayment} onChange={(e) => updateItem(index, { downPayment: Number(e.target.value) })} />
                   <TextField fullWidth label="Precio" type="number" value={item.productPrice} onChange={(e) => updateItem(index, { productPrice: Number(e.target.value) })} />
                   <TextField fullWidth label="Cuotas" type="number" value={item.termMonths} onChange={(e) => updateItem(index, { termMonths: Number(e.target.value) })} />
-                  <TextField fullWidth label="Seguro" type="number" value={item.insurance} onChange={(e) => updateItem(index, { insurance: Number(e.target.value) })} />
-                  <TextField fullWidth label="Gastos adm." type="number" value={item.administrativeFees} onChange={(e) => updateItem(index, { administrativeFees: Number(e.target.value) })} />
-                  <QuoteSimulationPreview value={item} selectedProduct={selectedProduct} compact />
+                  {activeChargeConcepts.map((concept) => <TextField
+                    key={concept.id}
+                    fullWidth
+                    label={concept.name}
+                    type="number"
+                    value={chargeValues[concept.id] ?? 0}
+                    onChange={(e) => {
+                      const nextChargeValues = { ...chargeValues, [concept.id]: Number(e.target.value) };
+                      const totals = quoteChargeTotals({ ...item, chargeValues: nextChargeValues }, activeChargeConcepts, selectedProduct);
+                      updateItem(index, { chargeValues: nextChargeValues, insurance: totals.insurance, administrativeFees: totals.administrativeFees });
+                    }}
+                  />)}
+                  <QuoteSimulationPreview value={simulationItem} selectedProduct={selectedProduct} compact />
                 </Box>
               </Stack>
             </Paper>;
@@ -5600,6 +5717,49 @@ function productSearchText(product: Product) {
     product.color,
     product.year?.toString()
   ].filter(Boolean).join(' '));
+}
+function normalizedQuoteChargeConcepts(concepts: QuoteChargeConcept[]) {
+  const active = concepts.filter((concept) => concept.active).sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
+  return active.length ? active : [
+    { id: 'SEGURO', name: 'Seguro', code: 'SEGURO', calculationGroup: 'Seguro', defaultValueSource: 'SoatProducto', defaultAmount: 0, order: 1, active: true },
+    { id: 'MATRICULA', name: 'Matricula', code: 'MATRICULA', calculationGroup: 'Gasto', defaultValueSource: 'MatriculaProducto', defaultAmount: 0, order: 2, active: true },
+    { id: 'IMPUESTOS', name: 'Impuestos', code: 'IMPUESTOS', calculationGroup: 'Gasto', defaultValueSource: 'ImpuestosProducto', defaultAmount: 0, order: 3, active: true }
+  ];
+}
+function quoteChargeDefaultValue(concept: QuoteChargeConcept, product?: Product) {
+  if (concept.defaultValueSource === 'SoatProducto') return Number(product?.soat ?? 0);
+  if (concept.defaultValueSource === 'MatriculaProducto') return Number(product?.registrationFee ?? 0);
+  if (concept.defaultValueSource === 'ImpuestosProducto') return Number(product?.taxes ?? 0);
+  if (concept.defaultValueSource === 'ValorFijo') return Number(concept.defaultAmount ?? 0);
+  return 0;
+}
+function quoteChargeDefaults(product: Product | undefined, concepts: QuoteChargeConcept[]) {
+  return concepts.reduce<Record<string, number>>((values, concept) => {
+    values[concept.id] = quoteChargeDefaultValue(concept, product);
+    return values;
+  }, {});
+}
+function quoteChargeValues(item: typeof emptyQuoteItem, concepts: QuoteChargeConcept[], product?: Product) {
+  return { ...quoteChargeDefaults(product, concepts), ...(item.chargeValues ?? {}) };
+}
+function quoteChargeTotals(item: typeof emptyQuoteItem, concepts: QuoteChargeConcept[], product?: Product) {
+  const values = quoteChargeValues(item, concepts, product);
+  return concepts.reduce((totals, concept) => {
+    const value = Math.max(Number(values[concept.id]) || 0, 0);
+    if (concept.calculationGroup === 'Seguro') {
+      totals.insurance += value;
+    } else {
+      totals.administrativeFees += value;
+    }
+    return totals;
+  }, { insurance: 0, administrativeFees: 0 });
+}
+function quoteChargeDefaultSourceLabel(source: string, fixedAmount: number) {
+  if (source === 'SoatProducto') return 'SOAT del producto';
+  if (source === 'MatriculaProducto') return 'Matricula del producto';
+  if (source === 'ImpuestosProducto') return 'Impuestos del producto';
+  if (source === 'ValorFijo') return `Valor fijo ${money(fixedAmount)}`;
+  return 'Manual en cero';
 }
 function isApplianceCategoryName(category?: string) {
   return (category ?? '').toLowerCase().includes('electrodom');

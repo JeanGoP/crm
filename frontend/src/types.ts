@@ -218,6 +218,17 @@ export interface FinancialSettings {
   active: boolean;
 }
 
+export interface QuoteChargeConcept {
+  id: string;
+  name: string;
+  code: string;
+  calculationGroup: string;
+  defaultValueSource: string;
+  defaultAmount: number;
+  order: number;
+  active: boolean;
+}
+
 export interface SalesPoint {
   id: string;
   name: string;
