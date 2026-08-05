@@ -242,6 +242,7 @@ public sealed record QuoteItemDto(
 
 public sealed record CreateQuoteItemDto(
     Guid ProductId,
+    decimal ProductPrice,
     decimal DownPayment,
     decimal Insurance,
     decimal AdministrativeFees,

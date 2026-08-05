@@ -231,7 +231,7 @@ Cuando la empresa tiene inventario conectado y la sede del usuario tiene bodegas
 8. Edite el producto creado, complete precio, categoria, marca, modelo, cargos o foto si aplica.
 9. Active el producto cuando ya este listo para cotizar.
 
-Los productos sincronizados sin precio no quedan listos para cotizacion hasta que el administrador complete el valor comercial. Si el producto venia como **Pendiente precio**, al guardar un precio mayor a cero queda listo para usarse en cotizaciones.
+Los productos sincronizados sin precio tambien pueden usarse en cotizacion. En ese caso, el asesor debe digitar el precio comercial al momento de cotizar.
 
 El listado de productos tambien respeta esta regla: cuando hay inventario conectado, se muestran los productos que existen en las bodegas permitidas para la sede correspondiente.
 
@@ -283,7 +283,7 @@ La cotizacion usa automaticamente la sede principal del asesor conectado. Esa se
 
 Cuando la empresa tiene inventario conectado, el asesor puede buscar existencias en tiempo real por codigo, nombre, serial, chasis o bodega. El resultado muestra disponibilidad y punto de inventario. Para poder usar un articulo en la cotizacion, la combinacion de codigo y presentacion debe tener su producto equivalente creado en el catalogo del CRM, porque desde alli se toman precio, fotos, categoria y reglas comerciales.
 
-Al presionar **Usar** sobre una existencia, la cotizacion guarda la unidad seleccionada con su bodega, serial, motor y chasis cuando esa informacion esta disponible.
+Al presionar **Usar** sobre una existencia, la cotizacion guarda la unidad seleccionada con su bodega, serial, motor y chasis cuando esa informacion esta disponible. Si el producto no tiene precio configurado, el asesor puede escribirlo directamente en el articulo de la cotizacion.
 
 Tambien permite seleccionar un **perfil de requisitos**, por ejemplo Empleado, Independiente, Pensionado o Contado. Ese perfil indica que documentos se deben pedir si el cliente continua hacia solicitud de credito.
 
@@ -301,7 +301,7 @@ Si existe una promocion vigente para el producto, marca, color o sede, la cotiza
 8. Seleccione el **perfil de requisitos** que corresponda al cliente o a la forma de pago.
 9. Si desea validar disponibilidad, use **Buscar inventario en tiempo real** y presione **Usar** sobre el articulo encontrado. El sistema asigna el producto y conserva los datos de la unidad seleccionada.
 10. Si no usa la busqueda de inventario, seleccione manualmente el producto que desea cotizar.
-11. Digite la cuota inicial y el numero de cuotas.
+11. Revise o digite el precio del articulo, la cuota inicial y el numero de cuotas.
 12. Si desea comparar varias opciones, presione **Agregar articulo** y seleccione otro producto.
 13. Revise la cuota aproximada de cada articulo.
 14. Guarde la cotizacion.
@@ -789,6 +789,7 @@ El sistema muestra mensajes cuando algo no puede completarse.
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-08-05 | 10.3 | Las cotizaciones permiten usar articulos de inventario sin precio y digitar el precio comercial directamente al cotizar. |
 | 2026-08-01 | 10.2 | Se ajusta inventario externo para manejar productos por codigo y presentacion, y guardar bodega, serial, motor y chasis al usar una existencia en cotizacion. |
 | 2026-08-01 | 10.1 | Se mejora la lectura de precio en inventario externo para usar el precio efectivo de cotizacion y mostrar si falta producto, precio o activacion. |
 | 2026-08-01 | 10.0 | Se elimina el selector de sede en Productos; el catalogo y la sincronizacion usan automaticamente las bodegas de la sede asignada al usuario. |

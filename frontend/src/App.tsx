@@ -281,7 +281,7 @@ const emptySalesPoint = { name: '', code: '', city: '', address: '', phone: '', 
 const emptyRequirementDocument = { type: 5, name: '', description: '', required: true, order: 1 };
 const emptyRequirementProfile = { name: '', code: '', description: '', isCash: false, active: true, documents: [emptyRequirementDocument] };
 const emptyPromotion = { name: '', code: '', discountType: 'Valor', discountValue: 0, productId: '', brand: '', color: '', salesPointId: '', validFrom: today, validUntil: today, active: true };
-const emptyQuoteItem = { productId: '', downPayment: 0, insurance: 0, administrativeFees: 0, termMonths: 24, monthlyInterestRate: 2.2, inventoryWarehouseCode: '', inventoryWarehouseName: '', inventoryPresentation: '', inventorySerialNumber: '', inventoryEngineNumber: '', inventoryChassisNumber: '' };
+const emptyQuoteItem = { productId: '', productPrice: 0, downPayment: 0, insurance: 0, administrativeFees: 0, termMonths: 24, monthlyInterestRate: 2.2, inventoryWarehouseCode: '', inventoryWarehouseName: '', inventoryPresentation: '', inventorySerialNumber: '', inventoryEngineNumber: '', inventoryChassisNumber: '' };
 const emptyQuote = { identificationType: 1, identificationNumber: '', customerFirstNames: '', customerLastNames: '', customerFirstName: '', customerMiddleName: '', customerLastName: '', customerSecondLastName: '', phoneCountryCode: '+57', phoneNumber: '', requirementProfileId: '', productId: '', downPayment: 0, insurance: 0, administrativeFees: 0, termMonths: 24, monthlyInterestRate: 2.2, items: [emptyQuoteItem], notes: '' };
 const emptyCreditApplication = {
   customerId: '', productId: '', quoteId: '', dealId: '', requirementProfileId: '', identificationType: 1, identificationNumber: '', birthDate: '', mobile: '', address: '', city: '', occupation: '',
@@ -1460,10 +1460,11 @@ function QuotesPage() {
     if (!customerFirstName) throw new Error('El primer nombre del cliente es obligatorio.');
     if (!customerLastName) throw new Error('El primer apellido del cliente es obligatorio.');
     if (!phoneDigits) throw new Error('El telefono del cliente es obligatorio.');
-    const quoteItems = (payload.items?.length ? payload.items : [{ ...emptyQuoteItem, productId: payload.productId, downPayment: payload.downPayment, insurance: payload.insurance, administrativeFees: payload.administrativeFees, termMonths: payload.termMonths, monthlyInterestRate: payload.monthlyInterestRate }])
+    const quoteItems = (payload.items?.length ? payload.items : [{ ...emptyQuoteItem, productId: payload.productId, productPrice: 0, downPayment: payload.downPayment, insurance: payload.insurance, administrativeFees: payload.administrativeFees, termMonths: payload.termMonths, monthlyInterestRate: payload.monthlyInterestRate }])
       .filter((item) => item.productId)
       .map((item) => ({
         productId: item.productId,
+        productPrice: Number(item.productPrice),
         downPayment: Number(item.downPayment),
         insurance: Number(item.insurance),
         administrativeFees: Number(item.administrativeFees),
@@ -4077,6 +4078,7 @@ function QuoteDialog({ form, products, productCategories, requirementProfiles, o
   const initialItem = {
     ...emptyQuoteItem,
     productId: firstProduct?.id ?? '',
+    productPrice: firstProduct?.price ?? 0,
     insurance: firstProduct?.soat ?? 0,
     administrativeFees: (firstProduct?.registrationFee ?? 0) + (firstProduct?.taxes ?? 0)
   };
@@ -4174,7 +4176,7 @@ function QuoteDialog({ form, products, productCategories, requirementProfiles, o
         && selectedProducts.length === quoteItems.length
         && selectedProducts.every((product) => product.category === selectedCategory)
         && productCategories.some((category) => category.name === selectedCategory && category.quoteAsBundle);
-      const bundleTotal = selectedProducts.reduce((sum, product) => sum + Number(product.price || 0), 0);
+      const bundleTotal = quoteItems.reduce((sum, item) => sum + Number(item.productPrice || 0), 0);
       const updateItem = (index: number, patch: Partial<typeof emptyQuoteItem>) => {
         const items = quoteItems.map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item);
         set({ items, productId: items[0]?.productId ?? '', downPayment: Number(items[0]?.downPayment ?? 0), insurance: Number(items[0]?.insurance ?? 0), administrativeFees: Number(items[0]?.administrativeFees ?? 0), termMonths: Number(items[0]?.termMonths ?? 24), monthlyInterestRate: Number(items[0]?.monthlyInterestRate ?? 2.2) });
@@ -4183,6 +4185,7 @@ function QuoteDialog({ form, products, productCategories, requirementProfiles, o
         const selected = products.find((product) => product.id === productId);
         updateItem(index, {
           productId,
+          productPrice: selected?.price ?? 0,
           insurance: selected?.soat ?? 0,
           administrativeFees: (selected?.registrationFee ?? 0) + (selected?.taxes ?? 0),
           inventoryWarehouseCode: '',
@@ -4198,6 +4201,7 @@ function QuoteDialog({ form, products, productCategories, requirementProfiles, o
         const selected = products.find((product) => product.id === inventoryItem.productId);
         updateItem(index, {
           productId: inventoryItem.productId,
+          productPrice: Number(inventoryItem.productPrice ?? selected?.price ?? 0),
           insurance: selected?.soat ?? 0,
           administrativeFees: (selected?.registrationFee ?? 0) + (selected?.taxes ?? 0),
           inventoryWarehouseCode: inventoryItem.warehouseCode ?? '',
@@ -4214,6 +4218,7 @@ function QuoteDialog({ form, products, productCategories, requirementProfiles, o
         const items = [...quoteItems, {
           ...emptyQuoteItem,
           productId: selected?.id ?? '',
+          productPrice: selected?.price ?? 0,
           insurance: selected?.soat ?? 0,
           administrativeFees: (selected?.registrationFee ?? 0) + (selected?.taxes ?? 0)
         }];
@@ -4330,14 +4335,16 @@ function QuoteDialog({ form, products, productCategories, requirementProfiles, o
                       </Typography>}
                       <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
                         {item.isInCatalog && item.productId
-                          ? <Typography variant="caption" color="success.main" fontWeight={800}>Catalogo CRM: {money(item.productPrice ?? 0)}</Typography>
+                          ? <Typography variant="caption" color="success.main" fontWeight={800}>
+                            {Number(item.productPrice ?? 0) > 0 ? `Catalogo CRM: ${money(item.productPrice ?? 0)}` : 'Catalogo CRM: precio pendiente'}
+                          </Typography>
                           : <Typography variant="caption" color="warning.main" fontWeight={800}>
                             {!item.productId ? 'Sin producto CRM' : !item.productActive ? 'Producto inactivo' : 'Sin precio CRM'}
                           </Typography>}
                         <Button
                           size="small"
                           variant="outlined"
-                          disabled={!item.isInCatalog || !item.productId || Number(item.productPrice ?? 0) <= 0}
+                          disabled={!item.isInCatalog || !item.productId}
                           onClick={() => useInventoryItem(Math.min(inventoryTargetIndex, quoteItems.length - 1), item)}
                         >
                           Usar
@@ -4361,7 +4368,7 @@ function QuoteDialog({ form, products, productCategories, requirementProfiles, o
                   display: 'grid',
                   gridTemplateColumns: {
                     xs: '1fr',
-                    md: 'minmax(300px, 1.7fr) repeat(4, minmax(112px, 1fr)) minmax(170px, 1fr)'
+                    md: 'minmax(260px, 1.6fr) repeat(5, minmax(108px, 1fr)) minmax(170px, 1fr)'
                   },
                   gap: 1.5,
                   alignItems: 'stretch'
@@ -4373,6 +4380,7 @@ function QuoteDialog({ form, products, productCategories, requirementProfiles, o
                     Unidad seleccionada: {item.inventoryWarehouseName || 'Bodega'}{item.inventoryChassisNumber ? ` · Chasis ${item.inventoryChassisNumber}` : ''}{item.inventoryEngineNumber ? ` · Motor ${item.inventoryEngineNumber}` : ''}
                   </Alert>}
                   <TextField fullWidth label="Cuota inicial" type="number" value={item.downPayment} onChange={(e) => updateItem(index, { downPayment: Number(e.target.value) })} />
+                  <TextField fullWidth label="Precio" type="number" value={item.productPrice} onChange={(e) => updateItem(index, { productPrice: Number(e.target.value) })} />
                   <TextField fullWidth label="Cuotas" type="number" value={item.termMonths} onChange={(e) => updateItem(index, { termMonths: Number(e.target.value) })} />
                   <TextField fullWidth label="Seguro" type="number" value={item.insurance} onChange={(e) => updateItem(index, { insurance: Number(e.target.value) })} />
                   <TextField fullWidth label="Gastos adm." type="number" value={item.administrativeFees} onChange={(e) => updateItem(index, { administrativeFees: Number(e.target.value) })} />
@@ -4395,7 +4403,7 @@ function QuoteSimulationPreview({ value, selectedProduct, compact = false }: { v
   const [simulation, setSimulation] = useState<QuoteSimulationResult>();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const productPrice = selectedProduct?.price ?? 0;
+  const productPrice = Math.max(Number(value.productPrice) || 0, 0);
 
   useEffect(() => {
     if (!selectedProduct?.id) {
@@ -4409,7 +4417,7 @@ function QuoteSimulationPreview({ value, selectedProduct, compact = false }: { v
       setError('');
       api.post<QuoteSimulationResult>('/api/quotes/simulate', {
         productId: selectedProduct.id,
-        productPrice: selectedProduct.price,
+        productPrice,
         downPayment: Number(value.downPayment),
         insurance: Number(value.insurance),
         administrativeFees: Number(value.administrativeFees),
@@ -4422,7 +4430,7 @@ function QuoteSimulationPreview({ value, selectedProduct, compact = false }: { v
     }, 250);
 
     return () => window.clearTimeout(timer);
-  }, [selectedProduct?.id, selectedProduct?.price, value.downPayment, value.insurance, value.administrativeFees, value.termMonths, value.monthlyInterestRate]);
+  }, [selectedProduct?.id, productPrice, value.downPayment, value.insurance, value.administrativeFees, value.termMonths, value.monthlyInterestRate]);
 
   const insurance = Math.max(Number(value.insurance) || 0, 0);
   const administrativeFees = Math.max(Number(value.administrativeFees) || 0, 0);

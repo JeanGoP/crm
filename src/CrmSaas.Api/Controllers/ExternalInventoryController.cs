@@ -58,7 +58,7 @@ public sealed class ExternalInventoryController(IConfiguration configuration, Cr
                 productsByReference.TryGetValue(row.Code, out product);
             }
             var productPrice = product is null ? (decimal?)null : ResolveProductPrice(product, inventoryConfig.SalesPointId);
-            var isQuoteReady = product is not null && product.Activo && productPrice.GetValueOrDefault() > 0;
+            var isQuoteReady = product is not null && product.Activo;
             var (engine, chassis) = ParseSerial(row.SerialNumber);
             return new ExternalInventoryItemDto(
                 row.WarehouseCode,

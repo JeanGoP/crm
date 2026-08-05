@@ -270,7 +270,6 @@ public sealed class ProductsController(CrmDbContext db, IConfiguration configura
             {
                 var existingProduct = existingProductsByReference[item.Reference];
                 if (!existingProduct.Activo
-                    && existingProduct.Precio > 0
                     && string.Equals(existingProduct.Categoria, ExternalInventoryCategory, StringComparison.OrdinalIgnoreCase))
                 {
                     existingProduct.Activo = true;
@@ -300,7 +299,7 @@ public sealed class ProductsController(CrmDbContext db, IConfiguration configura
                 Impuestos = template?.Impuestos ?? 0,
                 FichaTecnica = BuildExternalInventoryTechnicalSheet(item, template?.FichaTecnica),
                 VigenteDesde = template?.VigenteDesde,
-                Activo = inheritedPrice > 0
+                Activo = true
             };
             db.Productos.Add(product);
             existingSet.Add(item.Reference);

@@ -73,7 +73,8 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             if (item.TermMonths <= 0) throw new ValidationException("El plazo debe ser mayor a cero.");
             if (item.MonthlyInterestRate < 0) throw new ValidationException("La tasa mensual no puede ser negativa.");
             var product = products[item.ProductId];
-            var productPrice = ResolveProductPrice(product, salesPoint);
+            var configuredProductPrice = ResolveProductPrice(product, salesPoint);
+            var productPrice = item.ProductPrice > 0 ? item.ProductPrice : configuredProductPrice;
             var insurance = item.Insurance > 0 ? item.Insurance : product.Soat;
             var administrativeFees = item.AdministrativeFees > 0 ? item.AdministrativeFees : product.Matricula + product.Impuestos;
             var promotion = ResolvePromotion(product, salesPoint, promotions, productPrice);
@@ -291,7 +292,8 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             ?? throw new KeyNotFoundException("Producto no encontrado o inactivo.");
         var financialSettings = await GetFinancialSettingsAsync(cancellationToken);
         var salesPoint = await GetCurrentSalesPointAsync(cancellationToken);
-        var productPrice = ResolveProductPrice(product, salesPoint);
+        var configuredProductPrice = ResolveProductPrice(product, salesPoint);
+        var productPrice = dto.ProductPrice > 0 ? dto.ProductPrice : configuredProductPrice;
         var promotion = ResolvePromotion(product, salesPoint, await GetActivePromotionsAsync(ColombiaTime.Now, cancellationToken), productPrice);
         var insurance = dto.Insurance > 0 ? dto.Insurance : product.Soat;
         var administrativeFees = dto.AdministrativeFees > 0 ? dto.AdministrativeFees : product.Matricula + product.Impuestos;
@@ -467,7 +469,7 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
 
         return dto.ProductId == Guid.Empty
             ? []
-            : [new CreateQuoteItemDto(dto.ProductId, dto.DownPayment, dto.Insurance, dto.AdministrativeFees, dto.TermMonths, dto.MonthlyInterestRate)];
+            : [new CreateQuoteItemDto(dto.ProductId, 0, dto.DownPayment, dto.Insurance, dto.AdministrativeFees, dto.TermMonths, dto.MonthlyInterestRate)];
     }
 
     private static IEnumerable<QuoteItemDto> QuoteItems(Cotizacion quote)
