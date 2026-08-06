@@ -203,10 +203,12 @@
 <p>9. Si desea validar disponibilidad, use <strong>Buscar inventario en tiempo real</strong> y presione <strong>Usar</strong> sobre el articulo encontrado. El sistema asigna el producto y conserva los datos de la unidad seleccionada.</p>
 <p>10. Si no usa la busqueda de inventario, busque el producto escribiendo nombre, codigo, referencia, categoria o color y seleccione la opcion correcta.</p>
 <p>11. Revise o digite el precio del articulo, la cuota inicial y el numero de cuotas.</p>
-<p>12. Revise los conceptos configurados por la empresa, como seguro, matricula, impuestos u otros cargos. Puede ajustar el valor si el caso comercial lo requiere.</p>
-<p>13. Si desea comparar varias opciones, presione <strong>Agregar articulo</strong> y seleccione otro producto.</p>
-<p>14. Revise la cuota aproximada de cada articulo.</p>
-<p>15. Guarde la cotizacion.</p>
+<p>12. En <strong>Paga hoy</strong>, indique cuanto entrega el cliente en el momento de la negociacion.</p>
+<p>13. Si la cuota inicial queda pendiente por completar, use <strong>Agregar pago</strong> en <strong>Plan de cuota inicial</strong> para registrar fecha y valor de cada pago futuro.</p>
+<p>14. Revise los conceptos configurados por la empresa, como seguro, matricula, impuestos u otros cargos. Puede ajustar el valor si el caso comercial lo requiere.</p>
+<p>15. Si desea comparar varias opciones, presione <strong>Agregar articulo</strong> y seleccione otro producto.</p>
+<p>16. Revise la cuota aproximada de cada articulo.</p>
+<p>17. Guarde la cotizacion.</p>
 <h3>Que ocurre al guardar</h3>
 <ul>
 <li>Se crea o actualiza el cliente con los datos correctos.</li>
@@ -236,12 +238,15 @@
 <h3>Campos principales</h3>
 <ul>
 <li><strong>Precio del producto:</strong> valor base del producto.</li>
-<li><strong>Cuota inicial:</strong> dinero que entrega el cliente al inicio.</li>
+<li><strong>Cuota inicial:</strong> valor total de inicial negociado con el cliente.</li>
+<li><strong>Paga hoy:</strong> valor que el cliente entrega en el momento de la cotizacion.</li>
+<li><strong>Plan de cuota inicial:</strong> pagos futuros para completar la inicial antes de iniciar el credito.</li>
 <li><strong>Numero de cuotas:</strong> cantidad de pagos que tendra la financiacion.</li>
 <li><strong>Conceptos de cotizacion:</strong> campos configurables por empresa, por ejemplo seguro, matricula, impuestos, formulario, accesorios o traspaso.</li>
 <li><strong>Total financiado:</strong> valor que queda pendiente despues de la cuota inicial y cargos.</li>
 <li><strong>Cuota aproximada:</strong> valor estimado de la cuota mensual.</li>
 </ul>
+<p>Cuando la inicial se paga por partes, el credito empieza a contar despues de la ultima fecha registrada en el plan de cuota inicial. Por ejemplo, si la inicial total es de $5.000.000, el cliente paga $3.000.000 hoy y deja $1.000.000 a 30 dias y $1.000.000 a 60 dias, las cuotas del credito empiezan despues de completar esos pagos.</p>
 <h3>Recomendacion de uso</h3>
 <p>Explique al cliente que la cuota es aproximada y puede cambiar segun la aprobacion final, politicas de credito, documentos entregados o condiciones comerciales vigentes.</p>
 <h2>13. Solicitudes de credito</h2>
@@ -585,6 +590,7 @@
 <h2>26. Historial del manual</h2>
 <table>
 <thead><tr><th>Fecha</th><th>Version</th><th>Cambio</th></tr></thead><tbody>
+<tr><td>2026-08-05</td><td>10.7</td><td>Se agrega plan de cuota inicial en cotizaciones para registrar pago de hoy, pagos futuros e inicio estimado del credito.</td></tr>
 <tr><td>2026-08-05</td><td>10.6</td><td>Se agregan conceptos configurables de cotizacion por empresa para mostrar campos como seguro, matricula, impuestos u otros cargos en Nueva cotizacion.</td></tr>
 <tr><td>2026-08-05</td><td>10.5</td><td>Se mejora el buscador de productos dentro de cotizaciones para encontrar articulos por nombre, codigo, referencia, categoria, marca o color.</td></tr>
 <tr><td>2026-08-05</td><td>10.4</td><td>Los productos existentes y sincronizados desde inventario quedan activos automaticamente para poder cotizarlos con precio editable.</td></tr>

@@ -304,6 +304,11 @@ export interface QuoteSimulationResult {
   usedCompanyFinancialSettings: boolean;
 }
 
+export interface QuoteInitialPayment {
+  dueDate: string;
+  amount: number;
+}
+
 export interface QuoteItem {
   id: string;
   productId: string;
@@ -314,6 +319,10 @@ export interface QuoteItem {
   promotionDiscount: number;
   discountedProductPrice: number;
   downPayment: number;
+  initialPaymentPaidToday: number;
+  initialPaymentBalance: number;
+  creditStartDate?: string;
+  initialPaymentSchedule: QuoteInitialPayment[];
   insurance: number;
   administrativeFees: number;
   termMonths: number;
@@ -360,6 +369,10 @@ export interface Quote {
   discountedProductPrice: number;
   productPrice: number;
   downPayment: number;
+  initialPaymentPaidToday: number;
+  initialPaymentBalance: number;
+  creditStartDate?: string;
+  initialPaymentSchedule: QuoteInitialPayment[];
   insurance: number;
   administrativeFees: number;
   termMonths: number;

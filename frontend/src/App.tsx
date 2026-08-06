@@ -282,7 +282,7 @@ const emptySalesPoint = { name: '', code: '', city: '', address: '', phone: '', 
 const emptyRequirementDocument = { type: 5, name: '', description: '', required: true, order: 1 };
 const emptyRequirementProfile = { name: '', code: '', description: '', isCash: false, active: true, documents: [emptyRequirementDocument] };
 const emptyPromotion = { name: '', code: '', discountType: 'Valor', discountValue: 0, productId: '', brand: '', color: '', salesPointId: '', validFrom: today, validUntil: today, active: true };
-const emptyQuoteItem = { productId: '', productPrice: 0, downPayment: 0, insurance: 0, administrativeFees: 0, chargeValues: {} as Record<string, number>, termMonths: 24, monthlyInterestRate: 2.2, inventoryWarehouseCode: '', inventoryWarehouseName: '', inventoryPresentation: '', inventorySerialNumber: '', inventoryEngineNumber: '', inventoryChassisNumber: '' };
+const emptyQuoteItem = { productId: '', productPrice: 0, downPayment: 0, initialPaymentPaidToday: 0, initialPaymentSchedule: [] as { dueDate: string; amount: number }[], insurance: 0, administrativeFees: 0, chargeValues: {} as Record<string, number>, termMonths: 24, monthlyInterestRate: 2.2, inventoryWarehouseCode: '', inventoryWarehouseName: '', inventoryPresentation: '', inventorySerialNumber: '', inventoryEngineNumber: '', inventoryChassisNumber: '' };
 const emptyQuote = { identificationType: 1, identificationNumber: '', customerFirstNames: '', customerLastNames: '', customerFirstName: '', customerMiddleName: '', customerLastName: '', customerSecondLastName: '', phoneCountryCode: '+57', phoneNumber: '', requirementProfileId: '', productId: '', downPayment: 0, insurance: 0, administrativeFees: 0, termMonths: 24, monthlyInterestRate: 2.2, items: [emptyQuoteItem], notes: '' };
 const emptyCreditApplication = {
   customerId: '', productId: '', quoteId: '', dealId: '', requirementProfileId: '', identificationType: 1, identificationNumber: '', birthDate: '', mobile: '', address: '', city: '', occupation: '',
@@ -1463,7 +1463,7 @@ function QuotesPage() {
     if (!customerLastName) throw new Error('El primer apellido del cliente es obligatorio.');
     if (!phoneDigits) throw new Error('El telefono del cliente es obligatorio.');
     const activeChargeConcepts = normalizedQuoteChargeConcepts(quoteChargeConcepts);
-    const quoteItems = (payload.items?.length ? payload.items : [{ ...emptyQuoteItem, productId: payload.productId, productPrice: 0, downPayment: payload.downPayment, insurance: payload.insurance, administrativeFees: payload.administrativeFees, termMonths: payload.termMonths, monthlyInterestRate: payload.monthlyInterestRate }])
+    const quoteItems = (payload.items?.length ? payload.items : [{ ...emptyQuoteItem, productId: payload.productId, productPrice: 0, downPayment: payload.downPayment, initialPaymentPaidToday: payload.downPayment, insurance: payload.insurance, administrativeFees: payload.administrativeFees, termMonths: payload.termMonths, monthlyInterestRate: payload.monthlyInterestRate }])
       .filter((item) => item.productId)
       .map((item) => {
         const product = products.find((candidate) => candidate.id === item.productId);
@@ -1472,6 +1472,10 @@ function QuotesPage() {
           productId: item.productId,
           productPrice: Number(item.productPrice),
           downPayment: Number(item.downPayment),
+          initialPaymentPaidToday: Number(item.initialPaymentPaidToday),
+          initialPaymentSchedule: (item.initialPaymentSchedule ?? [])
+            .filter((payment) => Number(payment.amount) > 0 && payment.dueDate)
+            .map((payment) => ({ dueDate: payment.dueDate, amount: Number(payment.amount) })),
           insurance: chargeTotals.insurance,
           administrativeFees: chargeTotals.administrativeFees,
           termMonths: Number(item.termMonths),
@@ -4523,7 +4527,12 @@ function QuoteDialog({ form, products, productCategories, requirementProfiles, q
                   {(item.inventoryChassisNumber || item.inventoryEngineNumber || item.inventoryWarehouseName) && <Alert severity="info" sx={{ gridColumn: { md: '1 / -1' }, py: 0.5 }}>
                     Unidad seleccionada: {item.inventoryWarehouseName || 'Bodega'}{item.inventoryChassisNumber ? ` · Chasis ${item.inventoryChassisNumber}` : ''}{item.inventoryEngineNumber ? ` · Motor ${item.inventoryEngineNumber}` : ''}
                   </Alert>}
-                  <TextField fullWidth label="Cuota inicial" type="number" value={item.downPayment} onChange={(e) => updateItem(index, { downPayment: Number(e.target.value) })} />
+                  <TextField fullWidth label="Inicial total" type="number" value={item.downPayment} onChange={(e) => {
+                    const nextDownPayment = Number(e.target.value);
+                    const keepPaidInSync = Number(item.initialPaymentPaidToday) === Number(item.downPayment);
+                    updateItem(index, { downPayment: nextDownPayment, initialPaymentPaidToday: keepPaidInSync ? nextDownPayment : item.initialPaymentPaidToday });
+                  }} />
+                  <TextField fullWidth label="Paga hoy" type="number" value={item.initialPaymentPaidToday} onChange={(e) => updateItem(index, { initialPaymentPaidToday: Number(e.target.value) })} />
                   <TextField fullWidth label="Precio" type="number" value={item.productPrice} onChange={(e) => updateItem(index, { productPrice: Number(e.target.value) })} />
                   <TextField fullWidth label="Cuotas" type="number" value={item.termMonths} onChange={(e) => updateItem(index, { termMonths: Number(e.target.value) })} />
                   {activeChargeConcepts.map((concept) => <TextField
@@ -4540,6 +4549,10 @@ function QuoteDialog({ form, products, productCategories, requirementProfiles, q
                   />)}
                   <QuoteSimulationPreview value={simulationItem} selectedProduct={selectedProduct} compact />
                 </Box>
+                <InitialPaymentPlanEditor
+                  item={item}
+                  onChange={(patch) => updateItem(index, patch)}
+                />
               </Stack>
             </Paper>;
           })}
@@ -4625,6 +4638,62 @@ function QuoteSimulationPreview({ value, selectedProduct, compact = false }: { v
           <Box><Typography variant="caption" color="text.secondary">Total financiado</Typography><Typography fontWeight={700}>{money(preview.financedAmount)}</Typography></Box>
           <Box><Typography variant="caption" color="text.secondary">Cuota aproximada</Typography><Typography fontWeight={700}>{money(preview.estimatedMonthlyPayment)}</Typography></Box>
         </FieldGrid>}
+    </Stack>
+  </Paper>;
+}
+
+function InitialPaymentPlanEditor({ item, onChange }: { item: typeof emptyQuoteItem; onChange: (patch: Partial<typeof emptyQuoteItem>) => void }) {
+  const schedule = item.initialPaymentSchedule ?? [];
+  const downPayment = Math.max(Number(item.downPayment) || 0, 0);
+  const paidToday = Math.max(Number(item.initialPaymentPaidToday) || 0, 0);
+  const scheduledAmount = schedule.reduce((sum, payment) => sum + Math.max(Number(payment.amount) || 0, 0), 0);
+  const balance = Math.max(downPayment - paidToday - scheduledAmount, 0);
+  const overpaid = Math.max(paidToday + scheduledAmount - downPayment, 0);
+  const sortedPaymentDates = schedule.map((payment) => payment.dueDate).filter(Boolean).sort();
+  const creditStartDate = sortedPaymentDates.length ? sortedPaymentDates[sortedPaymentDates.length - 1] : today;
+  const updatePayment = (index: number, patch: Partial<{ dueDate: string; amount: number }>) => {
+    onChange({ initialPaymentSchedule: schedule.map((payment, paymentIndex) => paymentIndex === index ? { ...payment, ...patch } : payment) });
+  };
+  const addPayment = () => {
+    onChange({ initialPaymentSchedule: [...schedule, { dueDate: addDaysIso(today, (schedule.length + 1) * 30), amount: balance > 0 ? balance : 0 }] });
+  };
+  const removePayment = (index: number) => {
+    onChange({ initialPaymentSchedule: schedule.filter((_, paymentIndex) => paymentIndex !== index) });
+  };
+
+  if (downPayment <= 0) {
+    return <Alert severity="info" sx={{ py: 0.5 }}>Sin cuota inicial configurada para este articulo.</Alert>;
+  }
+
+  return <Paper variant="outlined" sx={{ p: 1.5, bgcolor: '#fff' }}>
+    <Stack spacing={1.25}>
+      <Stack direction={{ xs: 'column', md: 'row' }} alignItems={{ xs: 'stretch', md: 'center' }} justifyContent="space-between" gap={1}>
+        <Box>
+          <Typography fontWeight={900} fontSize={14}>Plan de cuota inicial</Typography>
+          <Typography color="text.secondary" fontSize={12.5}>
+            El credito inicia cuando la inicial este completa{creditStartDate ? `: ${new Date(creditStartDate).toLocaleDateString()}` : ''}.
+          </Typography>
+        </Box>
+        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+          <Chip size="small" label={`Inicial ${money(downPayment)}`} />
+          <Chip size="small" color={balance > 0 ? 'warning' : overpaid > 0 ? 'error' : 'success'} label={overpaid > 0 ? `Exceso ${money(overpaid)}` : `Saldo ${money(balance)}`} />
+          <Button size="small" variant="outlined" startIcon={<Add />} onClick={addPayment}>Agregar pago</Button>
+        </Stack>
+      </Stack>
+      {!!schedule.length && <Stack spacing={0.75}>
+        {schedule.map((payment, index) => <Box key={index} sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr auto' },
+          gap: 1,
+          alignItems: 'center'
+        }}>
+          <TextField size="small" type="date" label={`Pago ${index + 1}`} value={payment.dueDate} onChange={(e) => updatePayment(index, { dueDate: e.target.value })} InputLabelProps={{ shrink: true }} />
+          <TextField size="small" type="number" label="Valor" value={payment.amount} onChange={(e) => updatePayment(index, { amount: Number(e.target.value) })} />
+          <IconButton color="error" onClick={() => removePayment(index)}><Delete fontSize="small" /></IconButton>
+        </Box>)}
+      </Stack>}
+      {balance > 0 && <Alert severity="warning" sx={{ py: 0.5 }}>Falta programar {money(balance)} de la cuota inicial.</Alert>}
+      {overpaid > 0 && <Alert severity="error" sx={{ py: 0.5 }}>Los pagos superan la cuota inicial por {money(overpaid)}.</Alert>}
     </Stack>
   </Paper>;
 }
@@ -5760,6 +5829,11 @@ function quoteChargeDefaultSourceLabel(source: string, fixedAmount: number) {
   if (source === 'ImpuestosProducto') return 'Impuestos del producto';
   if (source === 'ValorFijo') return `Valor fijo ${money(fixedAmount)}`;
   return 'Manual en cero';
+}
+function addDaysIso(dateIso: string, days: number) {
+  const date = new Date(`${dateIso}T00:00:00`);
+  date.setDate(date.getDate() + days);
+  return date.toISOString().slice(0, 10);
 }
 function isApplianceCategoryName(category?: string) {
   return (category ?? '').toLowerCase().includes('electrodom');

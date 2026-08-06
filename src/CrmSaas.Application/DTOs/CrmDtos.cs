@@ -231,6 +231,10 @@ public sealed record QuoteSimulationResultDto(
     string CreditType,
     bool UsedCompanyFinancialSettings);
 
+public sealed record QuoteInitialPaymentDto(
+    DateTime DueDate,
+    decimal Amount);
+
 public sealed record QuoteItemDto(
     Guid Id,
     Guid ProductId,
@@ -241,6 +245,10 @@ public sealed record QuoteItemDto(
     decimal PromotionDiscount,
     decimal DiscountedProductPrice,
     decimal DownPayment,
+    decimal InitialPaymentPaidToday,
+    decimal InitialPaymentBalance,
+    DateTime? CreditStartDate,
+    IReadOnlyCollection<QuoteInitialPaymentDto> InitialPaymentSchedule,
     decimal Insurance,
     decimal AdministrativeFees,
     int TermMonths,
@@ -262,6 +270,8 @@ public sealed record CreateQuoteItemDto(
     Guid ProductId,
     decimal ProductPrice,
     decimal DownPayment,
+    decimal InitialPaymentPaidToday,
+    IReadOnlyCollection<QuoteInitialPaymentDto>? InitialPaymentSchedule,
     decimal Insurance,
     decimal AdministrativeFees,
     int TermMonths,
@@ -301,6 +311,10 @@ public sealed record QuoteDto(
     decimal DiscountedProductPrice,
     decimal ProductPrice,
     decimal DownPayment,
+    decimal InitialPaymentPaidToday,
+    decimal InitialPaymentBalance,
+    DateTime? CreditStartDate,
+    IReadOnlyCollection<QuoteInitialPaymentDto> InitialPaymentSchedule,
     decimal Insurance,
     decimal AdministrativeFees,
     int TermMonths,

@@ -8,6 +8,7 @@ using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 
 namespace CrmSaas.Api.Controllers;
 
@@ -197,6 +198,10 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
             DiscountedPrice(x.PrecioProducto, x.DescuentoPromocion),
             x.PrecioProducto,
             x.CuotaInicial,
+            x.CuotaInicialPagadaHoy > 0 || x.PlanCuotaInicialJson is not null ? x.CuotaInicialPagadaHoy : x.CuotaInicial,
+            InitialPaymentBalance(x.CuotaInicial, x.CuotaInicialPagadaHoy > 0 || x.PlanCuotaInicialJson is not null ? x.CuotaInicialPagadaHoy : x.CuotaInicial, DeserializeInitialPaymentPlan(x.PlanCuotaInicialJson)),
+            x.FechaInicioCreditoEstimada,
+            DeserializeInitialPaymentPlan(x.PlanCuotaInicialJson),
             x.Seguro,
             x.GastosAdministrativos,
             termMonths,
@@ -231,6 +236,10 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
                 quote.DescuentoPromocion,
                 DiscountedPrice(quote.PrecioProducto, quote.DescuentoPromocion),
                 quote.CuotaInicial,
+                quote.CuotaInicialPagadaHoy > 0 || quote.PlanCuotaInicialJson is not null ? quote.CuotaInicialPagadaHoy : quote.CuotaInicial,
+                InitialPaymentBalance(quote.CuotaInicial, quote.CuotaInicialPagadaHoy > 0 || quote.PlanCuotaInicialJson is not null ? quote.CuotaInicialPagadaHoy : quote.CuotaInicial, DeserializeInitialPaymentPlan(quote.PlanCuotaInicialJson)),
+                quote.FechaInicioCreditoEstimada,
+                DeserializeInitialPaymentPlan(quote.PlanCuotaInicialJson),
                 quote.Seguro,
                 quote.GastosAdministrativos,
                 quote.PlazoMeses <= 0 ? 24 : quote.PlazoMeses,
@@ -260,6 +269,10 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
             item.DescuentoPromocion,
             DiscountedPrice(item.PrecioProducto, item.DescuentoPromocion),
             item.CuotaInicial,
+            item.CuotaInicialPagadaHoy > 0 || item.PlanCuotaInicialJson is not null ? item.CuotaInicialPagadaHoy : item.CuotaInicial,
+            InitialPaymentBalance(item.CuotaInicial, item.CuotaInicialPagadaHoy > 0 || item.PlanCuotaInicialJson is not null ? item.CuotaInicialPagadaHoy : item.CuotaInicial, DeserializeInitialPaymentPlan(item.PlanCuotaInicialJson)),
+            item.FechaInicioCreditoEstimada,
+            DeserializeInitialPaymentPlan(item.PlanCuotaInicialJson),
             item.Seguro,
             item.GastosAdministrativos,
             item.PlazoMeses <= 0 ? 24 : item.PlazoMeses,
@@ -614,6 +627,22 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
         if (!string.IsNullOrWhiteSpace(product.Nombre)) return product.Nombre.Trim();
         return $"{product.Marca} {product.Modelo} {product.Referencia}".Trim();
     }
+
+    private static IReadOnlyCollection<QuoteInitialPaymentDto> DeserializeInitialPaymentPlan(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return [];
+        try
+        {
+            return JsonSerializer.Deserialize<List<QuoteInitialPaymentDto>>(value) ?? [];
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
+    }
+
+    private static decimal InitialPaymentBalance(decimal downPayment, decimal paidToday, IReadOnlyCollection<QuoteInitialPaymentDto> schedule) =>
+        Math.Max(downPayment - paidToday - schedule.Sum(x => x.Amount), 0);
 
     private static decimal DiscountedPrice(decimal productPrice, decimal discount) => Math.Max(productPrice - Math.Max(discount, 0), 0);
 }

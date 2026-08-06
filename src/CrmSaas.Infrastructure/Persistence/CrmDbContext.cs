@@ -184,6 +184,8 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
         modelBuilder.Entity<Cotizacion>().Property(x => x.DescuentoPromocion).HasPrecision(18, 2);
         modelBuilder.Entity<Cotizacion>().Property(x => x.NombrePromocion).HasMaxLength(160);
         modelBuilder.Entity<Cotizacion>().Property(x => x.CuotaInicial).HasPrecision(18, 2);
+        modelBuilder.Entity<Cotizacion>().Property(x => x.CuotaInicialPagadaHoy).HasPrecision(18, 2);
+        modelBuilder.Entity<Cotizacion>().Property(x => x.PlanCuotaInicialJson).HasMaxLength(1600);
         modelBuilder.Entity<Cotizacion>().Property(x => x.Seguro).HasPrecision(18, 2);
         modelBuilder.Entity<Cotizacion>().Property(x => x.GastosAdministrativos).HasPrecision(18, 2);
         modelBuilder.Entity<Cotizacion>().Property(x => x.TasaInteresMensual).HasPrecision(6, 3);
@@ -208,6 +210,8 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
         modelBuilder.Entity<CotizacionItem>().Property(x => x.DescuentoPromocion).HasPrecision(18, 2);
         modelBuilder.Entity<CotizacionItem>().Property(x => x.NombrePromocion).HasMaxLength(160);
         modelBuilder.Entity<CotizacionItem>().Property(x => x.CuotaInicial).HasPrecision(18, 2);
+        modelBuilder.Entity<CotizacionItem>().Property(x => x.CuotaInicialPagadaHoy).HasPrecision(18, 2);
+        modelBuilder.Entity<CotizacionItem>().Property(x => x.PlanCuotaInicialJson).HasMaxLength(1600);
         modelBuilder.Entity<CotizacionItem>().Property(x => x.Seguro).HasPrecision(18, 2);
         modelBuilder.Entity<CotizacionItem>().Property(x => x.GastosAdministrativos).HasPrecision(18, 2);
         modelBuilder.Entity<CotizacionItem>().Property(x => x.TasaInteresMensual).HasPrecision(6, 3);

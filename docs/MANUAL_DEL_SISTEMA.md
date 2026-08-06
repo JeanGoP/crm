@@ -301,10 +301,12 @@ Si existe una promocion vigente para el producto, marca, color o sede, la cotiza
 9. Si desea validar disponibilidad, use **Buscar inventario en tiempo real** y presione **Usar** sobre el articulo encontrado. El sistema asigna el producto y conserva los datos de la unidad seleccionada.
 10. Si no usa la busqueda de inventario, busque el producto escribiendo nombre, codigo, referencia, categoria o color y seleccione la opcion correcta.
 11. Revise o digite el precio del articulo, la cuota inicial y el numero de cuotas.
-12. Revise los conceptos configurados por la empresa, como seguro, matricula, impuestos u otros cargos. Puede ajustar el valor si el caso comercial lo requiere.
-13. Si desea comparar varias opciones, presione **Agregar articulo** y seleccione otro producto.
-14. Revise la cuota aproximada de cada articulo.
-15. Guarde la cotizacion.
+12. En **Paga hoy**, indique cuanto entrega el cliente en el momento de la negociacion.
+13. Si la cuota inicial queda pendiente por completar, use **Agregar pago** en **Plan de cuota inicial** para registrar fecha y valor de cada pago futuro.
+14. Revise los conceptos configurados por la empresa, como seguro, matricula, impuestos u otros cargos. Puede ajustar el valor si el caso comercial lo requiere.
+15. Si desea comparar varias opciones, presione **Agregar articulo** y seleccione otro producto.
+16. Revise la cuota aproximada de cada articulo.
+17. Guarde la cotizacion.
 
 ### Que ocurre al guardar
 
@@ -345,11 +347,15 @@ El simulador ayuda a estimar rapidamente el valor de la cuota cuando el cliente 
 ### Campos principales
 
 - **Precio del producto:** valor base del producto.
-- **Cuota inicial:** dinero que entrega el cliente al inicio.
+- **Cuota inicial:** valor total de inicial negociado con el cliente.
+- **Paga hoy:** valor que el cliente entrega en el momento de la cotizacion.
+- **Plan de cuota inicial:** pagos futuros para completar la inicial antes de iniciar el credito.
 - **Numero de cuotas:** cantidad de pagos que tendra la financiacion.
 - **Conceptos de cotizacion:** campos configurables por empresa, por ejemplo seguro, matricula, impuestos, formulario, accesorios o traspaso.
 - **Total financiado:** valor que queda pendiente despues de la cuota inicial y cargos.
 - **Cuota aproximada:** valor estimado de la cuota mensual.
+
+Cuando la inicial se paga por partes, el credito empieza a contar despues de la ultima fecha registrada en el plan de cuota inicial. Por ejemplo, si la inicial total es de $5.000.000, el cliente paga $3.000.000 hoy y deja $1.000.000 a 30 dias y $1.000.000 a 60 dias, las cuotas del credito empiezan despues de completar esos pagos.
 
 ### Recomendacion de uso
 
@@ -809,6 +815,7 @@ El sistema muestra mensajes cuando algo no puede completarse.
 
 | Fecha | Version | Cambio |
 | --- | --- | --- |
+| 2026-08-05 | 10.7 | Se agrega plan de cuota inicial en cotizaciones para registrar pago de hoy, pagos futuros e inicio estimado del credito. |
 | 2026-08-05 | 10.6 | Se agregan conceptos configurables de cotizacion por empresa para mostrar campos como seguro, matricula, impuestos u otros cargos en Nueva cotizacion. |
 | 2026-08-05 | 10.5 | Se mejora el buscador de productos dentro de cotizaciones para encontrar articulos por nombre, codigo, referencia, categoria, marca o color. |
 | 2026-08-05 | 10.4 | Los productos existentes y sincronizados desde inventario quedan activos automaticamente para poder cotizarlos con precio editable. |

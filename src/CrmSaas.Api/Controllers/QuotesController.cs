@@ -9,6 +9,7 @@ using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 
 namespace CrmSaas.Api.Controllers;
 
@@ -68,6 +69,7 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
         var calculatedItems = requestedItems.Select((item, index) =>
         {
             if (item.DownPayment < 0) throw new ValidationException("La cuota inicial no puede ser negativa.");
+            if (item.InitialPaymentPaidToday < 0) throw new ValidationException("El pago de inicial de hoy no puede ser negativo.");
             if (item.Insurance < 0) throw new ValidationException("El seguro no puede ser negativo.");
             if (item.AdministrativeFees < 0) throw new ValidationException("Los gastos administrativos no pueden ser negativos.");
             if (item.TermMonths <= 0) throw new ValidationException("El plazo debe ser mayor a cero.");
@@ -79,7 +81,8 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             var administrativeFees = item.AdministrativeFees > 0 ? item.AdministrativeFees : product.Matricula + product.Impuestos;
             var promotion = ResolvePromotion(product, salesPoint, promotions, productPrice);
             var simulation = CalculateSimulation(promotion.DiscountedProductPrice, item.DownPayment, insurance, administrativeFees, item.TermMonths, item.MonthlyInterestRate, financialSettings, salesPoint);
-            return new { Source = item, Product = product, ProductPrice = productPrice, Promotion = promotion, Simulation = simulation, Order = index + 1 };
+            var initialPlan = NormalizeInitialPaymentPlan(item, now);
+            return new { Source = item, Product = product, ProductPrice = productPrice, Promotion = promotion, Simulation = simulation, InitialPlan = initialPlan, Order = index + 1 };
         }).ToList();
         var primary = calculatedItems[0];
         var product = primary.Product;
@@ -200,6 +203,9 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             DescuentoPromocion = quotePromotionDiscount,
             PrecioProducto = quoteProductPrice,
             CuotaInicial = simulation.DownPayment,
+            CuotaInicialPagadaHoy = primary.InitialPlan.PaidToday,
+            PlanCuotaInicialJson = SerializeInitialPaymentPlan(primary.InitialPlan.Schedule),
+            FechaInicioCreditoEstimada = primary.InitialPlan.CreditStartDate,
             Seguro = simulation.Insurance,
             GastosAdministrativos = simulation.AdministrativeFees,
             PlazoMeses = simulation.TermMonths,
@@ -225,6 +231,9 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
                 NombrePromocion = item.Promotion.Promotion?.Nombre,
                 DescuentoPromocion = item.Promotion.DiscountAmount,
                 CuotaInicial = item.Simulation.DownPayment,
+                CuotaInicialPagadaHoy = item.InitialPlan.PaidToday,
+                PlanCuotaInicialJson = SerializeInitialPaymentPlan(item.InitialPlan.Schedule),
+                FechaInicioCreditoEstimada = item.InitialPlan.CreditStartDate,
                 Seguro = item.Simulation.Insurance,
                 GastosAdministrativos = item.Simulation.AdministrativeFees,
                 PlazoMeses = item.Simulation.TermMonths,
@@ -445,6 +454,10 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             DiscountedPrice(x.PrecioProducto, x.DescuentoPromocion),
             x.PrecioProducto,
             x.CuotaInicial,
+            x.CuotaInicialPagadaHoy > 0 || x.PlanCuotaInicialJson is not null ? x.CuotaInicialPagadaHoy : x.CuotaInicial,
+            InitialPaymentBalance(x.CuotaInicial, x.CuotaInicialPagadaHoy > 0 || x.PlanCuotaInicialJson is not null ? x.CuotaInicialPagadaHoy : x.CuotaInicial, DeserializeInitialPaymentPlan(x.PlanCuotaInicialJson)),
+            x.FechaInicioCreditoEstimada,
+            DeserializeInitialPaymentPlan(x.PlanCuotaInicialJson),
             x.Seguro,
             x.GastosAdministrativos,
             termMonths,
@@ -469,8 +482,66 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
 
         return dto.ProductId == Guid.Empty
             ? []
-            : [new CreateQuoteItemDto(dto.ProductId, 0, dto.DownPayment, dto.Insurance, dto.AdministrativeFees, dto.TermMonths, dto.MonthlyInterestRate)];
+            : [new CreateQuoteItemDto(dto.ProductId, 0, dto.DownPayment, dto.DownPayment, [], dto.Insurance, dto.AdministrativeFees, dto.TermMonths, dto.MonthlyInterestRate)];
     }
+
+    private static InitialPaymentPlan NormalizeInitialPaymentPlan(CreateQuoteItemDto item, DateTime now)
+    {
+        var downPayment = Math.Max(item.DownPayment, 0);
+        var paidToday = Math.Max(item.InitialPaymentPaidToday, 0);
+        if (paidToday > downPayment)
+        {
+            throw new ValidationException("El pago de inicial de hoy no puede superar la cuota inicial total.");
+        }
+
+        var today = now.Date;
+        var schedule = (item.InitialPaymentSchedule ?? [])
+            .Where(x => x.Amount > 0)
+            .OrderBy(x => x.DueDate.Date)
+            .Select(x =>
+            {
+                if (x.DueDate.Date < today)
+                {
+                    throw new ValidationException("Los pagos pendientes de la inicial no pueden tener fecha vencida.");
+                }
+
+                return new QuoteInitialPaymentDto(x.DueDate.Date, x.Amount);
+            })
+            .ToList();
+        var scheduledAmount = schedule.Sum(x => x.Amount);
+        var balance = downPayment - paidToday - scheduledAmount;
+        if (balance < -0.01m)
+        {
+            throw new ValidationException("El pago de hoy y los pagos programados no pueden superar la cuota inicial total.");
+        }
+
+        if (balance > 0.01m)
+        {
+            throw new ValidationException("El plan de cuota inicial debe cubrir el saldo pendiente antes de guardar la cotizacion.");
+        }
+
+        var creditStartDate = schedule.Count > 0 ? schedule.Max(x => x.DueDate.Date) : today;
+        return new InitialPaymentPlan(paidToday, schedule, creditStartDate);
+    }
+
+    private static string? SerializeInitialPaymentPlan(IReadOnlyCollection<QuoteInitialPaymentDto> schedule) =>
+        schedule.Count == 0 ? null : JsonSerializer.Serialize(schedule);
+
+    private static IReadOnlyCollection<QuoteInitialPaymentDto> DeserializeInitialPaymentPlan(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return [];
+        try
+        {
+            return JsonSerializer.Deserialize<List<QuoteInitialPaymentDto>>(value) ?? [];
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
+    }
+
+    private static decimal InitialPaymentBalance(decimal downPayment, decimal paidToday, IReadOnlyCollection<QuoteInitialPaymentDto> schedule) =>
+        Math.Max(downPayment - paidToday - schedule.Sum(x => x.Amount), 0);
 
     private static IEnumerable<QuoteItemDto> QuoteItems(Cotizacion quote)
     {
@@ -491,6 +562,10 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
                 quote.DescuentoPromocion,
                 DiscountedPrice(quote.PrecioProducto, quote.DescuentoPromocion),
                 quote.CuotaInicial,
+                quote.CuotaInicialPagadaHoy > 0 || quote.PlanCuotaInicialJson is not null ? quote.CuotaInicialPagadaHoy : quote.CuotaInicial,
+                InitialPaymentBalance(quote.CuotaInicial, quote.CuotaInicialPagadaHoy > 0 || quote.PlanCuotaInicialJson is not null ? quote.CuotaInicialPagadaHoy : quote.CuotaInicial, DeserializeInitialPaymentPlan(quote.PlanCuotaInicialJson)),
+                quote.FechaInicioCreditoEstimada,
+                DeserializeInitialPaymentPlan(quote.PlanCuotaInicialJson),
                 quote.Seguro,
                 quote.GastosAdministrativos,
                 quote.PlazoMeses <= 0 ? 24 : quote.PlazoMeses,
@@ -522,6 +597,10 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             item.DescuentoPromocion,
             DiscountedPrice(item.PrecioProducto, item.DescuentoPromocion),
             item.CuotaInicial,
+            item.CuotaInicialPagadaHoy > 0 || item.PlanCuotaInicialJson is not null ? item.CuotaInicialPagadaHoy : item.CuotaInicial,
+            InitialPaymentBalance(item.CuotaInicial, item.CuotaInicialPagadaHoy > 0 || item.PlanCuotaInicialJson is not null ? item.CuotaInicialPagadaHoy : item.CuotaInicial, DeserializeInitialPaymentPlan(item.PlanCuotaInicialJson)),
+            item.FechaInicioCreditoEstimada,
+            DeserializeInitialPaymentPlan(item.PlanCuotaInicialJson),
             item.Seguro,
             item.GastosAdministrativos,
             termMonths,
@@ -705,6 +784,7 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
         bool UsedCompanyFinancialSettings);
 
     private sealed record PromotionApplication(Promocion? Promotion, decimal DiscountAmount, decimal DiscountedProductPrice);
+    private sealed record InitialPaymentPlan(decimal PaidToday, IReadOnlyCollection<QuoteInitialPaymentDto> Schedule, DateTime CreditStartDate);
 
     private static string ProductName(Producto product)
     {

@@ -488,14 +488,13 @@ public static class SimplePdfGenerator
 
         var labels = new[]
         {
-            "Forma de pago", "Modelo", "Precio Vehiculo", "Valor Tramites", "Valor Bono",
+            "Forma de pago", "Precio Vehiculo", "Valor Tramites", "Valor Bono",
             "Valor Dcto", "Chasis", "Motor", "", "Bodega", "Cuota Inicial",
-            "Nro de Cuotas", "Valor de Cuotas", "Valor Garantia", "Valor Poliza RC"
+            "Inicial Hoy", "Saldo Inicial", "Inicio Credito", "Nro de Cuotas", "Valor de Cuotas"
         };
         var values = new[]
         {
             Value(quote.CreditType, "CONTADO"),
-            quote.ValidUntil.Year.ToString(CultureInfo.InvariantCulture),
             Money(quote.ProductPrice),
             Money(quote.AdministrativeFees),
             "-",
@@ -505,10 +504,11 @@ public static class SimplePdfGenerator
             "",
             Value(inventoryItem?.InventoryWarehouseName),
             quote.DownPayment > 0 ? Money(quote.DownPayment) : "-",
+            quote.InitialPaymentPaidToday > 0 ? Money(quote.InitialPaymentPaidToday) : "-",
+            quote.InitialPaymentBalance > 0 ? Money(quote.InitialPaymentBalance) : "-",
+            quote.CreditStartDate.HasValue ? Date(quote.CreditStartDate.Value) : "-",
             quote.TermMonths > 0 ? quote.TermMonths.ToString(CultureInfo.InvariantCulture) : "-",
-            quote.EstimatedMonthlyPayment > 0 ? Money(quote.EstimatedMonthlyPayment) : "-",
-            "-",
-            "-"
+            quote.EstimatedMonthlyPayment > 0 ? Money(quote.EstimatedMonthlyPayment) : "-"
         };
 
         var y = boxY + boxH - 70;
@@ -614,6 +614,10 @@ public static class SimplePdfGenerator
             commands.AppendLine($"0.08 0.10 0.14 rg BT /F1 8 Tf {columns[1]} {rowY} Td ({Escape(Money(item.DiscountedProductPrice))}) Tj ET");
             commands.AppendLine($"0.08 0.10 0.14 rg BT /F1 8 Tf {columns[2]} {rowY} Td ({Escape(Money(item.DownPayment))}) Tj ET");
             commands.AppendLine($"0.08 0.10 0.14 rg BT /F1 8 Tf {columns[3]} {rowY} Td ({Escape(Money(item.FinancedAmount))}) Tj ET");
+            if (item.CreditStartDate.HasValue && item.InitialPaymentSchedule.Count > 0)
+            {
+                commands.AppendLine($"0.36 0.42 0.48 rg BT /F1 6 Tf {columns[2]} {rowY - 9} Td ({Escape("Inicio credito: " + Date(item.CreditStartDate.Value))}) Tj ET");
+            }
             rowY -= 30;
         }
 

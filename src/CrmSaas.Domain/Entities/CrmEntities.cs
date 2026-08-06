@@ -259,6 +259,9 @@ public sealed class Cotizacion : AuditableTenantEntity
     public decimal DescuentoPromocion { get; set; }
     public decimal PrecioProducto { get; set; }
     public decimal CuotaInicial { get; set; }
+    public decimal CuotaInicialPagadaHoy { get; set; }
+    public string? PlanCuotaInicialJson { get; set; }
+    public DateTime? FechaInicioCreditoEstimada { get; set; }
     public decimal Seguro { get; set; }
     public decimal GastosAdministrativos { get; set; }
     public int PlazoMeses { get; set; } = 24;
@@ -325,6 +328,9 @@ public sealed class CotizacionItem : AuditableTenantEntity
     public string? NombrePromocion { get; set; }
     public decimal DescuentoPromocion { get; set; }
     public decimal CuotaInicial { get; set; }
+    public decimal CuotaInicialPagadaHoy { get; set; }
+    public string? PlanCuotaInicialJson { get; set; }
+    public DateTime? FechaInicioCreditoEstimada { get; set; }
     public decimal Seguro { get; set; }
     public decimal GastosAdministrativos { get; set; }
     public int PlazoMeses { get; set; } = 24;
