@@ -449,7 +449,7 @@ public static class SimplePdfGenerator
         var quoteItems = quote.Items.Count > 0 ? quote.Items.OrderBy(x => x.Order).ToList() : [];
         if (quoteItems.Count > 1)
         {
-            DrawComparison(commands, 126, 305, quoteItems);
+            DrawComparison(commands, 45, 200, quoteItems);
         }
         else
         {
