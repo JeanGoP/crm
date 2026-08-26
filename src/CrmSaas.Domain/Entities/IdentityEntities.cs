@@ -14,6 +14,7 @@ public sealed class Usuario : AuditableTenantEntity
     public ICollection<UsuarioRol> UsuarioRoles { get; set; } = new List<UsuarioRol>();
     public ICollection<UsuarioSedeSupervisada> SedesSupervisadas { get; set; } = new List<UsuarioSedeSupervisada>();
     public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
+    public ICollection<IngresoPlataforma> IngresosPlataforma { get; set; } = new List<IngresoPlataforma>();
 }
 
 public sealed class Rol : AuditableTenantEntity
@@ -47,4 +48,18 @@ public sealed class RefreshToken : AuditableTenantEntity
     public DateTime ExpiraEn { get; set; }
     public DateTime? RevocadoEn { get; set; }
     public bool Activo => RevocadoEn is null && ExpiraEn > DateTime.UtcNow;
+}
+
+public sealed class IngresoPlataforma : AuditableTenantEntity
+{
+    public Guid? UsuarioId { get; set; }
+    public Usuario? Usuario { get; set; }
+    public string NombreUsuario { get; set; } = string.Empty;
+    public string Login { get; set; } = string.Empty;
+    public string? Email { get; set; }
+    public DateTime FechaIngreso { get; set; }
+    public bool Exitoso { get; set; }
+    public string? MotivoFallo { get; set; }
+    public string? DireccionIp { get; set; }
+    public string? UserAgent { get; set; }
 }

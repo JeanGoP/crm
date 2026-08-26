@@ -37,7 +37,7 @@ import ChevronRight from '@mui/icons-material/ChevronRight';
 import { AxiosError } from 'axios';
 import { api } from './api';
 import { useAuthStore } from './store';
-import { Activity, ColombianIdentityLookup, CollectionOrder, CommercialInventory, CommercialInventorySummary, CommercialReports, Company, CreditApplication, CreditDocument, Customer, Customer360, CustomerAiAnalysis, CustomerTimelineItem, Dashboard, Deal, DealStage, ExternalInventoryItem, ExternalInventoryWarehouse, FinancialSettings, Lead, MotorcycleDelivery, Procedure, Product, ProductCategory, ProductPhoto, Promotion, Quote, QuoteChargeConcept, QuoteSimulationResult, RequirementProfile, SalesPoint, User } from './types';
+import { Activity, ColombianIdentityLookup, CollectionOrder, CommercialInventory, CommercialInventorySummary, CommercialReports, Company, CreditApplication, CreditDocument, Customer, Customer360, CustomerAiAnalysis, CustomerTimelineItem, Dashboard, Deal, DealStage, ExternalInventoryItem, ExternalInventoryWarehouse, FinancialSettings, Lead, LoginAccessReport, MotorcycleDelivery, Procedure, Product, ProductCategory, ProductPhoto, Promotion, Quote, QuoteChargeConcept, QuoteSimulationResult, RequirementProfile, SalesPoint, User } from './types';
 
 const drawerWidth = 272;
 const today = new Date().toISOString().slice(0, 10);
@@ -228,7 +228,8 @@ const navGroups: NavGroup[] = [
     label: 'Reportes',
     icon: <Assessment />,
     items: [
-      { to: '/reportes', label: 'Reportes comerciales', icon: <Assessment /> }
+      { to: '/reportes', label: 'Reportes comerciales', icon: <Assessment /> },
+      { to: '/ingresos', label: 'Ingresos usuarios', icon: <Assessment /> }
     ]
   },
   {
@@ -523,6 +524,7 @@ function Layout() {
             <Route path="/pipeline" element={<PipelinePage />} />
             <Route path="/actividades" element={<ActivitiesPage />} />
             <Route path="/reportes" element={<CommercialReportsPage />} />
+            <Route path="/ingresos" element={<LoginAccessReportPage />} />
             <Route path="/configuracion" element={<SettingsPage />} />
           </Routes>
         </Box>
@@ -2902,6 +2904,58 @@ function CommercialReportsPage() {
         </CardContent></Card>
       </Grid>
     </Grid>
+  </Stack>;
+}
+
+function LoginAccessReportPage() {
+  const { data, loading, error, reload } = useResource<LoginAccessReport>('/api/access-logs');
+
+  return <Stack spacing={3}>
+    <Header title="Ingresos de usuarios" onRefresh={reload} />
+    <StatusBar loading={loading} error={error} />
+    {data && <Grid container spacing={2}>
+      <Grid item xs={6} md={3}><Metric label="Total registros" value={data.totalAccesses} /></Grid>
+      <Grid item xs={6} md={3}><Metric label="Ingresos correctos" value={data.successfulAccesses} /></Grid>
+      <Grid item xs={6} md={3}><Metric label="Intentos fallidos" value={data.failedAccesses} /></Grid>
+      <Grid item xs={6} md={3}><Metric label="Hoy" value={data.todayAccesses} /></Grid>
+    </Grid>}
+    {data && <Card><CardContent>
+      <Stack spacing={2}>
+        <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', md: 'center' }} gap={1}>
+          <Box>
+            <Typography variant="h5" fontWeight={900}>Ultimos accesos</Typography>
+            <Typography color="text.secondary" fontSize={14}>
+              {data.lastAccessAt ? `Ultimo ingreso registrado: ${formatLocalDateTime(data.lastAccessAt)}` : 'Aun no hay ingresos registrados.'}
+            </Typography>
+          </Box>
+          <Chip label="Auditoria de plataforma" color="primary" variant="outlined" />
+        </Stack>
+        <EntityTable
+          compact
+          headers={['Fecha', 'Usuario', 'Empresa', 'Estado', 'IP', 'Navegador']}
+          empty="No hay ingresos registrados"
+          rows={data.items.map((item) => [
+            <Box>
+              <Typography fontWeight={900}>{formatLocalDateTime(item.accessedAt)}</Typography>
+              <Typography color="text.secondary" fontSize={12}>{item.login}</Typography>
+            </Box>,
+            <Box>
+              <Typography fontWeight={900}>{item.userName}</Typography>
+              <Typography color="text.secondary" fontSize={12}>{item.email ?? '-'}</Typography>
+            </Box>,
+            item.companyName,
+            <Stack direction="row" spacing={.75} alignItems="center" flexWrap="wrap">
+              <StatusChip label={item.successful ? 'Correcto' : 'Fallido'} tone={item.successful ? 'success' : 'error'} />
+              {!item.successful && item.failureReason && <Typography color="error.main" fontSize={12}>{item.failureReason}</Typography>}
+            </Stack>,
+            item.ipAddress ?? '-',
+            <Tooltip title={item.userAgent ?? ''}>
+              <Typography fontSize={12.5} color="text.secondary" noWrap>{item.userAgent ?? '-'}</Typography>
+            </Tooltip>
+          ])}
+        />
+      </Stack>
+    </CardContent></Card>}
   </Stack>;
 }
 

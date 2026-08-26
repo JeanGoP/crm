@@ -11,6 +11,7 @@ public interface ICrmDbContext
     DbSet<UsuarioRol> UsuarioRoles { get; }
     DbSet<UsuarioSedeSupervisada> UsuariosSedesSupervisadas { get; }
     DbSet<RefreshToken> RefreshTokens { get; }
+    DbSet<IngresoPlataforma> IngresosPlataforma { get; }
     DbSet<Cliente> Clientes { get; }
     DbSet<Prospecto> Prospectos { get; }
     DbSet<Negocio> Negocios { get; }

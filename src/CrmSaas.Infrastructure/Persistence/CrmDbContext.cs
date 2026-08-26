@@ -13,6 +13,7 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
     public DbSet<UsuarioRol> UsuarioRoles => Set<UsuarioRol>();
     public DbSet<UsuarioSedeSupervisada> UsuariosSedesSupervisadas => Set<UsuarioSedeSupervisada>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<IngresoPlataforma> IngresosPlataforma => Set<IngresoPlataforma>();
     public DbSet<Cliente> Clientes => Set<Cliente>();
     public DbSet<Prospecto> Prospectos => Set<Prospecto>();
     public DbSet<Negocio> Negocios => Set<Negocio>();
@@ -48,6 +49,7 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
         modelBuilder.Entity<UsuarioRol>().ToTable("UsuariosRoles");
         modelBuilder.Entity<UsuarioSedeSupervisada>().ToTable("UsuariosSedesSupervisadas");
         modelBuilder.Entity<RefreshToken>().ToTable("RefreshTokens");
+        modelBuilder.Entity<IngresoPlataforma>().ToTable("IngresosPlataforma");
         modelBuilder.Entity<Cliente>().ToTable("Clientes");
         modelBuilder.Entity<Prospecto>().ToTable("Prospectos");
         modelBuilder.Entity<Negocio>().ToTable("Negocios");
@@ -95,6 +97,15 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
         modelBuilder.Entity<UsuarioSedeSupervisada>().HasIndex(x => new { x.EmpresaId, x.PuntoVentaId });
         modelBuilder.Entity<UsuarioSedeSupervisada>().HasOne(x => x.Usuario).WithMany(x => x.SedesSupervisadas).HasForeignKey(x => x.UsuarioId).OnDelete(DeleteBehavior.Cascade);
         modelBuilder.Entity<UsuarioSedeSupervisada>().HasOne(x => x.PuntoVenta).WithMany().HasForeignKey(x => x.PuntoVentaId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<IngresoPlataforma>().Property(x => x.NombreUsuario).HasMaxLength(180);
+        modelBuilder.Entity<IngresoPlataforma>().Property(x => x.Login).HasMaxLength(100);
+        modelBuilder.Entity<IngresoPlataforma>().Property(x => x.Email).HasMaxLength(180);
+        modelBuilder.Entity<IngresoPlataforma>().Property(x => x.MotivoFallo).HasMaxLength(260);
+        modelBuilder.Entity<IngresoPlataforma>().Property(x => x.DireccionIp).HasMaxLength(80);
+        modelBuilder.Entity<IngresoPlataforma>().Property(x => x.UserAgent).HasMaxLength(600);
+        modelBuilder.Entity<IngresoPlataforma>().HasIndex(x => new { x.EmpresaId, x.FechaIngreso });
+        modelBuilder.Entity<IngresoPlataforma>().HasIndex(x => new { x.EmpresaId, x.UsuarioId, x.FechaIngreso });
+        modelBuilder.Entity<IngresoPlataforma>().HasOne(x => x.Usuario).WithMany(x => x.IngresosPlataforma).HasForeignKey(x => x.UsuarioId).OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<Cliente>().HasIndex(x => new { x.EmpresaId, x.Email });
         modelBuilder.Entity<Prospecto>().HasIndex(x => new { x.EmpresaId, x.Email });
         modelBuilder.Entity<Negocio>().Property(x => x.Valor).HasPrecision(18, 2);
@@ -290,6 +301,7 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
         modelBuilder.Entity<UsuarioRol>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<UsuarioSedeSupervisada>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<RefreshToken>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
+        modelBuilder.Entity<IngresoPlataforma>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<Cliente>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<Prospecto>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<Negocio>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);

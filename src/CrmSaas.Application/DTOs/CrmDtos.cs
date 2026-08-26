@@ -734,3 +734,25 @@ public sealed record SalesBySellerDto(string Seller, int Quotes, int ApprovedCre
 public sealed record QuotesByStatusDto(string Status, int Count, decimal Amount);
 public sealed record CreditsByStatusDto(string Status, int Count, decimal Amount);
 public sealed record TopQuotedProductDto(Guid ProductId, string ProductName, string Brand, string Model, int QuoteCount, decimal QuotedAmount);
+
+public sealed record LoginAccessReportDto(
+    int TotalAccesses,
+    int SuccessfulAccesses,
+    int FailedAccesses,
+    int TodayAccesses,
+    DateTime? LastAccessAt,
+    IReadOnlyCollection<LoginAccessDto> Items);
+
+public sealed record LoginAccessDto(
+    Guid Id,
+    Guid? UserId,
+    string UserName,
+    string Login,
+    string? Email,
+    Guid CompanyId,
+    string CompanyName,
+    DateTime AccessedAt,
+    bool Successful,
+    string? FailureReason,
+    string? IpAddress,
+    string? UserAgent);

@@ -5,13 +5,15 @@ using System.Text;
 using CrmSaas.Application.Abstractions;
 using CrmSaas.Application.DTOs;
 using CrmSaas.Domain.Entities;
+using CrmSaas.Domain.Common;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
 namespace CrmSaas.Infrastructure.Auth;
 
-public sealed class AuthService(CrmSaas.Infrastructure.Persistence.CrmDbContext db, ITenantContext tenantContext, IPasswordHasher passwordHasher, IOptions<JwtOptions> options) : IAuthService
+public sealed class AuthService(CrmSaas.Infrastructure.Persistence.CrmDbContext db, ITenantContext tenantContext, IPasswordHasher passwordHasher, IOptions<JwtOptions> options, IHttpContextAccessor httpContextAccessor) : IAuthService
 {
     private const string GlobalAdminEmail = "admin@demo.com";
 
@@ -31,20 +33,27 @@ public sealed class AuthService(CrmSaas.Infrastructure.Persistence.CrmDbContext 
 
         if (validUsers.Count == 0)
         {
+            await RegisterLoginAccessAsync(candidates.Count == 1 ? candidates[0] : null, credential, false, "Credenciales invalidas.", cancellationToken);
             throw new UnauthorizedAccessException("Credenciales invalidas.");
         }
 
         if (validUsers.Count > 1)
         {
+            await RegisterLoginAccessAsync(null, credential, false, "Login duplicado en varias empresas.", cancellationToken);
             throw new UnauthorizedAccessException("El usuario existe en mas de una empresa. Solicite al administrador asignar un login unico.");
         }
 
         var user = validUsers[0];
         var empresa = await db.Empresas.IgnoreQueryFilters()
-            .FirstOrDefaultAsync(x => x.Id == user.EmpresaId && x.Activa, cancellationToken)
-            ?? throw new UnauthorizedAccessException("Empresa no encontrada o inactiva.");
+            .FirstOrDefaultAsync(x => x.Id == user.EmpresaId && x.Activa, cancellationToken);
+        if (empresa is null)
+        {
+            await RegisterLoginAccessAsync(user, credential, false, "Empresa no encontrada o inactiva.", cancellationToken);
+            throw new UnauthorizedAccessException("Empresa no encontrada o inactiva.");
+        }
 
         tenantContext.SetTenant(empresa.Id, empresa.Subdominio);
+        await RegisterLoginAccessAsync(user, credential, true, null, cancellationToken);
         return await IssueTokensAsync(user, cancellationToken);
     }
 
@@ -118,6 +127,35 @@ public sealed class AuthService(CrmSaas.Infrastructure.Persistence.CrmDbContext 
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(token));
         return Convert.ToHexString(bytes);
     }
+
+    private async Task RegisterLoginAccessAsync(Usuario? user, string credential, bool successful, string? failureReason, CancellationToken cancellationToken)
+    {
+        var companyId = user?.EmpresaId ?? tenantContext.EmpresaId;
+        if (!companyId.HasValue)
+        {
+            return;
+        }
+
+        var context = httpContextAccessor.HttpContext;
+        db.IngresosPlataforma.Add(new IngresoPlataforma
+        {
+            EmpresaId = companyId.Value,
+            UsuarioId = user?.Id,
+            NombreUsuario = user?.NombreCompleto ?? credential,
+            Login = credential,
+            Email = user?.Email ?? (credential.Contains('@') ? credential : null),
+            FechaIngreso = ColombiaTime.Now,
+            Exitoso = successful,
+            MotivoFallo = failureReason,
+            DireccionIp = context?.Request.Headers["X-Forwarded-For"].FirstOrDefault()?.Split(',').FirstOrDefault()?.Trim()
+                ?? context?.Connection.RemoteIpAddress?.ToString(),
+            UserAgent = Truncate(context?.Request.Headers.UserAgent.FirstOrDefault(), 600)
+        });
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private static string? Truncate(string? value, int maxLength) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Length <= maxLength ? value : value[..maxLength];
 
     private static string NormalizeLogin(string value) => value.Trim().ToLowerInvariant();
 }

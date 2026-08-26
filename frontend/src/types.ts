@@ -664,3 +664,27 @@ export interface TopQuotedProduct {
   quoteCount: number;
   quotedAmount: number;
 }
+
+export interface LoginAccessReport {
+  totalAccesses: number;
+  successfulAccesses: number;
+  failedAccesses: number;
+  todayAccesses: number;
+  lastAccessAt?: string;
+  items: LoginAccess[];
+}
+
+export interface LoginAccess {
+  id: string;
+  userId?: string;
+  userName: string;
+  login: string;
+  email?: string;
+  companyId: string;
+  companyName: string;
+  accessedAt: string;
+  successful: boolean;
+  failureReason?: string;
+  ipAddress?: string;
+  userAgent?: string;
+}
