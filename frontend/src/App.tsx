@@ -4533,12 +4533,15 @@ function QuoteDialog({ form, products, productCategories, requirementProfiles, q
                   display: 'grid',
                   gridTemplateColumns: {
                     xs: '1fr',
-                    md: `minmax(260px, 1.5fr) repeat(${Math.max(activeChargeConcepts.length + 3, 4)}, minmax(112px, 1fr)) minmax(170px, 1fr)`
+                    sm: 'repeat(2, minmax(0, 1fr))',
+                    md: 'repeat(auto-fit, minmax(132px, 1fr))'
                   },
                   gap: 1.5,
-                  alignItems: 'stretch'
+                  alignItems: 'stretch',
+                  minWidth: 0
                 }}>
                   <Autocomplete
+                    sx={{ gridColumn: { xs: '1', sm: 'span 2', lg: 'span 2' }, minWidth: 0 }}
                     value={selectedProduct ?? null}
                     options={products}
                     autoHighlight
@@ -4592,6 +4595,7 @@ function QuoteDialog({ form, products, productCategories, requirementProfiles, q
                   {activeChargeConcepts.map((concept) => <TextField
                     key={concept.id}
                     fullWidth
+                    sx={{ minWidth: 0 }}
                     label={concept.name}
                     type="number"
                     value={chargeValues[concept.id] ?? 0}
@@ -4601,7 +4605,9 @@ function QuoteDialog({ form, products, productCategories, requirementProfiles, q
                       updateItem(index, { chargeValues: nextChargeValues, insurance: totals.insurance, administrativeFees: totals.administrativeFees });
                     }}
                   />)}
-                  <QuoteSimulationPreview value={simulationItem} selectedProduct={selectedProduct} compact />
+                  <Box sx={{ gridColumn: { xs: '1', sm: 'span 2', lg: 'span 2' }, minWidth: 0 }}>
+                    <QuoteSimulationPreview value={simulationItem} selectedProduct={selectedProduct} compact />
+                  </Box>
                 </Box>
                 <InitialPaymentPlanEditor
                   item={item}
@@ -5274,7 +5280,7 @@ function FormDialog<T extends Record<string, unknown>>({ title, open, initial, c
     }
   };
 
-  return <Dialog open={open} onClose={saving ? undefined : onClose} fullWidth maxWidth={maxWidth} fullScreen={fullScreen} scroll="paper" sx={{ '& .MuiDialog-paper': { m: { xs: 0, sm: 2 }, width: { xs: '100%', sm: 'calc(100% - 32px)' } } }}>
+  return <Dialog open={open} onClose={saving ? undefined : onClose} fullWidth maxWidth={maxWidth} fullScreen={fullScreen} scroll="paper" sx={{ '& .MuiDialog-paper': { m: { xs: 0, sm: 2 }, width: { xs: '100%', sm: 'calc(100% - 32px)' }, overflowX: 'hidden' } }}>
     <DialogTitle sx={{ p: 0 }}>
       <Box sx={{ px: { xs: 2, sm: 3 }, py: 2.25, color: '#fff', background: 'linear-gradient(135deg, #155e75 0%, #0f766e 72%, #334155 100%)' }}>
         <Stack direction="row" justifyContent="space-between" alignItems="center" gap={1.5}>
@@ -5286,8 +5292,8 @@ function FormDialog<T extends Record<string, unknown>>({ title, open, initial, c
         </Stack>
       </Box>
     </DialogTitle>
-    <DialogContent sx={{ px: { xs: 1.5, sm: 2.5 }, py: { xs: 1.5, sm: 2.25 }, bgcolor: '#f4f7fb' }}>
-      <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 }, bgcolor: '#fff', borderColor: '#dbe4ee' }}>
+    <DialogContent sx={{ px: { xs: 1.5, sm: 2.5 }, py: { xs: 1.5, sm: 2.25 }, bgcolor: '#f4f7fb', overflowX: 'hidden' }}>
+      <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 }, bgcolor: '#fff', borderColor: '#dbe4ee', minWidth: 0, overflowX: 'hidden' }}>
         <Stack spacing={1.75}>{error && <Alert severity="error">{error}</Alert>}{children(value, (patch) => setValue((prev) => ({ ...prev, ...patch })))}</Stack>
       </Paper>
     </DialogContent>
