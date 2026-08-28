@@ -532,6 +532,8 @@ public sealed record PromotionDto(
     string? Color,
     Guid? SalesPointId,
     string? SalesPointName,
+    IReadOnlyCollection<Guid> SalesPointIds,
+    IReadOnlyCollection<string> SalesPointNames,
     DateTime ValidFrom,
     DateTime ValidUntil,
     bool Active);
@@ -545,6 +547,7 @@ public sealed record UpsertPromotionDto(
     string? Brand,
     string? Color,
     Guid? SalesPointId,
+    IReadOnlyCollection<Guid>? SalesPointIds,
     DateTime ValidFrom,
     DateTime ValidUntil,
     bool Active);

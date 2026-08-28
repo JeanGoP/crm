@@ -21,6 +21,8 @@ public sealed class PromotionsController(CrmDbContext db) : ControllerBase
         var rows = await db.Promociones
             .Include(x => x.Producto)
             .Include(x => x.PuntoVenta)
+            .Include(x => x.Sedes)
+                .ThenInclude(x => x.PuntoVenta)
             .OrderByDescending(x => x.Activa)
             .ThenByDescending(x => x.VigenteHasta)
             .ThenBy(x => x.Nombre)
@@ -42,11 +44,12 @@ public sealed class PromotionsController(CrmDbContext db) : ControllerBase
 
         await ValidateScopeAsync(dto, cancellationToken);
         var entity = new Promocion();
-        Apply(entity, dto, code);
+        var salesPointIds = SalesPointIds(dto);
+        Apply(entity, dto, code, salesPointIds);
+        AddSalesPoints(entity, salesPointIds);
         db.Promociones.Add(entity);
         await db.SaveChangesAsync(cancellationToken);
-        await LoadReferencesAsync(entity, cancellationToken);
-        return Ok(ToDto(entity));
+        return Ok(ToDto(await GetByIdAsync(entity.Id, cancellationToken)));
     }
 
     [HttpPut("{id:guid}")]
@@ -54,19 +57,33 @@ public sealed class PromotionsController(CrmDbContext db) : ControllerBase
     public async Task<ActionResult<PromotionDto>> Update(Guid id, UpsertPromotionDto dto, CancellationToken cancellationToken)
     {
         Validate(dto);
-        var entity = await db.Promociones.FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
-            ?? throw new KeyNotFoundException("Promocion no encontrada.");
-        var code = NormalizeCode(dto.Code);
-        if (await db.Promociones.AnyAsync(x => x.Id != id && x.Codigo == code, cancellationToken))
-        {
-            return BadRequest(new { detail = "Ya existe otra promocion con ese codigo." });
-        }
+        var strategy = db.Database.CreateExecutionStrategy();
 
-        await ValidateScopeAsync(dto, cancellationToken);
-        Apply(entity, dto, code);
-        await db.SaveChangesAsync(cancellationToken);
-        await LoadReferencesAsync(entity, cancellationToken);
-        return Ok(ToDto(entity));
+        return await strategy.ExecuteAsync<ActionResult<PromotionDto>>(async () =>
+        {
+            db.ChangeTracker.Clear();
+            await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+            var entity = await db.Promociones.FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
+                ?? throw new KeyNotFoundException("Promocion no encontrada.");
+            var code = NormalizeCode(dto.Code);
+            if (await db.Promociones.AnyAsync(x => x.Id != id && x.Codigo == code, cancellationToken))
+            {
+                return BadRequest(new { detail = "Ya existe otra promocion con ese codigo." });
+            }
+
+            await ValidateScopeAsync(dto, cancellationToken);
+            var salesPointIds = SalesPointIds(dto);
+            Apply(entity, dto, code, salesPointIds);
+            await db.PromocionesPuntosVenta
+                .Where(x => x.PromocionId == id)
+                .ExecuteDeleteAsync(cancellationToken);
+            db.PromocionesPuntosVenta.AddRange(CreateSalesPoints(id, salesPointIds));
+            await db.SaveChangesAsync(cancellationToken);
+            db.ChangeTracker.Clear();
+            var updated = ToDto(await GetByIdAsync(id, cancellationToken));
+            await transaction.CommitAsync(cancellationToken);
+            return Ok(updated);
+        });
     }
 
     private async Task ValidateScopeAsync(UpsertPromotionDto dto, CancellationToken cancellationToken)
@@ -76,13 +93,15 @@ public sealed class PromotionsController(CrmDbContext db) : ControllerBase
             throw new KeyNotFoundException("Producto no encontrado.");
         }
 
-        if (dto.SalesPointId.HasValue && !await db.PuntosVenta.AnyAsync(x => x.Id == dto.SalesPointId.Value, cancellationToken))
+        var salesPointIds = SalesPointIds(dto);
+        if (salesPointIds.Count > 0
+            && await db.PuntosVenta.CountAsync(x => salesPointIds.Contains(x.Id), cancellationToken) != salesPointIds.Count)
         {
-            throw new KeyNotFoundException("Sede no encontrada.");
+            throw new KeyNotFoundException("Una o mas sedes no fueron encontradas.");
         }
     }
 
-    private static void Apply(Promocion entity, UpsertPromotionDto dto, string code)
+    private static void Apply(Promocion entity, UpsertPromotionDto dto, string code, IReadOnlyCollection<Guid> salesPointIds)
     {
         entity.Nombre = dto.Name.Trim();
         entity.Codigo = code;
@@ -91,7 +110,7 @@ public sealed class PromotionsController(CrmDbContext db) : ControllerBase
         entity.ProductoId = dto.ProductId;
         entity.Marca = Normalize(dto.Brand);
         entity.Color = Normalize(dto.Color);
-        entity.PuntoVentaId = dto.SalesPointId;
+        entity.PuntoVentaId = salesPointIds.Count == 1 ? salesPointIds.Single() : null;
         entity.VigenteDesde = dto.ValidFrom.Date;
         entity.VigenteHasta = dto.ValidUntil.Date;
         entity.Activa = dto.Active;
@@ -107,11 +126,14 @@ public sealed class PromotionsController(CrmDbContext db) : ControllerBase
         if (dto.ValidUntil.Date < dto.ValidFrom.Date) throw new ValidationException("La fecha final no puede ser anterior a la fecha inicial.");
     }
 
-    private async Task LoadReferencesAsync(Promocion entity, CancellationToken cancellationToken)
-    {
-        if (entity.ProductoId.HasValue) await db.Entry(entity).Reference(x => x.Producto).LoadAsync(cancellationToken);
-        if (entity.PuntoVentaId.HasValue) await db.Entry(entity).Reference(x => x.PuntoVenta).LoadAsync(cancellationToken);
-    }
+    private async Task<Promocion> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
+        await db.Promociones
+            .AsNoTracking()
+            .Include(x => x.Producto)
+            .Include(x => x.PuntoVenta)
+            .Include(x => x.Sedes)
+                .ThenInclude(x => x.PuntoVenta)
+            .SingleAsync(x => x.Id == id, cancellationToken);
 
     private static PromotionDto ToDto(Promocion x) => new(
         x.Id,
@@ -125,9 +147,42 @@ public sealed class PromotionsController(CrmDbContext db) : ControllerBase
         x.Color,
         x.PuntoVentaId,
         x.PuntoVenta?.Nombre,
+        PromotionSalesPointIds(x),
+        PromotionSalesPointNames(x),
         x.VigenteDesde,
         x.VigenteHasta,
         x.Activa);
+
+    private static IReadOnlyCollection<Guid> SalesPointIds(UpsertPromotionDto dto) =>
+        (dto.SalesPointIds ?? [])
+            .Concat(dto.SalesPointId.HasValue ? [dto.SalesPointId.Value] : [])
+            .Distinct()
+            .ToList();
+
+    private static void AddSalesPoints(Promocion promotion, IEnumerable<Guid> salesPointIds)
+    {
+        foreach (var salesPoint in CreateSalesPoints(promotion.Id, salesPointIds))
+        {
+            promotion.Sedes.Add(salesPoint);
+        }
+    }
+
+    private static IEnumerable<PromocionPuntoVenta> CreateSalesPoints(Guid promotionId, IEnumerable<Guid> salesPointIds) =>
+        salesPointIds.Select(salesPointId => new PromocionPuntoVenta
+        {
+            PromocionId = promotionId,
+            PuntoVentaId = salesPointId
+        });
+
+    private static IReadOnlyCollection<Guid> PromotionSalesPointIds(Promocion promotion) =>
+        promotion.Sedes.Count > 0
+            ? promotion.Sedes.Select(x => x.PuntoVentaId).Distinct().ToList()
+            : promotion.PuntoVentaId.HasValue ? [promotion.PuntoVentaId.Value] : [];
+
+    private static IReadOnlyCollection<string> PromotionSalesPointNames(Promocion promotion) =>
+        promotion.Sedes.Count > 0
+            ? promotion.Sedes.Where(x => x.PuntoVenta is not null).Select(x => x.PuntoVenta!.Nombre).Distinct().Order().ToList()
+            : promotion.PuntoVenta is not null ? [promotion.PuntoVenta.Nombre] : [];
 
     private static string ProductName(Producto product)
     {

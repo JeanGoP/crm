@@ -282,7 +282,7 @@ const emptyQuoteChargeConcept = { name: '', code: '', calculationGroup: 'Gasto',
 const emptySalesPoint = { name: '', code: '', city: '', address: '', phone: '', mainBrand: 'Honda', brandLogoDataUrl: '', factorMonthlyRate: 4.5, maxTermMonths: 30, quoteValidityDays: 7, deliveryMode: 'ConSoat', soatDays: 14, registrationDays: 20, soatProvider: '', registrationAgent: '', commercialTerms: 'Cotizacion sujeta a disponibilidad del producto, validacion comercial y aprobacion final.', externalInventoryWarehouseCodes: '', active: true };
 const emptyRequirementDocument = { type: 5, name: '', description: '', required: true, order: 1 };
 const emptyRequirementProfile = { name: '', code: '', description: '', isCash: false, active: true, documents: [emptyRequirementDocument] };
-const emptyPromotion = { name: '', code: '', discountType: 'Valor', discountValue: 0, productId: '', brand: '', color: '', salesPointId: '', validFrom: today, validUntil: today, active: true };
+const emptyPromotion = { name: '', code: '', discountType: 'Valor', discountValue: 0, productId: '', brand: '', color: '', salesPointIds: [] as string[], validFrom: today, validUntil: today, active: true };
 const emptyQuoteItem = { productId: '', productPrice: 0, downPayment: 0, initialPaymentPaidToday: 0, initialPaymentSchedule: [] as { dueDate: string; amount: number }[], insurance: 0, administrativeFees: 0, chargeValues: {} as Record<string, number>, termMonths: 24, monthlyInterestRate: 2.2, inventoryWarehouseCode: '', inventoryWarehouseName: '', inventoryPresentation: '', inventorySerialNumber: '', inventoryEngineNumber: '', inventoryChassisNumber: '' };
 const emptyQuote = { identificationType: 1, identificationNumber: '', customerFirstNames: '', customerLastNames: '', customerFirstName: '', customerMiddleName: '', customerLastName: '', customerSecondLastName: '', phoneCountryCode: '+57', phoneNumber: '', requirementProfileId: '', productId: '', downPayment: 0, insurance: 0, administrativeFees: 0, termMonths: 24, monthlyInterestRate: 2.2, items: [emptyQuoteItem], notes: '' };
 const emptyCreditApplication = {
@@ -3171,7 +3171,8 @@ function SettingsPage() {
       productId: payload.productId || null,
       brand: payload.brand || null,
       color: payload.color || null,
-      salesPointId: payload.salesPointId || null,
+      salesPointId: null,
+      salesPointIds: payload.salesPointIds,
       validFrom: payload.validFrom,
       validUntil: payload.validUntil,
       active: Boolean(payload.active)
@@ -3343,7 +3344,7 @@ function SettingsPage() {
           rows={promotions.map((promotion) => [
             <Box><Typography fontWeight={800}>{promotion.name}</Typography><Typography color="text.secondary" fontSize={12}>{promotion.code}</Typography></Box>,
             promotion.discountType === 'Porcentaje' ? `${promotion.discountValue}%` : money(promotion.discountValue),
-            [promotion.productName, promotion.brand, promotion.color, promotion.salesPointName].filter(Boolean).join(' / ') || 'General',
+            [promotion.productName, promotion.brand, promotion.color, promotion.salesPointNames?.join(', ')].filter(Boolean).join(' / ') || 'General / todas las sedes',
             `${new Date(promotion.validFrom).toLocaleDateString()} - ${new Date(promotion.validUntil).toLocaleDateString()}`,
             <StatusChip label={promotion.active ? 'Activa' : 'Inactiva'} tone={promotion.active ? 'success' : 'default'} />,
             <Actions onEdit={canManage ? () => setPromotionForm({ open: true, item: promotion }) : undefined} />
@@ -3740,7 +3741,7 @@ function PromotionDialog({ form, products, salesPoints, onClose, onSave }: Dialo
     productId: form.item.productId ?? '',
     brand: form.item.brand ?? '',
     color: form.item.color ?? '',
-    salesPointId: form.item.salesPointId ?? '',
+    salesPointIds: form.item.salesPointIds ?? (form.item.salesPointId ? [form.item.salesPointId] : []),
     validFrom: form.item.validFrom?.slice(0, 10) ?? today,
     validUntil: form.item.validUntil?.slice(0, 10) ?? today,
     active: form.item.active
@@ -3767,10 +3768,15 @@ function PromotionDialog({ form, products, salesPoints, onClose, onSave }: Dialo
           <MenuItem value="">Cualquier producto</MenuItem>
           {products.map((product) => <MenuItem key={product.id} value={product.id}>{productName(product)} - {money(product.price)}</MenuItem>)}
         </TextField>
-        <TextField fullWidth select label="Sede" value={v.salesPointId} onChange={(e) => set({ salesPointId: e.target.value })}>
-          <MenuItem value="">Todas las sedes</MenuItem>
-          {salesPoints.map((point) => <MenuItem key={point.id} value={point.id}>{point.name} - {point.city}</MenuItem>)}
-        </TextField>
+        <Autocomplete
+          multiple
+          options={salesPoints}
+          value={salesPoints.filter((point) => v.salesPointIds.includes(point.id))}
+          getOptionLabel={(point) => `${point.name} - ${point.city}`}
+          isOptionEqualToValue={(option, value) => option.id === value.id}
+          onChange={(_, selected) => set({ salesPointIds: selected.map((point) => point.id) })}
+          renderInput={(params) => <TextField {...params} label="Sedes" helperText="Sin seleccion aplica en todas las sedes." />}
+        />
       </FieldGrid>
       <FieldGrid columns={2}>
         <TextField fullWidth label="Marca" value={v.brand} onChange={(e) => set({ brand: e.target.value })} helperText="Opcional. Si se llena, solo aplica a esa marca." />

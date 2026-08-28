@@ -282,6 +282,8 @@ export interface Promotion {
   color?: string;
   salesPointId?: string;
   salesPointName?: string;
+  salesPointIds: string[];
+  salesPointNames: string[];
   validFrom: string;
   validUntil: string;
   active: boolean;

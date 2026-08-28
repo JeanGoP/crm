@@ -30,6 +30,7 @@ public interface ICrmDbContext
     DbSet<PerfilRequisito> PerfilesRequisito { get; }
     DbSet<DocumentoPerfilRequisito> DocumentosPerfilRequisito { get; }
     DbSet<Promocion> Promociones { get; }
+    DbSet<PromocionPuntoVenta> PromocionesPuntosVenta { get; }
     DbSet<Cotizacion> Cotizaciones { get; }
     DbSet<CotizacionItem> CotizacionItems { get; }
     DbSet<SolicitudCredito> SolicitudesCredito { get; }

@@ -310,9 +310,18 @@ public sealed class Promocion : AuditableTenantEntity
     public string? Color { get; set; }
     public Guid? PuntoVentaId { get; set; }
     public PuntoVenta? PuntoVenta { get; set; }
+    public ICollection<PromocionPuntoVenta> Sedes { get; set; } = [];
     public DateTime VigenteDesde { get; set; } = ColombiaTime.Now.Date;
     public DateTime VigenteHasta { get; set; } = ColombiaTime.Now.Date.AddDays(30);
     public bool Activa { get; set; } = true;
+}
+
+public sealed class PromocionPuntoVenta : AuditableTenantEntity
+{
+    public Guid PromocionId { get; set; }
+    public Promocion? Promocion { get; set; }
+    public Guid PuntoVentaId { get; set; }
+    public PuntoVenta? PuntoVenta { get; set; }
 }
 
 public sealed class CotizacionItem : AuditableTenantEntity

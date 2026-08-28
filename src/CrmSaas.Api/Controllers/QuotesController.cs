@@ -648,6 +648,7 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
 
     private async Task<IReadOnlyCollection<Promocion>> GetActivePromotionsAsync(DateTime now, CancellationToken cancellationToken) =>
         await db.Promociones
+            .Include(x => x.Sedes)
             .Where(x => x.Activa && x.VigenteDesde.Date <= now.Date && x.VigenteHasta.Date >= now.Date)
             .ToListAsync(cancellationToken);
 
@@ -661,7 +662,7 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
                 var specificity = (x.ProductoId.HasValue ? 8 : 0)
                     + (!string.IsNullOrWhiteSpace(x.Marca) ? 4 : 0)
                     + (!string.IsNullOrWhiteSpace(x.Color) ? 2 : 0)
-                    + (x.PuntoVentaId.HasValue ? 1 : 0);
+                    + (x.Sedes.Count > 0 || x.PuntoVentaId.HasValue ? 1 : 0);
                 return new { Promotion = x, Discount = discount, Specificity = specificity };
             })
             .Where(x => x.Discount > 0)
@@ -698,7 +699,9 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
     }
 
     private static bool AppliesToSalesPoint(Promocion promotion, PuntoVenta? salesPoint) =>
-        !promotion.PuntoVentaId.HasValue || (salesPoint is not null && promotion.PuntoVentaId.Value == salesPoint.Id);
+        promotion.Sedes.Count > 0
+            ? salesPoint is not null && promotion.Sedes.Any(x => x.PuntoVentaId == salesPoint.Id)
+            : !promotion.PuntoVentaId.HasValue || (salesPoint is not null && promotion.PuntoVentaId.Value == salesPoint.Id);
 
     private static bool IsApplianceCategory(string category) =>
         (category ?? string.Empty).Contains("electrodom", StringComparison.OrdinalIgnoreCase);
