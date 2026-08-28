@@ -4496,7 +4496,7 @@ function QuoteDialog({ form, products, productCategories, requirementProfiles, q
                 {requirementProfiles.map((profile) => <MenuItem key={profile.id} value={profile.id}>{profile.name}{profile.isCash ? ' - contado' : ''}</MenuItem>)}
               </TextField>
               <TextField fullWidth required select label="Tasa de financiacion" value={selectedSalesPointRateId} onChange={(e) => set({ salesPointRateId: e.target.value })} helperText="Tasas activas configuradas para la sede actual.">
-                {salesPointRates.map((rate) => <MenuItem key={rate.id} value={rate.id}>{rate.name} - {rate.factorMonthlyRate}% (max. {rate.maxTermMonths} meses)</MenuItem>)}
+                {salesPointRates.map((rate) => <MenuItem key={rate.id} value={rate.id}>{rate.name}</MenuItem>)}
               </TextField>
             </Box>
           </Stack>
