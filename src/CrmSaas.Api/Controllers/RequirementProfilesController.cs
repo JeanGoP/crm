@@ -38,7 +38,8 @@ public sealed class RequirementProfilesController(CrmDbContext db) : ControllerB
         }
 
         var entity = new PerfilRequisito();
-        Apply(entity, dto, code);
+        ApplyProfile(entity, dto, code);
+        AddDocuments(entity, dto.Documents);
         db.PerfilesRequisito.Add(entity);
         await db.SaveChangesAsync(cancellationToken);
         return Ok(ToDto(entity));
@@ -49,8 +50,8 @@ public sealed class RequirementProfilesController(CrmDbContext db) : ControllerB
     public async Task<ActionResult<RequirementProfileDto>> Update(Guid id, UpsertRequirementProfileDto dto, CancellationToken cancellationToken)
     {
         Validate(dto);
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         var entity = await db.PerfilesRequisito
-            .Include(x => x.Documentos)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
             ?? throw new KeyNotFoundException("Perfil de requisitos no encontrado.");
         var code = NormalizeCode(dto.Code);
@@ -59,21 +60,32 @@ public sealed class RequirementProfilesController(CrmDbContext db) : ControllerB
             return BadRequest(new { detail = "Ya existe otro perfil con ese codigo." });
         }
 
-        Apply(entity, dto, code);
+        ApplyProfile(entity, dto, code);
+
+        // Reemplazar la colección directamente en la base evita que EF intente
+        // borrar una por una filas que otro envío concurrente ya pudo reemplazar.
+        await db.DocumentosPerfilRequisito
+            .Where(x => x.PerfilRequisitoId == entity.Id)
+            .ExecuteDeleteAsync(cancellationToken);
+        AddDocuments(entity, dto.Documents);
+
         await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
         return Ok(ToDto(entity));
     }
 
-    private static void Apply(PerfilRequisito entity, UpsertRequirementProfileDto dto, string code)
+    private static void ApplyProfile(PerfilRequisito entity, UpsertRequirementProfileDto dto, string code)
     {
         entity.Nombre = dto.Name.Trim();
         entity.Codigo = code;
         entity.Descripcion = Normalize(dto.Description);
         entity.EsContado = dto.IsCash;
         entity.Activo = dto.Active;
-        entity.Documentos.Clear();
+    }
 
-        foreach (var document in dto.Documents.OrderBy(x => x.Order).ThenBy(x => x.Name))
+    private static void AddDocuments(PerfilRequisito entity, IEnumerable<UpsertRequirementDocumentDto> documents)
+    {
+        foreach (var document in documents.OrderBy(x => x.Order).ThenBy(x => x.Name))
         {
             entity.Documentos.Add(new DocumentoPerfilRequisito
             {

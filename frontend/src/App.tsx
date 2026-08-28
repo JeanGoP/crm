@@ -5260,6 +5260,7 @@ function FormDialog<T extends Record<string, unknown>>({ title, open, initial, c
   const [value, setValue] = useState(initial);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [saveGuard] = useState(() => ({ active: false }));
 
   useEffect(() => {
     if (open) {
@@ -5269,6 +5270,8 @@ function FormDialog<T extends Record<string, unknown>>({ title, open, initial, c
   }, [open, JSON.stringify(initial)]);
 
   const save = async () => {
+    if (saveGuard.active) return;
+    saveGuard.active = true;
     setSaving(true);
     setError('');
     try {
@@ -5276,6 +5279,7 @@ function FormDialog<T extends Record<string, unknown>>({ title, open, initial, c
     } catch (err) {
       setError(apiError(err));
     } finally {
+      saveGuard.active = false;
       setSaving(false);
     }
   };
