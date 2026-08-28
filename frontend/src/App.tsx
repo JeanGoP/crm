@@ -3212,28 +3212,17 @@ function SettingsPage() {
       </Grid>
       <Grid item xs={12}><Chip icon={<CheckCircle />} label={`Sesion activa: ${user?.fullName ?? user?.email} (${user?.roles.join(', ')})`} /></Grid>
     </Grid></CardContent></Card>
-    <Card><CardContent>
-      <Stack spacing={2}>
-        <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', sm: 'center' }} gap={1}>
-          <Box>
-            <Typography variant="h5" fontWeight={900}>Configuracion financiera</Typography>
-            <Typography color="text.secondary" fontSize={14}>Condiciones usadas por la empresa al crear cotizaciones.</Typography>
-          </Box>
-          {canManage && <Button variant="outlined" startIcon={<Edit />} onClick={() => setFinancialForm({ open: true, item: financialSettings })}>Editar tabla</Button>}
-        </Stack>
-        <StatusBar loading={loadingFinancialSettings} error={financialSettingsError} />
-        {financialSettings && <Grid container spacing={1.5}>
-          <Grid item xs={6} md={3}><Metric label="Salario minimo" value={money(financialSettings.minimumWage)} /></Grid>
-          <Grid item xs={6} md={3}><Metric label="Consumo EA" value={`${financialSettings.consumerAnnualRate}%`} /></Grid>
-          <Grid item xs={6} md={3}><Metric label="Bajo monto EA" value={`${financialSettings.lowAmountAnnualRate}%`} /></Grid>
-          <Grid item xs={6} md={3}><Metric label="Factor mensual" value={`${financialSettings.factorMonthlyRate}%`} /></Grid>
-          <Grid item xs={6} md={3}><Metric label="Plazo maximo" value={`${financialSettings.maxTermMonths} meses`} /></Grid>
-          <Grid item xs={6} md={3}><Metric label="Redondeo cuota" value={money(financialSettings.paymentRounding)} /></Grid>
-          <Grid item xs={6} md={3}><Metric label="Tabla financiera" value={financialSettings.useMontelibanoTable ? 'Activa' : 'Manual'} /></Grid>
-          <Grid item xs={6} md={3}><Metric label="Estado" value={financialSettings.active ? 'Activa' : 'Inactiva'} /></Grid>
-        </Grid>}
-      </Stack>
-    </CardContent></Card>
+    {canManage && <Box>
+      <Button
+        variant="outlined"
+        startIcon={<Edit />}
+        disabled={loadingFinancialSettings || !financialSettings}
+        onClick={() => setFinancialForm({ open: true, item: financialSettings })}
+      >
+        Configuracion financiera
+      </Button>
+      <StatusBar loading={loadingFinancialSettings} error={financialSettingsError} />
+    </Box>}
     <Card><CardContent>
       <Stack spacing={2}>
         <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', sm: 'center' }} gap={1}>
