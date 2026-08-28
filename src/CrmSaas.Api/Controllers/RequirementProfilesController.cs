@@ -100,6 +100,44 @@ public sealed class RequirementProfilesController(CrmDbContext db) : ControllerB
         });
     }
 
+    [HttpDelete("{id:guid}")]
+    [Authorize(Roles = "Administrador,Supervisor")]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
+    {
+        var strategy = db.Database.CreateExecutionStrategy();
+
+        return await strategy.ExecuteAsync<IActionResult>(async () =>
+        {
+            await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+            var profile = await db.PerfilesRequisito
+                .AsNoTracking()
+                .Where(x => x.Id == id)
+                .Select(x => new { x.Nombre })
+                .SingleOrDefaultAsync(cancellationToken)
+                ?? throw new KeyNotFoundException("Perfil de requisitos no encontrado.");
+
+            var quoteCount = await db.Cotizaciones.CountAsync(x => x.PerfilRequisitoId == id, cancellationToken);
+            var applicationCount = await db.SolicitudesCredito.CountAsync(x => x.PerfilRequisitoId == id, cancellationToken);
+            if (quoteCount > 0 || applicationCount > 0)
+            {
+                return Conflict(new
+                {
+                    detail = $"No se puede eliminar el perfil '{profile.Nombre}' porque esta asociado a {quoteCount} cotizacion(es) y {applicationCount} solicitud(es). Puede editarlo y marcarlo como inactivo."
+                });
+            }
+
+            await db.DocumentosPerfilRequisito
+                .Where(x => x.PerfilRequisitoId == id)
+                .ExecuteDeleteAsync(cancellationToken);
+            await db.PerfilesRequisito
+                .Where(x => x.Id == id)
+                .ExecuteDeleteAsync(cancellationToken);
+
+            await transaction.CommitAsync(cancellationToken);
+            return NoContent();
+        });
+    }
+
     private static void ApplyProfile(PerfilRequisito entity, UpsertRequirementProfileDto dto, string code)
     {
         entity.Nombre = dto.Name.Trim();

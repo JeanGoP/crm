@@ -2982,6 +2982,7 @@ function SettingsPage() {
   const [quoteChargeConceptForm, setQuoteChargeConceptForm] = useState<FormMode<QuoteChargeConcept>>({ open: false });
   const [salesPointForm, setSalesPointForm] = useState<FormMode<SalesPoint>>({ open: false });
   const [requirementProfileForm, setRequirementProfileForm] = useState<FormMode<RequirementProfile>>({ open: false });
+  const [requirementProfileToDelete, setRequirementProfileToDelete] = useState<RequirementProfile>();
   const [promotionForm, setPromotionForm] = useState<FormMode<Promotion>>({ open: false });
   const [notice, setNotice] = useState<Notice>();
   const currentCompanyId = isGlobalAdmin ? activeCompanyId ?? user?.companyId : user?.companyId;
@@ -3153,6 +3154,14 @@ function SettingsPage() {
     setRequirementProfileForm({ open: false });
   };
 
+  const deleteRequirementProfile = async () => {
+    if (!requirementProfileToDelete) return;
+    await api.delete(`/api/requirement-profiles/${requirementProfileToDelete.id}`);
+    setRequirementProfiles(requirementProfiles.filter((profile) => profile.id !== requirementProfileToDelete.id));
+    setNotice({ type: 'success', text: 'Perfil de requisitos eliminado.' });
+    setRequirementProfileToDelete(undefined);
+  };
+
   const savePromotion = async (payload: typeof emptyPromotion) => {
     const body = {
       name: payload.name,
@@ -3310,7 +3319,10 @@ function SettingsPage() {
             profile.isCash ? 'Contado' : 'Credito',
             <Stack direction="row" gap={.5} flexWrap="wrap">{profile.documents.slice(0, 4).map((document) => <Chip key={document.id} size="small" label={document.name} variant="outlined" />)}{profile.documents.length > 4 && <Chip size="small" label={`+${profile.documents.length - 4}`} />}</Stack>,
             <StatusChip label={profile.active ? 'Activo' : 'Inactivo'} tone={profile.active ? 'success' : 'default'} />,
-            <Actions onEdit={canManage ? () => setRequirementProfileForm({ open: true, item: profile }) : undefined} />
+            <Actions
+              onEdit={canManage ? () => setRequirementProfileForm({ open: true, item: profile }) : undefined}
+              onDelete={canManage ? () => setRequirementProfileToDelete(profile) : undefined}
+            />
           ])}
         />
       </Stack>
@@ -3384,6 +3396,13 @@ function SettingsPage() {
     <ProductCategoryDialog form={productCategoryForm} onClose={() => setProductCategoryForm({ open: false })} onSave={saveProductCategory} />
     <QuoteChargeConceptDialog form={quoteChargeConceptForm} onClose={() => setQuoteChargeConceptForm({ open: false })} onSave={saveQuoteChargeConcept} />
     <RequirementProfileDialog form={requirementProfileForm} onClose={() => setRequirementProfileForm({ open: false })} onSave={saveRequirementProfile} />
+    <ConfirmDialog
+      title="Eliminar perfil de requisitos"
+      text={`Se eliminara el perfil ${requirementProfileToDelete?.name ?? ''} y su lista de documentos. Esta accion no se puede deshacer.`}
+      open={!!requirementProfileToDelete}
+      onClose={() => setRequirementProfileToDelete(undefined)}
+      onConfirm={deleteRequirementProfile}
+    />
     <PromotionDialog form={promotionForm} products={products.filter((x) => x.active)} salesPoints={salesPoints.filter((x) => x.active)} onClose={() => setPromotionForm({ open: false })} onSave={savePromotion} />
     <UserDialog form={userForm} companies={userDialogCompanies} salesPoints={salesPoints.filter((x) => x.active)} defaultCompanyId={currentCompanyId} onClose={() => setUserForm({ open: false })} onSave={saveUser} />
     <FinancialSettingsDialog form={financialForm} onClose={() => setFinancialForm({ open: false })} onSave={saveFinancialSettings} />
