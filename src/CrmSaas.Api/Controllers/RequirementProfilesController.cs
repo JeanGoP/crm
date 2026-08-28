@@ -50,28 +50,36 @@ public sealed class RequirementProfilesController(CrmDbContext db) : ControllerB
     public async Task<ActionResult<RequirementProfileDto>> Update(Guid id, UpsertRequirementProfileDto dto, CancellationToken cancellationToken)
     {
         Validate(dto);
-        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        var entity = await db.PerfilesRequisito
-            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
-            ?? throw new KeyNotFoundException("Perfil de requisitos no encontrado.");
-        var code = NormalizeCode(dto.Code);
-        if (await db.PerfilesRequisito.AnyAsync(x => x.Id != id && x.Codigo == code, cancellationToken))
+        var strategy = db.Database.CreateExecutionStrategy();
+
+        return await strategy.ExecuteAsync<ActionResult<RequirementProfileDto>>(async () =>
         {
-            return BadRequest(new { detail = "Ya existe otro perfil con ese codigo." });
-        }
+            // Cada reintento debe empezar sin entidades conservadas por un intento
+            // anterior que pudo fallar despues de modificar el ChangeTracker.
+            db.ChangeTracker.Clear();
+            await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+            var entity = await db.PerfilesRequisito
+                .FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
+                ?? throw new KeyNotFoundException("Perfil de requisitos no encontrado.");
+            var code = NormalizeCode(dto.Code);
+            if (await db.PerfilesRequisito.AnyAsync(x => x.Id != id && x.Codigo == code, cancellationToken))
+            {
+                return BadRequest(new { detail = "Ya existe otro perfil con ese codigo." });
+            }
 
-        ApplyProfile(entity, dto, code);
+            ApplyProfile(entity, dto, code);
 
-        // Reemplazar la colección directamente en la base evita que EF intente
-        // borrar una por una filas que otro envío concurrente ya pudo reemplazar.
-        await db.DocumentosPerfilRequisito
-            .Where(x => x.PerfilRequisitoId == entity.Id)
-            .ExecuteDeleteAsync(cancellationToken);
-        AddDocuments(entity, dto.Documents);
+            // Reemplazar la colección directamente en la base evita que EF intente
+            // borrar una por una filas que otro envío concurrente ya pudo reemplazar.
+            await db.DocumentosPerfilRequisito
+                .Where(x => x.PerfilRequisitoId == entity.Id)
+                .ExecuteDeleteAsync(cancellationToken);
+            AddDocuments(entity, dto.Documents);
 
-        await db.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
-        return Ok(ToDto(entity));
+            await db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return Ok(ToDto(entity));
+        });
     }
 
     private static void ApplyProfile(PerfilRequisito entity, UpsertRequirementProfileDto dto, string code)
