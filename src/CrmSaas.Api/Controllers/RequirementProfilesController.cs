@@ -1,4 +1,5 @@
 using CrmSaas.Application.DTOs;
+using CrmSaas.Domain.Common;
 using CrmSaas.Domain.Entities;
 using CrmSaas.Domain.Enums;
 using CrmSaas.Infrastructure.Persistence;
@@ -54,31 +55,48 @@ public sealed class RequirementProfilesController(CrmDbContext db) : ControllerB
 
         return await strategy.ExecuteAsync<ActionResult<RequirementProfileDto>>(async () =>
         {
-            // Cada reintento debe empezar sin entidades conservadas por un intento
-            // anterior que pudo fallar despues de modificar el ChangeTracker.
             db.ChangeTracker.Clear();
             await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-            var entity = await db.PerfilesRequisito
-                .FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
-                ?? throw new KeyNotFoundException("Perfil de requisitos no encontrado.");
             var code = NormalizeCode(dto.Code);
+            if (!await db.PerfilesRequisito.AnyAsync(x => x.Id == id, cancellationToken))
+            {
+                throw new KeyNotFoundException("Perfil de requisitos no encontrado.");
+            }
+
             if (await db.PerfilesRequisito.AnyAsync(x => x.Id != id && x.Codigo == code, cancellationToken))
             {
                 return BadRequest(new { detail = "Ya existe otro perfil con ese codigo." });
             }
 
-            ApplyProfile(entity, dto, code);
+            // Las operaciones directas evitan que EF conserve documentos eliminados
+            // en el ChangeTracker y luego intente modificarlos o borrarlos otra vez.
+            var updatedAt = ColombiaTime.Now;
+            var updatedBy = User.Identity?.Name ?? "system";
+            await db.PerfilesRequisito
+                .Where(x => x.Id == id)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(x => x.Nombre, dto.Name.Trim())
+                    .SetProperty(x => x.Codigo, code)
+                    .SetProperty(x => x.Descripcion, Normalize(dto.Description))
+                    .SetProperty(x => x.EsContado, dto.IsCash)
+                    .SetProperty(x => x.Activo, dto.Active)
+                    .SetProperty(x => x.FechaActualizacion, updatedAt)
+                    .SetProperty(x => x.UsuarioActualizacion, updatedBy),
+                    cancellationToken);
 
-            // Reemplazar la colección directamente en la base evita que EF intente
-            // borrar una por una filas que otro envío concurrente ya pudo reemplazar.
             await db.DocumentosPerfilRequisito
-                .Where(x => x.PerfilRequisitoId == entity.Id)
+                .Where(x => x.PerfilRequisitoId == id)
                 .ExecuteDeleteAsync(cancellationToken);
-            AddDocuments(entity, dto.Documents);
+
+            db.DocumentosPerfilRequisito.AddRange(CreateDocuments(id, dto.Documents));
 
             await db.SaveChangesAsync(cancellationToken);
+            var updated = await db.PerfilesRequisito
+                .AsNoTracking()
+                .Include(x => x.Documentos)
+                .SingleAsync(x => x.Id == id, cancellationToken);
             await transaction.CommitAsync(cancellationToken);
-            return Ok(ToDto(entity));
+            return Ok(ToDto(updated));
         });
     }
 
@@ -93,18 +111,27 @@ public sealed class RequirementProfilesController(CrmDbContext db) : ControllerB
 
     private static void AddDocuments(PerfilRequisito entity, IEnumerable<UpsertRequirementDocumentDto> documents)
     {
-        foreach (var document in documents.OrderBy(x => x.Order).ThenBy(x => x.Name))
+        foreach (var document in CreateDocuments(entity.Id, documents))
         {
-            entity.Documentos.Add(new DocumentoPerfilRequisito
+            entity.Documentos.Add(document);
+        }
+    }
+
+    private static IEnumerable<DocumentoPerfilRequisito> CreateDocuments(
+        Guid profileId,
+        IEnumerable<UpsertRequirementDocumentDto> documents) =>
+        documents
+            .OrderBy(x => x.Order)
+            .ThenBy(x => x.Name)
+            .Select(document => new DocumentoPerfilRequisito
             {
+                PerfilRequisitoId = profileId,
                 Tipo = document.Type,
                 Nombre = document.Name.Trim(),
                 Descripcion = Normalize(document.Description),
                 Obligatorio = document.Required,
                 Orden = document.Order
             });
-        }
-    }
 
     private static void Validate(UpsertRequirementProfileDto dto)
     {
