@@ -126,7 +126,18 @@ public static class DatabaseSeeder
                 TiempoSoatDias = 14,
                 TiempoMatriculaDias = 20,
                 CondicionesComerciales = "Cotizacion sujeta a disponibilidad del producto, validacion comercial y aprobacion final.",
-                Activa = true
+                Activa = true,
+                Tasas =
+                [
+                    new TasaPuntoVenta
+                    {
+                        EmpresaId = empresaId,
+                        Nombre = "Tasa general",
+                        TasaFactorMensual = 4.5m,
+                        PlazoMaximoMeses = 30,
+                        Activa = true
+                    }
+                ]
             });
         }
 

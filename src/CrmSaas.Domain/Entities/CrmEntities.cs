@@ -225,6 +225,17 @@ public sealed class PuntoVenta : AuditableTenantEntity
     public string? CondicionesComerciales { get; set; }
     public string? BodegasInventarioExterno { get; set; }
     public bool Activa { get; set; } = true;
+    public ICollection<TasaPuntoVenta> Tasas { get; set; } = [];
+}
+
+public sealed class TasaPuntoVenta : AuditableTenantEntity
+{
+    public Guid PuntoVentaId { get; set; }
+    public PuntoVenta? PuntoVenta { get; set; }
+    public string Nombre { get; set; } = string.Empty;
+    public decimal TasaFactorMensual { get; set; }
+    public int PlazoMaximoMeses { get; set; } = 30;
+    public bool Activa { get; set; } = true;
 }
 
 public sealed class Cotizacion : AuditableTenantEntity
@@ -244,12 +255,15 @@ public sealed class Cotizacion : AuditableTenantEntity
     public Producto? Producto { get; set; }
     public Guid? PuntoVentaId { get; set; }
     public PuntoVenta? PuntoVenta { get; set; }
+    public Guid? TasaPuntoVentaId { get; set; }
+    public TasaPuntoVenta? TasaPuntoVenta { get; set; }
     public Guid? PerfilRequisitoId { get; set; }
     public PerfilRequisito? PerfilRequisito { get; set; }
     public string? NombreSede { get; set; }
     public string? MarcaSede { get; set; }
     public string? ModalidadEntregaSede { get; set; }
     public decimal? TasaFactorMensualSede { get; set; }
+    public string? NombreTasaSede { get; set; }
     public int? PlazoMaximoMesesSede { get; set; }
     public int? VigenciaCotizacionDiasSede { get; set; }
     public string? CondicionesSede { get; set; }

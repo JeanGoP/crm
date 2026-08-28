@@ -248,6 +248,15 @@ export interface SalesPoint {
   registrationAgent?: string;
   commercialTerms?: string;
   externalInventoryWarehouseCodes?: string;
+  rates: SalesPointRate[];
+  active: boolean;
+}
+
+export interface SalesPointRate {
+  id: string;
+  name: string;
+  factorMonthlyRate: number;
+  maxTermMonths: number;
   active: boolean;
 }
 
@@ -295,6 +304,8 @@ export interface QuoteSimulationResult {
   administrativeFees: number;
   termMonths: number;
   monthlyInterestRate: number;
+  salesPointRateId?: string;
+  salesPointRateName?: string;
   promotionId?: string;
   promotionName?: string;
   promotionDiscount: number;
@@ -363,6 +374,8 @@ export interface Quote {
   salesPointBrand?: string;
   salesPointDeliveryMode?: string;
   salesPointCommercialTerms?: string;
+  salesPointRateId?: string;
+  salesPointRateName?: string;
   requirementProfileId?: string;
   requirementProfileName?: string;
   promotionId?: string;

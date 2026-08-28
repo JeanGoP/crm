@@ -190,6 +190,8 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
             x.MarcaSede,
             x.ModalidadEntregaSede,
             x.CondicionesSede,
+            x.TasaPuntoVentaId,
+            x.NombreTasaSede,
             x.PerfilRequisitoId,
             x.PerfilRequisito?.Nombre,
             x.PromocionId,

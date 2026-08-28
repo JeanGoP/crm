@@ -185,6 +185,21 @@ public sealed record SalesPointDto(
     string? RegistrationAgent,
     string? CommercialTerms,
     string? ExternalInventoryWarehouseCodes,
+    IReadOnlyCollection<SalesPointRateDto> Rates,
+    bool Active);
+
+public sealed record SalesPointRateDto(
+    Guid Id,
+    string Name,
+    decimal FactorMonthlyRate,
+    int MaxTermMonths,
+    bool Active);
+
+public sealed record UpsertSalesPointRateDto(
+    Guid? Id,
+    string Name,
+    decimal FactorMonthlyRate,
+    int MaxTermMonths,
     bool Active);
 
 public sealed record UpsertSalesPointDto(
@@ -205,6 +220,7 @@ public sealed record UpsertSalesPointDto(
     string? RegistrationAgent,
     string? CommercialTerms,
     string? ExternalInventoryWarehouseCodes,
+    IReadOnlyCollection<UpsertSalesPointRateDto>? Rates,
     bool Active);
 
 public sealed record QuoteSimulationDto(
@@ -214,13 +230,16 @@ public sealed record QuoteSimulationDto(
     decimal Insurance,
     decimal AdministrativeFees,
     int TermMonths,
-    decimal MonthlyInterestRate);
+    decimal MonthlyInterestRate,
+    Guid? SalesPointRateId);
 public sealed record QuoteSimulationResultDto(
     decimal DownPayment,
     decimal Insurance,
     decimal AdministrativeFees,
     int TermMonths,
     decimal MonthlyInterestRate,
+    Guid? SalesPointRateId,
+    string? SalesPointRateName,
     Guid? PromotionId,
     string? PromotionName,
     decimal PromotionDiscount,
@@ -303,6 +322,8 @@ public sealed record QuoteDto(
     string? SalesPointBrand,
     string? SalesPointDeliveryMode,
     string? SalesPointCommercialTerms,
+    Guid? SalesPointRateId,
+    string? SalesPointRateName,
     Guid? RequirementProfileId,
     string? RequirementProfileName,
     Guid? PromotionId,
@@ -347,6 +368,7 @@ public sealed record CreateQuoteDto(
     decimal AdministrativeFees,
     int TermMonths,
     decimal MonthlyInterestRate,
+    Guid? SalesPointRateId,
     string? Notes);
 
 public sealed record ColombianIdentityLookupDto(

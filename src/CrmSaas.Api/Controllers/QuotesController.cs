@@ -34,6 +34,20 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
         return Ok(quotes);
     }
 
+    [HttpGet("rates")]
+    public async Task<ActionResult<IReadOnlyCollection<SalesPointRateDto>>> GetRates(CancellationToken cancellationToken)
+    {
+        var salesPoint = await GetCurrentSalesPointAsync(cancellationToken);
+        if (salesPoint is null) return Ok(Array.Empty<SalesPointRateDto>());
+
+        var rates = await db.TasasPuntosVenta
+            .Where(x => x.PuntoVentaId == salesPoint.Id && x.Activa)
+            .OrderBy(x => x.Nombre)
+            .Select(x => new SalesPointRateDto(x.Id, x.Nombre, x.TasaFactorMensual, x.PlazoMaximoMeses, x.Activa))
+            .ToListAsync(cancellationToken);
+        return Ok(rates);
+    }
+
     [HttpPost]
     public async Task<ActionResult<QuoteDto>> Create(CreateQuoteDto dto, CancellationToken cancellationToken)
     {
@@ -49,6 +63,7 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
 
         var financialSettings = await GetFinancialSettingsAsync(cancellationToken);
         var salesPoint = await GetCurrentSalesPointAsync(cancellationToken);
+        var salesPointRate = await ResolveSalesPointRateAsync(salesPoint, dto.SalesPointRateId, cancellationToken);
         var requirementProfile = dto.RequirementProfileId.HasValue
             ? await db.PerfilesRequisito.FirstOrDefaultAsync(x => x.Id == dto.RequirementProfileId.Value && x.Activo, cancellationToken)
                 ?? throw new KeyNotFoundException("Perfil de requisitos no encontrado o inactivo.")
@@ -80,7 +95,7 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             var insurance = item.Insurance > 0 ? item.Insurance : product.Soat;
             var administrativeFees = item.AdministrativeFees > 0 ? item.AdministrativeFees : product.Matricula + product.Impuestos;
             var promotion = ResolvePromotion(product, salesPoint, promotions, productPrice);
-            var simulation = CalculateSimulation(promotion.DiscountedProductPrice, item.DownPayment, insurance, administrativeFees, item.TermMonths, item.MonthlyInterestRate, financialSettings, salesPoint);
+            var simulation = CalculateSimulation(promotion.DiscountedProductPrice, item.DownPayment, insurance, administrativeFees, item.TermMonths, item.MonthlyInterestRate, financialSettings, salesPoint, salesPointRate);
             var initialPlan = NormalizeInitialPaymentPlan(item, now);
             return new { Source = item, Product = product, ProductPrice = productPrice, Promotion = promotion, Simulation = simulation, InitialPlan = initialPlan, Order = index + 1 };
         }).ToList();
@@ -107,7 +122,8 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
                 primary.Simulation.TermMonths,
                 primary.Simulation.MonthlyInterestRate,
                 financialSettings,
-                salesPoint)
+                salesPoint,
+                salesPointRate)
             : primary.Simulation;
         var initialStage = await db.EtapasNegocio
             .Where(x => x.Activa)
@@ -188,13 +204,16 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             ClienteId = customer.Id,
             ProductoId = product.Id,
             PuntoVentaId = salesPoint?.Id,
+            TasaPuntoVentaId = salesPointRate?.Id,
+            TasaPuntoVenta = salesPointRate,
             PerfilRequisitoId = requirementProfile?.Id,
             PerfilRequisito = requirementProfile,
             NombreSede = salesPoint?.Nombre,
             MarcaSede = salesPoint?.MarcaPrincipal,
             ModalidadEntregaSede = salesPoint?.ModalidadEntrega,
-            TasaFactorMensualSede = salesPoint?.TasaFactorMensual,
-            PlazoMaximoMesesSede = salesPoint?.PlazoMaximoMeses,
+            TasaFactorMensualSede = salesPointRate?.TasaFactorMensual ?? salesPoint?.TasaFactorMensual,
+            NombreTasaSede = salesPointRate?.Nombre ?? "Tasa general",
+            PlazoMaximoMesesSede = salesPointRate?.PlazoMaximoMeses ?? salesPoint?.PlazoMaximoMeses,
             VigenciaCotizacionDiasSede = salesPoint?.VigenciaCotizacionDias,
             CondicionesSede = salesPoint?.CondicionesComerciales,
             PromocionId = quotePromotion?.Id,
@@ -301,12 +320,13 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             ?? throw new KeyNotFoundException("Producto no encontrado o inactivo.");
         var financialSettings = await GetFinancialSettingsAsync(cancellationToken);
         var salesPoint = await GetCurrentSalesPointAsync(cancellationToken);
+        var salesPointRate = await ResolveSalesPointRateAsync(salesPoint, dto.SalesPointRateId, cancellationToken);
         var configuredProductPrice = ResolveProductPrice(product, salesPoint);
         var productPrice = dto.ProductPrice > 0 ? dto.ProductPrice : configuredProductPrice;
         var promotion = ResolvePromotion(product, salesPoint, await GetActivePromotionsAsync(ColombiaTime.Now, cancellationToken), productPrice);
         var insurance = dto.Insurance > 0 ? dto.Insurance : product.Soat;
         var administrativeFees = dto.AdministrativeFees > 0 ? dto.AdministrativeFees : product.Matricula + product.Impuestos;
-        var simulation = CalculateSimulation(promotion.DiscountedProductPrice, dto.DownPayment, insurance, administrativeFees, dto.TermMonths, dto.MonthlyInterestRate, financialSettings, salesPoint);
+        var simulation = CalculateSimulation(promotion.DiscountedProductPrice, dto.DownPayment, insurance, administrativeFees, dto.TermMonths, dto.MonthlyInterestRate, financialSettings, salesPoint, salesPointRate);
 
         return Ok(new QuoteSimulationResultDto(
             simulation.DownPayment,
@@ -314,6 +334,8 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             simulation.AdministrativeFees,
             simulation.TermMonths,
             simulation.MonthlyInterestRate,
+            salesPointRate?.Id,
+            salesPointRate?.Nombre,
             promotion.Promotion?.Id,
             promotion.Promotion?.Nombre,
             promotion.DiscountAmount,
@@ -446,6 +468,8 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             x.MarcaSede,
             x.ModalidadEntregaSede,
             x.CondicionesSede,
+            x.TasaPuntoVentaId,
+            x.NombreTasaSede,
             x.PerfilRequisitoId,
             x.PerfilRequisito?.Nombre,
             x.PromocionId,
@@ -639,6 +663,27 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             .FirstOrDefaultAsync(cancellationToken);
     }
 
+    private async Task<TasaPuntoVenta?> ResolveSalesPointRateAsync(PuntoVenta? salesPoint, Guid? rateId, CancellationToken cancellationToken)
+    {
+        if (salesPoint is null)
+        {
+            if (rateId.HasValue) throw new KeyNotFoundException("La sede actual no fue encontrada para aplicar la tasa.");
+            return null;
+        }
+
+        if (rateId.HasValue)
+        {
+            return await db.TasasPuntosVenta
+                .FirstOrDefaultAsync(x => x.Id == rateId.Value && x.PuntoVentaId == salesPoint.Id && x.Activa, cancellationToken)
+                ?? throw new KeyNotFoundException("La tasa seleccionada no existe, esta inactiva o no pertenece a la sede actual.");
+        }
+
+        return await db.TasasPuntosVenta
+            .Where(x => x.PuntoVentaId == salesPoint.Id && x.Activa)
+            .OrderBy(x => x.Nombre)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
     private async Task<PerfilRequisito?> GetDefaultRequirementProfileAsync(CancellationToken cancellationToken) =>
         await db.PerfilesRequisito
             .Where(x => x.Activo)
@@ -716,7 +761,7 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
 
     private static decimal DiscountedPrice(decimal productPrice, decimal discount) => Math.Max(productPrice - Math.Max(discount, 0), 0);
 
-    private static CreditSimulation CalculateSimulation(decimal productPrice, decimal downPayment, decimal insurance, decimal administrativeFees, int termMonths, decimal monthlyInterestRate, ConfiguracionFinancieraEmpresa? financialSettings, PuntoVenta? salesPoint)
+    private static CreditSimulation CalculateSimulation(decimal productPrice, decimal downPayment, decimal insurance, decimal administrativeFees, int termMonths, decimal monthlyInterestRate, ConfiguracionFinancieraEmpresa? financialSettings, PuntoVenta? salesPoint, TasaPuntoVenta? salesPointRate)
     {
         var normalizedInsurance = Math.Max(insurance, 0);
         var normalizedAdministrativeFees = Math.Max(administrativeFees, 0);
@@ -727,12 +772,18 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
 
         if (financialSettings is { UsarTablaMontelibano: true, Activa: true })
         {
-            normalizedTermMonths = Math.Min(normalizedTermMonths, salesPoint?.PlazoMaximoMeses > 0 ? salesPoint.PlazoMaximoMeses : financialSettings.PlazoMaximoMeses);
+            var maxTermMonths = salesPointRate?.PlazoMaximoMeses > 0
+                ? salesPointRate.PlazoMaximoMeses
+                : salesPoint?.PlazoMaximoMeses > 0 ? salesPoint.PlazoMaximoMeses : financialSettings.PlazoMaximoMeses;
+            normalizedTermMonths = Math.Min(normalizedTermMonths, maxTermMonths);
             var creditType = financedAmount <= financialSettings.SalarioMinimoVigente * 2 ? "Bajo monto" : "Consumo";
             var annualRate = creditType == "Bajo monto" ? financialSettings.TasaBajoMontoEa : financialSettings.TasaConsumoEa;
             var legalMonthlyRate = AnnualEffectiveToMonthly(annualRate);
-            var factorMonthlyRate = (salesPoint?.TasaFactorMensual > 0 ? salesPoint.TasaFactorMensual : financialSettings.TasaFactorMensual) / 100;
-            var paymentBase = normalizedTermMonths > 3
+            var configuredRate = salesPointRate is not null
+                ? salesPointRate.TasaFactorMensual
+                : salesPoint?.TasaFactorMensual > 0 ? salesPoint.TasaFactorMensual : financialSettings.TasaFactorMensual;
+            var factorMonthlyRate = configuredRate / 100;
+            var paymentBase = normalizedTermMonths > 3 && factorMonthlyRate > 0
                 ? Payment(financedAmount, normalizedTermMonths, factorMonthlyRate)
                 : financedAmount / normalizedTermMonths;
             var configuredMonthlyPayment = RoundTo(paymentBase, financialSettings.RedondeoCuota);
@@ -751,7 +802,12 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
                 true);
         }
 
-        var monthlyRate = monthlyInterestRate / 100;
+        if (salesPointRate?.PlazoMaximoMeses > 0)
+        {
+            normalizedTermMonths = Math.Min(normalizedTermMonths, salesPointRate.PlazoMaximoMeses);
+        }
+        var effectiveMonthlyInterestRate = salesPointRate?.TasaFactorMensual ?? monthlyInterestRate;
+        var monthlyRate = effectiveMonthlyInterestRate / 100;
         var monthlyPayment = financedAmount == 0
             ? 0
             : monthlyRate == 0
@@ -759,7 +815,7 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
                 : Payment(financedAmount, normalizedTermMonths, monthlyRate);
         monthlyPayment = Math.Round(monthlyPayment, 0, MidpointRounding.AwayFromZero);
         var totalPayment = normalizedDownPayment + (monthlyPayment * normalizedTermMonths);
-        return new CreditSimulation(normalizedDownPayment, normalizedInsurance, normalizedAdministrativeFees, normalizedTermMonths, monthlyInterestRate, financedAmount, monthlyPayment, totalPayment, "Manual", false);
+        return new CreditSimulation(normalizedDownPayment, normalizedInsurance, normalizedAdministrativeFees, normalizedTermMonths, effectiveMonthlyInterestRate, financedAmount, monthlyPayment, totalPayment, "Manual", false);
     }
 
     private static decimal AnnualEffectiveToMonthly(decimal annualEffectivePercent) =>

@@ -29,6 +29,7 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
     public DbSet<ConfiguracionFinancieraEmpresa> ConfiguracionesFinancierasEmpresa => Set<ConfiguracionFinancieraEmpresa>();
     public DbSet<ConceptoCotizacion> ConceptosCotizacion => Set<ConceptoCotizacion>();
     public DbSet<PuntoVenta> PuntosVenta => Set<PuntoVenta>();
+    public DbSet<TasaPuntoVenta> TasasPuntosVenta => Set<TasaPuntoVenta>();
     public DbSet<PerfilRequisito> PerfilesRequisito => Set<PerfilRequisito>();
     public DbSet<DocumentoPerfilRequisito> DocumentosPerfilRequisito => Set<DocumentoPerfilRequisito>();
     public DbSet<Promocion> Promociones => Set<Promocion>();
@@ -66,6 +67,7 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
         modelBuilder.Entity<ConfiguracionFinancieraEmpresa>().ToTable("ConfiguracionesFinancierasEmpresa");
         modelBuilder.Entity<ConceptoCotizacion>().ToTable("ConceptosCotizacion");
         modelBuilder.Entity<PuntoVenta>().ToTable("PuntosVenta");
+        modelBuilder.Entity<TasaPuntoVenta>().ToTable("TasasPuntosVenta");
         modelBuilder.Entity<PerfilRequisito>().ToTable("PerfilesRequisito");
         modelBuilder.Entity<DocumentoPerfilRequisito>().ToTable("DocumentosPerfilRequisito");
         modelBuilder.Entity<Promocion>().ToTable("Promociones");
@@ -175,6 +177,10 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
         modelBuilder.Entity<PuntoVenta>().Property(x => x.CondicionesComerciales).HasMaxLength(1200);
         modelBuilder.Entity<PuntoVenta>().HasIndex(x => new { x.EmpresaId, x.Codigo }).IsUnique();
         modelBuilder.Entity<PuntoVenta>().HasIndex(x => new { x.EmpresaId, x.Ciudad });
+        modelBuilder.Entity<TasaPuntoVenta>().Property(x => x.Nombre).HasMaxLength(120);
+        modelBuilder.Entity<TasaPuntoVenta>().Property(x => x.TasaFactorMensual).HasPrecision(6, 3);
+        modelBuilder.Entity<TasaPuntoVenta>().HasIndex(x => new { x.EmpresaId, x.PuntoVentaId, x.Nombre }).IsUnique();
+        modelBuilder.Entity<TasaPuntoVenta>().HasOne(x => x.PuntoVenta).WithMany(x => x.Tasas).HasForeignKey(x => x.PuntoVentaId).OnDelete(DeleteBehavior.Cascade);
         modelBuilder.Entity<PerfilRequisito>().Property(x => x.Nombre).HasMaxLength(120);
         modelBuilder.Entity<PerfilRequisito>().Property(x => x.Codigo).HasMaxLength(40);
         modelBuilder.Entity<PerfilRequisito>().Property(x => x.Descripcion).HasMaxLength(500);
@@ -220,6 +226,8 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
         modelBuilder.Entity<Cotizacion>().HasIndex(x => new { x.EmpresaId, x.PromocionId });
         modelBuilder.Entity<Cotizacion>().HasOne(x => x.Producto).WithMany().HasForeignKey(x => x.ProductoId).OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<Cotizacion>().HasOne(x => x.PuntoVenta).WithMany().HasForeignKey(x => x.PuntoVentaId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<Cotizacion>().Property(x => x.NombreTasaSede).HasMaxLength(120);
+        modelBuilder.Entity<Cotizacion>().HasOne(x => x.TasaPuntoVenta).WithMany().HasForeignKey(x => x.TasaPuntoVentaId).OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<Cotizacion>().HasOne(x => x.PerfilRequisito).WithMany().HasForeignKey(x => x.PerfilRequisitoId).OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<Cotizacion>().HasOne(x => x.Promocion).WithMany().HasForeignKey(x => x.PromocionId).OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<CotizacionItem>().Property(x => x.PrecioProducto).HasPrecision(18, 2);
@@ -321,6 +329,7 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
         modelBuilder.Entity<ConfiguracionFinancieraEmpresa>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<ConceptoCotizacion>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<PuntoVenta>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
+        modelBuilder.Entity<TasaPuntoVenta>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<PerfilRequisito>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<DocumentoPerfilRequisito>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<Promocion>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);

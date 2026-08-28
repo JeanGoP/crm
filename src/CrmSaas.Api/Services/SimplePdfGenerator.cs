@@ -484,7 +484,10 @@ public static class SimplePdfGenerator
         var boxH = 214;
         DrawRoundedLikeBox(commands, boxX, boxY, boxW, boxH);
         CenterText(commands, boxX + boxW / 2, boxY + boxH - 22, quote.ProductName.ToUpperInvariant(), 12, true, 32);
-        CenterText(commands, boxX + boxW / 2, boxY + boxH - 50, Value(quote.CreditType, "CONTADO").ToUpperInvariant(), 9, true, 24);
+        var financingLabel = string.IsNullOrWhiteSpace(quote.SalesPointRateName)
+            ? Value(quote.CreditType, "CONTADO")
+            : $"{Value(quote.CreditType, "CONTADO")} / {quote.SalesPointRateName}";
+        CenterText(commands, boxX + boxW / 2, boxY + boxH - 50, financingLabel.ToUpperInvariant(), 9, true, 40);
 
         var labels = new[]
         {
