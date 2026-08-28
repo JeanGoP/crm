@@ -116,15 +116,18 @@ app.UseAuthorization();
 app.MapControllers();
 app.MapGet("/health", () => Results.Ok(new { status = "ok", service = "crm-saas-api" })).AllowAnonymous();
 
-if (app.Configuration.GetValue<bool>("Seed:Enabled"))
+using (var scope = app.Services.CreateScope())
 {
-    using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<CrmDbContext>();
     await db.Database.MigrateAsync();
-    await DatabaseSeeder.SeedDemoAsync(
-        db,
-        scope.ServiceProvider.GetRequiredService<IPasswordHasher>(),
-        app.Configuration["Seed:AdminPassword"] ?? throw new InvalidOperationException("Seed:AdminPassword no configurado."));
+
+    if (app.Configuration.GetValue<bool>("Seed:Enabled"))
+    {
+        await DatabaseSeeder.SeedDemoAsync(
+            db,
+            scope.ServiceProvider.GetRequiredService<IPasswordHasher>(),
+            app.Configuration["Seed:AdminPassword"] ?? throw new InvalidOperationException("Seed:AdminPassword no configurado."));
+    }
 }
 
 app.Run();
