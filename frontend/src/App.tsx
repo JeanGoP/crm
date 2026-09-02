@@ -3199,15 +3199,6 @@ function SettingsPage() {
 
   const activeCompanies = companies.filter((x) => x.active);
   const userDialogCompanies = activeCompanies;
-  const userSalesPointLabel = (managedUser: User) => {
-    if (managedUser.roles.includes('Administrador')) return 'Todas las sedes';
-    if (managedUser.roles.includes('Supervisor')) {
-      return managedUser.supervisedSalesPointNames?.join(', ') || 'Sin sedes asignadas';
-    }
-    return managedUser.salesPointName
-      ?? salesPoints.find((point) => point.id === managedUser.salesPointId)?.name
-      ?? 'Sin sede asignada';
-  };
 
   return <Stack spacing={3}>
     <Header title="Configuracion" onRefresh={() => { reloadCompanies(); reloadUsers(); reloadProductCategories(); reloadFinancialSettings(); reloadQuoteChargeConcepts(); reloadSalesPoints(); reloadRequirementProfiles(); reloadPromotions(); }} />
@@ -3387,14 +3378,13 @@ function SettingsPage() {
       </Stack>
       <StatusBar loading={loadingUsers} error={usersError} />
       <EntityTable
-        headers={['Nombre', 'Usuario', 'Email', 'Empresa', 'Sede', 'Roles', 'Acciones']}
+        headers={['Nombre', 'Usuario', 'Email', 'Empresa', 'Roles', 'Acciones']}
         empty="No hay usuarios registrados"
         rows={users.map((u) => [
-          <Row primary={u.fullName} secondary={`Sede: ${userSalesPointLabel(u)}`} />,
+          <Typography fontWeight={700} sx={{ wordBreak: 'normal', overflowWrap: 'normal' }}>{u.fullName}</Typography>,
           u.login,
           u.email,
           companies.find((c) => c.id === u.companyId)?.name ?? u.companyId,
-          userSalesPointLabel(u),
           u.roles.join(', '),
           <Actions onEdit={() => setUserForm({ open: true, item: u })} />
         ])}
@@ -5462,6 +5452,11 @@ function tableColumnSx(header: string, compact = false) {
     Solicitud: compact ? 132 : 170,
     Identificacion: 150,
     Numero: 150,
+    Nombre: 240,
+    Usuario: 190,
+    Email: 260,
+    Empresa: 210,
+    Roles: 150,
     Cliente: compact ? 250 : 220,
     Credito: compact ? 280 : 260,
     Producto: compact ? 235 : 220,
