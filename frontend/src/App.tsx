@@ -3199,6 +3199,15 @@ function SettingsPage() {
 
   const activeCompanies = companies.filter((x) => x.active);
   const userDialogCompanies = activeCompanies;
+  const userSalesPointLabel = (managedUser: User) => {
+    if (managedUser.roles.includes('Administrador')) return 'Todas las sedes';
+    if (managedUser.roles.includes('Supervisor')) {
+      return managedUser.supervisedSalesPointNames?.join(', ') || 'Sin sedes asignadas';
+    }
+    return managedUser.salesPointName
+      ?? salesPoints.find((point) => point.id === managedUser.salesPointId)?.name
+      ?? 'Sin sede asignada';
+  };
 
   return <Stack spacing={3}>
     <Header title="Configuracion" onRefresh={() => { reloadCompanies(); reloadUsers(); reloadProductCategories(); reloadFinancialSettings(); reloadQuoteChargeConcepts(); reloadSalesPoints(); reloadRequirementProfiles(); reloadPromotions(); }} />
@@ -3381,13 +3390,11 @@ function SettingsPage() {
         headers={['Nombre', 'Usuario', 'Email', 'Empresa', 'Sede', 'Roles', 'Acciones']}
         empty="No hay usuarios registrados"
         rows={users.map((u) => [
-          u.fullName,
+          <Row primary={u.fullName} secondary={`Sede: ${userSalesPointLabel(u)}`} />,
           u.login,
           u.email,
           companies.find((c) => c.id === u.companyId)?.name ?? u.companyId,
-          u.roles.includes('Supervisor')
-            ? (u.supervisedSalesPointNames?.join(', ') || '-')
-            : (u.salesPointName ?? salesPoints.find((p) => p.id === u.salesPointId)?.name ?? '-'),
+          userSalesPointLabel(u),
           u.roles.join(', '),
           <Actions onEdit={() => setUserForm({ open: true, item: u })} />
         ])}
@@ -3846,6 +3853,7 @@ function UserDialog({ form, companies, salesPoints, defaultCompanyId, onClose, o
           supervisedSalesPointIds: role === 'Supervisor' ? v.supervisedSalesPointIds : []
         });
       }}>{['Administrador', 'Supervisor', 'Vendedor'].map((role) => <MenuItem key={role} value={role}>{role}</MenuItem>)}</TextField>
+      {isAdministrator && <Alert severity="info">Este usuario tiene acceso a todas las sedes de la empresa.</Alert>}
       {selectedRole === 'Vendedor' && <TextField required select label="Sede principal" value={v.salesPointId} onChange={(e) => set({ salesPointId: e.target.value })} helperText="Se usara en cotizaciones, reportes y tramites por sede.">
         {currentSalesPoints.length === 0 && <MenuItem value="">Cree una sede antes de crear vendedores.</MenuItem>}
         {currentSalesPoints.map((point) => <MenuItem key={point.id} value={point.id}>{point.name} - {point.city}</MenuItem>)}
