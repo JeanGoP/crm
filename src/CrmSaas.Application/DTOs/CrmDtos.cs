@@ -195,6 +195,12 @@ public sealed record SalesPointRateDto(
     int MaxTermMonths,
     bool Active);
 
+public sealed record QuoteSalesPointDto(
+    Guid Id,
+    string Name,
+    string City,
+    IReadOnlyCollection<SalesPointRateDto> Rates);
+
 public sealed record UpsertSalesPointRateDto(
     Guid? Id,
     string Name,
@@ -231,6 +237,7 @@ public sealed record QuoteSimulationDto(
     decimal AdministrativeFees,
     int TermMonths,
     decimal MonthlyInterestRate,
+    Guid? SalesPointId,
     Guid? SalesPointRateId);
 public sealed record QuoteSimulationResultDto(
     decimal DownPayment,
@@ -368,6 +375,7 @@ public sealed record CreateQuoteDto(
     decimal AdministrativeFees,
     int TermMonths,
     decimal MonthlyInterestRate,
+    Guid? SalesPointId,
     Guid? SalesPointRateId,
     string? Notes);
 

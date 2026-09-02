@@ -37,7 +37,7 @@ import ChevronRight from '@mui/icons-material/ChevronRight';
 import { AxiosError } from 'axios';
 import { api } from './api';
 import { useAuthStore } from './store';
-import { Activity, ColombianIdentityLookup, CollectionOrder, CommercialInventory, CommercialInventorySummary, CommercialReports, Company, CreditApplication, CreditDocument, Customer, Customer360, CustomerAiAnalysis, CustomerTimelineItem, Dashboard, Deal, DealStage, ExternalInventoryItem, ExternalInventoryWarehouse, FinancialSettings, Lead, LoginAccessReport, MotorcycleDelivery, Procedure, Product, ProductCategory, ProductPhoto, Promotion, Quote, QuoteChargeConcept, QuoteSimulationResult, RequirementProfile, SalesPoint, SalesPointRate, User } from './types';
+import { Activity, ColombianIdentityLookup, CollectionOrder, CommercialInventory, CommercialInventorySummary, CommercialReports, Company, CreditApplication, CreditDocument, Customer, Customer360, CustomerAiAnalysis, CustomerTimelineItem, Dashboard, Deal, DealStage, ExternalInventoryItem, ExternalInventoryWarehouse, FinancialSettings, Lead, LoginAccessReport, MotorcycleDelivery, Procedure, Product, ProductCategory, ProductPhoto, Promotion, Quote, QuoteChargeConcept, QuoteSalesPoint, QuoteSimulationResult, RequirementProfile, SalesPoint, SalesPointRate, User } from './types';
 
 const drawerWidth = 272;
 const today = new Date().toISOString().slice(0, 10);
@@ -285,7 +285,7 @@ const emptyRequirementDocument = { type: 5, name: '', description: '', required:
 const emptyRequirementProfile = { name: '', code: '', description: '', isCash: false, active: true, documents: [emptyRequirementDocument] };
 const emptyPromotion = { name: '', code: '', discountType: 'Valor', discountValue: 0, productId: '', brand: '', color: '', salesPointIds: [] as string[], validFrom: today, validUntil: today, active: true };
 const emptyQuoteItem = { productId: '', productPrice: 0, downPayment: 0, initialPaymentPaidToday: 0, initialPaymentSchedule: [] as { dueDate: string; amount: number }[], insurance: 0, administrativeFees: 0, chargeValues: {} as Record<string, number>, termMonths: 24, monthlyInterestRate: 2.2, inventoryWarehouseCode: '', inventoryWarehouseName: '', inventoryPresentation: '', inventorySerialNumber: '', inventoryEngineNumber: '', inventoryChassisNumber: '' };
-const emptyQuote = { identificationType: 1, identificationNumber: '', customerFirstNames: '', customerLastNames: '', customerFirstName: '', customerMiddleName: '', customerLastName: '', customerSecondLastName: '', phoneCountryCode: '+57', phoneNumber: '', requirementProfileId: '', salesPointRateId: '', productId: '', downPayment: 0, insurance: 0, administrativeFees: 0, termMonths: 24, monthlyInterestRate: 2.2, items: [emptyQuoteItem], notes: '' };
+const emptyQuote = { identificationType: 1, identificationNumber: '', customerFirstNames: '', customerLastNames: '', customerFirstName: '', customerMiddleName: '', customerLastName: '', customerSecondLastName: '', phoneCountryCode: '+57', phoneNumber: '', requirementProfileId: '', salesPointId: '', salesPointRateId: '', productId: '', downPayment: 0, insurance: 0, administrativeFees: 0, termMonths: 24, monthlyInterestRate: 2.2, items: [emptyQuoteItem], notes: '' };
 const emptyCreditApplication = {
   customerId: '', productId: '', quoteId: '', dealId: '', requirementProfileId: '', identificationType: 1, identificationNumber: '', birthDate: '', mobile: '', address: '', city: '', occupation: '',
   monthlyIncome: 0, downPayment: 0, termMonths: 24, motorcycleValue: 0,
@@ -1434,13 +1434,14 @@ function CommercialInventoryPage() {
 }
 
 function QuotesPage() {
+  const currentUser = useAuthStore((state) => state.user);
   const { data: rows = [], loading, error, reload, setData } = useResource<Quote[]>('/api/quotes', []);
   const { data: products = [] } = useResource<Product[]>('/api/products', []);
   const { data: productCategories = [] } = useResource<ProductCategory[]>('/api/product-categories', []);
   const { data: customers = [] } = useResource<Customer[]>('/api/customers', []);
   const { data: requirementProfiles = [] } = useResource<RequirementProfile[]>('/api/requirement-profiles', []);
   const { data: quoteChargeConcepts = [] } = useResource<QuoteChargeConcept[]>('/api/quote-charge-concepts', []);
-  const { data: salesPointRates = [] } = useResource<SalesPointRate[]>('/api/quotes/rates', []);
+  const { data: quoteSalesPoints = [] } = useResource<QuoteSalesPoint[]>('/api/quotes/sales-points', []);
   const [form, setForm] = useState<FormMode<Quote>>({ open: false });
   const [analysis, setAnalysis] = useState<CustomerAiAnalysis>();
   const [analysisPhone, setAnalysisPhone] = useState<string>();
@@ -1503,6 +1504,7 @@ function QuotesPage() {
       phoneCountryCode: payload.phoneCountryCode || '+57',
       phoneNumber: payload.phoneNumber || null,
       requirementProfileId: payload.requirementProfileId || null,
+      salesPointId: payload.salesPointId || null,
       salesPointRateId: payload.salesPointRateId || null,
       productId: firstItem.productId,
       items: quoteItems,
@@ -1549,7 +1551,7 @@ function QuotesPage() {
         <Actions onAi={() => analyzeCustomer(r.customerId, customers.find((x) => x.id === r.customerId)?.phone)} onDownload={() => setPreviewQuote(r)} />
       ])}
     />
-    <QuoteDialog form={form} products={products.filter((x) => x.active)} productCategories={productCategories.filter((x) => x.active)} requirementProfiles={requirementProfiles.filter((x) => x.active)} quoteChargeConcepts={quoteChargeConcepts.filter((x) => x.active)} salesPointRates={salesPointRates} onClose={() => setForm({ open: false })} onSave={save} />
+    <QuoteDialog form={form} products={products.filter((x) => x.active)} productCategories={productCategories.filter((x) => x.active)} requirementProfiles={requirementProfiles.filter((x) => x.active)} quoteChargeConcepts={quoteChargeConcepts.filter((x) => x.active)} salesPoints={quoteSalesPoints} canChooseSalesPoint={currentUser?.roles.some((role) => role === 'Administrador' || role === 'Supervisor') ?? false} onClose={() => setForm({ open: false })} onSave={save} />
     <QuotePdfPreviewDialog quote={previewQuote} onClose={() => setPreviewQuote(undefined)} onDownload={downloadPdf} />
     <AiAnalysisDialog analysis={analysis} phone={analysisPhone} onClose={() => { setAnalysis(undefined); setAnalysisPhone(undefined); }} />
     <Notice notice={notice} onClose={() => setNotice(undefined)} />
@@ -4266,7 +4268,7 @@ function ProductPhotosManager({ product, onChanged }: { product: Product; onChan
   </Paper>;
 }
 
-function QuoteDialog({ form, products, productCategories, requirementProfiles, quoteChargeConcepts, salesPointRates, onClose, onSave }: DialogProps<Quote, typeof emptyQuote> & { products: Product[]; productCategories: ProductCategory[]; requirementProfiles: RequirementProfile[]; quoteChargeConcepts: QuoteChargeConcept[]; salesPointRates: SalesPointRate[] }) {
+function QuoteDialog({ form, products, productCategories, requirementProfiles, quoteChargeConcepts, salesPoints, canChooseSalesPoint, onClose, onSave }: DialogProps<Quote, typeof emptyQuote> & { products: Product[]; productCategories: ProductCategory[]; requirementProfiles: RequirementProfile[]; quoteChargeConcepts: QuoteChargeConcept[]; salesPoints: QuoteSalesPoint[]; canChooseSalesPoint: boolean }) {
   const firstProduct = products[0];
   const activeChargeConcepts = normalizedQuoteChargeConcepts(quoteChargeConcepts);
   const initialChargeValues = quoteChargeDefaults(firstProduct, activeChargeConcepts);
@@ -4279,7 +4281,8 @@ function QuoteDialog({ form, products, productCategories, requirementProfiles, q
     administrativeFees: initialChargeTotals.administrativeFees,
     chargeValues: initialChargeValues
   };
-  const initial = { ...emptyQuote, requirementProfileId: requirementProfiles[0]?.id ?? '', salesPointRateId: salesPointRates[0]?.id ?? '', productId: initialItem.productId, items: [initialItem] };
+  const initialSalesPoint = salesPoints[0];
+  const initial = { ...emptyQuote, requirementProfileId: requirementProfiles[0]?.id ?? '', salesPointId: initialSalesPoint?.id ?? '', salesPointRateId: initialSalesPoint?.rates[0]?.id ?? '', productId: initialItem.productId, items: [initialItem] };
   const [identityLoading, setIdentityLoading] = useState(false);
   const [identityNotice, setIdentityNotice] = useState<Notice>();
   const [inventorySearch, setInventorySearch] = useState('');
@@ -4367,7 +4370,12 @@ function QuoteDialog({ form, products, productCategories, requirementProfiles, q
   return <FormDialog title="Nueva cotizacion" open={form.open} initial={initial} onClose={onClose} onSave={onSave} maxWidth="lg">
     {(v, set) => {
       const quoteItems = v.items?.length ? v.items : [{ ...emptyQuoteItem, productId: v.productId }];
-      const selectedSalesPointRateId = v.salesPointRateId || salesPointRates[0]?.id || '';
+      const selectedSalesPointId = v.salesPointId || salesPoints[0]?.id || '';
+      const selectedSalesPoint = salesPoints.find((salesPoint) => salesPoint.id === selectedSalesPointId);
+      const salesPointRates = selectedSalesPoint?.rates.filter((rate) => rate.active) ?? [];
+      const selectedSalesPointRateId = salesPointRates.some((rate) => rate.id === v.salesPointRateId)
+        ? v.salesPointRateId
+        : salesPointRates[0]?.id ?? '';
       const selectedProducts = quoteItems.map((item) => products.find((product) => product.id === item.productId)).filter(Boolean) as Product[];
       const selectedCategory = selectedProducts.map((product) => product.category).filter(Boolean)[0];
       const isBundleQuote = quoteItems.length > 1
@@ -4477,12 +4485,19 @@ function QuoteDialog({ form, products, productCategories, requirementProfiles, q
               <TextField fullWidth label="Indicativo" value={v.phoneCountryCode} onChange={(e) => set({ phoneCountryCode: e.target.value })} />
               <TextField fullWidth required label="Telefono / WhatsApp" value={v.phoneNumber} onChange={(e) => set({ phoneNumber: e.target.value })} />
             </Box>
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' }, gap: 1.5, maxWidth: { md: 860 } }}>
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(3, minmax(0, 1fr))' }, gap: 1.5 }}>
               <TextField fullWidth select label="Perfil de requisitos" value={v.requirementProfileId} onChange={(e) => set({ requirementProfileId: e.target.value })} helperText="Este perfil generara el checklist de documentos si la cotizacion pasa a solicitud de credito.">
                 <MenuItem value="">Empleado por defecto</MenuItem>
                 {requirementProfiles.map((profile) => <MenuItem key={profile.id} value={profile.id}>{profile.name}{profile.isCash ? ' - contado' : ''}</MenuItem>)}
               </TextField>
-              <TextField fullWidth required select label="Tasa de financiacion" value={selectedSalesPointRateId} onChange={(e) => set({ salesPointRateId: e.target.value })} helperText="Tasas activas configuradas para la sede actual.">
+              <TextField fullWidth required select label="Sede" value={selectedSalesPointId} disabled={!canChooseSalesPoint} onChange={(e) => {
+                const salesPointId = e.target.value;
+                const firstRateId = salesPoints.find((salesPoint) => salesPoint.id === salesPointId)?.rates.find((rate) => rate.active)?.id ?? '';
+                set({ salesPointId, salesPointRateId: firstRateId });
+              }} helperText={canChooseSalesPoint ? 'Seleccione la sede donde se realizara la cotizacion.' : 'Sede asignada al vendedor.'}>
+                {salesPoints.map((salesPoint) => <MenuItem key={salesPoint.id} value={salesPoint.id}>{salesPoint.name} - {salesPoint.city}</MenuItem>)}
+              </TextField>
+              <TextField fullWidth required select label="Tasa de financiacion" value={selectedSalesPointRateId} disabled={!selectedSalesPointId || salesPointRates.length === 0} onChange={(e) => set({ salesPointRateId: e.target.value })} helperText={salesPointRates.length ? 'Tasas activas configuradas para la sede seleccionada.' : 'La sede seleccionada no tiene tasas activas.'}>
                 {salesPointRates.map((rate) => <MenuItem key={rate.id} value={rate.id}>{rate.name}</MenuItem>)}
               </TextField>
             </Box>
@@ -4654,7 +4669,7 @@ function QuoteDialog({ form, products, productCategories, requirementProfiles, q
                     }}
                   />)}
                   <Box sx={{ gridColumn: { xs: '1', sm: 'span 2', lg: 'span 2' }, minWidth: 0 }}>
-                    <QuoteSimulationPreview value={simulationItem} selectedProduct={selectedProduct} salesPointRateId={selectedSalesPointRateId} compact />
+                    <QuoteSimulationPreview value={simulationItem} selectedProduct={selectedProduct} salesPointId={selectedSalesPointId} salesPointRateId={selectedSalesPointRateId} compact />
                   </Box>
                 </Box>
                 <InitialPaymentPlanEditor
@@ -4674,7 +4689,7 @@ function QuoteDialog({ form, products, productCategories, requirementProfiles, q
   </FormDialog>;
 }
 
-function QuoteSimulationPreview({ value, selectedProduct, salesPointRateId, compact = false }: { value: typeof emptyQuoteItem; selectedProduct?: Product; salesPointRateId?: string; compact?: boolean }) {
+function QuoteSimulationPreview({ value, selectedProduct, salesPointId, salesPointRateId, compact = false }: { value: typeof emptyQuoteItem; selectedProduct?: Product; salesPointId?: string; salesPointRateId?: string; compact?: boolean }) {
   const [simulation, setSimulation] = useState<QuoteSimulationResult>();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -4698,6 +4713,7 @@ function QuoteSimulationPreview({ value, selectedProduct, salesPointRateId, comp
         administrativeFees: Number(value.administrativeFees),
         termMonths: Number(value.termMonths),
         monthlyInterestRate: Number(value.monthlyInterestRate),
+        salesPointId: salesPointId || null,
         salesPointRateId: salesPointRateId || null
       })
         .then(({ data }) => setSimulation(data))
@@ -4706,7 +4722,7 @@ function QuoteSimulationPreview({ value, selectedProduct, salesPointRateId, comp
     }, 250);
 
     return () => window.clearTimeout(timer);
-  }, [selectedProduct?.id, productPrice, value.downPayment, value.insurance, value.administrativeFees, value.termMonths, value.monthlyInterestRate, salesPointRateId]);
+  }, [selectedProduct?.id, productPrice, value.downPayment, value.insurance, value.administrativeFees, value.termMonths, value.monthlyInterestRate, salesPointId, salesPointRateId]);
 
   const insurance = Math.max(Number(value.insurance) || 0, 0);
   const administrativeFees = Math.max(Number(value.administrativeFees) || 0, 0);

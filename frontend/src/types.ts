@@ -260,6 +260,13 @@ export interface SalesPointRate {
   active: boolean;
 }
 
+export interface QuoteSalesPoint {
+  id: string;
+  name: string;
+  city: string;
+  rates: SalesPointRate[];
+}
+
 export interface RequirementDocument {
   id: string;
   type: number;

@@ -9,6 +9,7 @@ using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 using System.Text.Json;
 
 namespace CrmSaas.Api.Controllers;
@@ -35,9 +36,9 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
     }
 
     [HttpGet("rates")]
-    public async Task<ActionResult<IReadOnlyCollection<SalesPointRateDto>>> GetRates(CancellationToken cancellationToken)
+    public async Task<ActionResult<IReadOnlyCollection<SalesPointRateDto>>> GetRates([FromQuery] Guid? salesPointId, CancellationToken cancellationToken)
     {
-        var salesPoint = await GetCurrentSalesPointAsync(cancellationToken);
+        var salesPoint = await GetCurrentSalesPointAsync(salesPointId, false, cancellationToken);
         if (salesPoint is null) return Ok(Array.Empty<SalesPointRateDto>());
 
         var rates = await db.TasasPuntosVenta
@@ -46,6 +47,26 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             .Select(x => new SalesPointRateDto(x.Id, x.Nombre, x.TasaFactorMensual, x.PlazoMaximoMeses, x.Activa))
             .ToListAsync(cancellationToken);
         return Ok(rates);
+    }
+
+    [HttpGet("sales-points")]
+    public async Task<ActionResult<IReadOnlyCollection<QuoteSalesPointDto>>> GetSalesPoints(CancellationToken cancellationToken)
+    {
+        var salesPoints = await GetAllowedSalesPointsQuery()
+            .Include(x => x.Tasas)
+            .OrderByDescending(x => x.Codigo == "PRINCIPAL")
+            .ThenBy(x => x.Nombre)
+            .ToListAsync(cancellationToken);
+
+        return Ok(salesPoints.Select(point => new QuoteSalesPointDto(
+            point.Id,
+            point.Nombre,
+            point.Ciudad,
+            point.Tasas
+                .Where(rate => rate.Activa)
+                .OrderBy(rate => rate.Nombre)
+                .Select(rate => new SalesPointRateDto(rate.Id, rate.Nombre, rate.TasaFactorMensual, rate.PlazoMaximoMeses, rate.Activa))
+                .ToList())));
     }
 
     [HttpPost]
@@ -62,7 +83,7 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
         if (string.IsNullOrWhiteSpace(NormalizePhoneDigits(dto.PhoneNumber))) throw new ValidationException("El telefono del cliente es obligatorio.");
 
         var financialSettings = await GetFinancialSettingsAsync(cancellationToken);
-        var salesPoint = await GetCurrentSalesPointAsync(cancellationToken);
+        var salesPoint = await GetCurrentSalesPointAsync(dto.SalesPointId, true, cancellationToken);
         var salesPointRate = await ResolveSalesPointRateAsync(salesPoint, dto.SalesPointRateId, cancellationToken);
         var requirementProfile = dto.RequirementProfileId.HasValue
             ? await db.PerfilesRequisito.FirstOrDefaultAsync(x => x.Id == dto.RequirementProfileId.Value && x.Activo, cancellationToken)
@@ -319,7 +340,7 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             .FirstOrDefaultAsync(x => x.Id == dto.ProductId && x.Activo, cancellationToken)
             ?? throw new KeyNotFoundException("Producto no encontrado o inactivo.");
         var financialSettings = await GetFinancialSettingsAsync(cancellationToken);
-        var salesPoint = await GetCurrentSalesPointAsync(cancellationToken);
+        var salesPoint = await GetCurrentSalesPointAsync(dto.SalesPointId, true, cancellationToken);
         var salesPointRate = await ResolveSalesPointRateAsync(salesPoint, dto.SalesPointRateId, cancellationToken);
         var configuredProductPrice = ResolveProductPrice(product, salesPoint);
         var productPrice = dto.ProductPrice > 0 ? dto.ProductPrice : configuredProductPrice;
@@ -646,21 +667,49 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
     private async Task<ConfiguracionFinancieraEmpresa?> GetFinancialSettingsAsync(CancellationToken cancellationToken) =>
         await db.ConfiguracionesFinancierasEmpresa.FirstOrDefaultAsync(x => x.Activa, cancellationToken);
 
-    private async Task<PuntoVenta?> GetCurrentSalesPointAsync(CancellationToken cancellationToken)
+    private async Task<PuntoVenta?> GetCurrentSalesPointAsync(Guid? requestedSalesPointId, bool requireExplicitSelection, CancellationToken cancellationToken)
     {
-        var currentUser = await db.Usuarios
-            .Include(x => x.PuntoVenta)
-            .FirstOrDefaultAsync(x => x.Email == tenantContext.UsuarioActual && x.Activo, cancellationToken);
-        if (currentUser?.PuntoVenta is { Activa: true } salesPoint)
+        var isAdministrator = User.IsInRole("Administrador");
+        var isSupervisor = User.IsInRole("Supervisor");
+        var isGlobalAdmin = string.Equals(User.FindFirstValue("global_admin"), "true", StringComparison.OrdinalIgnoreCase);
+        var allowedSalesPoints = GetAllowedSalesPointsQuery();
+
+        if (requestedSalesPointId.HasValue)
         {
-            return salesPoint;
+            return await allowedSalesPoints.FirstOrDefaultAsync(x => x.Id == requestedSalesPointId.Value, cancellationToken)
+                ?? throw new ValidationException("La sede seleccionada no esta activa o no esta asignada al usuario.");
         }
 
-        return await db.PuntosVenta
-            .Where(x => x.Activa)
+        if (requireExplicitSelection && (isAdministrator || isSupervisor || isGlobalAdmin))
+        {
+            throw new ValidationException("Debe seleccionar la sede de la cotizacion.");
+        }
+
+        return await allowedSalesPoints
             .OrderByDescending(x => x.Codigo == "PRINCIPAL")
             .ThenBy(x => x.Nombre)
             .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    private IQueryable<PuntoVenta> GetAllowedSalesPointsQuery()
+    {
+        var isAdministrator = User.IsInRole("Administrador");
+        var isSupervisor = User.IsInRole("Supervisor");
+        var isGlobalAdmin = string.Equals(User.FindFirstValue("global_admin"), "true", StringComparison.OrdinalIgnoreCase);
+        Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var currentUserId);
+
+        IQueryable<PuntoVenta> query = db.PuntosVenta.Where(x => x.Activa);
+        if (isAdministrator || isGlobalAdmin) return query;
+        if (currentUserId == Guid.Empty)
+        {
+            throw new ValidationException("No fue posible identificar el usuario para seleccionar la sede.");
+        }
+
+        return isSupervisor
+            ? query.Where(point => db.UsuariosSedesSupervisadas
+                .Any(assignment => assignment.UsuarioId == currentUserId && assignment.PuntoVentaId == point.Id))
+            : query.Where(point => db.Usuarios
+                .Any(currentUser => currentUser.Id == currentUserId && currentUser.Activo && currentUser.PuntoVentaId == point.Id));
     }
 
     private async Task<TasaPuntoVenta?> ResolveSalesPointRateAsync(PuntoVenta? salesPoint, Guid? rateId, CancellationToken cancellationToken)
