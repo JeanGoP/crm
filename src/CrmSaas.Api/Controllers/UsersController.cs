@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using CrmSaas.Application.Abstractions;
 using CrmSaas.Application.DTOs;
+using CrmSaas.Domain.Common;
 using CrmSaas.Domain.Entities;
 using CrmSaas.Infrastructure.Auth;
 using CrmSaas.Infrastructure.Persistence;
@@ -163,122 +164,153 @@ public sealed class UsersController(CrmDbContext db, IPasswordHasher passwordHas
         if (string.IsNullOrWhiteSpace(dto.Email)) return BadRequest(new { detail = "El email es obligatorio." });
         if (string.IsNullOrWhiteSpace(dto.Login)) return BadRequest(new { detail = "El login es obligatorio." });
 
-        var query = IsGlobalAdmin()
-            ? db.Usuarios.IgnoreQueryFilters()
-            : db.Usuarios.AsQueryable();
-
-        var user = await query
-            .Include(x => x.UsuarioRoles)
-            .Include(x => x.SedesSupervisadas)
-            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
-            ?? throw new KeyNotFoundException("Usuario no encontrado.");
-
-        if (!CanManageCompany(user.EmpresaId) || !CanManageCompany(dto.CompanyId))
+        var strategy = db.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync<ActionResult<UserDto>>(async () =>
         {
-            return Forbid();
-        }
+            db.ChangeTracker.Clear();
+            await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+            var userQuery = IsGlobalAdmin()
+                ? db.Usuarios.IgnoreQueryFilters()
+                : db.Usuarios.AsQueryable();
+            var existingUser = await userQuery
+                .AsNoTracking()
+                .Where(x => x.Id == id)
+                .Select(x => new { x.Id, x.EmpresaId })
+                .SingleOrDefaultAsync(cancellationToken)
+                ?? throw new KeyNotFoundException("Usuario no encontrado.");
 
-        var companyExists = await db.Empresas.IgnoreQueryFilters().AnyAsync(x => x.Id == dto.CompanyId && x.Activa, cancellationToken);
-        if (!companyExists)
-        {
-            return BadRequest(new { detail = "Empresa no encontrada o inactiva." });
-        }
-
-        var login = NormalizeLogin(dto.Login);
-        if (login.Length > 80)
-        {
-            return BadRequest(new { detail = "El login no puede superar 80 caracteres." });
-        }
-
-        if (await db.Usuarios.IgnoreQueryFilters().AnyAsync(x => x.Id != id && x.Login == login, cancellationToken))
-        {
-            return BadRequest(new { detail = "Ya existe un usuario con ese login." });
-        }
-
-        var roles = await db.Roles.IgnoreQueryFilters()
-            .Where(x => x.EmpresaId == dto.CompanyId && dto.Roles.Contains(x.Nombre))
-            .ToListAsync(cancellationToken);
-        if (roles.Count == 0)
-        {
-            return BadRequest(new { detail = "Selecciona al menos un rol valido para la empresa." });
-        }
-
-        var isAdministrator = roles.Any(x => x.Nombre == "Administrador");
-        var isSupervisor = roles.Any(x => x.Nombre == "Supervisor");
-        Guid? salesPointId = null;
-        var supervisedSalesPointIds = Array.Empty<Guid>();
-        if (isSupervisor)
-        {
-            supervisedSalesPointIds = (dto.SupervisedSalesPointIds ?? [])
-                .Where(x => x != Guid.Empty)
-                .Distinct()
-                .ToArray();
-            if (supervisedSalesPointIds.Length == 0)
+            if (!CanManageCompany(existingUser.EmpresaId) || !CanManageCompany(dto.CompanyId))
             {
-                return BadRequest(new { detail = "Debe seleccionar al menos una sede para supervisar." });
+                return Forbid();
             }
 
-            var validSupervisedCount = await db.PuntosVenta.IgnoreQueryFilters()
-                .CountAsync(x => x.EmpresaId == dto.CompanyId && x.Activa && supervisedSalesPointIds.Contains(x.Id), cancellationToken);
-            if (validSupervisedCount != supervisedSalesPointIds.Length)
+            var companyExists = await db.Empresas.IgnoreQueryFilters().AnyAsync(x => x.Id == dto.CompanyId && x.Activa, cancellationToken);
+            if (!companyExists)
             {
-                return BadRequest(new { detail = "Una de las sedes supervisadas no existe o esta inactiva para la empresa seleccionada." });
-            }
-        }
-        else if (!isAdministrator)
-        {
-            if (!dto.SalesPointId.HasValue)
-            {
-                return BadRequest(new { detail = "Debe seleccionar una sede para el vendedor." });
+                return BadRequest(new { detail = "Empresa no encontrada o inactiva." });
             }
 
-            salesPointId = await db.PuntosVenta.IgnoreQueryFilters()
-                .Where(x => x.EmpresaId == dto.CompanyId && x.Id == dto.SalesPointId.Value && x.Activa)
-                .Select(x => (Guid?)x.Id)
-                .FirstOrDefaultAsync(cancellationToken);
-
-            if (!salesPointId.HasValue)
+            var login = NormalizeLogin(dto.Login);
+            if (login.Length > 80)
             {
-                return BadRequest(new { detail = "Sede no encontrada o inactiva para la empresa seleccionada." });
+                return BadRequest(new { detail = "El login no puede superar 80 caracteres." });
             }
-        }
 
-        user.EmpresaId = dto.CompanyId;
-        user.NombreCompleto = dto.FullName;
-        user.Login = login;
-        user.Email = dto.Email;
-        user.PuntoVentaId = salesPointId;
-        if (!string.IsNullOrWhiteSpace(dto.Password))
-        {
-            user.PasswordHash = passwordHasher.Hash(dto.Password);
-        }
+            if (await db.Usuarios.IgnoreQueryFilters().AnyAsync(x => x.Id != id && x.Login == login, cancellationToken))
+            {
+                return BadRequest(new { detail = "Ya existe un usuario con ese login." });
+            }
 
-        db.UsuarioRoles.RemoveRange(user.UsuarioRoles);
-        foreach (var role in roles)
-        {
-            user.UsuarioRoles.Add(new UsuarioRol { EmpresaId = dto.CompanyId, UsuarioId = user.Id, RolId = role.Id });
-        }
+            var roles = await db.Roles.IgnoreQueryFilters()
+                .Where(x => x.EmpresaId == dto.CompanyId && dto.Roles.Contains(x.Nombre))
+                .ToListAsync(cancellationToken);
+            if (roles.Count == 0)
+            {
+                return BadRequest(new { detail = "Selecciona al menos un rol valido para la empresa." });
+            }
 
-        db.UsuariosSedesSupervisadas.RemoveRange(user.SedesSupervisadas);
-        foreach (var supervisedSalesPointId in supervisedSalesPointIds)
-        {
-            user.SedesSupervisadas.Add(new UsuarioSedeSupervisada { EmpresaId = dto.CompanyId, UsuarioId = user.Id, PuntoVentaId = supervisedSalesPointId });
-        }
+            var isAdministrator = roles.Any(x => x.Nombre == "Administrador");
+            var isSupervisor = roles.Any(x => x.Nombre == "Supervisor");
+            Guid? salesPointId = null;
+            var supervisedSalesPointIds = Array.Empty<Guid>();
+            if (isSupervisor)
+            {
+                supervisedSalesPointIds = (dto.SupervisedSalesPointIds ?? [])
+                    .Where(x => x != Guid.Empty)
+                    .Distinct()
+                    .ToArray();
+                if (supervisedSalesPointIds.Length == 0)
+                {
+                    return BadRequest(new { detail = "Debe seleccionar al menos una sede para supervisar." });
+                }
 
-        await db.SaveChangesAsync(cancellationToken);
+                var validSupervisedCount = await db.PuntosVenta.IgnoreQueryFilters()
+                    .CountAsync(x => x.EmpresaId == dto.CompanyId && x.Activa && supervisedSalesPointIds.Contains(x.Id), cancellationToken);
+                if (validSupervisedCount != supervisedSalesPointIds.Length)
+                {
+                    return BadRequest(new { detail = "Una de las sedes supervisadas no existe o esta inactiva para la empresa seleccionada." });
+                }
+            }
+            else if (!isAdministrator)
+            {
+                if (!dto.SalesPointId.HasValue)
+                {
+                    return BadRequest(new { detail = "Debe seleccionar una sede para el vendedor." });
+                }
 
-        var salesPointName = salesPointId.HasValue
-            ? await db.PuntosVenta.IgnoreQueryFilters().Where(x => x.Id == salesPointId.Value).Select(x => x.Nombre).FirstOrDefaultAsync(cancellationToken)
-            : null;
-        var supervisedSalesPointNames = supervisedSalesPointIds.Length == 0
-            ? Array.Empty<string>()
-            : await db.PuntosVenta.IgnoreQueryFilters()
-                .Where(x => supervisedSalesPointIds.Contains(x.Id))
-                .OrderBy(x => x.Nombre)
-                .Select(x => x.Nombre)
-                .ToArrayAsync(cancellationToken);
+                salesPointId = await db.PuntosVenta.IgnoreQueryFilters()
+                    .Where(x => x.EmpresaId == dto.CompanyId && x.Id == dto.SalesPointId.Value && x.Activa)
+                    .Select(x => (Guid?)x.Id)
+                    .FirstOrDefaultAsync(cancellationToken);
+                if (!salesPointId.HasValue)
+                {
+                    return BadRequest(new { detail = "Sede no encontrada o inactiva para la empresa seleccionada." });
+                }
+            }
 
-        return Ok(new UserDto(user.Id, user.NombreCompleto, user.Login, user.Email, roles.Select(x => x.Nombre).ToArray(), user.EmpresaId, salesPointId, salesPointName, supervisedSalesPointIds, supervisedSalesPointNames));
+            var updatedAt = ColombiaTime.Now;
+            var updatedBy = User.Identity?.Name ?? "system";
+            var normalizedFullName = dto.FullName.Trim();
+            var normalizedEmail = dto.Email.Trim();
+            var targetUser = db.Usuarios.IgnoreQueryFilters().Where(x => x.Id == id);
+            var affectedRows = string.IsNullOrWhiteSpace(dto.Password)
+                ? await targetUser.ExecuteUpdateAsync(setters => setters
+                    .SetProperty(x => x.EmpresaId, dto.CompanyId)
+                    .SetProperty(x => x.NombreCompleto, normalizedFullName)
+                    .SetProperty(x => x.Login, login)
+                    .SetProperty(x => x.Email, normalizedEmail)
+                    .SetProperty(x => x.PuntoVentaId, salesPointId)
+                    .SetProperty(x => x.FechaActualizacion, updatedAt)
+                    .SetProperty(x => x.UsuarioActualizacion, updatedBy), cancellationToken)
+                : await targetUser.ExecuteUpdateAsync(setters => setters
+                    .SetProperty(x => x.EmpresaId, dto.CompanyId)
+                    .SetProperty(x => x.NombreCompleto, normalizedFullName)
+                    .SetProperty(x => x.Login, login)
+                    .SetProperty(x => x.Email, normalizedEmail)
+                    .SetProperty(x => x.PasswordHash, passwordHasher.Hash(dto.Password))
+                    .SetProperty(x => x.PuntoVentaId, salesPointId)
+                    .SetProperty(x => x.FechaActualizacion, updatedAt)
+                    .SetProperty(x => x.UsuarioActualizacion, updatedBy), cancellationToken);
+            if (affectedRows != 1)
+            {
+                throw new KeyNotFoundException("Usuario no encontrado.");
+            }
+
+            await db.UsuarioRoles.IgnoreQueryFilters()
+                .Where(x => x.UsuarioId == id)
+                .ExecuteDeleteAsync(cancellationToken);
+            await db.UsuariosSedesSupervisadas.IgnoreQueryFilters()
+                .Where(x => x.UsuarioId == id)
+                .ExecuteDeleteAsync(cancellationToken);
+
+            db.UsuarioRoles.AddRange(roles.Select(role => new UsuarioRol
+            {
+                EmpresaId = dto.CompanyId,
+                UsuarioId = id,
+                RolId = role.Id
+            }));
+            db.UsuariosSedesSupervisadas.AddRange(supervisedSalesPointIds.Select(supervisedSalesPointId => new UsuarioSedeSupervisada
+            {
+                EmpresaId = dto.CompanyId,
+                UsuarioId = id,
+                PuntoVentaId = supervisedSalesPointId
+            }));
+            await db.SaveChangesAsync(cancellationToken);
+
+            var salesPointName = salesPointId.HasValue
+                ? await db.PuntosVenta.IgnoreQueryFilters().Where(x => x.Id == salesPointId.Value).Select(x => x.Nombre).FirstOrDefaultAsync(cancellationToken)
+                : null;
+            var supervisedSalesPointNames = supervisedSalesPointIds.Length == 0
+                ? Array.Empty<string>()
+                : await db.PuntosVenta.IgnoreQueryFilters()
+                    .Where(x => supervisedSalesPointIds.Contains(x.Id))
+                    .OrderBy(x => x.Nombre)
+                    .Select(x => x.Nombre)
+                    .ToArrayAsync(cancellationToken);
+
+            await transaction.CommitAsync(cancellationToken);
+            return Ok(new UserDto(id, normalizedFullName, login, normalizedEmail, roles.Select(x => x.Nombre).ToArray(), dto.CompanyId, salesPointId, salesPointName, supervisedSalesPointIds, supervisedSalesPointNames));
+        });
     }
 
     private bool IsGlobalAdmin() =>
