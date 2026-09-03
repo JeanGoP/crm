@@ -7,6 +7,7 @@ interface AuthState {
   user?: User;
   activeCompanyId?: string;
   setSession: (accessToken: string, refreshToken: string, user: User) => void;
+  refreshSession: (accessToken: string, refreshToken: string, user: User) => void;
   setActiveCompanyId: (companyId: string) => void;
   logout: () => void;
 }
@@ -20,6 +21,11 @@ export const useAuthStore = create<AuthState>((set) => ({
     localStorage.setItem('crm-session', JSON.stringify(session));
     set(session);
   },
+  refreshSession: (accessToken, refreshToken, user) => set((state) => {
+    const session = { accessToken, refreshToken, user, activeCompanyId: state.activeCompanyId ?? user.companyId };
+    localStorage.setItem('crm-session', JSON.stringify(session));
+    return session;
+  }),
   setActiveCompanyId: (companyId) => set((state) => {
     const session = { ...state, activeCompanyId: companyId };
     localStorage.setItem('crm-session', JSON.stringify(session));

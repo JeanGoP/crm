@@ -60,13 +60,15 @@ public sealed class AuthService(CrmSaas.Infrastructure.Persistence.CrmDbContext 
     public async Task<AuthResponseDto> RefreshAsync(RefreshTokenRequestDto request, CancellationToken cancellationToken)
     {
         var tokenHash = HashToken(request.RefreshToken);
-        var refreshToken = await db.RefreshTokens
+        var now = DateTime.UtcNow;
+        var refreshToken = await db.RefreshTokens.IgnoreQueryFilters()
             .Include(x => x.Usuario).ThenInclude(x => x!.UsuarioRoles).ThenInclude(x => x.Rol)
             .Include(x => x.Usuario).ThenInclude(x => x!.PuntoVenta)
             .Include(x => x.Usuario).ThenInclude(x => x!.SedesSupervisadas).ThenInclude(x => x.PuntoVenta)
-            .FirstOrDefaultAsync(x => x.TokenHash == tokenHash && x.Activo, cancellationToken)
+            .FirstOrDefaultAsync(x => x.TokenHash == tokenHash && x.RevocadoEn == null && x.ExpiraEn > now && x.Usuario != null && x.Usuario.Activo, cancellationToken)
             ?? throw new UnauthorizedAccessException("Refresh token invalido.");
 
+        tenantContext.SetTenant(refreshToken.EmpresaId);
         refreshToken.RevocadoEn = DateTime.UtcNow;
         return await IssueTokensAsync(refreshToken.Usuario!, cancellationToken);
     }
