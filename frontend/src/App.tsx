@@ -1626,23 +1626,33 @@ function CreditWorkflowBoardPage() {
     <Header title="Tablero de solicitudes de credito" onRefresh={reload} />
     <StatusBar loading={loading} error={error} />
     <Grid container spacing={1.5}>
-      <Grid item xs={12} sm={4}><Metric label="Procesos activos" value={active} /></Grid>
-      <Grid item xs={12} sm={4}><Metric label="Requieren atencion" value={attention} /></Grid>
-      <Grid item xs={12} sm={4}><Metric label="Bienvenida completada" value={finished} /></Grid>
+      <Grid item xs={12} sm={6} lg={3}><Metric label="Total solicitudes" value={applications.length} /></Grid>
+      <Grid item xs={12} sm={6} lg={3}><Metric label="Procesos activos" value={active} /></Grid>
+      <Grid item xs={12} sm={6} lg={3}><Metric label="Requieren atencion" value={attention} /></Grid>
+      <Grid item xs={12} sm={6} lg={3}><Metric label="Bienvenida completada" value={finished} /></Grid>
     </Grid>
-    <TextField
-      size="small"
-      value={search}
-      onChange={(event) => setSearch(event.target.value)}
-      placeholder="Buscar solicitud, cliente, cedula o producto"
-      InputProps={{ startAdornment: <InputAdornment position="start"><Search fontSize="small" /></InputAdornment> }}
-      sx={{ maxWidth: 520, bgcolor: '#fff' }}
-    />
-    <Box sx={{ overflowX: 'auto', pb: 1.5 }}>
-      <Stack direction="row" spacing={1.5} alignItems="flex-start" sx={{ minWidth: 'max-content' }}>
+    <Stack direction={{ xs: 'column', sm: 'row' }} alignItems={{ xs: 'stretch', sm: 'center' }} justifyContent="space-between" gap={1}>
+      <TextField
+        size="small"
+        value={search}
+        onChange={(event) => setSearch(event.target.value)}
+        placeholder="Buscar solicitud, cliente, cedula o producto"
+        InputProps={{ startAdornment: <InputAdornment position="start"><Search fontSize="small" /></InputAdornment> }}
+        sx={{ width: { xs: '100%', sm: 520 }, bgcolor: '#fff' }}
+      />
+      <Typography color="text.secondary" fontSize={13} fontWeight={700}>
+        Mostrando {visibleApplications.length} de {applications.length} solicitudes
+      </Typography>
+    </Stack>
+    <Box sx={{
+      display: 'grid',
+      gridTemplateColumns: { xs: 'minmax(0, 1fr)', md: 'repeat(2, minmax(0, 1fr))', xl: 'repeat(3, minmax(0, 1fr))' },
+      gap: 1.5,
+      alignItems: 'start'
+    }}>
         {creditWorkflowColumns.map((column) => {
           const cards = visibleApplications.filter((application) => creditWorkflowColumn(application) === column.id);
-          return <Paper key={column.id} variant="outlined" sx={{ width: 285, bgcolor: '#f8fafc', overflow: 'hidden' }}>
+          return <Paper key={column.id} variant="outlined" sx={{ width: '100%', minWidth: 0, bgcolor: '#f8fafc', overflow: 'hidden' }}>
             <Box sx={{ p: 1.5, borderTop: `4px solid ${column.color}`, borderBottom: `1px solid ${uiBorder}`, bgcolor: '#fff' }}>
               <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1}>
                 <Stack direction="row" alignItems="center" gap={1}>
@@ -1655,7 +1665,7 @@ function CreditWorkflowBoardPage() {
                 <Chip size="small" label={cards.length} sx={{ bgcolor: '#eef2f6' }} />
               </Stack>
             </Box>
-            <Stack spacing={1} sx={{ p: 1, maxHeight: 'calc(100vh - 355px)', minHeight: 190, overflowY: 'auto' }}>
+            <Stack spacing={1} sx={{ p: 1, maxHeight: 440, minHeight: 145, overflowY: 'auto' }}>
               {cards.map((application) => {
                 const stageDate = new Date(creditWorkflowStageDate(application, column.id));
                 const days = Math.max(0, Math.floor((Date.now() - stageDate.getTime()) / 86400000));
@@ -1685,7 +1695,6 @@ function CreditWorkflowBoardPage() {
             </Stack>
           </Paper>;
         })}
-      </Stack>
     </Box>
   </Stack>;
 }
