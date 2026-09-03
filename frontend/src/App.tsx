@@ -5026,15 +5026,16 @@ function CreditApplicationDialog({ form, customers, products, quotes, deals, req
             <Box sx={{ maxWidth: { md: 260 } }}>
               <TextField fullWidth label="Ingresos codeudor" type="number" value={v.coDebtorMonthlyIncome} onChange={(e) => set({ coDebtorMonthlyIncome: Number(e.target.value) })} />
             </Box>
+            <Typography variant="subtitle2" fontWeight={900}>Referencias personales del cliente</Typography>
             <FieldGrid columns={3}>
-              <TextField fullWidth label="Referencia 1" value={v.reference1Name} onChange={(e) => set({ reference1Name: e.target.value })} />
-              <TextField fullWidth label="Celular referencia 1" value={v.reference1Mobile} onChange={(e) => set({ reference1Mobile: e.target.value })} />
-              <TextField fullWidth label="Relacion referencia 1" value={v.reference1Relationship} onChange={(e) => set({ reference1Relationship: e.target.value })} />
+              <TextField fullWidth required label="Nombre referencia 1" value={v.reference1Name} onChange={(e) => set({ reference1Name: e.target.value })} />
+              <TextField fullWidth required label="Celular referencia 1" value={v.reference1Mobile} onChange={(e) => set({ reference1Mobile: e.target.value })} />
+              <TextField fullWidth required label="Relacion referencia 1" value={v.reference1Relationship} onChange={(e) => set({ reference1Relationship: e.target.value })} />
             </FieldGrid>
             <FieldGrid columns={3}>
-              <TextField fullWidth label="Referencia 2" value={v.reference2Name} onChange={(e) => set({ reference2Name: e.target.value })} />
-              <TextField fullWidth label="Celular referencia 2" value={v.reference2Mobile} onChange={(e) => set({ reference2Mobile: e.target.value })} />
-              <TextField fullWidth label="Relacion referencia 2" value={v.reference2Relationship} onChange={(e) => set({ reference2Relationship: e.target.value })} />
+              <TextField fullWidth required label="Nombre referencia 2" value={v.reference2Name} onChange={(e) => set({ reference2Name: e.target.value })} />
+              <TextField fullWidth required label="Celular referencia 2" value={v.reference2Mobile} onChange={(e) => set({ reference2Mobile: e.target.value })} />
+              <TextField fullWidth required label="Relacion referencia 2" value={v.reference2Relationship} onChange={(e) => set({ reference2Relationship: e.target.value })} />
             </FieldGrid>
           </Stack>
         </Paper>

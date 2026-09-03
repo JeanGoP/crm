@@ -409,6 +409,12 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         if (dto.TermMonths <= 0) throw new ValidationException("El plazo debe ser mayor a cero.");
         if (dto.CoDebtorMonthlyIncome.HasValue && dto.CoDebtorMonthlyIncome < 0) throw new ValidationException("Los ingresos del codeudor no pueden ser negativos.");
         if (!string.IsNullOrWhiteSpace(dto.CoDebtorName) && string.IsNullOrWhiteSpace(dto.CoDebtorMobile)) throw new ValidationException("Si registra codeudor, el celular del codeudor es obligatorio.");
+        if (string.IsNullOrWhiteSpace(dto.Reference1Name)) throw new ValidationException("El nombre de la referencia 1 es obligatorio.");
+        if (string.IsNullOrWhiteSpace(dto.Reference1Mobile)) throw new ValidationException("El celular de la referencia 1 es obligatorio.");
+        if (string.IsNullOrWhiteSpace(dto.Reference1Relationship)) throw new ValidationException("La relacion de la referencia 1 es obligatoria.");
+        if (string.IsNullOrWhiteSpace(dto.Reference2Name)) throw new ValidationException("El nombre de la referencia 2 es obligatorio.");
+        if (string.IsNullOrWhiteSpace(dto.Reference2Mobile)) throw new ValidationException("El celular de la referencia 2 es obligatorio.");
+        if (string.IsNullOrWhiteSpace(dto.Reference2Relationship)) throw new ValidationException("La relacion de la referencia 2 es obligatoria.");
     }
 
     private async Task<PerfilRequisito?> ResolveRequirementProfileAsync(Guid? profileId, CancellationToken cancellationToken)
