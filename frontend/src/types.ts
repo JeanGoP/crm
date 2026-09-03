@@ -482,6 +482,12 @@ export interface CreditApplication {
   reference2Name?: string;
   reference2Mobile?: string;
   reference2Relationship?: string;
+  coDebtorReference1Name?: string;
+  coDebtorReference1Mobile?: string;
+  coDebtorReference1Relationship?: string;
+  coDebtorReference2Name?: string;
+  coDebtorReference2Mobile?: string;
+  coDebtorReference2Relationship?: string;
   status: number;
   notes?: string;
   submittedAt?: string;

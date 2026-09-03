@@ -88,6 +88,12 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             Referencia2Nombre = Normalize(dto.Reference2Name),
             Referencia2Celular = Normalize(dto.Reference2Mobile),
             Referencia2Relacion = Normalize(dto.Reference2Relationship),
+            CodeudorReferencia1Nombre = Normalize(dto.CoDebtorReference1Name),
+            CodeudorReferencia1Celular = Normalize(dto.CoDebtorReference1Mobile),
+            CodeudorReferencia1Relacion = Normalize(dto.CoDebtorReference1Relationship),
+            CodeudorReferencia2Nombre = Normalize(dto.CoDebtorReference2Name),
+            CodeudorReferencia2Celular = Normalize(dto.CoDebtorReference2Mobile),
+            CodeudorReferencia2Relacion = Normalize(dto.CoDebtorReference2Relationship),
             Estado = dto.Status,
             Observaciones = dto.Notes
         };
@@ -151,6 +157,12 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         entity.Referencia2Nombre = Normalize(dto.Reference2Name);
         entity.Referencia2Celular = Normalize(dto.Reference2Mobile);
         entity.Referencia2Relacion = Normalize(dto.Reference2Relationship);
+        entity.CodeudorReferencia1Nombre = Normalize(dto.CoDebtorReference1Name);
+        entity.CodeudorReferencia1Celular = Normalize(dto.CoDebtorReference1Mobile);
+        entity.CodeudorReferencia1Relacion = Normalize(dto.CoDebtorReference1Relationship);
+        entity.CodeudorReferencia2Nombre = Normalize(dto.CoDebtorReference2Name);
+        entity.CodeudorReferencia2Celular = Normalize(dto.CoDebtorReference2Mobile);
+        entity.CodeudorReferencia2Relacion = Normalize(dto.CoDebtorReference2Relationship);
         entity.Estado = dto.Status;
         entity.Observaciones = dto.Notes;
         AddMissingChecklistDocuments(entity, requirementProfile);
@@ -415,6 +427,15 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         if (string.IsNullOrWhiteSpace(dto.Reference2Name)) throw new ValidationException("El nombre de la referencia 2 es obligatorio.");
         if (string.IsNullOrWhiteSpace(dto.Reference2Mobile)) throw new ValidationException("El celular de la referencia 2 es obligatorio.");
         if (string.IsNullOrWhiteSpace(dto.Reference2Relationship)) throw new ValidationException("La relacion de la referencia 2 es obligatoria.");
+        if (!string.IsNullOrWhiteSpace(dto.CoDebtorName))
+        {
+            if (string.IsNullOrWhiteSpace(dto.CoDebtorReference1Name)) throw new ValidationException("El nombre de la referencia 1 del codeudor es obligatorio.");
+            if (string.IsNullOrWhiteSpace(dto.CoDebtorReference1Mobile)) throw new ValidationException("El celular de la referencia 1 del codeudor es obligatorio.");
+            if (string.IsNullOrWhiteSpace(dto.CoDebtorReference1Relationship)) throw new ValidationException("La relacion de la referencia 1 del codeudor es obligatoria.");
+            if (string.IsNullOrWhiteSpace(dto.CoDebtorReference2Name)) throw new ValidationException("El nombre de la referencia 2 del codeudor es obligatorio.");
+            if (string.IsNullOrWhiteSpace(dto.CoDebtorReference2Mobile)) throw new ValidationException("El celular de la referencia 2 del codeudor es obligatorio.");
+            if (string.IsNullOrWhiteSpace(dto.CoDebtorReference2Relationship)) throw new ValidationException("La relacion de la referencia 2 del codeudor es obligatoria.");
+        }
     }
 
     private async Task<PerfilRequisito?> ResolveRequirementProfileAsync(Guid? profileId, CancellationToken cancellationToken)
@@ -726,6 +747,12 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             x.Referencia2Nombre,
             x.Referencia2Celular,
             x.Referencia2Relacion,
+            x.CodeudorReferencia1Nombre,
+            x.CodeudorReferencia1Celular,
+            x.CodeudorReferencia1Relacion,
+            x.CodeudorReferencia2Nombre,
+            x.CodeudorReferencia2Celular,
+            x.CodeudorReferencia2Relacion,
             x.Estado,
             x.Observaciones,
             x.FechaEnvio,

@@ -406,6 +406,12 @@ public sealed class SolicitudCredito : AuditableTenantEntity
     public string? Referencia2Nombre { get; set; }
     public string? Referencia2Celular { get; set; }
     public string? Referencia2Relacion { get; set; }
+    public string? CodeudorReferencia1Nombre { get; set; }
+    public string? CodeudorReferencia1Celular { get; set; }
+    public string? CodeudorReferencia1Relacion { get; set; }
+    public string? CodeudorReferencia2Nombre { get; set; }
+    public string? CodeudorReferencia2Celular { get; set; }
+    public string? CodeudorReferencia2Relacion { get; set; }
     public EstadoSolicitudCredito Estado { get; set; } = EstadoSolicitudCredito.Borrador;
     public string? Observaciones { get; set; }
     public DateTime? FechaEnvio { get; set; }

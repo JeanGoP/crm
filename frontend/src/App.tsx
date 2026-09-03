@@ -291,6 +291,7 @@ const emptyCreditApplication = {
   monthlyIncome: 0, downPayment: 0, termMonths: 24, motorcycleValue: 0,
   coDebtorName: '', coDebtorIdentification: '', coDebtorMobile: '', coDebtorRelationship: '', coDebtorMonthlyIncome: 0,
   reference1Name: '', reference1Mobile: '', reference1Relationship: '', reference2Name: '', reference2Mobile: '', reference2Relationship: '',
+  coDebtorReference1Name: '', coDebtorReference1Mobile: '', coDebtorReference1Relationship: '', coDebtorReference2Name: '', coDebtorReference2Mobile: '', coDebtorReference2Relationship: '',
   status: 1, notes: ''
 };
 const emptyMotorcycleDelivery = {
@@ -1573,6 +1574,12 @@ function CreditApplicationsPage() {
   const managementApplication = management ? rows.find((x) => x.id === management.id) ?? management : undefined;
 
   const save = async (payload: typeof emptyCreditApplication) => {
+    const clientReferencesComplete = [payload.reference1Name, payload.reference1Mobile, payload.reference1Relationship, payload.reference2Name, payload.reference2Mobile, payload.reference2Relationship]
+      .every((value) => value.trim());
+    if (!clientReferencesComplete) throw new Error('Debe completar las dos referencias personales del cliente.');
+    const coDebtorReferencesComplete = [payload.coDebtorReference1Name, payload.coDebtorReference1Mobile, payload.coDebtorReference1Relationship, payload.coDebtorReference2Name, payload.coDebtorReference2Mobile, payload.coDebtorReference2Relationship]
+      .every((value) => value.trim());
+    if (payload.coDebtorName.trim() && !coDebtorReferencesComplete) throw new Error('Debe completar las dos referencias personales del codeudor.');
     const body = {
       ...payload,
       quoteId: payload.quoteId || null,
@@ -1595,6 +1602,12 @@ function CreditApplicationsPage() {
       reference2Name: payload.reference2Name || null,
       reference2Mobile: payload.reference2Mobile || null,
       reference2Relationship: payload.reference2Relationship || null,
+      coDebtorReference1Name: payload.coDebtorReference1Name || null,
+      coDebtorReference1Mobile: payload.coDebtorReference1Mobile || null,
+      coDebtorReference1Relationship: payload.coDebtorReference1Relationship || null,
+      coDebtorReference2Name: payload.coDebtorReference2Name || null,
+      coDebtorReference2Mobile: payload.coDebtorReference2Mobile || null,
+      coDebtorReference2Relationship: payload.coDebtorReference2Relationship || null,
       status: Number(payload.status),
       notes: payload.notes || null
     };
@@ -4905,6 +4918,10 @@ function QuotePdfPreviewDialog({ quote, onClose, onDownload }: { quote?: Quote; 
 }
 
 function CreditApplicationDialog({ form, customers, products, quotes, deals, requirementProfiles, onClose, onSave }: DialogProps<CreditApplication, typeof emptyCreditApplication> & { customers: Customer[]; products: Product[]; quotes: Quote[]; deals: Deal[]; requirementProfiles: RequirementProfile[] }) {
+  const [referenceDialog, setReferenceDialog] = useState<'client' | 'coDebtor'>();
+  useEffect(() => {
+    if (!form.open) setReferenceDialog(undefined);
+  }, [form.open]);
   const quote = quotes.find((x) => x.id === (form.item?.quoteId ?? ''));
   const initial = form.item ? {
     customerId: form.item.customerId,
@@ -4934,6 +4951,12 @@ function CreditApplicationDialog({ form, customers, products, quotes, deals, req
     reference2Name: form.item.reference2Name ?? '',
     reference2Mobile: form.item.reference2Mobile ?? '',
     reference2Relationship: form.item.reference2Relationship ?? '',
+    coDebtorReference1Name: form.item.coDebtorReference1Name ?? '',
+    coDebtorReference1Mobile: form.item.coDebtorReference1Mobile ?? '',
+    coDebtorReference1Relationship: form.item.coDebtorReference1Relationship ?? '',
+    coDebtorReference2Name: form.item.coDebtorReference2Name ?? '',
+    coDebtorReference2Mobile: form.item.coDebtorReference2Mobile ?? '',
+    coDebtorReference2Relationship: form.item.coDebtorReference2Relationship ?? '',
     status: form.item.status,
     notes: form.item.notes ?? ''
   } : { ...emptyCreditApplication, customerId: customers[0]?.id ?? '', productId: products[0]?.id ?? '', requirementProfileId: requirementProfiles[0]?.id ?? '', motorcycleValue: products[0]?.price ?? 0 };
@@ -4942,6 +4965,9 @@ function CreditApplicationDialog({ form, customers, products, quotes, deals, req
       const selectedQuote = quotes.find((x) => x.id === v.quoteId);
       const selectedProduct = products.find((x) => x.id === v.productId);
       const selectedCustomer = customers.find((x) => x.id === v.customerId);
+      const clientReferencesComplete = [v.reference1Name, v.reference1Mobile, v.reference1Relationship, v.reference2Name, v.reference2Mobile, v.reference2Relationship].every((value) => value.trim());
+      const hasCoDebtor = Boolean(v.coDebtorName.trim());
+      const coDebtorReferencesComplete = [v.coDebtorReference1Name, v.coDebtorReference1Mobile, v.coDebtorReference1Relationship, v.coDebtorReference2Name, v.coDebtorReference2Mobile, v.coDebtorReference2Relationship].every((value) => value.trim());
       return <>
         <Paper variant="outlined" sx={{ p: 2, bgcolor: '#fbfdff' }}>
           <Stack spacing={2}>
@@ -5026,19 +5052,53 @@ function CreditApplicationDialog({ form, customers, products, quotes, deals, req
             <Box sx={{ maxWidth: { md: 260 } }}>
               <TextField fullWidth label="Ingresos codeudor" type="number" value={v.coDebtorMonthlyIncome} onChange={(e) => set({ coDebtorMonthlyIncome: Number(e.target.value) })} />
             </Box>
-            <Typography variant="subtitle2" fontWeight={900}>Referencias personales del cliente</Typography>
-            <FieldGrid columns={3}>
-              <TextField fullWidth required label="Nombre referencia 1" value={v.reference1Name} onChange={(e) => set({ reference1Name: e.target.value })} />
-              <TextField fullWidth required label="Celular referencia 1" value={v.reference1Mobile} onChange={(e) => set({ reference1Mobile: e.target.value })} />
-              <TextField fullWidth required label="Relacion referencia 1" value={v.reference1Relationship} onChange={(e) => set({ reference1Relationship: e.target.value })} />
-            </FieldGrid>
-            <FieldGrid columns={3}>
-              <TextField fullWidth required label="Nombre referencia 2" value={v.reference2Name} onChange={(e) => set({ reference2Name: e.target.value })} />
-              <TextField fullWidth required label="Celular referencia 2" value={v.reference2Mobile} onChange={(e) => set({ reference2Mobile: e.target.value })} />
-              <TextField fullWidth required label="Relacion referencia 2" value={v.reference2Relationship} onChange={(e) => set({ reference2Relationship: e.target.value })} />
-            </FieldGrid>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems={{ xs: 'stretch', sm: 'center' }}>
+              <Button type="button" variant="outlined" onClick={() => setReferenceDialog('client')}>Referencias del cliente</Button>
+              <StatusChip label={clientReferencesComplete ? 'Completas' : 'Pendientes'} tone={clientReferencesComplete ? 'success' : 'warning'} />
+              <Button type="button" variant="outlined" disabled={!hasCoDebtor} onClick={() => setReferenceDialog('coDebtor')}>Referencias del codeudor</Button>
+              <StatusChip label={!hasCoDebtor ? 'Sin codeudor' : coDebtorReferencesComplete ? 'Completas' : 'Pendientes'} tone={!hasCoDebtor ? 'default' : coDebtorReferencesComplete ? 'success' : 'warning'} />
+            </Stack>
+            {hasCoDebtor && !coDebtorReferencesComplete && <Typography variant="caption" color="text.secondary">Al registrar un codeudor debe completar también sus dos referencias.</Typography>}
           </Stack>
         </Paper>
+
+        <Dialog open={referenceDialog === 'client'} onClose={() => setReferenceDialog(undefined)} fullWidth maxWidth="md">
+          <DialogTitle>Referencias personales del cliente</DialogTitle>
+          <DialogContent>
+            <Stack spacing={2} sx={{ pt: 1 }}>
+              <FieldGrid columns={3}>
+                <TextField fullWidth required label="Nombre referencia 1" value={v.reference1Name} onChange={(e) => set({ reference1Name: e.target.value })} />
+                <TextField fullWidth required label="Celular referencia 1" value={v.reference1Mobile} onChange={(e) => set({ reference1Mobile: e.target.value })} />
+                <TextField fullWidth required label="Relacion referencia 1" value={v.reference1Relationship} onChange={(e) => set({ reference1Relationship: e.target.value })} />
+              </FieldGrid>
+              <FieldGrid columns={3}>
+                <TextField fullWidth required label="Nombre referencia 2" value={v.reference2Name} onChange={(e) => set({ reference2Name: e.target.value })} />
+                <TextField fullWidth required label="Celular referencia 2" value={v.reference2Mobile} onChange={(e) => set({ reference2Mobile: e.target.value })} />
+                <TextField fullWidth required label="Relacion referencia 2" value={v.reference2Relationship} onChange={(e) => set({ reference2Relationship: e.target.value })} />
+              </FieldGrid>
+            </Stack>
+          </DialogContent>
+          <DialogActions><Button variant="contained" onClick={() => setReferenceDialog(undefined)}>Listo</Button></DialogActions>
+        </Dialog>
+
+        <Dialog open={referenceDialog === 'coDebtor'} onClose={() => setReferenceDialog(undefined)} fullWidth maxWidth="md">
+          <DialogTitle>Referencias personales del codeudor</DialogTitle>
+          <DialogContent>
+            <Stack spacing={2} sx={{ pt: 1 }}>
+              <FieldGrid columns={3}>
+                <TextField fullWidth required={hasCoDebtor} label="Nombre referencia 1" value={v.coDebtorReference1Name} onChange={(e) => set({ coDebtorReference1Name: e.target.value })} />
+                <TextField fullWidth required={hasCoDebtor} label="Celular referencia 1" value={v.coDebtorReference1Mobile} onChange={(e) => set({ coDebtorReference1Mobile: e.target.value })} />
+                <TextField fullWidth required={hasCoDebtor} label="Relacion referencia 1" value={v.coDebtorReference1Relationship} onChange={(e) => set({ coDebtorReference1Relationship: e.target.value })} />
+              </FieldGrid>
+              <FieldGrid columns={3}>
+                <TextField fullWidth required={hasCoDebtor} label="Nombre referencia 2" value={v.coDebtorReference2Name} onChange={(e) => set({ coDebtorReference2Name: e.target.value })} />
+                <TextField fullWidth required={hasCoDebtor} label="Celular referencia 2" value={v.coDebtorReference2Mobile} onChange={(e) => set({ coDebtorReference2Mobile: e.target.value })} />
+                <TextField fullWidth required={hasCoDebtor} label="Relacion referencia 2" value={v.coDebtorReference2Relationship} onChange={(e) => set({ coDebtorReference2Relationship: e.target.value })} />
+              </FieldGrid>
+            </Stack>
+          </DialogContent>
+          <DialogActions><Button variant="contained" onClick={() => setReferenceDialog(undefined)}>Listo</Button></DialogActions>
+        </Dialog>
 
         <Paper variant="outlined" sx={{ p: 2, bgcolor: '#f8fafc' }}>
           <Stack spacing={2}>
