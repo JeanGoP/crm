@@ -382,6 +382,42 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             string.IsNullOrWhiteSpace(document.NombreArchivo) ? document.Nombre : document.NombreArchivo);
     }
 
+    [HttpDelete("{id:guid}/documents/{documentId:guid}/file")]
+    public async Task<ActionResult<CreditApplicationDto>> DeleteDocumentFile(Guid id, Guid documentId, CancellationToken cancellationToken)
+    {
+        var entity = await db.SolicitudesCredito
+            .Include(x => x.Cliente)
+            .Include(x => x.Producto)
+            .Include(x => x.PerfilRequisito)
+            .Include(x => x.Documentos)
+            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
+            ?? throw new KeyNotFoundException("Solicitud de credito no encontrada.");
+        var document = entity.Documentos.FirstOrDefault(x => x.Id == documentId)
+            ?? throw new KeyNotFoundException("Documento no encontrado.");
+        if (string.IsNullOrWhiteSpace(document.RutaArchivo))
+        {
+            throw new ValidationException("El documento no tiene un archivo cargado.");
+        }
+
+        DeleteStoredFile(document.RutaArchivo);
+        document.NombreArchivo = null;
+        document.RutaArchivo = null;
+        document.ContentType = null;
+        document.TamanoBytes = null;
+        document.FechaCarga = null;
+        document.Estado = EstadoDocumentoCredito.Pendiente;
+        document.FechaVencimiento = null;
+        ApplyDocumentAudit(document, EstadoDocumentoCredito.Pendiente, null);
+        if (entity.Estado == EstadoSolicitudCredito.DocumentosRecibidos)
+        {
+            entity.Estado = EstadoSolicitudCredito.DocumentosPendientes;
+        }
+
+        await SyncPipelineAsync(entity, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+        return Ok(ToDto(entity));
+    }
+
     [HttpGet("{id:guid}/pdf/{template}")]
     public async Task<IActionResult> DownloadTemplate(Guid id, string template, CancellationToken cancellationToken)
     {

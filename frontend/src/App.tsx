@@ -1724,6 +1724,17 @@ function CreditApplicationsPage() {
     }
   };
 
+  const deleteDocument = async (application: CreditApplication, document: CreditDocument) => {
+    if (!window.confirm(`¿Eliminar el archivo ${document.fileName || document.name}? El documento volvera a estado Pendiente.`)) return;
+    try {
+      const { data } = await api.delete<CreditApplication>(`/api/credit-applications/${application.id}/documents/${document.id}/file`);
+      setData(rows.map((x) => x.id === data.id ? data : x));
+      setNotice({ type: 'success', text: `${document.name} eliminado correctamente.` });
+    } catch (err) {
+      setNotice({ type: 'error', text: apiError(err) });
+    }
+  };
+
   const downloadTemplate = async (application: CreditApplication, template: CreditTemplate) => {
     try {
       const response = await api.get<Blob>(`/api/credit-applications/${application.id}/pdf/${template.id}`, { responseType: 'blob' });
@@ -1783,6 +1794,7 @@ function CreditApplicationsPage() {
       onUpdateDocument={updateDocument}
       onUploadDocument={uploadDocument}
       onDownloadDocument={downloadDocument}
+      onDeleteDocument={deleteDocument}
       onStep0={saveStep0}
       onRecalculate={saveRecalculation}
       onDecision={decide}
@@ -1822,6 +1834,7 @@ function CreditApplicationManagementDialog({
   onUpdateDocument,
   onUploadDocument,
   onDownloadDocument,
+  onDeleteDocument,
   onStep0,
   onRecalculate,
   onDecision,
@@ -1835,6 +1848,7 @@ function CreditApplicationManagementDialog({
   onUpdateDocument: (application: CreditApplication, document: CreditDocument, status: number, patch?: Partial<Pick<CreditDocument, 'expiresAt' | 'notes' | 'rejectionReason'>>) => Promise<void>;
   onUploadDocument: (application: CreditApplication, document: CreditDocument, file: File) => Promise<void>;
   onDownloadDocument: (application: CreditApplication, document: CreditDocument) => Promise<void>;
+  onDeleteDocument: (application: CreditApplication, document: CreditDocument) => Promise<void>;
   onStep0: (application: CreditApplication, patch?: Partial<CreditApplication>) => Promise<void>;
   onRecalculate: (application: CreditApplication, patch: Partial<CreditApplication>) => Promise<void>;
   onDecision: (application: CreditApplication, status: number, notes?: string, study?: Partial<CreditApplication> & { result?: string }) => Promise<void>;
@@ -1872,7 +1886,7 @@ function CreditApplicationManagementDialog({
           <Stack direction="row" gap={.75} flexWrap="wrap" useFlexGap>
             <CreditApplicationPendingSummary application={application} />
           </Stack>
-          <DocumentSummary application={application} onUpdate={onUpdateDocument} onUpload={onUploadDocument} onDownload={onDownloadDocument} />
+          <DocumentSummary application={application} onUpdate={onUpdateDocument} onUpload={onUploadDocument} onDownload={onDownloadDocument} onDelete={onDeleteDocument} />
         </Stack>}
         {tab === 1 && <CreditStudySummary application={application} onStep0={onStep0} onRecalculate={onRecalculate} onDecision={onDecision} />}
         {tab === 2 && <Stack spacing={2}>
@@ -5114,11 +5128,12 @@ function CreditApplicationDialog({ form, customers, products, quotes, deals, req
   </FormDialog>;
 }
 
-function DocumentSummary({ application, onUpdate, onUpload, onDownload }: {
+function DocumentSummary({ application, onUpdate, onUpload, onDownload, onDelete }: {
   application: CreditApplication;
   onUpdate: (application: CreditApplication, document: CreditDocument, status: number, patch?: Partial<Pick<CreditDocument, 'expiresAt' | 'notes' | 'rejectionReason'>>) => Promise<void>;
   onUpload: (application: CreditApplication, document: CreditDocument, file: File) => Promise<void>;
   onDownload: (application: CreditApplication, document: CreditDocument) => Promise<void>;
+  onDelete: (application: CreditApplication, document: CreditDocument) => Promise<void>;
 }) {
   const canValidate = useCanManage();
   const statusOptions = canValidate ? [1, 2, 3, 4] : [1, 2];
@@ -5163,6 +5178,11 @@ function DocumentSummary({ application, onUpdate, onUpload, onDownload }: {
           {document.hasFile && <Tooltip title="Descargar documento">
             <IconButton size="small" onClick={() => onDownload(application, document)}>
               <Download fontSize="small" />
+            </IconButton>
+          </Tooltip>}
+          {document.hasFile && <Tooltip title="Eliminar archivo">
+            <IconButton size="small" color="error" onClick={() => onDelete(application, document)}>
+              <Delete fontSize="small" />
             </IconButton>
           </Tooltip>}
           <TextField select size="small" value={document.status} onChange={(e) => handleStatus(document, Number(e.target.value))} sx={{ width: 126 }} helperText={!canValidate ? 'Sin validar' : undefined}>
