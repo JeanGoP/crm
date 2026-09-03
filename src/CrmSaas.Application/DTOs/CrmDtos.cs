@@ -398,6 +398,7 @@ public sealed record ColombianIdentityLookupDto(
 public sealed record CreditApplicationDto(
     Guid Id,
     string Number,
+    DateTime CreatedAt,
     Guid CustomerId,
     string CustomerName,
     Guid ProductId,
@@ -444,6 +445,13 @@ public sealed record CreditApplicationDto(
     bool IdentityValidated,
     string? Step0User,
     string? Step0Notes,
+    bool CreditBureauClientChecked,
+    int? CreditBureauClientScore,
+    bool CreditBureauCoDebtorChecked,
+    int? CreditBureauCoDebtorScore,
+    DateTime? CreditBureauReviewedAt,
+    string? CreditBureauUser,
+    string? CreditBureauNotes,
     decimal? AnalystApprovedAmount,
     decimal? ApprovedDownPayment,
     int? ApprovedTermMonths,
@@ -456,6 +464,18 @@ public sealed record CreditApplicationDto(
     DateTime? DisbursedAt,
     string? DecisionUser,
     string? DecisionNotes,
+    bool SignaturesCompleted,
+    DateTime? SignaturesCompletedAt,
+    string? SignaturesUser,
+    string? SignaturesNotes,
+    bool FinalReviewApproved,
+    DateTime? FinalReviewAt,
+    string? FinalReviewUser,
+    string? FinalReviewNotes,
+    bool WelcomeCompleted,
+    DateTime? WelcomeCompletedAt,
+    string? WelcomeUser,
+    string? WelcomeNotes,
     IReadOnlyCollection<CreditDocumentDto> Documents);
 
 public sealed record UpsertCreditApplicationDto(
@@ -529,6 +549,8 @@ public sealed record CreditApplicationDecisionDto(
     string? FinalConditions);
 public sealed record CreditStudyStep0Dto(bool RuntChecked, bool SimitChecked, bool IdentityValidated, string? Notes);
 public sealed record CreditStudyRecalculationDto(decimal ApprovedAmount, decimal ApprovedDownPayment, int ApprovedTermMonths, decimal ApprovedMonthlyPayment, string? Notes);
+public sealed record CreditBureauCheckDto(bool ClientChecked, int? ClientScore, bool CoDebtorChecked, int? CoDebtorScore, string? Notes);
+public sealed record CreditWorkflowMilestoneDto(bool Completed, string? Notes);
 
 public sealed record RequirementDocumentDto(
     Guid Id,

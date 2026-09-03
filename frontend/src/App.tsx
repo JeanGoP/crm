@@ -1,5 +1,5 @@
 ﻿import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Navigate, NavLink, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { Navigate, NavLink, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   Alert, AppBar, Autocomplete, Box, Button, Card, CardContent, Checkbox, Chip, CssBaseline, Dialog, DialogActions,
   DialogContent, DialogTitle, Divider, Drawer, Grid, IconButton, LinearProgress, MenuItem,
@@ -179,7 +179,7 @@ const theme = createTheme({
   }
 });
 
-type NavItem = { to: string; label: string; icon: ReactNode; locked?: boolean };
+type NavItem = { to: string; label: string; icon: ReactNode; locked?: boolean; managerOnly?: boolean };
 type NavGroup = { key: string; label: string; icon: ReactNode; items: NavItem[] };
 
 const navGroups: NavGroup[] = [
@@ -201,6 +201,7 @@ const navGroups: NavGroup[] = [
     label: 'Credito',
     icon: <Assignment />,
     items: [
+      { to: '/tablero-creditos', label: 'Tablero de creditos', icon: <ViewKanban />, managerOnly: true },
       { to: '/solicitudes-credito', label: 'Solicitudes', icon: <Assignment /> },
       { to: '/ordenes-recaudo', label: 'Ordenes recaudo', icon: <ReceiptLong /> }
     ]
@@ -371,8 +372,10 @@ function Layout() {
   const muiTheme = useTheme();
   const isDesktop = useMediaQuery(muiTheme.breakpoints.up('md'));
   const [mobileOpen, setMobileOpen] = useState(false);
-  const activeGroupKey = navGroups.find((group) => isNavGroupActive(group, location.pathname))?.key ?? 'comercial';
-  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => Object.fromEntries(navGroups.map((group) => [group.key, group.key === activeGroupKey])));
+  const canManageCredit = user?.roles.some((role) => role === 'Administrador' || role === 'Supervisor') ?? false;
+  const visibleNavGroups = useMemo(() => navGroups.map((group) => ({ ...group, items: group.items.filter((item) => !item.managerOnly || canManageCredit) })), [canManageCredit]);
+  const activeGroupKey = visibleNavGroups.find((group) => isNavGroupActive(group, location.pathname))?.key ?? 'comercial';
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => Object.fromEntries(visibleNavGroups.map((group) => [group.key, group.key === activeGroupKey])));
   useEffect(() => {
     setOpenGroups((current) => ({ ...current, [activeGroupKey]: true }));
   }, [activeGroupKey]);
@@ -439,7 +442,7 @@ function Layout() {
     </Toolbar>
     <Divider sx={{ borderColor: '#e2e8f0' }} />
     <Stack sx={{ px: 1.1, py: 1.35, flex: 1, overflowY: 'auto' }}>
-      {navGroups.map((group) => {
+      {visibleNavGroups.map((group) => {
         const active = isNavGroupActive(group, location.pathname);
         const open = openGroups[group.key] ?? false;
         return <Box key={group.key} sx={{ mb: .45 }}>
@@ -518,6 +521,7 @@ function Layout() {
             <Route path="/productos" element={<ProductsPage />} />
             <Route path="/inventario" element={<CommercialInventoryPage />} />
             <Route path="/cotizaciones" element={<QuotesPage />} />
+            <Route path="/tablero-creditos" element={canManageCredit ? <CreditWorkflowBoardPage /> : <Navigate to="/" replace />} />
             <Route path="/solicitudes-credito" element={<CreditApplicationsPage />} />
             <Route path="/ordenes-recaudo" element={<CollectionOrdersPage />} />
             <Route path="/tramites" element={<ProceduresPage />} />
@@ -1559,7 +1563,135 @@ function QuotesPage() {
   </Stack>;
 }
 
+type CreditWorkflowColumnId = 'initial' | 'bureau' | 'created' | 'documents' | 'approval' | 'signatures' | 'final-review' | 'welcome' | 'closed';
+
+const creditWorkflowColumns: Array<{ id: CreditWorkflowColumnId; step: string; title: string; color: string; description: string }> = [
+  { id: 'initial', step: '1', title: 'SIMIT y RUNT', color: '#0369a1', description: 'Consultas e identidad' },
+  { id: 'bureau', step: '2', title: 'Datacredito', color: '#7c3aed', description: 'Cliente y codeudor' },
+  { id: 'created', step: '3', title: 'Solicitud creada', color: '#0f766e', description: 'Lista para soportes' },
+  { id: 'documents', step: '4', title: 'Soportes', color: '#b45309', description: 'Carga y correcciones' },
+  { id: 'approval', step: '5', title: 'Aprobaciones', color: '#c2410c', description: 'Estudio y decisión' },
+  { id: 'signatures', step: '6', title: 'Firmas', color: '#2563eb', description: 'Documentos del negocio' },
+  { id: 'final-review', step: '7', title: 'Revision final', color: '#4338ca', description: 'Autorizar entrega' },
+  { id: 'welcome', step: '8', title: 'Bienvenida', color: '#15803d', description: 'Confirmación y cierre' },
+  { id: 'closed', step: '—', title: 'Cerradas', color: '#64748b', description: 'Negadas o desistidas' }
+];
+
+function creditWorkflowColumn(application: CreditApplication): CreditWorkflowColumnId {
+  if (application.status === 6 || application.status === 9) return 'closed';
+  if (application.status === 5 || application.status === 7) {
+    if (!application.signaturesCompleted) return 'signatures';
+    if (!application.finalReviewApproved) return 'final-review';
+    return 'welcome';
+  }
+  if (application.status === 4) return 'approval';
+  const initialReady = application.runtChecked && application.simitChecked && application.identityValidated;
+  if (!initialReady) return 'initial';
+  const bureauReady = application.creditBureauClientChecked && (!application.coDebtorName || application.creditBureauCoDebtorChecked);
+  if (!bureauReady) return 'bureau';
+  const documentsStarted = application.status >= 2 || application.documents.some((document) => document.hasFile || document.status > 1);
+  if (!documentsStarted) return 'created';
+  const documentsReady = application.documents.length > 0 && application.documents.every((document) => document.status === 2 || document.status === 3);
+  if (!documentsReady) return 'documents';
+  return 'approval';
+}
+
+function creditWorkflowStageDate(application: CreditApplication, column: CreditWorkflowColumnId) {
+  const value = column === 'bureau' ? application.step0ReviewedAt
+    : column === 'created' || column === 'documents' ? application.creditBureauReviewedAt
+      : column === 'approval' ? application.submittedAt
+        : column === 'signatures' ? application.approvedAt
+          : column === 'final-review' ? application.signaturesCompletedAt
+            : column === 'welcome' ? application.finalReviewAt
+              : application.createdAt;
+  return value || application.createdAt;
+}
+
+function CreditWorkflowBoardPage() {
+  const { data: applications = [], loading, error, reload } = useResource<CreditApplication[]>('/api/credit-applications/board', []);
+  const navigate = useNavigate();
+  const [search, setSearch] = useState('');
+  const normalizedSearch = normalizeSearch(search);
+  const visibleApplications = applications.filter((application) => !normalizedSearch || normalizeSearch([
+    application.number,
+    application.customerName,
+    application.identificationNumber,
+    application.productName
+  ].join(' ')).includes(normalizedSearch));
+  const active = applications.filter((application) => ![6, 9].includes(application.status) && !application.welcomeCompleted).length;
+  const finished = applications.filter((application) => application.welcomeCompleted).length;
+  const attention = applications.filter((application) => application.documents.some((document) => document.status === 4 || document.isExpired)).length;
+
+  return <Stack spacing={2.5}>
+    <Header title="Tablero de solicitudes de credito" onRefresh={reload} />
+    <StatusBar loading={loading} error={error} />
+    <Grid container spacing={1.5}>
+      <Grid item xs={12} sm={4}><Metric label="Procesos activos" value={active} /></Grid>
+      <Grid item xs={12} sm={4}><Metric label="Requieren atencion" value={attention} /></Grid>
+      <Grid item xs={12} sm={4}><Metric label="Bienvenida completada" value={finished} /></Grid>
+    </Grid>
+    <TextField
+      size="small"
+      value={search}
+      onChange={(event) => setSearch(event.target.value)}
+      placeholder="Buscar solicitud, cliente, cedula o producto"
+      InputProps={{ startAdornment: <InputAdornment position="start"><Search fontSize="small" /></InputAdornment> }}
+      sx={{ maxWidth: 520, bgcolor: '#fff' }}
+    />
+    <Box sx={{ overflowX: 'auto', pb: 1.5 }}>
+      <Stack direction="row" spacing={1.5} alignItems="flex-start" sx={{ minWidth: 'max-content' }}>
+        {creditWorkflowColumns.map((column) => {
+          const cards = visibleApplications.filter((application) => creditWorkflowColumn(application) === column.id);
+          return <Paper key={column.id} variant="outlined" sx={{ width: 285, bgcolor: '#f8fafc', overflow: 'hidden' }}>
+            <Box sx={{ p: 1.5, borderTop: `4px solid ${column.color}`, borderBottom: `1px solid ${uiBorder}`, bgcolor: '#fff' }}>
+              <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1}>
+                <Stack direction="row" alignItems="center" gap={1}>
+                  <Box sx={{ width: 28, height: 28, borderRadius: '50%', display: 'grid', placeItems: 'center', bgcolor: column.color, color: '#fff', fontWeight: 900, fontSize: 12 }}>{column.step}</Box>
+                  <Box>
+                    <Typography fontWeight={900} fontSize={14}>{column.title}</Typography>
+                    <Typography color="text.secondary" fontSize={11}>{column.description}</Typography>
+                  </Box>
+                </Stack>
+                <Chip size="small" label={cards.length} sx={{ bgcolor: '#eef2f6' }} />
+              </Stack>
+            </Box>
+            <Stack spacing={1} sx={{ p: 1, maxHeight: 'calc(100vh - 355px)', minHeight: 190, overflowY: 'auto' }}>
+              {cards.map((application) => {
+                const stageDate = new Date(creditWorkflowStageDate(application, column.id));
+                const days = Math.max(0, Math.floor((Date.now() - stageDate.getTime()) / 86400000));
+                const pending = application.documents.filter((document) => document.status === 1 || document.status === 4 || document.isExpired).length;
+                return <Card key={application.id} variant="outlined" sx={{ borderColor: pending ? '#f5c26b' : uiBorder, boxShadow: '0 5px 14px rgba(15, 23, 42, .05)' }}>
+                  <CardContent sx={{ p: '12px !important' }}>
+                    <Stack spacing={1}>
+                      <Stack direction="row" justifyContent="space-between" gap={1}>
+                        <Typography fontSize={11} fontWeight={900} color="primary.main">{application.number}</Typography>
+                        <Chip size="small" variant="outlined" label={`${days} d`} sx={{ height: 21, fontSize: 10 }} />
+                      </Stack>
+                      <Box>
+                        <Typography fontWeight={900} fontSize={13.5} sx={{ overflowWrap: 'anywhere' }}>{application.customerName}</Typography>
+                        <Typography color="text.secondary" fontSize={11.5} sx={{ mt: .25 }}>{application.productName}</Typography>
+                      </Box>
+                      <Stack direction="row" gap={.5} flexWrap="wrap" useFlexGap>
+                        <StatusChip label={creditStatus(application.status)} tone={creditTone(application.status)} />
+                        {pending > 0 && <Chip size="small" color="warning" variant="outlined" label={`${pending} pendiente${pending === 1 ? '' : 's'}`} />}
+                        {column.id === 'welcome' && application.welcomeCompleted && <Chip size="small" color="success" label="Finalizado" />}
+                      </Stack>
+                      <Button size="small" variant="outlined" onClick={() => navigate(`/solicitudes-credito?solicitud=${application.id}&tab=proceso`)}>Gestionar proceso</Button>
+                    </Stack>
+                  </CardContent>
+                </Card>;
+              })}
+              {!cards.length && <Typography color="text.secondary" fontSize={12} textAlign="center" sx={{ py: 3 }}>Sin solicitudes</Typography>}
+            </Stack>
+          </Paper>;
+        })}
+      </Stack>
+    </Box>
+  </Stack>;
+}
+
 function CreditApplicationsPage() {
+  const canManageCredit = useCanManage();
   const { data: rows = [], loading, error, reload, setData } = useResource<CreditApplication[]>('/api/credit-applications', []);
   const { data: customers = [] } = useResource<Customer[]>('/api/customers', []);
   const { data: products = [] } = useResource<Product[]>('/api/products', []);
@@ -1571,7 +1703,25 @@ function CreditApplicationsPage() {
   const [analysis, setAnalysis] = useState<CustomerAiAnalysis>();
   const [analysisPhone, setAnalysisPhone] = useState<string>();
   const [notice, setNotice] = useState<Notice>();
+  const [searchParams, setSearchParams] = useSearchParams();
   const managementApplication = management ? rows.find((x) => x.id === management.id) ?? management : undefined;
+
+  useEffect(() => {
+    const requestedId = searchParams.get('solicitud');
+    if (!requestedId || !rows.length) return;
+    const requested = rows.find((application) => application.id === requestedId);
+    if (requested) setManagement(requested);
+  }, [rows, searchParams]);
+
+  const closeManagement = () => {
+    setManagement(undefined);
+    if (searchParams.has('solicitud')) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('solicitud');
+      next.delete('tab');
+      setSearchParams(next, { replace: true });
+    }
+  };
 
   const save = async (payload: typeof emptyCreditApplication) => {
     const clientReferencesComplete = [payload.reference1Name, payload.reference1Mobile, payload.reference1Relationship, payload.reference2Name, payload.reference2Mobile, payload.reference2Relationship]
@@ -1724,6 +1874,34 @@ function CreditApplicationsPage() {
     }
   };
 
+  const saveCreditBureau = async (application: CreditApplication, patch: Partial<CreditApplication>) => {
+    try {
+      const { data } = await api.post<CreditApplication>(`/api/credit-applications/${application.id}/study/credit-bureau`, {
+        clientChecked: patch.creditBureauClientChecked ?? application.creditBureauClientChecked,
+        clientScore: patch.creditBureauClientScore ?? null,
+        coDebtorChecked: patch.creditBureauCoDebtorChecked ?? application.creditBureauCoDebtorChecked,
+        coDebtorScore: patch.creditBureauCoDebtorScore ?? null,
+        notes: patch.creditBureauNotes ?? null
+      });
+      setData(rows.map((x) => x.id === data.id ? data : x));
+      setNotice({ type: 'success', text: 'Validacion de Datacredito actualizada.' });
+    } catch (err) {
+      setNotice({ type: 'error', text: apiError(err) });
+      throw err;
+    }
+  };
+
+  const saveWorkflowMilestone = async (application: CreditApplication, milestone: 'signatures' | 'final-review' | 'welcome', completed: boolean, notes?: string) => {
+    try {
+      const { data } = await api.post<CreditApplication>(`/api/credit-applications/${application.id}/workflow/${milestone}`, { completed, notes: notes || null });
+      setData(rows.map((x) => x.id === data.id ? data : x));
+      setNotice({ type: 'success', text: 'Etapa del proceso actualizada.' });
+    } catch (err) {
+      setNotice({ type: 'error', text: apiError(err) });
+      throw err;
+    }
+  };
+
   const deleteDocument = async (application: CreditApplication, document: CreditDocument) => {
     if (!window.confirm(`¿Eliminar el archivo ${document.fileName || document.name}? El documento volvera a estado Pendiente.`)) return;
     try {
@@ -1790,12 +1968,16 @@ function CreditApplicationsPage() {
     <CreditApplicationDialog form={form} customers={customers} products={products.filter((x) => x.active)} quotes={quotes} deals={deals} requirementProfiles={requirementProfiles.filter((x) => x.active)} onClose={() => setForm({ open: false })} onSave={save} />
     <CreditApplicationManagementDialog
       application={managementApplication}
-      onClose={() => setManagement(undefined)}
+      initialTab={searchParams.get('tab') === 'proceso' ? 4 : 0}
+      showWorkflow={canManageCredit}
+      onClose={closeManagement}
       onUpdateDocument={updateDocument}
       onUploadDocument={uploadDocument}
       onDownloadDocument={downloadDocument}
       onDeleteDocument={deleteDocument}
       onStep0={saveStep0}
+      onCreditBureau={saveCreditBureau}
+      onWorkflowMilestone={saveWorkflowMilestone}
       onRecalculate={saveRecalculation}
       onDecision={decide}
       onDownloadTemplate={downloadTemplate}
@@ -1830,12 +2012,16 @@ function CreditApplicationPendingSummary({ application, compact = false }: { app
 
 function CreditApplicationManagementDialog({
   application,
+  initialTab,
+  showWorkflow,
   onClose,
   onUpdateDocument,
   onUploadDocument,
   onDownloadDocument,
   onDeleteDocument,
   onStep0,
+  onCreditBureau,
+  onWorkflowMilestone,
   onRecalculate,
   onDecision,
   onDownloadTemplate,
@@ -1844,12 +2030,16 @@ function CreditApplicationManagementDialog({
   onChangeStatus
 }: {
   application?: CreditApplication;
+  initialTab?: number;
+  showWorkflow: boolean;
   onClose: () => void;
   onUpdateDocument: (application: CreditApplication, document: CreditDocument, status: number, patch?: Partial<Pick<CreditDocument, 'expiresAt' | 'notes' | 'rejectionReason'>>) => Promise<void>;
   onUploadDocument: (application: CreditApplication, document: CreditDocument, file: File) => Promise<void>;
   onDownloadDocument: (application: CreditApplication, document: CreditDocument) => Promise<void>;
   onDeleteDocument: (application: CreditApplication, document: CreditDocument) => Promise<void>;
   onStep0: (application: CreditApplication, patch?: Partial<CreditApplication>) => Promise<void>;
+  onCreditBureau: (application: CreditApplication, patch: Partial<CreditApplication>) => Promise<void>;
+  onWorkflowMilestone: (application: CreditApplication, milestone: 'signatures' | 'final-review' | 'welcome', completed: boolean, notes?: string) => Promise<void>;
   onRecalculate: (application: CreditApplication, patch: Partial<CreditApplication>) => Promise<void>;
   onDecision: (application: CreditApplication, status: number, notes?: string, study?: Partial<CreditApplication> & { result?: string }) => Promise<void>;
   onDownloadTemplate: (application: CreditApplication, template: CreditTemplate) => Promise<void>;
@@ -1860,7 +2050,7 @@ function CreditApplicationManagementDialog({
   const muiTheme = useTheme();
   const fullScreen = useMediaQuery(muiTheme.breakpoints.down('sm'));
   const [tab, setTab] = useState(0);
-  useEffect(() => { if (application) setTab(0); }, [application?.id]);
+  useEffect(() => { if (application) setTab(initialTab ?? 0); }, [application?.id, initialTab]);
 
   if (!application) return null;
 
@@ -1880,6 +2070,7 @@ function CreditApplicationManagementDialog({
         <Tab label="Estudio" />
         <Tab label="Plantillas" />
         <Tab label="Acciones" />
+        {showWorkflow && <Tab label="Proceso" />}
       </Tabs>
       <Box sx={{ p: { xs: 1.5, sm: 2.5 } }}>
         {tab === 0 && <Stack spacing={2}>
@@ -1915,12 +2106,140 @@ function CreditApplicationManagementDialog({
           </Paper>
         </Stack>
         }
+        {showWorkflow && tab === 4 && <CreditWorkflowControls application={application} onCreditBureau={onCreditBureau} onMilestone={onWorkflowMilestone} />}
       </Box>
     </DialogContent>
     <DialogActions sx={{ px: { xs: 2, sm: 3 }, py: 1.5, '& .MuiButton-root': { width: { xs: '100%', sm: 'auto' } } }}>
       <Button onClick={onClose}>Cerrar</Button>
     </DialogActions>
   </Dialog>;
+}
+
+type CreditWorkflowEditor = 'bureau' | 'signatures' | 'final-review' | 'welcome';
+
+function CreditWorkflowControls({ application, onCreditBureau, onMilestone }: {
+  application: CreditApplication;
+  onCreditBureau: (application: CreditApplication, patch: Partial<CreditApplication>) => Promise<void>;
+  onMilestone: (application: CreditApplication, milestone: 'signatures' | 'final-review' | 'welcome', completed: boolean, notes?: string) => Promise<void>;
+}) {
+  const initialReady = application.runtChecked && application.simitChecked && application.identityValidated;
+  const bureauReady = application.creditBureauClientChecked && (!application.coDebtorName || application.creditBureauCoDebtorChecked);
+  const documentsReady = application.documents.length > 0 && application.documents.every((document) => document.status === 2 || document.status === 3);
+  const approved = application.status === 5 || application.status === 7;
+  const [editor, setEditor] = useState<CreditWorkflowEditor>();
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ completed: false, clientChecked: false, clientScore: '', coDebtorChecked: false, coDebtorScore: '', notes: '' });
+
+  const stages = [
+    { number: 1, title: 'Verificacion SIMIT y RUNT', complete: initialReady, detail: initialReady ? `Completada por ${application.step0User || 'el equipo'}` : 'Pendiente en la pestaña Estudio' },
+    { number: 2, title: 'Verificacion Datacredito', complete: bureauReady, detail: bureauReady ? `Cliente${application.creditBureauClientScore != null ? `: ${application.creditBureauClientScore}` : ''}${application.coDebtorName ? ` · Codeudor${application.creditBureauCoDebtorScore != null ? `: ${application.creditBureauCoDebtorScore}` : ''}` : ''}` : 'Falta registrar la consulta', action: 'bureau' as CreditWorkflowEditor },
+    { number: 3, title: 'Creacion de la solicitud', complete: true, detail: `Creada el ${new Date(application.createdAt).toLocaleDateString()}` },
+    { number: 4, title: 'Ingreso de soportes', complete: documentsReady, detail: documentsReady ? 'Todos los soportes fueron recibidos' : `${application.documents.filter((document) => document.status === 1 || document.status === 4).length} soporte(s) pendiente(s)` },
+    { number: 5, title: 'Aprobaciones', complete: approved, detail: application.studyResult || (application.status === 4 ? 'Credito en estudio' : 'Pendiente de estudio') },
+    { number: 6, title: 'Firmas del negocio', complete: application.signaturesCompleted, detail: application.signaturesCompleted ? `Registradas por ${application.signaturesUser || 'el equipo'}` : 'Pendientes después de la aprobación', action: 'signatures' as CreditWorkflowEditor, disabled: !approved },
+    { number: 7, title: 'Revision final de aprobaciones', complete: application.finalReviewApproved, detail: application.finalReviewApproved ? `Autorizada por ${application.finalReviewUser || 'el equipo'}` : 'Pendiente después de las firmas', action: 'final-review' as CreditWorkflowEditor, disabled: !application.signaturesCompleted },
+    { number: 8, title: 'Bienvenida y cierre', complete: application.welcomeCompleted, detail: application.welcomeCompleted ? `Completada por ${application.welcomeUser || 'el equipo'}` : 'Pendiente después de la revisión final', action: 'welcome' as CreditWorkflowEditor, disabled: !application.finalReviewApproved }
+  ];
+  const completedCount = stages.filter((stage) => stage.complete).length;
+
+  const openEditor = (kind: CreditWorkflowEditor) => {
+    const completed = kind === 'signatures' ? application.signaturesCompleted : kind === 'final-review' ? application.finalReviewApproved : kind === 'welcome' ? application.welcomeCompleted : bureauReady;
+    const notes = kind === 'bureau' ? application.creditBureauNotes : kind === 'signatures' ? application.signaturesNotes : kind === 'final-review' ? application.finalReviewNotes : application.welcomeNotes;
+    setForm({
+      completed,
+      clientChecked: application.creditBureauClientChecked,
+      clientScore: application.creditBureauClientScore?.toString() ?? '',
+      coDebtorChecked: application.creditBureauCoDebtorChecked,
+      coDebtorScore: application.creditBureauCoDebtorScore?.toString() ?? '',
+      notes: notes ?? ''
+    });
+    setEditor(kind);
+  };
+
+  const save = async () => {
+    if (!editor) return;
+    setSaving(true);
+    try {
+      if (editor === 'bureau') {
+        await onCreditBureau(application, {
+          creditBureauClientChecked: form.clientChecked,
+          creditBureauClientScore: form.clientScore === '' ? undefined : Number(form.clientScore),
+          creditBureauCoDebtorChecked: form.coDebtorChecked,
+          creditBureauCoDebtorScore: form.coDebtorScore === '' ? undefined : Number(form.coDebtorScore),
+          creditBureauNotes: form.notes
+        });
+      } else {
+        await onMilestone(application, editor, form.completed, form.notes);
+      }
+      setEditor(undefined);
+    } catch {
+      // El mensaje detallado lo presenta el controlador de la página.
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const editorTitle = editor === 'bureau' ? 'Verificacion Datacredito'
+    : editor === 'signatures' ? 'Firmas del negocio'
+      : editor === 'final-review' ? 'Revision final de aprobaciones'
+        : 'Bienvenida y cierre';
+
+  return <>
+    <Stack spacing={2}>
+      <Box>
+        <Stack direction="row" justifyContent="space-between" alignItems="center" gap={2}>
+          <Box>
+            <Typography variant="h6" fontWeight={900}>Avance del proceso</Typography>
+            <Typography color="text.secondary" fontSize={13}>{completedCount} de 8 pasos completados</Typography>
+          </Box>
+          <Chip color={completedCount === 8 ? 'success' : 'primary'} label={`${Math.round((completedCount / 8) * 100)}%`} />
+        </Stack>
+        <LinearProgress variant="determinate" value={(completedCount / 8) * 100} sx={{ mt: 1.25, height: 8, borderRadius: 4 }} />
+      </Box>
+      <Grid container spacing={1.25}>
+        {stages.map((stage) => <Grid item xs={12} md={6} key={stage.number}>
+          <Paper variant="outlined" sx={{ p: 1.5, height: '100%', borderColor: stage.complete ? '#86efac' : uiBorder, bgcolor: stage.complete ? '#f0fdf4' : '#fff' }}>
+            <Stack direction="row" gap={1.25} alignItems="flex-start">
+              {stage.complete
+                ? <CheckCircle color="success" sx={{ mt: .1 }} />
+                : <Box sx={{ width: 24, height: 24, flex: '0 0 24px', borderRadius: '50%', display: 'grid', placeItems: 'center', border: '2px solid #cbd5e1', color: '#64748b', fontWeight: 900, fontSize: 11 }}>{stage.number}</Box>}
+              <Box sx={{ minWidth: 0, flex: 1 }}>
+                <Typography fontWeight={900} fontSize={13.5}>{stage.number}. {stage.title}</Typography>
+                <Typography color="text.secondary" fontSize={12} sx={{ mt: .25 }}>{stage.detail}</Typography>
+              </Box>
+              {stage.action && <Button size="small" variant={stage.complete ? 'text' : 'outlined'} disabled={stage.disabled} onClick={() => openEditor(stage.action!)}>{stage.complete ? 'Editar' : 'Registrar'}</Button>}
+            </Stack>
+          </Paper>
+        </Grid>)}
+      </Grid>
+      <Alert severity="info">El tablero cambia de columna automáticamente cuando se completa el siguiente paso.</Alert>
+    </Stack>
+    <Dialog open={!!editor} onClose={() => !saving && setEditor(undefined)} fullWidth maxWidth="sm">
+      <DialogTitle>{editorTitle}</DialogTitle>
+      <DialogContent dividers>
+        {editor === 'bureau' ? <Stack spacing={2}>
+          <Alert severity="info">Registra el resultado de la consulta. El puntaje es opcional y debe estar entre 0 y 1000.</Alert>
+          <FormControlLabel control={<Checkbox checked={form.clientChecked} onChange={(event) => setForm((current) => ({ ...current, clientChecked: event.target.checked }))} />} label="Datacredito del cliente consultado" />
+          <TextField type="number" label="Puntaje del cliente (opcional)" value={form.clientScore} onChange={(event) => setForm((current) => ({ ...current, clientScore: event.target.value }))} inputProps={{ min: 0, max: 1000 }} />
+          {application.coDebtorName && <>
+            <Divider />
+            <Typography fontWeight={800}>Codeudor: {application.coDebtorName}</Typography>
+            <FormControlLabel control={<Checkbox checked={form.coDebtorChecked} onChange={(event) => setForm((current) => ({ ...current, coDebtorChecked: event.target.checked }))} />} label="Datacredito del codeudor consultado" />
+            <TextField type="number" label="Puntaje del codeudor (opcional)" value={form.coDebtorScore} onChange={(event) => setForm((current) => ({ ...current, coDebtorScore: event.target.value }))} inputProps={{ min: 0, max: 1000 }} />
+          </>}
+          <TextField multiline minRows={3} label="Observaciones" value={form.notes} onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} />
+        </Stack> : <Stack spacing={2}>
+          <Alert severity="info">Confirma esta etapa únicamente cuando se haya realizado completamente.</Alert>
+          <FormControlLabel control={<Checkbox checked={form.completed} onChange={(event) => setForm((current) => ({ ...current, completed: event.target.checked }))} />} label="Etapa completada" />
+          <TextField multiline minRows={4} label="Observaciones y comprobaciones realizadas" value={form.notes} onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} />
+        </Stack>}
+      </DialogContent>
+      <DialogActions>
+        <Button disabled={saving} onClick={() => setEditor(undefined)}>Cancelar</Button>
+        <Button disabled={saving || (editor === 'bureau' && !form.clientChecked)} variant="contained" onClick={() => void save()}>{saving ? 'Guardando...' : 'Guardar'}</Button>
+      </DialogActions>
+    </Dialog>
+  </>;
 }
 
 function CreditStudySummary({ application, onStep0, onRecalculate, onDecision }: {
@@ -1933,7 +2252,7 @@ function CreditStudySummary({ application, onStep0, onRecalculate, onDecision }:
     { status: 8, label: 'Interesado', show: application.status === 1 },
     { status: 2, label: 'Documentos', show: application.status === 1 || application.status === 8 },
     { status: 4, label: 'Estudio', show: application.status === 2 || application.status === 3 },
-    { status: 7, label: 'Entregar', show: application.status === 5 },
+    { status: 7, label: 'Entregar', show: application.status === 5 && application.finalReviewApproved },
     { status: 9, label: 'Desistir', show: ![6, 7, 9].includes(application.status) }
   ].filter((x) => x.show);
   const lastDate = application.disbursedAt ?? application.approvedAt ?? application.rejectedAt ?? application.reviewStartedAt ?? application.submittedAt;

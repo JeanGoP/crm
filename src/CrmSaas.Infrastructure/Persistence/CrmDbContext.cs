@@ -259,6 +259,14 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
         modelBuilder.Entity<SolicitudCredito>().Property(x => x.CodeudorIngresosMensuales).HasPrecision(18, 2);
         modelBuilder.Entity<SolicitudCredito>().Property(x => x.UsuarioPaso0).HasMaxLength(180);
         modelBuilder.Entity<SolicitudCredito>().Property(x => x.ResultadoEstudio).HasMaxLength(60);
+        modelBuilder.Entity<SolicitudCredito>().Property(x => x.UsuarioDataCredito).HasMaxLength(180);
+        modelBuilder.Entity<SolicitudCredito>().Property(x => x.ObservacionDataCredito).HasMaxLength(1000);
+        modelBuilder.Entity<SolicitudCredito>().Property(x => x.UsuarioFirmas).HasMaxLength(180);
+        modelBuilder.Entity<SolicitudCredito>().Property(x => x.ObservacionFirmas).HasMaxLength(1000);
+        modelBuilder.Entity<SolicitudCredito>().Property(x => x.UsuarioRevisionFinal).HasMaxLength(180);
+        modelBuilder.Entity<SolicitudCredito>().Property(x => x.ObservacionRevisionFinal).HasMaxLength(1000);
+        modelBuilder.Entity<SolicitudCredito>().Property(x => x.UsuarioBienvenida).HasMaxLength(180);
+        modelBuilder.Entity<SolicitudCredito>().Property(x => x.ObservacionBienvenida).HasMaxLength(1000);
         modelBuilder.Entity<SolicitudCredito>().Property(x => x.ValorAprobadoAnalista).HasPrecision(18, 2);
         modelBuilder.Entity<SolicitudCredito>().Property(x => x.CuotaInicialAprobada).HasPrecision(18, 2);
         modelBuilder.Entity<SolicitudCredito>().Property(x => x.CuotaMensualAprobada).HasPrecision(18, 2);

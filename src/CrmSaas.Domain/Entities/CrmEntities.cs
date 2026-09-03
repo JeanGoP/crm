@@ -422,6 +422,13 @@ public sealed class SolicitudCredito : AuditableTenantEntity
     public bool IdentidadValidada { get; set; }
     public string? UsuarioPaso0 { get; set; }
     public string? ObservacionPaso0 { get; set; }
+    public bool DataCreditoClienteConsultado { get; set; }
+    public int? DataCreditoPuntajeCliente { get; set; }
+    public bool DataCreditoCodeudorConsultado { get; set; }
+    public int? DataCreditoPuntajeCodeudor { get; set; }
+    public DateTime? FechaRevisionDataCredito { get; set; }
+    public string? UsuarioDataCredito { get; set; }
+    public string? ObservacionDataCredito { get; set; }
     public decimal? ValorAprobadoAnalista { get; set; }
     public decimal? CuotaInicialAprobada { get; set; }
     public int? PlazoAprobadoMeses { get; set; }
@@ -434,6 +441,18 @@ public sealed class SolicitudCredito : AuditableTenantEntity
     public DateTime? FechaDesembolso { get; set; }
     public string? UsuarioDecision { get; set; }
     public string? ObservacionDecision { get; set; }
+    public bool FirmasCompletas { get; set; }
+    public DateTime? FechaFirmasCompletas { get; set; }
+    public string? UsuarioFirmas { get; set; }
+    public string? ObservacionFirmas { get; set; }
+    public bool RevisionFinalAprobada { get; set; }
+    public DateTime? FechaRevisionFinal { get; set; }
+    public string? UsuarioRevisionFinal { get; set; }
+    public string? ObservacionRevisionFinal { get; set; }
+    public bool BienvenidaCompletada { get; set; }
+    public DateTime? FechaBienvenida { get; set; }
+    public string? UsuarioBienvenida { get; set; }
+    public string? ObservacionBienvenida { get; set; }
     public ICollection<DocumentoSolicitudCredito> Documentos { get; set; } = new List<DocumentoSolicitudCredito>();
 }
 

@@ -42,6 +42,21 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         return Ok(rows.Select(ToDto).ToList());
     }
 
+    [HttpGet("board")]
+    [Authorize(Roles = "Administrador,Supervisor")]
+    public async Task<ActionResult<IReadOnlyCollection<CreditApplicationDto>>> GetBoard(CancellationToken cancellationToken)
+    {
+        var rows = await db.SolicitudesCredito
+            .Include(x => x.Cliente)
+            .Include(x => x.Producto)
+            .Include(x => x.PerfilRequisito)
+            .Include(x => x.Documentos)
+            .OrderByDescending(x => x.FechaCreacion)
+            .ToListAsync(cancellationToken);
+
+        return Ok(rows.Select(ToDto).ToList());
+    }
+
     [HttpPost]
     public async Task<ActionResult<CreditApplicationDto>> Create(UpsertCreditApplicationDto dto, CancellationToken cancellationToken)
     {
@@ -418,6 +433,90 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         return Ok(ToDto(entity));
     }
 
+    [HttpPost("{id:guid}/study/credit-bureau")]
+    [Authorize(Roles = "Administrador,Supervisor")]
+    public async Task<ActionResult<CreditApplicationDto>> SaveCreditBureau(Guid id, CreditBureauCheckDto dto, CancellationToken cancellationToken)
+    {
+        if (dto.ClientScore is < 0 or > 1000) throw new ValidationException("El puntaje del cliente debe estar entre 0 y 1000.");
+        if (dto.CoDebtorScore is < 0 or > 1000) throw new ValidationException("El puntaje del codeudor debe estar entre 0 y 1000.");
+
+        var entity = await LoadApplicationAsync(id, cancellationToken);
+        if (dto.CoDebtorChecked && string.IsNullOrWhiteSpace(entity.CodeudorNombre))
+        {
+            throw new ValidationException("La solicitud no tiene un codeudor registrado.");
+        }
+
+        entity.DataCreditoClienteConsultado = dto.ClientChecked;
+        entity.DataCreditoPuntajeCliente = dto.ClientChecked ? dto.ClientScore : null;
+        entity.DataCreditoCodeudorConsultado = dto.CoDebtorChecked;
+        entity.DataCreditoPuntajeCodeudor = dto.CoDebtorChecked ? dto.CoDebtorScore : null;
+        entity.FechaRevisionDataCredito = dto.ClientChecked && (string.IsNullOrWhiteSpace(entity.CodeudorNombre) || dto.CoDebtorChecked) ? ColombiaTime.Now : null;
+        entity.UsuarioDataCredito = tenantContext.UsuarioActual;
+        entity.ObservacionDataCredito = Normalize(dto.Notes);
+
+        await db.SaveChangesAsync(cancellationToken);
+        return Ok(ToDto(entity));
+    }
+
+    [HttpPost("{id:guid}/workflow/signatures")]
+    [Authorize(Roles = "Administrador,Supervisor")]
+    public async Task<ActionResult<CreditApplicationDto>> SaveSignatures(Guid id, CreditWorkflowMilestoneDto dto, CancellationToken cancellationToken)
+    {
+        var entity = await LoadApplicationAsync(id, cancellationToken);
+        if (dto.Completed && entity.Estado is not (EstadoSolicitudCredito.Aprobada or EstadoSolicitudCredito.Desembolsada))
+        {
+            throw new ValidationException("Las firmas solo pueden completarse después de aprobar el crédito.");
+        }
+
+        entity.FirmasCompletas = dto.Completed;
+        entity.FechaFirmasCompletas = dto.Completed ? ColombiaTime.Now : null;
+        entity.UsuarioFirmas = tenantContext.UsuarioActual;
+        entity.ObservacionFirmas = Normalize(dto.Notes);
+        if (!dto.Completed) ClearFinalWorkflow(entity);
+
+        await db.SaveChangesAsync(cancellationToken);
+        return Ok(ToDto(entity));
+    }
+
+    [HttpPost("{id:guid}/workflow/final-review")]
+    [Authorize(Roles = "Administrador,Supervisor")]
+    public async Task<ActionResult<CreditApplicationDto>> SaveFinalReview(Guid id, CreditWorkflowMilestoneDto dto, CancellationToken cancellationToken)
+    {
+        var entity = await LoadApplicationAsync(id, cancellationToken);
+        if (dto.Completed && !entity.FirmasCompletas)
+        {
+            throw new ValidationException("Debe completar las firmas antes de aprobar la revisión final.");
+        }
+
+        entity.RevisionFinalAprobada = dto.Completed;
+        entity.FechaRevisionFinal = dto.Completed ? ColombiaTime.Now : null;
+        entity.UsuarioRevisionFinal = tenantContext.UsuarioActual;
+        entity.ObservacionRevisionFinal = Normalize(dto.Notes);
+        if (!dto.Completed) ClearWelcome(entity);
+
+        await db.SaveChangesAsync(cancellationToken);
+        return Ok(ToDto(entity));
+    }
+
+    [HttpPost("{id:guid}/workflow/welcome")]
+    [Authorize(Roles = "Administrador,Supervisor")]
+    public async Task<ActionResult<CreditApplicationDto>> SaveWelcome(Guid id, CreditWorkflowMilestoneDto dto, CancellationToken cancellationToken)
+    {
+        var entity = await LoadApplicationAsync(id, cancellationToken);
+        if (dto.Completed && !entity.RevisionFinalAprobada)
+        {
+            throw new ValidationException("Debe aprobar la revisión final antes de completar la bienvenida.");
+        }
+
+        entity.BienvenidaCompletada = dto.Completed;
+        entity.FechaBienvenida = dto.Completed ? ColombiaTime.Now : null;
+        entity.UsuarioBienvenida = tenantContext.UsuarioActual;
+        entity.ObservacionBienvenida = Normalize(dto.Notes);
+
+        await db.SaveChangesAsync(cancellationToken);
+        return Ok(ToDto(entity));
+    }
+
     [HttpGet("{id:guid}/pdf/{template}")]
     public async Task<IActionResult> DownloadTemplate(Guid id, string template, CancellationToken cancellationToken)
     {
@@ -472,6 +571,32 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             if (string.IsNullOrWhiteSpace(dto.CoDebtorReference2Mobile)) throw new ValidationException("El celular de la referencia 2 del codeudor es obligatorio.");
             if (string.IsNullOrWhiteSpace(dto.CoDebtorReference2Relationship)) throw new ValidationException("La relacion de la referencia 2 del codeudor es obligatoria.");
         }
+    }
+
+    private async Task<SolicitudCredito> LoadApplicationAsync(Guid id, CancellationToken cancellationToken) =>
+        await db.SolicitudesCredito
+            .Include(x => x.Cliente)
+            .Include(x => x.Producto)
+            .Include(x => x.PerfilRequisito)
+            .Include(x => x.Documentos)
+            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
+        ?? throw new KeyNotFoundException("Solicitud de crédito no encontrada.");
+
+    private static void ClearFinalWorkflow(SolicitudCredito entity)
+    {
+        entity.RevisionFinalAprobada = false;
+        entity.FechaRevisionFinal = null;
+        entity.UsuarioRevisionFinal = null;
+        entity.ObservacionRevisionFinal = null;
+        ClearWelcome(entity);
+    }
+
+    private static void ClearWelcome(SolicitudCredito entity)
+    {
+        entity.BienvenidaCompletada = false;
+        entity.FechaBienvenida = null;
+        entity.UsuarioBienvenida = null;
+        entity.ObservacionBienvenida = null;
     }
 
     private async Task<PerfilRequisito?> ResolveRequirementProfileAsync(Guid? profileId, CancellationToken cancellationToken)
@@ -606,6 +731,11 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             throw new ValidationException("Antes de enviar a estudio debe completar paso 0: RUNT, SIMIT e identidad validada.");
         }
 
+        if (status == EstadoSolicitudCredito.EnEstudio && (!entity.DataCreditoClienteConsultado || (!string.IsNullOrWhiteSpace(entity.CodeudorNombre) && !entity.DataCreditoCodeudorConsultado)))
+        {
+            throw new ValidationException("Antes de enviar a estudio debe completar la consulta de Datacrédito del cliente y del codeudor cuando aplique.");
+        }
+
         if (status == EstadoSolicitudCredito.Aprobada && entity.Estado != EstadoSolicitudCredito.EnEstudio)
         {
             throw new ValidationException("Solo se puede aprobar una solicitud que este en estudio.");
@@ -614,6 +744,11 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         if (status == EstadoSolicitudCredito.Desembolsada && entity.Estado != EstadoSolicitudCredito.Aprobada)
         {
             throw new ValidationException("Solo se puede desembolsar una solicitud aprobada.");
+        }
+
+        if (status == EstadoSolicitudCredito.Desembolsada && !entity.RevisionFinalAprobada)
+        {
+            throw new ValidationException("Debe completar las firmas y la revisión final antes de autorizar la entrega.");
         }
 
         if (status == EstadoSolicitudCredito.Desistida && entity.Estado == EstadoSolicitudCredito.Desembolsada)
@@ -753,6 +888,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         return new CreditApplicationDto(
             x.Id,
             x.Numero,
+            x.FechaCreacion,
             x.ClienteId,
             customerName,
             x.ProductoId,
@@ -799,6 +935,13 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             x.IdentidadValidada,
             x.UsuarioPaso0,
             x.ObservacionPaso0,
+            x.DataCreditoClienteConsultado,
+            x.DataCreditoPuntajeCliente,
+            x.DataCreditoCodeudorConsultado,
+            x.DataCreditoPuntajeCodeudor,
+            x.FechaRevisionDataCredito,
+            x.UsuarioDataCredito,
+            x.ObservacionDataCredito,
             x.ValorAprobadoAnalista,
             x.CuotaInicialAprobada,
             x.PlazoAprobadoMeses,
@@ -811,6 +954,18 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             x.FechaDesembolso,
             x.UsuarioDecision,
             x.ObservacionDecision,
+            x.FirmasCompletas,
+            x.FechaFirmasCompletas,
+            x.UsuarioFirmas,
+            x.ObservacionFirmas,
+            x.RevisionFinalAprobada,
+            x.FechaRevisionFinal,
+            x.UsuarioRevisionFinal,
+            x.ObservacionRevisionFinal,
+            x.BienvenidaCompletada,
+            x.FechaBienvenida,
+            x.UsuarioBienvenida,
+            x.ObservacionBienvenida,
             x.Documentos.OrderBy(d => d.Tipo).ThenBy(d => d.Nombre).Select(ToDocumentDto).ToList());
     }
 

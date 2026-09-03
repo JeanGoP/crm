@@ -452,6 +452,7 @@ export interface CreditDocument {
 export interface CreditApplication {
   id: string;
   number: string;
+  createdAt: string;
   customerId: string;
   customerName: string;
   productId: string;
@@ -498,6 +499,13 @@ export interface CreditApplication {
   identityValidated: boolean;
   step0User?: string;
   step0Notes?: string;
+  creditBureauClientChecked: boolean;
+  creditBureauClientScore?: number;
+  creditBureauCoDebtorChecked: boolean;
+  creditBureauCoDebtorScore?: number;
+  creditBureauReviewedAt?: string;
+  creditBureauUser?: string;
+  creditBureauNotes?: string;
   analystApprovedAmount?: number;
   approvedDownPayment?: number;
   approvedTermMonths?: number;
@@ -510,6 +518,18 @@ export interface CreditApplication {
   disbursedAt?: string;
   decisionUser?: string;
   decisionNotes?: string;
+  signaturesCompleted: boolean;
+  signaturesCompletedAt?: string;
+  signaturesUser?: string;
+  signaturesNotes?: string;
+  finalReviewApproved: boolean;
+  finalReviewAt?: string;
+  finalReviewUser?: string;
+  finalReviewNotes?: string;
+  welcomeCompleted: boolean;
+  welcomeCompletedAt?: string;
+  welcomeUser?: string;
+  welcomeNotes?: string;
   documents: CreditDocument[];
 }
 
