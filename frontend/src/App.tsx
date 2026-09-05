@@ -4190,7 +4190,10 @@ function UserDialog({ form, companies, salesPoints, defaultCompanyId, onClose, o
       <TextField required label="Nombre completo" value={v.fullName} onChange={(e) => set({ fullName: e.target.value })} />
       <TextField required label="Usuario / Login" value={v.login} onChange={(e) => set({ login: e.target.value.toLowerCase().replace(/\s/g, '').slice(0, 80) })} helperText="Este es el usuario con el que ingresa al sistema." />
       <TextField required label="Email" value={v.email} onChange={(e) => set({ email: e.target.value })} />
-      <TextField required={!form.item} label={form.item ? 'Nueva contrasena (opcional)' : 'Contrasena temporal'} type="password" value={v.password} onChange={(e) => set({ password: e.target.value })} />
+      <TextField disabled label="Contraseña de acceso" type="password" value="********" autoComplete="off"
+        helperText={form.item?.email.trim().toLowerCase() === 'admin@demo.com'
+          ? 'El superusuario conserva su contraseña actual.'
+          : 'La contraseña está definida por el sistema y se mantiene al guardar.'} />
       <TextField required select label="Empresa" value={v.companyId} onChange={(e) => set({ companyId: e.target.value, salesPointId: isAdministrator ? '' : defaultSalesPointId })}>{companies.map((c) => <MenuItem key={c.id} value={c.id}>{c.name} ({c.subdomain})</MenuItem>)}</TextField>
       <TextField select label="Rol" value={selectedRole} onChange={(e) => {
         const role = e.target.value;

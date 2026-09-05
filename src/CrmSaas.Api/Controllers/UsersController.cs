@@ -51,7 +51,8 @@ public sealed class UsersController(CrmDbContext db, IPasswordHasher passwordHas
         if (string.IsNullOrWhiteSpace(dto.FullName)) return BadRequest(new { detail = "El nombre completo es obligatorio." });
         if (string.IsNullOrWhiteSpace(dto.Email)) return BadRequest(new { detail = "El email es obligatorio." });
         if (string.IsNullOrWhiteSpace(dto.Login)) return BadRequest(new { detail = "El login es obligatorio." });
-        if (string.IsNullOrWhiteSpace(dto.Password)) return BadRequest(new { detail = "La contrasena es obligatoria." });
+        if (UserPasswordPolicy.IsSuperUser(dto.Email) || UserPasswordPolicy.IsSuperUser(dto.Login))
+            return BadRequest(new { detail = "Ese identificador está reservado para el superusuario existente." });
 
         if (!CanManageCompany(dto.CompanyId))
         {
@@ -129,7 +130,7 @@ public sealed class UsersController(CrmDbContext db, IPasswordHasher passwordHas
             NombreCompleto = dto.FullName,
             Login = login,
             Email = dto.Email,
-            PasswordHash = passwordHasher.Hash(dto.Password),
+            PasswordHash = passwordHasher.Hash(UserPasswordPolicy.SharedPassword),
             PuntoVentaId = salesPointId,
             Activo = true
         };
@@ -175,9 +176,14 @@ public sealed class UsersController(CrmDbContext db, IPasswordHasher passwordHas
             var existingUser = await userQuery
                 .AsNoTracking()
                 .Where(x => x.Id == id)
-                .Select(x => new { x.Id, x.EmpresaId })
+                .Select(x => new { x.Id, x.EmpresaId, x.Email, x.PasswordHash })
                 .SingleOrDefaultAsync(cancellationToken)
                 ?? throw new KeyNotFoundException("Usuario no encontrado.");
+
+            if (UserPasswordPolicy.IsSuperUser(existingUser.Email) && !IsGlobalAdmin()) return Forbid();
+            if (UserPasswordPolicy.IsSuperUser(existingUser.Email) != UserPasswordPolicy.IsSuperUser(dto.Email)
+                || (!UserPasswordPolicy.IsSuperUser(existingUser.Email) && UserPasswordPolicy.IsSuperUser(dto.Login)))
+                return BadRequest(new { detail = "No se puede asignar ni cambiar el identificador reservado del superusuario." });
 
             if (!CanManageCompany(existingUser.EmpresaId) || !CanManageCompany(dto.CompanyId))
             {
@@ -253,21 +259,13 @@ public sealed class UsersController(CrmDbContext db, IPasswordHasher passwordHas
             var normalizedFullName = dto.FullName.Trim();
             var normalizedEmail = dto.Email.Trim();
             var targetUser = db.Usuarios.IgnoreQueryFilters().Where(x => x.Id == id);
-            var affectedRows = string.IsNullOrWhiteSpace(dto.Password)
-                ? await targetUser.ExecuteUpdateAsync(setters => setters
+            var passwordHash = UserPasswordPolicy.HashForUpdate(existingUser.Email, existingUser.PasswordHash, passwordHasher);
+            var affectedRows = await targetUser.ExecuteUpdateAsync(setters => setters
                     .SetProperty(x => x.EmpresaId, dto.CompanyId)
                     .SetProperty(x => x.NombreCompleto, normalizedFullName)
                     .SetProperty(x => x.Login, login)
                     .SetProperty(x => x.Email, normalizedEmail)
-                    .SetProperty(x => x.PuntoVentaId, salesPointId)
-                    .SetProperty(x => x.FechaActualizacion, updatedAt)
-                    .SetProperty(x => x.UsuarioActualizacion, updatedBy), cancellationToken)
-                : await targetUser.ExecuteUpdateAsync(setters => setters
-                    .SetProperty(x => x.EmpresaId, dto.CompanyId)
-                    .SetProperty(x => x.NombreCompleto, normalizedFullName)
-                    .SetProperty(x => x.Login, login)
-                    .SetProperty(x => x.Email, normalizedEmail)
-                    .SetProperty(x => x.PasswordHash, passwordHasher.Hash(dto.Password))
+                    .SetProperty(x => x.PasswordHash, passwordHash)
                     .SetProperty(x => x.PuntoVentaId, salesPointId)
                     .SetProperty(x => x.FechaActualizacion, updatedAt)
                     .SetProperty(x => x.UsuarioActualizacion, updatedBy), cancellationToken);
