@@ -5318,10 +5318,35 @@ function CreditApplicationDialog({ form, customers, products, quotes, deals, req
           <Stack spacing={2}>
             <Typography variant="subtitle1" fontWeight={900}>Origen y cliente</Typography>
             <FieldGrid columns={3}>
-              <TextField select label="Cotizacion" value={v.quoteId} onChange={(e) => {
-                const selected = quotes.find((x) => x.id === e.target.value);
+              <Autocomplete
+                fullWidth
+                options={quotes}
+                value={selectedQuote ?? null}
+                isOptionEqualToValue={(option, value) => option.id === value.id}
+                getOptionLabel={(option) => `${option.number} - ${fullFirstNames(option.customerFirstName, option.customerMiddleName, option.customerFirstNames)} ${fullLastNames(option.customerLastName, option.customerSecondLastName, option.customerLastNames)}`.trim()}
+                filterOptions={(options, { inputValue }) => {
+                  const terms = normalizeSearch(inputValue).split(/\s+/).filter(Boolean);
+                  return options.filter((option) => {
+                    const text = normalizeSearch([option.number, option.identificationNumber,
+                      fullFirstNames(option.customerFirstName, option.customerMiddleName, option.customerFirstNames),
+                      fullLastNames(option.customerLastName, option.customerSecondLastName, option.customerLastNames)].join(' '));
+                    return terms.every((term) => text.includes(term));
+                  });
+                }}
+                noOptionsText="No se encontraron cotizaciones"
+                clearText="Quitar cotización"
+                openText="Buscar cotización"
+                closeText="Cerrar opciones"
+                renderOption={(props, option) => <li {...props} key={option.id}>
+                  <Box sx={{ minWidth: 0, overflowWrap: 'anywhere' }}>
+                    <Typography fontWeight={800} fontSize={13}>{fullFirstNames(option.customerFirstName, option.customerMiddleName, option.customerFirstNames)} {fullLastNames(option.customerLastName, option.customerSecondLastName, option.customerLastNames)}</Typography>
+                    <Typography fontSize={12} color="text.secondary">{option.number}{option.identificationNumber ? ` · ${option.identificationNumber}` : ''}</Typography>
+                  </Box>
+                </li>}
+                renderInput={(params) => <TextField {...params} label="Buscar cotización" placeholder="Nombre, cédula o número" helperText="Escriba para buscar. Puede continuar sin cotización." />}
+                onChange={(_, selected) => {
                 set({
-                  quoteId: e.target.value,
+                  quoteId: selected?.id ?? '',
                   customerId: selected?.customerId ?? v.customerId,
                   productId: selected?.productId ?? v.productId,
                   requirementProfileId: selected?.requirementProfileId ?? v.requirementProfileId,
@@ -5331,10 +5356,7 @@ function CreditApplicationDialog({ form, customers, products, quotes, deals, req
                   downPayment: selected?.downPayment ?? v.downPayment,
                   termMonths: selected?.termMonths ?? v.termMonths
                 });
-              }}>
-                <MenuItem value="">Sin cotizacion</MenuItem>
-                {quotes.map((x) => <MenuItem key={x.id} value={x.id}>{x.number} - {fullFirstNames(x.customerFirstName, x.customerMiddleName, x.customerFirstNames)} {fullLastNames(x.customerLastName, x.customerSecondLastName, x.customerLastNames)}</MenuItem>)}
-              </TextField>
+              }} />
               <TextField required select label="Cliente" value={v.customerId} onChange={(e) => set({ customerId: e.target.value })}>{customers.map((x) => <MenuItem key={x.id} value={x.id}>{x.firstNames || x.name} {x.lastNames}</MenuItem>)}</TextField>
               <TextField select label="Negocio pipeline" value={v.dealId} onChange={(e) => set({ dealId: e.target.value })}><MenuItem value="">Sin negocio</MenuItem>{deals.map((x) => <MenuItem key={x.id} value={x.id}>{x.title}</MenuItem>)}</TextField>
             </FieldGrid>
