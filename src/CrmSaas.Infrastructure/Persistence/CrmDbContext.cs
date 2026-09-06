@@ -221,6 +221,7 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
         modelBuilder.Entity<Cotizacion>().Property(x => x.TotalPagarEstimado).HasPrecision(18, 2);
         modelBuilder.Entity<Cotizacion>().Property(x => x.TipoCredito).HasMaxLength(40);
         modelBuilder.Entity<Cotizacion>().HasIndex(x => new { x.EmpresaId, x.Numero }).IsUnique();
+        modelBuilder.Entity<Cotizacion>().HasOne(x => x.Negocio).WithMany().HasForeignKey(x => x.NegocioId).OnDelete(DeleteBehavior.SetNull);
         modelBuilder.Entity<Cotizacion>().HasIndex(x => new { x.EmpresaId, x.PuntoVentaId });
         modelBuilder.Entity<Cotizacion>().HasIndex(x => new { x.EmpresaId, x.PerfilRequisitoId });
         modelBuilder.Entity<Cotizacion>().HasIndex(x => new { x.EmpresaId, x.PromocionId });

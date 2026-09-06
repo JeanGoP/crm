@@ -69,7 +69,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             ? await db.Cotizaciones.FirstOrDefaultAsync(x => x.Id == dto.QuoteId.Value, cancellationToken)
                 ?? throw new KeyNotFoundException("Cotizacion no encontrada.")
             : null;
-        if (dto.DealId.HasValue && !await db.Negocios.AnyAsync(x => x.Id == dto.DealId.Value, cancellationToken)) throw new KeyNotFoundException("Negocio no encontrado.");
+        var dealId = await ResolveQuoteDealAsync(quote, dto.CustomerId, cancellationToken);
         var requirementProfile = await ResolveRequirementProfileAsync(dto.RequirementProfileId ?? quote?.PerfilRequisitoId, cancellationToken);
 
         var entity = new SolicitudCredito
@@ -78,7 +78,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             ClienteId = customer.Id,
             ProductoId = product.Id,
             CotizacionId = dto.QuoteId,
-            NegocioId = dto.DealId,
+            NegocioId = dealId,
             PerfilRequisitoId = requirementProfile?.Id,
             PerfilRequisito = requirementProfile,
             TipoIdentificacion = dto.IdentificationType,
@@ -144,10 +144,14 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             : null;
         var requirementProfile = await ResolveRequirementProfileAsync(dto.RequirementProfileId ?? quote?.PerfilRequisitoId, cancellationToken);
 
+        var dealId = quote is not null
+            ? await ResolveQuoteDealAsync(quote, dto.CustomerId, cancellationToken)
+            : entity.CotizacionId is null && entity.ClienteId == dto.CustomerId ? entity.NegocioId : null;
+
         entity.ClienteId = dto.CustomerId;
         entity.ProductoId = dto.ProductId;
         entity.CotizacionId = dto.QuoteId;
-        entity.NegocioId = dto.DealId;
+        entity.NegocioId = dealId;
         entity.PerfilRequisitoId = requirementProfile?.Id;
         entity.PerfilRequisito = requirementProfile;
         entity.TipoIdentificacion = dto.IdentificationType;
@@ -840,11 +844,57 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
 
     private static string? Normalize(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
+    private async Task<Guid?> ResolveQuoteDealAsync(Cotizacion? quote, Guid customerId, CancellationToken cancellationToken)
+    {
+        if (quote is null) return null;
+        if (quote.ClienteId != customerId)
+            throw new ValidationException("La cotización seleccionada no pertenece al cliente de la solicitud.");
+
+        if (quote.NegocioId.HasValue && await db.Negocios.AnyAsync(x => x.Id == quote.NegocioId && x.ClienteId == customerId, cancellationToken))
+            return quote.NegocioId;
+
+        // Older quotes linked their deal only through this automatic follow-up.
+        var prefix = $"Cotizacion {quote.Numero}:";
+        var candidates = await db.Actividades
+            .Where(x => x.ClienteId == customerId && x.NegocioId.HasValue && x.Descripcion != null && x.Descripcion.StartsWith(prefix))
+            .Select(x => x.NegocioId!.Value).Distinct().ToListAsync(cancellationToken);
+        var matches = await db.Negocios.Where(x => x.ClienteId == customerId && candidates.Contains(x.Id))
+            .Select(x => x.Id).ToListAsync(cancellationToken);
+        if (matches.Count > 1)
+            throw new ValidationException("Esta cotización tiene varios negocios vinculados. Un administrador debe revisar sus actividades de seguimiento.");
+
+        if (matches.Count == 1)
+        {
+            quote.NegocioId = matches[0];
+        }
+        else
+        {
+            var stage = await db.EtapasNegocio.Where(x => x.Activa).OrderBy(x => x.Orden).FirstOrDefaultAsync(cancellationToken)
+                ?? throw new ValidationException("Debe existir una etapa activa en el Pipeline para vincular la cotización.");
+            var deal = new Negocio
+            {
+                EmpresaId = quote.EmpresaId,
+                ClienteId = customerId,
+                Titulo = $"{quote.Numero} - {quote.NombresCliente} {quote.ApellidosCliente}".Trim(),
+                EtapaNegocioId = stage.Id,
+                Valor = quote.PrecioProducto,
+                ProbabilidadCierre = stage.ProbabilidadPredeterminada,
+                FechaEstimadaCierre = ColombiaTime.Now.AddDays(15),
+                Estado = EstadoNegocio.Abierto
+            };
+            db.Negocios.Add(deal);
+            quote.Negocio = deal;
+            quote.NegocioId = deal.Id;
+        }
+        return quote.NegocioId;
+    }
+
     private async Task SyncPipelineAsync(SolicitudCredito application, CancellationToken cancellationToken)
     {
         if (!application.NegocioId.HasValue) return;
 
-        var deal = await db.Negocios.FirstOrDefaultAsync(x => x.Id == application.NegocioId.Value, cancellationToken);
+        var deal = db.Negocios.Local.FirstOrDefault(x => x.Id == application.NegocioId.Value)
+            ?? await db.Negocios.FirstOrDefaultAsync(x => x.Id == application.NegocioId.Value, cancellationToken);
         if (deal is null) return;
 
         var stageName = application.Estado switch

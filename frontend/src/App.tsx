@@ -1705,7 +1705,6 @@ function CreditApplicationsPage() {
   const { data: customers = [] } = useResource<Customer[]>('/api/customers', []);
   const { data: products = [] } = useResource<Product[]>('/api/products', []);
   const { data: quotes = [] } = useResource<Quote[]>('/api/quotes', []);
-  const { data: deals = [] } = useResource<Deal[]>('/api/pipeline/deals', []);
   const { data: requirementProfiles = [] } = useResource<RequirementProfile[]>('/api/requirement-profiles', []);
   const [form, setForm] = useState<FormMode<CreditApplication>>({ open: false });
   const [management, setManagement] = useState<CreditApplication>();
@@ -1974,7 +1973,7 @@ function CreditApplicationsPage() {
         </Stack>
       ])}
     />
-    <CreditApplicationDialog form={form} customers={customers} products={products.filter((x) => x.active)} quotes={quotes} deals={deals} requirementProfiles={requirementProfiles.filter((x) => x.active)} onClose={() => setForm({ open: false })} onSave={save} />
+    <CreditApplicationDialog form={form} customers={customers} products={products.filter((x) => x.active)} quotes={quotes} requirementProfiles={requirementProfiles.filter((x) => x.active)} onClose={() => setForm({ open: false })} onSave={save} />
     <CreditApplicationManagementDialog
       application={managementApplication}
       initialTab={searchParams.get('tab') === 'proceso' ? 4 : 0}
@@ -5262,7 +5261,7 @@ function QuotePdfPreviewDialog({ quote, onClose, onDownload }: { quote?: Quote; 
   </Dialog>;
 }
 
-function CreditApplicationDialog({ form, customers, products, quotes, deals, requirementProfiles, onClose, onSave }: DialogProps<CreditApplication, typeof emptyCreditApplication> & { customers: Customer[]; products: Product[]; quotes: Quote[]; deals: Deal[]; requirementProfiles: RequirementProfile[] }) {
+function CreditApplicationDialog({ form, customers, products, quotes, requirementProfiles, onClose, onSave }: DialogProps<CreditApplication, typeof emptyCreditApplication> & { customers: Customer[]; products: Product[]; quotes: Quote[]; requirementProfiles: RequirementProfile[] }) {
   const [referenceDialog, setReferenceDialog] = useState<'client' | 'coDebtor'>();
   useEffect(() => {
     if (!form.open) setReferenceDialog(undefined);
@@ -5317,7 +5316,7 @@ function CreditApplicationDialog({ form, customers, products, quotes, deals, req
         <Paper variant="outlined" sx={{ p: 2, bgcolor: '#fbfdff' }}>
           <Stack spacing={2}>
             <Typography variant="subtitle1" fontWeight={900}>Origen y cliente</Typography>
-            <FieldGrid columns={3}>
+            <FieldGrid columns={2}>
               <Autocomplete
                 fullWidth
                 options={quotes}
@@ -5357,8 +5356,7 @@ function CreditApplicationDialog({ form, customers, products, quotes, deals, req
                   termMonths: selected?.termMonths ?? v.termMonths
                 });
               }} />
-              <TextField required select label="Cliente" value={v.customerId} onChange={(e) => set({ customerId: e.target.value })}>{customers.map((x) => <MenuItem key={x.id} value={x.id}>{x.firstNames || x.name} {x.lastNames}</MenuItem>)}</TextField>
-              <TextField select label="Negocio pipeline" value={v.dealId} onChange={(e) => set({ dealId: e.target.value })}><MenuItem value="">Sin negocio</MenuItem>{deals.map((x) => <MenuItem key={x.id} value={x.id}>{x.title}</MenuItem>)}</TextField>
+              <TextField required select disabled={!!selectedQuote} label="Cliente" value={v.customerId} onChange={(e) => set({ customerId: e.target.value })} helperText={selectedQuote ? 'Cliente asociado a la cotización seleccionada.' : undefined}>{customers.map((x) => <MenuItem key={x.id} value={x.id}>{x.firstNames || x.name} {x.lastNames}</MenuItem>)}</TextField>
             </FieldGrid>
             <Box sx={{ maxWidth: { md: 520 } }}>
               <TextField fullWidth select label="Perfil de requisitos" value={v.requirementProfileId} onChange={(e) => set({ requirementProfileId: e.target.value })} helperText="Define el checklist inicial de documentos de esta solicitud.">

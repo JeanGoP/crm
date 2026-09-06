@@ -313,6 +313,8 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             NegocioId = deal.Id
         };
 
+        quote.Negocio = deal;
+        quote.NegocioId = deal.Id;
         db.Cotizaciones.Add(quote);
         db.Negocios.Add(deal);
         db.Actividades.Add(followUp);

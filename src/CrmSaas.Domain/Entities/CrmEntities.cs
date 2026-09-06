@@ -240,6 +240,8 @@ public sealed class TasaPuntoVenta : AuditableTenantEntity
 
 public sealed class Cotizacion : AuditableTenantEntity
 {
+    public Guid? NegocioId { get; set; }
+    public Negocio? Negocio { get; set; }
     public string Numero { get; set; } = string.Empty;
     public TipoIdentificacionColombia TipoIdentificacion { get; set; }
     public string? NumeroIdentificacion { get; set; }
