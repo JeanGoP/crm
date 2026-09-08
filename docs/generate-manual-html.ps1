@@ -100,7 +100,10 @@ foreach ($line in $lines) {
         if (Test-Path $imgPath) {
             $ext = [System.IO.Path]::GetExtension($imgPath).TrimStart('.').ToLowerInvariant()
             if ($ext -eq 'jpg') { $ext = 'jpeg' }
-            $b64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes($imgPath))
+            $imageBytes = [IO.File]::ReadAllBytes($imgPath)
+            # Algunas capturas del navegador se exportan como JPEG aunque conserven el nombre PNG.
+            if ($imageBytes.Length -ge 3 -and $imageBytes[0] -eq 255 -and $imageBytes[1] -eq 216 -and $imageBytes[2] -eq 255) { $ext = 'jpeg' }
+            $b64 = [Convert]::ToBase64String($imageBytes)
             [void]$sb.AppendLine('<figure><img alt="' + (Enc $alt) + '" src="data:image/' + $ext + ';base64,' + $b64 + '"><figcaption>' + (Enc $alt) + '</figcaption></figure>')
         }
         continue

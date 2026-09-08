@@ -1,7 +1,7 @@
 # Manual de usuario - EnMarcha CRM
 
-Ultima actualizacion: 2026-08-01  
-Version del manual: 10.1
+Ultima actualizacion: 2026-09-08  
+Version del manual: 11.0
 Sistema: EnMarcha CRM para gestion comercial y ventas a credito  
 
 ## 1. Bienvenida
@@ -42,6 +42,8 @@ Puede crear clientes, cotizaciones, actividades, solicitudes y hacer seguimiento
 
 ![Login](./assets/manual/01-login.png)
 
+Captura actualizada el 8 de septiembre de 2026. Las capturas nuevas muestran la vista adaptable en una ventana estrecha; en escritorio los campos pueden distribuirse en varias columnas.
+
 ### Para que sirve
 
 La pantalla de ingreso permite entrar al CRM con el usuario o login asignado por el administrador. El correo se conserva en la ficha del usuario, pero el ingreso se realiza con el campo **Usuario**.
@@ -50,7 +52,7 @@ La pantalla de ingreso permite entrar al CRM con el usuario o login asignado por
 
 1. Escriba su **Usuario**.
 2. Escriba su contrasena.
-3. Presione **Ingresar**.
+3. Presione **Ingresar al CRM**.
 
 ### Si no puede ingresar
 
@@ -290,6 +292,10 @@ Si existe una promocion vigente para el producto, marca, color o sede, la cotiza
 
 ### Crear una cotizacion
 
+![Seleccion actual de sede y tasa por nombre](./assets/manual/05-sede-tasa.png)
+
+Seleccione la sede de la venta y despues la tasa por su nombre. Las tasas disponibles corresponden a la sede seleccionada.
+
 1. Entre a **Cotizaciones**.
 2. Presione **Nueva cotizacion**.
 3. Seleccione el tipo de identificacion del cliente.
@@ -375,6 +381,10 @@ Cuando la solicitud viene desde una cotizacion, el sistema puede traer el perfil
 
 ### Crear o revisar una solicitud
 
+![Formulario actual de nueva solicitud con buscador de cotizaciones](./assets/manual/06-nueva-solicitud.png)
+
+En **Buscar cotización**, escriba parte del nombre del cliente, su identificacion o el numero de cotizacion. Al elegirla se utilizan sus datos disponibles y el negocio del Pipeline se vincula automaticamente al guardar: ya no debe seleccionarlo manualmente. Revise y complete los campos faltantes. Tambien puede continuar sin cotizacion.
+
 1. Entre a **Solicitudes de credito**.
 2. Seleccione o cree la solicitud del cliente.
 3. Si viene desde una cotizacion, seleccionela en el campo correspondiente.
@@ -427,7 +437,21 @@ El panel de estudio permite al supervisor o administrador controlar la revision 
 
 Para enviar una solicitud a estudio, la **Validacion inicial** debe estar completa y los documentos no pueden estar pendientes o rechazados.
 
+### Tablero de creditos: seguimiento de las solicitudes
+
+![Resumen actual del tablero de creditos](./assets/manual/06-tablero-creditos.png)
+
+Administradores y supervisores pueden abrir **Credito → Tablero de creditos**. El resumen muestra solicitudes totales, procesos activos, casos que requieren atencion y bienvenidas completadas. Pulse **Actualizar** para consultar los cambios recientes.
+
+![Buscador y primeras etapas del tablero de creditos](./assets/manual/06-tablero-etapas.png)
+
+Busque por solicitud, cliente, cedula o producto y compruebe **Mostrando X de Y solicitudes**. Recorra las etapas: SIMIT y RUNT, Datacredito, Solicitud creada, Soportes, Aprobaciones, Firmas, Revision final y Bienvenida; las negadas o desistidas aparecen en Cerradas. Cada tarjeta permite **Gestionar proceso**. La ubicacion refleja los datos registrados; no sustituye la decision de credito ni las verificaciones del equipo.
+
 ## 14. Codeudor y referencias
+
+![Modal actual de referencias personales del cliente](./assets/manual/06-referencias-cliente.png)
+
+Use **Referencias del cliente** para diligenciar las dos referencias con nombre, celular y relacion. Si registra un codeudor, se habilita **Referencias del codeudor** para sus propias referencias. Pulse **Listo** para volver al formulario y finalmente **Guardar** para guardar la solicitud.
 
 ### Para que sirve
 
