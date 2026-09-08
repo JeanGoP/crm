@@ -1,5 +1,10 @@
 $ErrorActionPreference = 'Stop'
 
+# La versión vigente se mantiene en la plantilla interactiva; conservar las capturas integradas.
+& node (Join-Path $PSScriptRoot 'build-manual.mjs')
+if ($LASTEXITCODE -ne 0) { throw 'No se pudo generar el manual.' }
+return
+
 $mdPath = Join-Path $PSScriptRoot 'MANUAL_DEL_SISTEMA.md'
 $htmlPath = Join-Path $PSScriptRoot 'MANUAL_DEL_SISTEMA.html'
 $lines = Get-Content $mdPath -Encoding UTF8

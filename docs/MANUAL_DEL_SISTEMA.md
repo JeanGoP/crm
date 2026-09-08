@@ -1,5 +1,7 @@
 # Manual de usuario - EnMarcha CRM
 
+> La versión vigente e interactiva está en [MANUAL_DEL_SISTEMA.html](./MANUAL_DEL_SISTEMA.html), actualizada el 8 de septiembre de 2026. Incluye buscador, índice, instrucciones actuales y capturas históricas identificadas. Este Markdown se conserva como referencia histórica detallada; no debe utilizarse para regenerar la versión vigente.
+
 Ultima actualizacion: 2026-08-01  
 Version del manual: 10.1
 Sistema: EnMarcha CRM para gestion comercial y ventas a credito  
