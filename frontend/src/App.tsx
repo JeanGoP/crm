@@ -1546,7 +1546,10 @@ function QuotesPage() {
       rows={rows.map((r) => [
         r.number,
         `${fullFirstNames(r.customerFirstName, r.customerMiddleName, r.customerFirstNames)} ${fullLastNames(r.customerLastName, r.customerSecondLastName, r.customerLastNames)}`.trim(),
-        <Row primary={r.salesPointName || '-'} secondary={r.salesPointRateName || 'Tasa general'} />,
+        <Box sx={{ minWidth: 0, whiteSpace: 'normal', wordBreak: 'normal', overflowWrap: 'break-word' }}>
+          <Typography variant="body2" fontWeight={700}>{r.salesPointName || '-'}</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: .25 }}>{r.salesPointRateName || 'Tasa general'}</Typography>
+        </Box>,
         r.requirementProfileName || '-',
         r.promotionDiscount > 0 ? <Row primary={r.promotionName ?? 'Promocion'} secondary={`-${money(r.promotionDiscount)}`} /> : '-',
         (r.items?.length ?? 0) > 1 ? `${r.items.length} productos` : r.productName,
