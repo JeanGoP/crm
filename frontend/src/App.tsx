@@ -4859,7 +4859,8 @@ function QuoteDialog({ form, products, productCategories, requirementProfiles, q
                     md: 'repeat(auto-fit, minmax(132px, 1fr))'
                   },
                   gap: 1.5,
-                  alignItems: 'stretch',
+                  alignItems: 'start',
+                  gridAutoRows: 'min-content',
                   minWidth: 0
                 }}>
                   <Autocomplete
