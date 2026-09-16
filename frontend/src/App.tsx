@@ -283,8 +283,6 @@ const emptyFinancialSettings = { minimumWage: 1400000, consumerAnnualRate: 29.72
 const emptyQuoteChargeConcept = { name: '', code: '', calculationGroup: 'Gasto', defaultValueSource: 'Manual', defaultAmount: 0, order: 1, active: true };
 const emptySalesPointRate = { id: '', name: 'Tasa general', factorMonthlyRate: 4.5, maxTermMonths: 30, active: true };
 const emptySalesPoint = { name: '', code: '', city: '', address: '', phone: '', mainBrand: 'Honda', brandLogoDataUrl: '', factorMonthlyRate: 4.5, maxTermMonths: 30, quoteValidityDays: 7, deliveryMode: 'ConSoat', soatDays: 14, registrationDays: 20, soatProvider: '', registrationAgent: '', commercialTerms: 'Cotizacion sujeta a disponibilidad del producto, validacion comercial y aprobacion final.', externalInventoryWarehouseCodes: '', rates: [emptySalesPointRate], active: true };
-const emptyRequirementDocument = { type: 5, name: '', description: '', required: true, order: 1 };
-const emptyRequirementProfile = { name: '', code: '', description: '', isCash: false, active: true, documents: [emptyRequirementDocument] };
 const emptyPromotion = { name: '', code: '', discountType: 'Valor', discountValue: 0, productId: '', brand: '', color: '', salesPointIds: [] as string[], validFrom: today, validUntil: today, active: true };
 const emptyQuoteItem = { productId: '', productPrice: 0, downPayment: 0, initialPaymentPaidToday: 0, initialPaymentSchedule: [] as { dueDate: string; amount: number }[], insurance: 0, administrativeFees: 0, chargeValues: {} as Record<string, number>, termMonths: 24, monthlyInterestRate: 2.2, inventoryWarehouseCode: '', inventoryWarehouseName: '', inventoryPresentation: '', inventorySerialNumber: '', inventoryEngineNumber: '', inventoryChassisNumber: '' };
 const emptyQuote = { identificationType: 1, identificationNumber: '', customerFirstNames: '', customerLastNames: '', customerFirstName: '', customerMiddleName: '', customerLastName: '', customerSecondLastName: '', phoneCountryCode: '+57', phoneNumber: '', requirementProfileId: '', salesPointId: '', salesPointRateId: '', productId: '', downPayment: 0, insurance: 0, administrativeFees: 0, termMonths: 24, monthlyInterestRate: 2.2, items: [emptyQuoteItem], notes: '' };
@@ -1445,7 +1443,6 @@ function QuotesPage() {
   const { data: products = [] } = useResource<Product[]>('/api/products', []);
   const { data: productCategories = [] } = useResource<ProductCategory[]>('/api/product-categories', []);
   const { data: customers = [] } = useResource<Customer[]>('/api/customers', []);
-  const { data: requirementProfiles = [] } = useResource<RequirementProfile[]>('/api/requirement-profiles', []);
   const { data: quoteChargeConcepts = [] } = useResource<QuoteChargeConcept[]>('/api/quote-charge-concepts', []);
   const { data: quoteSalesPoints = [] } = useResource<QuoteSalesPoint[]>('/api/quotes/sales-points', []);
   const [form, setForm] = useState<FormMode<Quote>>({ open: false });
@@ -1509,7 +1506,7 @@ function QuotesPage() {
       identificationNumber: payload.identificationNumber || null,
       phoneCountryCode: payload.phoneCountryCode || '+57',
       phoneNumber: payload.phoneNumber || null,
-      requirementProfileId: payload.requirementProfileId || null,
+      requirementProfileId: null,
       salesPointId: payload.salesPointId || null,
       salesPointRateId: payload.salesPointRateId || null,
       productId: firstItem.productId,
@@ -1542,7 +1539,7 @@ function QuotesPage() {
     <Header title="Cotizaciones" action="Nueva cotizacion" onAction={() => setForm({ open: true })} onRefresh={reload} />
     <StatusBar loading={loading} error={error} />
     <EntityTable
-      headers={['Numero', 'Cliente', 'Sede', 'Perfil', 'Promocion', 'Productos', 'Total financiado', 'Cuota aprox.', 'Valida hasta', 'Acciones']}
+      headers={['Numero', 'Cliente', 'Sede', 'Promocion', 'Productos', 'Total financiado', 'Cuota aprox.', 'Valida hasta', 'Acciones']}
       empty="No hay cotizaciones registradas"
       rows={rows.map((r) => [
         r.number,
@@ -1551,7 +1548,6 @@ function QuotesPage() {
           <Typography variant="body2" fontWeight={700}>{r.salesPointName || '-'}</Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: .25 }}>{r.salesPointRateName || 'Tasa general'}</Typography>
         </Box>,
-        r.requirementProfileName || '-',
         r.promotionDiscount > 0 ? <Row primary={r.promotionName ?? 'Promocion'} secondary={`-${money(r.promotionDiscount)}`} /> : '-',
         (r.items?.length ?? 0) > 1 ? `${r.items.length} productos` : r.productName,
         money(r.financedAmount),
@@ -1560,7 +1556,7 @@ function QuotesPage() {
         <Actions onAi={() => analyzeCustomer(r.customerId, customers.find((x) => x.id === r.customerId)?.phone)} onDownload={() => setPreviewQuote(r)} />
       ])}
     />
-    <QuoteDialog form={form} products={products.filter((x) => x.active)} productCategories={productCategories.filter((x) => x.active)} requirementProfiles={requirementProfiles.filter((x) => x.active)} quoteChargeConcepts={quoteChargeConcepts.filter((x) => x.active)} salesPoints={quoteSalesPoints} canChooseSalesPoint={currentUser?.roles.some((role) => role === 'Administrador' || role === 'Supervisor') ?? false} onClose={() => setForm({ open: false })} onSave={save} />
+    <QuoteDialog form={form} products={products.filter((x) => x.active)} productCategories={productCategories.filter((x) => x.active)} quoteChargeConcepts={quoteChargeConcepts.filter((x) => x.active)} salesPoints={quoteSalesPoints} canChooseSalesPoint={currentUser?.roles.some((role) => role === 'Administrador' || role === 'Supervisor') ?? false} onClose={() => setForm({ open: false })} onSave={save} />
     <QuotePdfPreviewDialog quote={previewQuote} onClose={() => setPreviewQuote(undefined)} onDownload={downloadPdf} />
     <AiAnalysisDialog analysis={analysis} phone={analysisPhone} onClose={() => { setAnalysis(undefined); setAnalysisPhone(undefined); }} />
     <Notice notice={notice} onClose={() => setNotice(undefined)} />
@@ -3336,7 +3332,6 @@ function SettingsPage() {
   const { data: financialSettings, loading: loadingFinancialSettings, error: financialSettingsError, reload: reloadFinancialSettings, setData: setFinancialSettings } = useResource<FinancialSettings>('/api/financial-settings');
   const { data: quoteChargeConcepts = [], loading: loadingQuoteChargeConcepts, error: quoteChargeConceptsError, reload: reloadQuoteChargeConcepts, setData: setQuoteChargeConcepts } = useResource<QuoteChargeConcept[]>('/api/quote-charge-concepts', []);
   const { data: salesPoints = [], loading: loadingSalesPoints, error: salesPointsError, reload: reloadSalesPoints, setData: setSalesPoints } = useResource<SalesPoint[]>('/api/sales-points', []);
-  const { data: requirementProfiles = [], loading: loadingRequirementProfiles, error: requirementProfilesError, reload: reloadRequirementProfiles, setData: setRequirementProfiles } = useResource<RequirementProfile[]>('/api/requirement-profiles', []);
   const { data: promotions = [], loading: loadingPromotions, error: promotionsError, reload: reloadPromotions, setData: setPromotions } = useResource<Promotion[]>('/api/promotions', []);
   const [companyForm, setCompanyForm] = useState<FormMode<Company>>({ open: false });
   const [userForm, setUserForm] = useState<FormMode<User>>({ open: false });
@@ -3344,8 +3339,6 @@ function SettingsPage() {
   const [financialForm, setFinancialForm] = useState<FormMode<FinancialSettings>>({ open: false });
   const [quoteChargeConceptForm, setQuoteChargeConceptForm] = useState<FormMode<QuoteChargeConcept>>({ open: false });
   const [salesPointForm, setSalesPointForm] = useState<FormMode<SalesPoint>>({ open: false });
-  const [requirementProfileForm, setRequirementProfileForm] = useState<FormMode<RequirementProfile>>({ open: false });
-  const [requirementProfileToDelete, setRequirementProfileToDelete] = useState<RequirementProfile>();
   const [promotionForm, setPromotionForm] = useState<FormMode<Promotion>>({ open: false });
   const [notice, setNotice] = useState<Notice>();
   const currentCompanyId = isGlobalAdmin ? activeCompanyId ?? user?.companyId : user?.companyId;
@@ -3364,7 +3357,6 @@ function SettingsPage() {
     reloadFinancialSettings();
     reloadQuoteChargeConcepts();
     reloadSalesPoints();
-    reloadRequirementProfiles();
     reloadPromotions();
   }, [activeCompanyId, isGlobalAdmin]);
 
@@ -3500,40 +3492,6 @@ function SettingsPage() {
     setSalesPointForm({ open: false });
   };
 
-  const saveRequirementProfile = async (payload: typeof emptyRequirementProfile) => {
-    const documents = payload.documents
-      .filter((document) => document.name.trim())
-      .map((document, index) => ({
-        type: Number(document.type),
-        name: document.name,
-        description: document.description || null,
-        required: Boolean(document.required),
-        order: Number(document.order) > 0 ? Number(document.order) : index + 1
-      }));
-    const body = {
-      name: payload.name,
-      code: payload.code,
-      description: payload.description || null,
-      isCash: Boolean(payload.isCash),
-      active: Boolean(payload.active),
-      documents
-    };
-    const { data } = requirementProfileForm.item
-      ? await api.put<RequirementProfile>(`/api/requirement-profiles/${requirementProfileForm.item.id}`, body)
-      : await api.post<RequirementProfile>('/api/requirement-profiles', body);
-    setRequirementProfiles(requirementProfileForm.item ? requirementProfiles.map((x) => x.id === data.id ? data : x) : [...requirementProfiles, data].sort((a, b) => a.name.localeCompare(b.name)));
-    setNotice({ type: 'success', text: requirementProfileForm.item ? 'Perfil actualizado.' : 'Perfil creado.' });
-    setRequirementProfileForm({ open: false });
-  };
-
-  const deleteRequirementProfile = async () => {
-    if (!requirementProfileToDelete) return;
-    await api.delete(`/api/requirement-profiles/${requirementProfileToDelete.id}`);
-    setRequirementProfiles(requirementProfiles.filter((profile) => profile.id !== requirementProfileToDelete.id));
-    setNotice({ type: 'success', text: 'Perfil de requisitos eliminado.' });
-    setRequirementProfileToDelete(undefined);
-  };
-
   const savePromotion = async (payload: typeof emptyPromotion) => {
     const body = {
       name: payload.name,
@@ -3561,7 +3519,7 @@ function SettingsPage() {
   const userDialogCompanies = activeCompanies;
 
   return <Stack spacing={3}>
-    <Header title="Configuracion" onRefresh={() => { reloadCompanies(); reloadUsers(); reloadProductCategories(); reloadFinancialSettings(); reloadQuoteChargeConcepts(); reloadSalesPoints(); reloadRequirementProfiles(); reloadPromotions(); }} />
+    <Header title="Configuracion" onRefresh={() => { reloadCompanies(); reloadUsers(); reloadProductCategories(); reloadFinancialSettings(); reloadQuoteChargeConcepts(); reloadSalesPoints();  reloadPromotions(); }} />
     <Card><CardContent><Grid container spacing={2}>
       <Grid item xs={12} md={6}><TextField fullWidth label="API URL" value={import.meta.env.VITE_API_URL ?? ''} InputProps={{ readOnly: true }} /></Grid>
       <Grid item xs={12} md={6}>{isGlobalAdmin
@@ -3663,32 +3621,7 @@ function SettingsPage() {
         />
       </Stack>
     </CardContent></Card>
-    <Card><CardContent>
-      <Stack spacing={2}>
-        <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', sm: 'center' }} gap={1}>
-          <Box>
-            <Typography variant="h5" fontWeight={900}>Perfiles de requisitos</Typography>
-            <Typography color="text.secondary" fontSize={14}>Checklist documental por tipo de cliente o forma de pago.</Typography>
-          </Box>
-          {canManage && <Button variant="contained" startIcon={<Add />} onClick={() => setRequirementProfileForm({ open: true })}>Nuevo perfil</Button>}
-        </Stack>
-        <StatusBar loading={loadingRequirementProfiles} error={requirementProfilesError} />
-        <EntityTable
-          headers={['Perfil', 'Tipo', 'Documentos', 'Estado', 'Acciones']}
-          empty="No hay perfiles de requisitos registrados"
-          rows={requirementProfiles.map((profile) => [
-            <Box><Typography fontWeight={800}>{profile.name}</Typography><Typography color="text.secondary" fontSize={12}>{profile.code}</Typography></Box>,
-            profile.isCash ? 'Contado' : 'Credito',
-            <Stack direction="row" gap={.5} flexWrap="wrap">{profile.documents.slice(0, 4).map((document) => <Chip key={document.id} size="small" label={document.name} variant="outlined" />)}{profile.documents.length > 4 && <Chip size="small" label={`+${profile.documents.length - 4}`} />}</Stack>,
-            <StatusChip label={profile.active ? 'Activo' : 'Inactivo'} tone={profile.active ? 'success' : 'default'} />,
-            <Actions
-              onEdit={canManage ? () => setRequirementProfileForm({ open: true, item: profile }) : undefined}
-              onDelete={canManage ? () => setRequirementProfileToDelete(profile) : undefined}
-            />
-          ])}
-        />
-      </Stack>
-    </CardContent></Card>
+
     <Card><CardContent>
       <Stack spacing={2}>
         <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', sm: 'center' }} gap={1}>
@@ -3754,14 +3687,6 @@ function SettingsPage() {
     <SalesPointDialog form={salesPointForm} onClose={() => setSalesPointForm({ open: false })} onSave={saveSalesPoint} />
     <ProductCategoryDialog form={productCategoryForm} onClose={() => setProductCategoryForm({ open: false })} onSave={saveProductCategory} />
     <QuoteChargeConceptDialog form={quoteChargeConceptForm} onClose={() => setQuoteChargeConceptForm({ open: false })} onSave={saveQuoteChargeConcept} />
-    <RequirementProfileDialog form={requirementProfileForm} onClose={() => setRequirementProfileForm({ open: false })} onSave={saveRequirementProfile} />
-    <ConfirmDialog
-      title="Eliminar perfil de requisitos"
-      text={`Se eliminara el perfil ${requirementProfileToDelete?.name ?? ''} y su lista de documentos. Esta accion no se puede deshacer.`}
-      open={!!requirementProfileToDelete}
-      onClose={() => setRequirementProfileToDelete(undefined)}
-      onConfirm={deleteRequirementProfile}
-    />
     <PromotionDialog form={promotionForm} products={products.filter((x) => x.active)} salesPoints={salesPoints.filter((x) => x.active)} onClose={() => setPromotionForm({ open: false })} onSave={savePromotion} />
     <UserDialog form={userForm} companies={userDialogCompanies} salesPoints={salesPoints.filter((x) => x.active)} defaultCompanyId={currentCompanyId} onClose={() => setUserForm({ open: false })} onSave={saveUser} />
     <FinancialSettingsDialog form={financialForm} onClose={() => setFinancialForm({ open: false })} onSave={saveFinancialSettings} />
@@ -4046,69 +3971,6 @@ function CompanyLogoPicker({ value, onChange, title = 'Logo de la empresa', help
   </Stack>;
 }
 
-function RequirementProfileDialog({ form, onClose, onSave }: DialogProps<RequirementProfile, typeof emptyRequirementProfile>) {
-  const initial = form.item ? {
-    name: form.item.name,
-    code: form.item.code,
-    description: form.item.description ?? '',
-    isCash: form.item.isCash,
-    active: form.item.active,
-    documents: form.item.documents.length ? form.item.documents.map((document) => ({
-      type: document.type,
-      name: document.name,
-      description: document.description ?? '',
-      required: document.required,
-      order: document.order
-    })) : [emptyRequirementDocument]
-  } : emptyRequirementProfile;
-
-  return <FormDialog title={form.item ? 'Editar perfil de requisitos' : 'Nuevo perfil de requisitos'} open={form.open} initial={initial} onClose={onClose} onSave={onSave} maxWidth="md">
-    {(v, set) => {
-      const documents = v.documents.length ? v.documents : [emptyRequirementDocument];
-      const updateDocument = (index: number, patch: Partial<typeof emptyRequirementDocument>) => {
-        set({ documents: documents.map((document, documentIndex) => documentIndex === index ? { ...document, ...patch } : document) });
-      };
-      const addDocument = () => set({ documents: [...documents, { ...emptyRequirementDocument, order: documents.length + 1 }] });
-      const removeDocument = (index: number) => set({ documents: documents.filter((_, documentIndex) => documentIndex !== index).map((document, documentIndex) => ({ ...document, order: documentIndex + 1 })) });
-
-      return <>
-        <SectionTitle title="Perfil" />
-        <FieldGrid columns={2}>
-          <TextField fullWidth required label="Nombre" value={v.name} onChange={(e) => set({ name: e.target.value })} />
-          <TextField fullWidth required label="Codigo" value={v.code} onChange={(e) => set({ code: e.target.value.toUpperCase().replace(/[^A-Z0-9_ -]/g, '').replace(/\s+/g, '_') })} />
-        </FieldGrid>
-        <TextField label="Descripcion" value={v.description} onChange={(e) => set({ description: e.target.value })} multiline minRows={2} />
-        <Stack direction={{ xs: 'column', sm: 'row' }} gap={1}>
-          <FormControlLabel control={<Checkbox checked={v.isCash} onChange={(e) => set({ isCash: e.target.checked })} />} label="Perfil para venta de contado" />
-          <FormControlLabel control={<Checkbox checked={v.active} onChange={(e) => set({ active: e.target.checked })} />} label="Perfil activo" />
-        </Stack>
-        <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', sm: 'center' }} gap={1}>
-          <SectionTitle title="Documentos requeridos" />
-          <Button type="button" variant="outlined" startIcon={<Add />} onClick={addDocument}>Agregar documento</Button>
-        </Stack>
-        <Stack spacing={1.25}>
-          {documents.map((document, index) => <Paper key={index} variant="outlined" sx={{ p: 1.5, bgcolor: '#f8fafc' }}>
-            <Box sx={{
-              display: 'grid',
-              gridTemplateColumns: { xs: '1fr', md: '80px minmax(160px, 1fr) minmax(220px, 1.3fr) 120px 48px' },
-              gap: 1,
-              alignItems: 'center'
-            }}>
-              <TextField fullWidth label="Orden" type="number" value={document.order} onChange={(e) => updateDocument(index, { order: Number(e.target.value) })} />
-              <TextField fullWidth select label="Tipo" value={document.type} onChange={(e) => updateDocument(index, { type: Number(e.target.value) })}>
-                {[1, 2, 3, 4, 5].map((type) => <MenuItem key={type} value={type}>{documentType(type)}</MenuItem>)}
-              </TextField>
-              <TextField fullWidth required label="Documento" value={document.name} onChange={(e) => updateDocument(index, { name: e.target.value })} />
-              <FormControlLabel control={<Checkbox checked={document.required} onChange={(e) => updateDocument(index, { required: e.target.checked })} />} label="Obligatorio" />
-              <IconButton color="error" disabled={documents.length === 1} onClick={() => removeDocument(index)}><Delete fontSize="small" /></IconButton>
-            </Box>
-            <TextField fullWidth sx={{ mt: 1 }} label="Nota para el asesor" value={document.description} onChange={(e) => updateDocument(index, { description: e.target.value })} />
-          </Paper>)}
-        </Stack>
-      </>;
-    }}
-  </FormDialog>;
-}
 
 function PromotionDialog({ form, products, salesPoints, onClose, onSave }: DialogProps<Promotion, typeof emptyPromotion> & { products: Product[]; salesPoints: SalesPoint[] }) {
   const initial = form.item ? {
@@ -4629,7 +4491,7 @@ function ProductPhotosManager({ product, onChanged }: { product: Product; onChan
   </Paper>;
 }
 
-function QuoteDialog({ form, products, productCategories, requirementProfiles, quoteChargeConcepts, salesPoints, canChooseSalesPoint, onClose, onSave }: DialogProps<Quote, typeof emptyQuote> & { products: Product[]; productCategories: ProductCategory[]; requirementProfiles: RequirementProfile[]; quoteChargeConcepts: QuoteChargeConcept[]; salesPoints: QuoteSalesPoint[]; canChooseSalesPoint: boolean }) {
+function QuoteDialog({ form, products, productCategories, quoteChargeConcepts, salesPoints, canChooseSalesPoint, onClose, onSave }: DialogProps<Quote, typeof emptyQuote> & { products: Product[]; productCategories: ProductCategory[]; quoteChargeConcepts: QuoteChargeConcept[]; salesPoints: QuoteSalesPoint[]; canChooseSalesPoint: boolean }) {
   const firstProduct = products[0];
   const activeChargeConcepts = normalizedQuoteChargeConcepts(quoteChargeConcepts);
   const initialChargeValues = quoteChargeDefaults(firstProduct, activeChargeConcepts);
@@ -4643,7 +4505,7 @@ function QuoteDialog({ form, products, productCategories, requirementProfiles, q
     chargeValues: initialChargeValues
   };
   const initialSalesPoint = salesPoints[0];
-  const initial = { ...emptyQuote, requirementProfileId: requirementProfiles[0]?.id ?? '', salesPointId: initialSalesPoint?.id ?? '', salesPointRateId: initialSalesPoint?.rates[0]?.id ?? '', productId: initialItem.productId, items: [initialItem] };
+  const initial = { ...emptyQuote, salesPointId: initialSalesPoint?.id ?? '', salesPointRateId: initialSalesPoint?.rates[0]?.id ?? '', productId: initialItem.productId, items: [initialItem] };
   const [identityLoading, setIdentityLoading] = useState(false);
   const [identityNotice, setIdentityNotice] = useState<Notice>();
   const [confirmNewQuote, setConfirmNewQuote] = useState(false);
@@ -4758,7 +4620,6 @@ function QuoteDialog({ form, products, productCategories, requirementProfiles, q
           ...emptyQuote,
           salesPointId: selectedSalesPointId,
           salesPointRateId: salesPointRates[0]?.id ?? '',
-          requirementProfileId: requirementProfiles[0]?.id ?? '',
           items: [{ ...emptyQuoteItem, chargeValues: {}, initialPaymentSchedule: [] }]
         });
         setIdentityNotice(undefined);
@@ -4814,11 +4675,8 @@ function QuoteDialog({ form, products, productCategories, requirementProfiles, q
               <TextField fullWidth label="Indicativo" value={v.phoneCountryCode} onChange={(e) => set({ phoneCountryCode: e.target.value })} />
               <TextField fullWidth required label="Telefono / WhatsApp" value={v.phoneNumber} onChange={(e) => set({ phoneNumber: e.target.value })} />
             </Box>
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(3, minmax(0, 1fr))' }, gap: 1.5 }}>
-              <TextField fullWidth select label="Perfil de requisitos" value={v.requirementProfileId} onChange={(e) => set({ requirementProfileId: e.target.value })} helperText="Este perfil generara el checklist de documentos si la cotizacion pasa a solicitud de credito.">
-                <MenuItem value="">Empleado por defecto</MenuItem>
-                {requirementProfiles.map((profile) => <MenuItem key={profile.id} value={profile.id}>{profile.name}{profile.isCash ? ' - contado' : ''}</MenuItem>)}
-              </TextField>
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' }, gap: 1.5 }}>
+
               <TextField fullWidth required select label="Sede" value={selectedSalesPointId} disabled={!canChooseSalesPoint} onChange={(e) => {
                 const salesPointId = e.target.value;
                 const firstRateId = salesPoints.find((salesPoint) => salesPoint.id === salesPointId)?.rates.find((rate) => rate.active)?.id ?? '';
@@ -6422,4 +6280,3 @@ export default function App() {
   const token = useAuthStore((s) => s.accessToken);
   return <ThemeProvider theme={theme}><CssBaseline /><Routes><Route path="/login" element={token ? <Navigate to="/" /> : <LoginPage />} /><Route path="/*" element={token ? <Layout /> : <Navigate to="/login" />} /></Routes></ThemeProvider>;
 }
-

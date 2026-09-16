@@ -85,10 +85,6 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
         var financialSettings = await GetFinancialSettingsAsync(cancellationToken);
         var salesPoint = await GetCurrentSalesPointAsync(dto.SalesPointId, true, cancellationToken);
         var salesPointRate = await ResolveSalesPointRateAsync(salesPoint, dto.SalesPointRateId, cancellationToken);
-        var requirementProfile = dto.RequirementProfileId.HasValue
-            ? await db.PerfilesRequisito.FirstOrDefaultAsync(x => x.Id == dto.RequirementProfileId.Value && x.Activo, cancellationToken)
-                ?? throw new KeyNotFoundException("Perfil de requisitos no encontrado o inactivo.")
-            : await GetDefaultRequirementProfileAsync(cancellationToken);
         var requestedItems = NormalizeQuoteItems(dto);
         if (requestedItems.Count == 0) throw new ValidationException("Debe seleccionar al menos un producto para cotizar.");
         if (requestedItems.Count > 4) throw new ValidationException("Puede comparar maximo 4 productos por cotizacion.");
@@ -227,8 +223,7 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             PuntoVentaId = salesPoint?.Id,
             TasaPuntoVentaId = salesPointRate?.Id,
             TasaPuntoVenta = salesPointRate,
-            PerfilRequisitoId = requirementProfile?.Id,
-            PerfilRequisito = requirementProfile,
+            PerfilRequisitoId = null,
             NombreSede = salesPoint?.Nombre,
             MarcaSede = salesPoint?.MarcaPrincipal,
             ModalidadEntregaSede = salesPoint?.ModalidadEntrega,
@@ -734,13 +729,6 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             .OrderBy(x => x.Nombre)
             .FirstOrDefaultAsync(cancellationToken);
     }
-
-    private async Task<PerfilRequisito?> GetDefaultRequirementProfileAsync(CancellationToken cancellationToken) =>
-        await db.PerfilesRequisito
-            .Where(x => x.Activo)
-            .OrderByDescending(x => x.Codigo == "EMPLEADO")
-            .ThenBy(x => x.Nombre)
-            .FirstOrDefaultAsync(cancellationToken);
 
     private async Task<IReadOnlyCollection<Promocion>> GetActivePromotionsAsync(DateTime now, CancellationToken cancellationToken) =>
         await db.Promociones
