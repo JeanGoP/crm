@@ -4652,7 +4652,8 @@ function QuoteDialog({ form, products, productCategories, requirementProfiles, q
     if (!form.open) {
       setConfirmNewQuote(false);
       setIdentityLoading(false);
-      setIdentityNotice(undefined);    }
+      setIdentityNotice(undefined);
+    }
   }, [form.open]);
 
   const lookupIdentity = async (value: typeof emptyQuote, set: (patch: Partial<typeof emptyQuote>) => void) => {
