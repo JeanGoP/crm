@@ -386,19 +386,19 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
                 d.Nombre,
                 d.Estado,
                 d.FechaRecepcion,
-                d.FechaVencimiento,
+                null,
                 d.Observaciones,
                 d.FechaRechazo,
                 d.MotivoRechazo,
                 d.FechaValidacion,
                 d.UsuarioValidacion,
-                d.FechaVencimiento.HasValue && d.FechaVencimiento.Value.Date < ColombiaTime.Now.Date,
-                d.FechaVencimiento.HasValue ? (int)(d.FechaVencimiento.Value.Date - ColombiaTime.Now.Date).TotalDays : null,
+                false,
+                null,
                 !string.IsNullOrWhiteSpace(d.RutaArchivo),
                 d.NombreArchivo,
                 d.ContentType,
                 d.TamanoBytes,
-                d.FechaCarga)).ToList());
+                d.FechaCarga)).ToList(), x.DocumentacionCompleta, x.FechaDocumentacionCompleta, x.UsuarioDocumentacionCompleta);
     }
 
     private static IReadOnlyCollection<CustomerTimelineItemDto> BuildTimeline(
@@ -563,7 +563,7 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
             riskLevel = "Alto";
             priority = "Alta";
         }
-        else if (latestApplication?.Documentos.Any(x => x.Estado == EstadoDocumentoCredito.Pendiente) == true || latestApplication?.Estado is EstadoSolicitudCredito.DocumentosPendientes or EstadoSolicitudCredito.EnEstudio || daysWithoutFollowUp >= 5)
+        else if (latestApplication is { DocumentacionCompleta: false } || latestApplication?.Estado is EstadoSolicitudCredito.DocumentosPendientes or EstadoSolicitudCredito.EnEstudio || daysWithoutFollowUp >= 5)
         {
             riskLevel = "Medio";
             priority = "Alta";
@@ -580,7 +580,7 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
                 ? ProductName(latestQuote.Producto)
                 : "el producto de interes";
 
-        var nextAction = latestApplication?.Documentos.Any(x => x.Estado is EstadoDocumentoCredito.Pendiente or EstadoDocumentoCredito.Rechazado) == true
+        var nextAction = latestApplication is { DocumentacionCompleta: false }
             ? "Contactar al cliente para solicitar o corregir los documentos pendientes."
             : overdueActivities.Count > 0
                 ? "Resolver la actividad vencida y registrar el resultado del seguimiento."

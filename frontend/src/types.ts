@@ -531,6 +531,9 @@ export interface CreditApplication {
   welcomeUser?: string;
   welcomeNotes?: string;
   documents: CreditDocument[];
+  documentationCompleted: boolean;
+  documentationCompletedAt?: string;
+  documentationCompletedBy?: string;
 }
 
 export interface MotorcycleDelivery {

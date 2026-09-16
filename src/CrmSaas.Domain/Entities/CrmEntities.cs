@@ -456,6 +456,9 @@ public sealed class SolicitudCredito : AuditableTenantEntity
     public string? UsuarioBienvenida { get; set; }
     public string? ObservacionBienvenida { get; set; }
     public ICollection<DocumentoSolicitudCredito> Documentos { get; set; } = new List<DocumentoSolicitudCredito>();
+    public bool DocumentacionCompleta { get; set; }
+    public DateTime? FechaDocumentacionCompleta { get; set; }
+    public string? UsuarioDocumentacionCompleta { get; set; }
 }
 
 public sealed class DocumentoSolicitudCredito : AuditableTenantEntity

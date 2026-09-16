@@ -918,7 +918,7 @@ function Customer360Page() {
   const nextActivity = sortedPendingActivities.find((activity) => new Date(activity.scheduledAt).getTime() >= Date.now()) ?? sortedPendingActivities[0];
   const latestQuote = [...quotes].sort((a, b) => new Date(b.quoteDate).getTime() - new Date(a.quoteDate).getTime())[0];
   const activeCredit = [...creditApplications].sort((a, b) => new Date(b.submittedAt ?? '').getTime() - new Date(a.submittedAt ?? '').getTime())[0];
-  const pendingDocuments = creditApplications.reduce((sum, application) => sum + (application.documents?.filter((document) => document.status === 1).length ?? 0), 0);
+  const pendingDocuments = creditApplications.filter((application) => !application.documentationCompleted).length;
   const latestTimeline = timeline[0];
   const completedActivities = activities.filter((activity) => activity.status === 3).length;
   const commercialHealthTone = overdueActivities.length || pendingDocuments ? 'warning' : 'success';
@@ -1595,7 +1595,7 @@ function creditWorkflowColumn(application: CreditApplication): CreditWorkflowCol
   if (!bureauReady) return 'bureau';
   const documentsStarted = application.status >= 2 || application.documents.some((document) => document.hasFile || document.status > 1);
   if (!documentsStarted) return 'created';
-  const documentsReady = application.documents.length > 0 && application.documents.every((document) => document.status === 2 || document.status === 3);
+  const documentsReady = application.documentationCompleted;
   if (!documentsReady) return 'documents';
   return 'approval';
 }
@@ -1673,7 +1673,7 @@ function CreditWorkflowBoardPage() {
               {cards.map((application) => {
                 const stageDate = new Date(creditWorkflowStageDate(application, column.id));
                 const days = Math.max(0, Math.floor((Date.now() - stageDate.getTime()) / 86400000));
-                const pending = application.documents.filter((document) => document.status === 1 || document.status === 4 || document.isExpired).length;
+                const pending = application.documentationCompleted ? 0 : 1;
                 return <Card key={application.id} variant="outlined" sx={{ borderColor: pending ? '#f5c26b' : uiBorder, boxShadow: '0 5px 14px rgba(15, 23, 42, .05)' }}>
                   <CardContent sx={{ p: '12px !important' }}>
                     <Stack spacing={1}>
@@ -1687,7 +1687,7 @@ function CreditWorkflowBoardPage() {
                       </Box>
                       <Stack direction="row" gap={.5} flexWrap="wrap" useFlexGap>
                         <StatusChip label={creditStatus(application.status)} tone={creditTone(application.status)} />
-                        {pending > 0 && <Chip size="small" color="warning" variant="outlined" label={`${pending} pendiente${pending === 1 ? '' : 's'}`} />}
+                        {pending > 0 && <Chip size="small" color="warning" variant="outlined" label="Documentación por confirmar" />}
                         {column.id === 'welcome' && application.welcomeCompleted && <Chip size="small" color="success" label="Finalizado" />}
                       </Stack>
                       <Button size="small" variant="outlined" onClick={() => navigate(`/solicitudes-credito?solicitud=${application.id}&tab=proceso`)}>Gestionar proceso</Button>
@@ -1849,7 +1849,7 @@ function CreditApplicationsPage() {
         name: document.name,
         status,
         receivedAt: status === 2 || status === 3 ? new Date().toISOString() : document.receivedAt ?? null,
-        expiresAt: patch?.expiresAt ?? document.expiresAt ?? null,
+        expiresAt: null,
         notes: patch?.notes ?? document.notes ?? null,
         rejectionReason: patch?.rejectionReason ?? document.rejectionReason ?? null
       });
@@ -1903,7 +1903,7 @@ function CreditApplicationsPage() {
     }
   };
 
-  const saveWorkflowMilestone = async (application: CreditApplication, milestone: 'signatures' | 'final-review' | 'welcome', completed: boolean, notes?: string) => {
+  const saveWorkflowMilestone = async (application: CreditApplication, milestone: 'signatures' | 'final-review' | 'welcome' | "documentation", completed: boolean, notes?: string) => {
     try {
       const { data } = await api.post<CreditApplication>(`/api/credit-applications/${application.id}/workflow/${milestone}`, { completed, notes: notes || null });
       setData(rows.map((x) => x.id === data.id ? data : x));
@@ -2003,8 +2003,8 @@ function CreditApplicationsPage() {
 }
 
 function CreditApplicationPendingSummary({ application, compact = false }: { application: CreditApplication; compact?: boolean }) {
-  const validDocuments = application.documents.filter((x) => x.status === 3).length;
-  const pendingDocuments = application.documents.filter((x) => x.status === 1 || x.status === 4 || x.isExpired).length;
+
+  const pendingDocuments = application.documentationCompleted ? 0 : 1;
   const step0Ready = application.runtChecked && application.simitChecked && application.identityValidated;
   const items = [
     pendingDocuments > 0 ? `${pendingDocuments} doc. pendientes` : 'Docs ok',
@@ -2015,7 +2015,7 @@ function CreditApplicationPendingSummary({ application, compact = false }: { app
   ].filter(Boolean);
 
   return <Stack direction="row" gap={.5} flexWrap="wrap" useFlexGap>
-    <Chip size="small" color={pendingDocuments ? 'warning' : 'success'} label={compact ? `${validDocuments}/${application.documents.length}` : `${validDocuments}/${application.documents.length} docs`} />
+    <Chip size="small" color={application.documentationCompleted ? "success" : "warning"} label={application.documentationCompleted ? "Documentación completa" : "Documentación por confirmar"} />
     <Chip size="small" color={step0Ready ? 'success' : 'warning'} variant={step0Ready ? 'filled' : 'outlined'} label={compact ? (step0Ready ? 'Inicial ok' : 'Inicial') : (step0Ready ? 'Validacion inicial lista' : 'Validacion inicial pendiente')} />
     {application.studyResult && <Chip size="small" label={application.studyResult} variant="outlined" color={application.status === 6 ? 'error' : application.status === 5 ? 'success' : 'default'} />}
     {!application.studyResult && items.length === 0 && <Chip size="small" variant="outlined" label="Sin pendientes" />}
@@ -2051,7 +2051,7 @@ function CreditApplicationManagementDialog({
   onDeleteDocument: (application: CreditApplication, document: CreditDocument) => Promise<void>;
   onStep0: (application: CreditApplication, patch?: Partial<CreditApplication>) => Promise<void>;
   onCreditBureau: (application: CreditApplication, patch: Partial<CreditApplication>) => Promise<void>;
-  onWorkflowMilestone: (application: CreditApplication, milestone: 'signatures' | 'final-review' | 'welcome', completed: boolean, notes?: string) => Promise<void>;
+  onWorkflowMilestone: (application: CreditApplication, milestone: 'signatures' | 'final-review' | 'welcome' | "documentation", completed: boolean, notes?: string) => Promise<void>;
   onRecalculate: (application: CreditApplication, patch: Partial<CreditApplication>) => Promise<void>;
   onDecision: (application: CreditApplication, status: number, notes?: string, study?: Partial<CreditApplication> & { result?: string }) => Promise<void>;
   onDownloadTemplate: (application: CreditApplication, template: CreditTemplate) => Promise<void>;
@@ -2089,7 +2089,7 @@ function CreditApplicationManagementDialog({
           <Stack direction="row" gap={.75} flexWrap="wrap" useFlexGap>
             <CreditApplicationPendingSummary application={application} />
           </Stack>
-          <DocumentSummary application={application} onUpdate={onUpdateDocument} onUpload={onUploadDocument} onDownload={onDownloadDocument} onDelete={onDeleteDocument} />
+          <DocumentSummary application={application} onComplete={(completed) => onWorkflowMilestone(application, "documentation", completed)} onUpdate={onUpdateDocument} onUpload={onUploadDocument} onDownload={onDownloadDocument} onDelete={onDeleteDocument} />
         </Stack>}
         {tab === 1 && <CreditStudySummary application={application} onStep0={onStep0} onRecalculate={onRecalculate} onDecision={onDecision} />}
         {tab === 2 && <Stack spacing={2}>
@@ -2132,11 +2132,11 @@ type CreditWorkflowEditor = 'bureau' | 'signatures' | 'final-review' | 'welcome'
 function CreditWorkflowControls({ application, onCreditBureau, onMilestone }: {
   application: CreditApplication;
   onCreditBureau: (application: CreditApplication, patch: Partial<CreditApplication>) => Promise<void>;
-  onMilestone: (application: CreditApplication, milestone: 'signatures' | 'final-review' | 'welcome', completed: boolean, notes?: string) => Promise<void>;
+  onMilestone: (application: CreditApplication, milestone: 'signatures' | 'final-review' | 'welcome' | "documentation", completed: boolean, notes?: string) => Promise<void>;
 }) {
   const initialReady = application.runtChecked && application.simitChecked && application.identityValidated;
   const bureauReady = application.creditBureauClientChecked && (!application.coDebtorName || application.creditBureauCoDebtorChecked);
-  const documentsReady = application.documents.length > 0 && application.documents.every((document) => document.status === 2 || document.status === 3);
+  const documentsReady = application.documentationCompleted;
   const approved = application.status === 5 || application.status === 7;
   const [editor, setEditor] = useState<CreditWorkflowEditor>();
   const [saving, setSaving] = useState(false);
@@ -2146,7 +2146,7 @@ function CreditWorkflowControls({ application, onCreditBureau, onMilestone }: {
     { number: 1, title: 'Verificacion SIMIT y RUNT', complete: initialReady, detail: initialReady ? `Completada por ${application.step0User || 'el equipo'}` : 'Pendiente en la pestaña Estudio' },
     { number: 2, title: 'Verificacion Datacredito', complete: bureauReady, detail: bureauReady ? `Cliente${application.creditBureauClientScore != null ? `: ${application.creditBureauClientScore}` : ''}${application.coDebtorName ? ` · Codeudor${application.creditBureauCoDebtorScore != null ? `: ${application.creditBureauCoDebtorScore}` : ''}` : ''}` : 'Falta registrar la consulta', action: 'bureau' as CreditWorkflowEditor },
     { number: 3, title: 'Creacion de la solicitud', complete: true, detail: `Creada el ${new Date(application.createdAt).toLocaleDateString()}` },
-    { number: 4, title: 'Ingreso de soportes', complete: documentsReady, detail: documentsReady ? 'Todos los soportes fueron recibidos' : `${application.documents.filter((document) => document.status === 1 || document.status === 4).length} soporte(s) pendiente(s)` },
+    { number: 4, title: "Ingreso de soportes", complete: documentsReady, detail: documentsReady ? "Documentación confirmada por el responsable" : "Confirme que recibió los documentos necesarios para este caso" },
     { number: 5, title: 'Aprobaciones', complete: approved, detail: application.studyResult || (application.status === 4 ? 'Credito en estudio' : 'Pendiente de estudio') },
     { number: 6, title: 'Firmas del negocio', complete: application.signaturesCompleted, detail: application.signaturesCompleted ? `Registradas por ${application.signaturesUser || 'el equipo'}` : 'Pendientes después de la aprobación', action: 'signatures' as CreditWorkflowEditor, disabled: !approved },
     { number: 7, title: 'Revision final de aprobaciones', complete: application.finalReviewApproved, detail: application.finalReviewApproved ? `Autorizada por ${application.finalReviewUser || 'el equipo'}` : 'Pendiente después de las firmas', action: 'final-review' as CreditWorkflowEditor, disabled: !application.signaturesCompleted },
@@ -5379,8 +5379,11 @@ function CreditApplicationDialog({ form, customers, products, quotes, requiremen
   </FormDialog>;
 }
 
-function DocumentSummary({ application, onUpdate, onUpload, onDownload, onDelete }: {
+const creditDocumentNames = ['Cédula de ciudadanía', 'Recibo de servicio público', 'Carta laboral', 'Desprendibles de pago', 'Certificado de libertad y tradición', 'Compraventa o escritura', 'Tarjeta de propiedad', 'Sana posesión', 'Extractos bancarios', 'Declaración de renta', 'RUT', 'Certificado de vacunación de ganado', 'Cámara de comercio', 'Registro de hierro', 'Otros'];
+
+function DocumentSummary({ application, onUpdate, onUpload, onDownload, onDelete, onComplete }: {
   application: CreditApplication;
+  onComplete: (completed: boolean) => Promise<void>;
   onUpdate: (application: CreditApplication, document: CreditDocument, status: number, patch?: Partial<Pick<CreditDocument, 'expiresAt' | 'notes' | 'rejectionReason'>>) => Promise<void>;
   onUpload: (application: CreditApplication, document: CreditDocument, file: File) => Promise<void>;
   onDownload: (application: CreditApplication, document: CreditDocument) => Promise<void>;
@@ -5388,6 +5391,16 @@ function DocumentSummary({ application, onUpdate, onUpload, onDownload, onDelete
 }) {
   const canValidate = useCanManage();
   const statusOptions = canValidate ? [1, 2, 3, 4] : [1, 2];
+  const [confirmComplete, setConfirmComplete] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [completionError, setCompletionError] = useState('');
+  const groups = [
+    { title: 'Identificación y domicilio', names: creditDocumentNames.slice(0, 2) },
+    { title: 'Soportes laborales y financieros', names: [creditDocumentNames[2], creditDocumentNames[3], creditDocumentNames[8], creditDocumentNames[9]] },
+    { title: 'Propiedad y actividad económica', names: [...creditDocumentNames.slice(4, 8), ...creditDocumentNames.slice(10, 14)] },
+    { title: 'Otros soportes', names: [creditDocumentNames[14]] },
+    { title: 'Documentos anteriores conservados', names: application.documents.filter((d) => d.hasFile && !creditDocumentNames.includes(d.name)).map((d) => d.name) }
+  ];
 
   const handleStatus = (document: CreditDocument, status: number) => {
     if (status === 4) {
@@ -5401,15 +5414,33 @@ function DocumentSummary({ application, onUpdate, onUpload, onDownload, onDelete
   };
 
   return <Stack spacing={1} sx={{ minWidth: 0, width: '100%' }}>
-    {application.documents.map((document) => {
+    <Alert severity={application.documentationCompleted ? 'success' : 'info'}>
+      {application.documentationCompleted ? 'Documentación completa, confirmada por el responsable.' : 'Los documentos son opcionales. Cargue solamente los necesarios para este caso y confirme cuando el expediente esté completo.'}
+      {application.documentationCompletedAt && <Typography variant="caption" display="block">{application.documentationCompletedBy} · {new Date(application.documentationCompletedAt).toLocaleString()}</Typography>}
+    </Alert>
+    <Stack direction={{ xs: 'column', sm: 'row' }} gap={1} alignItems={{ sm: 'center' }} justifyContent="space-between">
+      <Typography variant="body2">{application.documents.filter((d) => d.hasFile).length} archivos cargados · Sin fechas de vencimiento</Typography>
+      <Button variant={application.documentationCompleted ? 'outlined' : 'contained'} disabled={saving} onClick={() => setConfirmComplete(true)}>{application.documentationCompleted ? 'Reabrir documentación' : 'Documentación completa'}</Button>
+    </Stack>
+    {completionError && <Alert severity="error">{completionError}</Alert>}
+    <ConfirmDialog open={confirmComplete} title={application.documentationCompleted ? 'Reabrir documentación' : 'Confirmar documentación completa'} text={application.documentationCompleted ? 'La documentación volverá a quedar pendiente de confirmación. No se borrará ningún archivo.' : 'Confirmo que recibí todos los documentos necesarios para esta solicitud. No es necesario cargar todas las opciones del listado.'} confirmLabel="Confirmar" onClose={() => setConfirmComplete(false)} onConfirm={async () => {
+      setSaving(true);
+      setCompletionError('');
+      try { await onComplete(!application.documentationCompleted); setConfirmComplete(false); }
+      catch (err) { setCompletionError(apiError(err)); throw err; }
+      finally { setSaving(false); }
+    }} />
+    {groups.filter((group) => group.names.length > 0).map((group) => <Box key={group.title} sx={{ pt: 1.5 }}>
+      <Typography variant="subtitle1" fontWeight={800} sx={{ mb: 1 }}>{group.title}</Typography>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' }, gap: 1.25 }}>
+    {application.documents.filter((document) => group.names.includes(document.name)).map((document) => {
       const documentStatusOptions = statusOptions.includes(document.status) ? statusOptions : [...statusOptions, document.status];
       return <Stack key={document.id} spacing={.75} sx={{ p: 1, border: '1px solid #e2e8f0', borderRadius: 1, bgcolor: '#fff' }}>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1}>
+      <Stack spacing={1}>
         <Stack spacing={.4} sx={{ minWidth: 0 }}>
           <Stack direction="row" gap={.5} flexWrap="wrap">
-            <Chip size="small" label={`${document.name}: ${documentStatus(document.status)}`} color={document.status === 3 ? 'success' : document.status === 4 ? 'error' : undefined} variant={document.status === 1 ? 'outlined' : 'filled'} />
-            {document.isExpired && <Chip size="small" color="error" variant="outlined" label="Vencido" />}
-            {!document.isExpired && document.daysToExpire !== undefined && document.daysToExpire !== null && document.daysToExpire <= 7 && <Chip size="small" color="warning" variant="outlined" label={`Vence en ${document.daysToExpire} dia(s)`} />}
+            <Typography variant="body2" fontWeight={800} sx={{ width: '100%', overflowWrap: 'break-word' }}>{document.name}</Typography>
+            <Chip size="small" label={document.status === 1 ? 'Sin cargar (opcional)' : documentStatus(document.status)} color={document.status === 3 ? 'success' : document.status === 4 ? 'error' : undefined} variant={document.status === 1 ? 'outlined' : 'filled'} />
           </Stack>
           {document.hasFile && <Typography variant="caption" color="text.secondary" noWrap>{document.fileName}</Typography>}
           {document.rejectionReason && <Typography variant="caption" color="error">Motivo: {document.rejectionReason}</Typography>}
@@ -5441,16 +5472,10 @@ function DocumentSummary({ application, onUpdate, onUpload, onDownload, onDelete
           </TextField>
         </Stack>
       </Stack>
-      <TextField
-        size="small"
-        type="date"
-        label="Vigencia"
-        value={document.expiresAt?.slice(0, 10) ?? ''}
-        onChange={(e) => onUpdate(application, document, document.status, { expiresAt: e.target.value ? new Date(`${e.target.value}T00:00:00`).toISOString() : undefined })}
-        InputLabelProps={{ shrink: true }}
-      />
     </Stack>;
     })}
+      </Box>
+    </Box>)}
   </Stack>;
 }
 

@@ -476,7 +476,10 @@ public sealed record CreditApplicationDto(
     DateTime? WelcomeCompletedAt,
     string? WelcomeUser,
     string? WelcomeNotes,
-    IReadOnlyCollection<CreditDocumentDto> Documents);
+    IReadOnlyCollection<CreditDocumentDto> Documents,
+    bool DocumentationCompleted = false,
+    DateTime? DocumentationCompletedAt = null,
+    string? DocumentationCompletedBy = null);
 
 public sealed record UpsertCreditApplicationDto(
     Guid CustomerId,

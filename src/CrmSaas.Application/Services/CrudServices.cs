@@ -375,7 +375,7 @@ public sealed class DashboardService(ICrmDbContext db) : IDashboardService
             .ToListAsync(cancellationToken));
 
         var pendingDocumentRequests = await db.SolicitudesCredito
-            .Where(x => x.Estado == EstadoSolicitudCredito.DocumentosPendientes || x.Documentos.Any(d => d.Estado == EstadoDocumentoCredito.Pendiente || d.Estado == EstadoDocumentoCredito.Rechazado))
+            .Where(x => !x.DocumentacionCompleta && x.Estado != EstadoSolicitudCredito.Rechazada && x.Estado != EstadoSolicitudCredito.Desistida && x.Estado != EstadoSolicitudCredito.Desembolsada)
             .OrderBy(x => x.FechaCreacion)
             .Take(5)
             .Select(x => new
@@ -389,9 +389,7 @@ public sealed class DashboardService(ICrmDbContext db) : IDashboardService
 
         alerts.AddRange(pendingDocumentRequests.Select(x =>
         {
-            var documentSummary = x.PendingDocuments + x.RejectedDocuments == 0
-                ? x.Numero + " requiere completar o validar documentos."
-                : x.Numero + " tiene " + x.PendingDocuments + " documento(s) pendiente(s) y " + x.RejectedDocuments + " rechazado(s).";
+            var documentSummary = x.Numero + " requiere confirmar que la documentación necesaria está completa. Los soportes son opcionales.";
 
             return new CommercialAlertDto(
                 "Credito",
@@ -403,8 +401,7 @@ public sealed class DashboardService(ICrmDbContext db) : IDashboardService
         }));
 
         var completeChecklistRequests = await db.SolicitudesCredito
-            .Where(x => x.Documentos.Count > 0
-                && x.Documentos.All(d => d.Estado == EstadoDocumentoCredito.Recibido || d.Estado == EstadoDocumentoCredito.Validado)
+            .Where(x => x.DocumentacionCompleta
                 && x.Estado == EstadoSolicitudCredito.DocumentosRecibidos)
             .OrderBy(x => x.FechaActualizacion ?? x.FechaCreacion)
             .Take(5)

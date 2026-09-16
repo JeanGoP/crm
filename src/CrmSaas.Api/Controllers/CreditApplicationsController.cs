@@ -304,7 +304,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         document.Tipo = dto.Type;
         document.Nombre = string.IsNullOrWhiteSpace(dto.Name) ? document.Nombre : dto.Name.Trim();
         document.ClienteId = entity.ClienteId;
-        document.FechaVencimiento = dto.ExpiresAt;
+        document.FechaVencimiento = null;
         if (dto.Status is EstadoDocumentoCredito.Validado or EstadoDocumentoCredito.Rechazado && !CanValidateDocuments())
         {
             return Forbid();
@@ -322,7 +322,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         document.Observaciones = dto.Notes;
         ApplyDocumentAudit(document, dto.Status, dto.RejectionReason);
 
-        MarkReadyIfDocumentsComplete(entity);
+        ClearDocumentationConfirmation(entity);
 
         await SyncPipelineAsync(entity, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
@@ -373,10 +373,10 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         document.Estado = EstadoDocumentoCredito.Recibido;
         document.FechaRecepcion = ColombiaTime.Now;
         document.ClienteId = entity.ClienteId;
-        document.FechaVencimiento ??= DefaultExpiration(document.Tipo, ColombiaTime.Now);
+        document.FechaVencimiento = null;
         ApplyDocumentAudit(document, EstadoDocumentoCredito.Recibido, null);
 
-        MarkReadyIfDocumentsComplete(entity);
+        ClearDocumentationConfirmation(entity);
         await SyncPipelineAsync(entity, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         return Ok(ToDto(entity));
@@ -427,6 +427,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         document.Estado = EstadoDocumentoCredito.Pendiente;
         document.FechaVencimiento = null;
         ApplyDocumentAudit(document, EstadoDocumentoCredito.Pendiente, null);
+        ClearDocumentationConfirmation(entity);
         if (entity.Estado == EstadoSolicitudCredito.DocumentosRecibidos)
         {
             entity.Estado = EstadoSolicitudCredito.DocumentosPendientes;
@@ -621,62 +622,63 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             .FirstOrDefaultAsync(cancellationToken);
     }
 
+
     private static void AddChecklistDocuments(SolicitudCredito entity, PerfilRequisito? profile)
     {
-        var documents = profile?.Documentos.Count > 0
-            ? profile.Documentos.OrderBy(x => x.Orden).Select(ToApplicationDocument)
-            : DefaultDocuments();
-
-        foreach (var document in documents)
+        foreach (var document in CreditDocumentCatalog.Create())
         {
             PrepareDocument(entity, document);
             entity.Documentos.Add(document);
         }
     }
 
-    private static void AddMissingChecklistDocuments(SolicitudCredito entity, PerfilRequisito? profile)
+    private void AddMissingChecklistDocuments(SolicitudCredito entity, PerfilRequisito? profile)
     {
-        if (profile?.Documentos.Count is not > 0) return;
-        var existingNames = entity.Documentos.Select(x => x.Nombre.Trim()).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        foreach (var document in profile.Documentos.OrderBy(x => x.Orden))
+        var names = entity.Documentos.Select(x => x.Nombre).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var document in CreditDocumentCatalog.Create().Where(x => !names.Contains(x.Nombre)))
         {
-            if (existingNames.Contains(document.Nombre.Trim())) continue;
-            var applicationDocument = ToApplicationDocument(document);
-            PrepareDocument(entity, applicationDocument);
-            entity.Documentos.Add(applicationDocument);
+            PrepareDocument(entity, document);
+            document.SolicitudCreditoId = entity.Id;
+            document.EmpresaId = entity.EmpresaId;
+            entity.Documentos.Add(document);
+            db.DocumentosSolicitudCredito.Add(document);
         }
     }
-
-    private static DocumentoSolicitudCredito ToApplicationDocument(DocumentoPerfilRequisito document) => new()
-    {
-        Tipo = document.Tipo,
-        Nombre = document.Obligatorio ? document.Nombre : $"{document.Nombre} (opcional)",
-        Observaciones = document.Descripcion
-    };
-
-    private static IReadOnlyCollection<DocumentoSolicitudCredito> DefaultDocuments() =>
-    [
-        new() { Tipo = TipoDocumentoCredito.Cedula, Nombre = "Cedula" },
-        new() { Tipo = TipoDocumentoCredito.SoporteIngresos, Nombre = "Soporte de ingresos" },
-        new() { Tipo = TipoDocumentoCredito.ReciboServicio, Nombre = "Recibo de servicio o direccion" },
-        new() { Tipo = TipoDocumentoCredito.Referencias, Nombre = "Referencias" }
-    ];
 
     private static void PrepareDocument(SolicitudCredito entity, DocumentoSolicitudCredito document)
     {
         document.ClienteId = entity.ClienteId;
-        document.FechaVencimiento ??= DefaultExpiration(document.Tipo, ColombiaTime.Now);
+        document.FechaVencimiento = null;
     }
 
-    private static void MarkReadyIfDocumentsComplete(SolicitudCredito entity)
+    private static void ClearDocumentationConfirmation(SolicitudCredito entity)
     {
-        if (entity.Documentos.Count > 0 && entity.Documentos.All(x => x.Estado is EstadoDocumentoCredito.Recibido or EstadoDocumentoCredito.Validado))
+        entity.DocumentacionCompleta = false;
+        entity.FechaDocumentacionCompleta = null;
+        entity.UsuarioDocumentacionCompleta = null;
+        if (entity.Estado == EstadoSolicitudCredito.DocumentosRecibidos)
+            entity.Estado = EstadoSolicitudCredito.DocumentosPendientes;
+    }
+
+    [HttpPost("{id:guid}/workflow/documentation")]
+    public async Task<ActionResult<CreditApplicationDto>> ConfirmDocumentation(Guid id, CreditWorkflowMilestoneDto dto, CancellationToken cancellationToken)
+    {
+        var entity = await db.SolicitudesCredito.Include(x => x.Cliente).Include(x => x.Producto)
+            .Include(x => x.PerfilRequisito).Include(x => x.Documentos)
+            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
+            ?? throw new KeyNotFoundException("Solicitud no encontrada.");
+        ClearDocumentationConfirmation(entity);
+        if (dto.Completed)
         {
+            entity.DocumentacionCompleta = true;
+            entity.FechaDocumentacionCompleta = ColombiaTime.Now;
+            entity.UsuarioDocumentacionCompleta = tenantContext.UsuarioActual;
             if (entity.Estado is EstadoSolicitudCredito.Borrador or EstadoSolicitudCredito.Cotizado or EstadoSolicitudCredito.Interesado or EstadoSolicitudCredito.DocumentosPendientes)
-            {
                 entity.Estado = EstadoSolicitudCredito.DocumentosRecibidos;
-            }
         }
+        await SyncPipelineAsync(entity, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+        return Ok(ToDto(entity));
     }
 
     private bool CanValidateDocuments() =>
@@ -715,19 +717,11 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         document.UsuarioValidacion = null;
     }
 
-    private static DateTime? DefaultExpiration(TipoDocumentoCredito type, DateTime baseDate) => type switch
-    {
-        TipoDocumentoCredito.Cedula => baseDate.Date.AddYears(1),
-        TipoDocumentoCredito.SoporteIngresos => baseDate.Date.AddDays(30),
-        TipoDocumentoCredito.ReciboServicio => baseDate.Date.AddDays(60),
-        _ => null
-    };
-
     private static void ValidateDecision(SolicitudCredito entity, EstadoSolicitudCredito status)
     {
-        if (status == EstadoSolicitudCredito.EnEstudio && entity.Documentos.Any(x => x.Estado is EstadoDocumentoCredito.Pendiente or EstadoDocumentoCredito.Rechazado))
+        if (status == EstadoSolicitudCredito.EnEstudio && !entity.DocumentacionCompleta)
         {
-            throw new ValidationException("Para enviar a estudio todos los documentos deben estar recibidos o validados.");
+            throw new ValidationException("Antes de enviar a estudio confirme que la documentación necesaria está completa.");
         }
 
         if (status == EstadoSolicitudCredito.EnEstudio && (!entity.RuntConsultado || !entity.SimitConsultado || !entity.IdentidadValidada))
@@ -1016,7 +1010,8 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             x.FechaBienvenida,
             x.UsuarioBienvenida,
             x.ObservacionBienvenida,
-            x.Documentos.OrderBy(d => d.Tipo).ThenBy(d => d.Nombre).Select(ToDocumentDto).ToList());
+            x.Documentos.OrderBy(d => Array.IndexOf(CreditDocumentCatalog.Names, d.Nombre) is var index && index >= 0 ? index : 999).ThenBy(d => d.Nombre).Select(ToDocumentDto).ToList(),
+            x.DocumentacionCompleta, x.FechaDocumentacionCompleta, x.UsuarioDocumentacionCompleta);
     }
 
     private static CreditDocumentDto ToDocumentDto(DocumentoSolicitudCredito d) =>
@@ -1027,14 +1022,14 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             d.Nombre,
             d.Estado,
             d.FechaRecepcion,
-            d.FechaVencimiento,
+            null,
             d.Observaciones,
             d.FechaRechazo,
             d.MotivoRechazo,
             d.FechaValidacion,
             d.UsuarioValidacion,
-            d.FechaVencimiento.HasValue && d.FechaVencimiento.Value.Date < ColombiaTime.Now.Date,
-            d.FechaVencimiento.HasValue ? (int)(d.FechaVencimiento.Value.Date - ColombiaTime.Now.Date).TotalDays : null,
+            false,
+            null,
             !string.IsNullOrWhiteSpace(d.RutaArchivo),
             d.NombreArchivo,
             d.ContentType,
