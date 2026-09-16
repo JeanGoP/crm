@@ -6065,7 +6065,7 @@ function toActivityPayload(payload: typeof emptyActivity | Activity) {
   };
 }
 
-function CurrencyField({ label, value, onChange, size = 'medium', fullWidth = true, sx }: { label: string; value?: number; onChange: (value: number) => void; size?: 'small' | 'medium'; fullWidth?: boolean; sx?: SxProps<Theme> }) {
+function CurrencyField({ label, value, onChange, size = 'small', fullWidth = true, sx }: { label: string; value?: number; onChange: (value: number) => void; size?: 'small' | 'medium'; fullWidth?: boolean; sx?: SxProps<Theme> }) {
   const displayValue = Number(value) > 0
     ? new Intl.NumberFormat('es-CO', { maximumFractionDigits: 0 }).format(Number(value))
     : '';
