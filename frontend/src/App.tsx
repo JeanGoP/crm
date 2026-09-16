@@ -6,6 +6,7 @@ import {
   FormControlLabel, Paper, Snackbar, Stack, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tabs, TextField, InputAdornment,
   ThemeProvider, Toolbar, Tooltip, Typography, createTheme, useMediaQuery, useTheme
 } from '@mui/material';
+import type { SxProps, Theme } from '@mui/material/styles';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import Groups from '@mui/icons-material/Groups';
 import Handshake from '@mui/icons-material/Handshake';
@@ -4905,23 +4906,20 @@ function QuoteDialog({ form, products, productCategories, requirementProfiles, q
                   {(item.inventoryChassisNumber || item.inventoryEngineNumber || item.inventoryWarehouseName) && <Alert severity="info" sx={{ gridColumn: { md: '1 / -1' }, py: 0.5 }}>
                     Unidad seleccionada: {item.inventoryWarehouseName || 'Bodega'}{item.inventoryChassisNumber ? ` · Chasis ${item.inventoryChassisNumber}` : ''}{item.inventoryEngineNumber ? ` · Motor ${item.inventoryEngineNumber}` : ''}
                   </Alert>}
-                  <TextField fullWidth label="Cuota inicial" type="number" value={item.downPayment} onChange={(e) => {
-                    const nextDownPayment = Number(e.target.value);
+                  <CurrencyField label="Cuota inicial" value={item.downPayment} onChange={(nextDownPayment) => {
                     const keepPaidInSync = Number(item.initialPaymentPaidToday) === Number(item.downPayment);
                     updateItem(index, { downPayment: nextDownPayment, initialPaymentPaidToday: keepPaidInSync ? nextDownPayment : item.initialPaymentPaidToday });
                   }} />
-                  <TextField fullWidth label="Cuota extra" type="number" value={item.initialPaymentPaidToday} onChange={(e) => updateItem(index, { initialPaymentPaidToday: Number(e.target.value) })} />
-                  <TextField fullWidth label="Precio" type="number" value={item.productPrice} onChange={(e) => updateItem(index, { productPrice: Number(e.target.value) })} />
+                  <CurrencyField label="Cuota extra" value={item.initialPaymentPaidToday} onChange={(initialPaymentPaidToday) => updateItem(index, { initialPaymentPaidToday })} />
+                  <CurrencyField label="Precio" value={item.productPrice} onChange={(productPrice) => updateItem(index, { productPrice })} />
                   <TextField fullWidth label="Cuotas" type="number" value={item.termMonths} onChange={(e) => updateItem(index, { termMonths: Number(e.target.value) })} />
-                  {activeChargeConcepts.map((concept) => <TextField
+                  {activeChargeConcepts.map((concept) => <CurrencyField
                     key={concept.id}
-                    fullWidth
                     sx={{ minWidth: 0 }}
                     label={concept.name}
-                    type="number"
                     value={chargeValues[concept.id] ?? 0}
-                    onChange={(e) => {
-                      const nextChargeValues = { ...chargeValues, [concept.id]: Number(e.target.value) };
+                    onChange={(amount) => {
+                      const nextChargeValues = { ...chargeValues, [concept.id]: amount };
                       const totals = quoteChargeTotals({ ...item, chargeValues: nextChargeValues }, activeChargeConcepts, selectedProduct);
                       updateItem(index, { chargeValues: nextChargeValues, insurance: totals.insurance, administrativeFees: totals.administrativeFees });
                     }}
@@ -5074,7 +5072,7 @@ function InitialPaymentPlanEditor({ item, onChange }: { item: typeof emptyQuoteI
           alignItems: 'center'
         }}>
           <TextField size="small" type="date" label={`Pago ${index + 1}`} value={payment.dueDate} onChange={(e) => updatePayment(index, { dueDate: e.target.value })} InputLabelProps={{ shrink: true }} />
-          <TextField size="small" type="number" label="Valor" value={payment.amount} onChange={(e) => updatePayment(index, { amount: Number(e.target.value) })} />
+          <CurrencyField size="small" label="Valor" value={payment.amount} onChange={(amount) => updatePayment(index, { amount })} />
           <IconButton color="error" onClick={() => removePayment(index)}><Delete fontSize="small" /></IconButton>
         </Box>)}
       </Stack>}
@@ -6064,6 +6062,25 @@ function toActivityPayload(payload: typeof emptyActivity | Activity) {
     scheduledAt: new Date(payload.scheduledAt).toISOString(),
     reminderAt: payload.reminderAt ? new Date(payload.reminderAt).toISOString() : null
   };
+}
+
+function CurrencyField({ label, value, onChange, size = 'medium', fullWidth = true, sx }: { label: string; value?: number; onChange: (value: number) => void; size?: 'small' | 'medium'; fullWidth?: boolean; sx?: SxProps<Theme> }) {
+  const displayValue = Number(value) > 0
+    ? new Intl.NumberFormat('es-CO', { maximumFractionDigits: 0 }).format(Number(value))
+    : '';
+
+  return <TextField
+    fullWidth={fullWidth}
+    size={size}
+    sx={sx}
+    label={label}
+    value={displayValue}
+    onChange={(event) => {
+      const digits = event.target.value.replace(/\D/g, '');
+      onChange(digits ? Number(digits) : 0);
+    }}
+    inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
+  />;
 }
 
 function money(value?: number) { return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(value ?? 0); }
