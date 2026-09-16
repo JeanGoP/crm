@@ -4645,11 +4645,6 @@ function QuoteDialog({ form, products, productCategories, requirementProfiles, q
   const initial = { ...emptyQuote, requirementProfileId: requirementProfiles[0]?.id ?? '', salesPointId: initialSalesPoint?.id ?? '', salesPointRateId: initialSalesPoint?.rates[0]?.id ?? '', productId: initialItem.productId, items: [initialItem] };
   const [identityLoading, setIdentityLoading] = useState(false);
   const [identityNotice, setIdentityNotice] = useState<Notice>();
-  const [inventorySearch, setInventorySearch] = useState('');
-  const [inventoryItems, setInventoryItems] = useState<ExternalInventoryItem[]>([]);
-  const [inventoryLoading, setInventoryLoading] = useState(false);
-  const [inventoryError, setInventoryError] = useState('');
-  const [inventoryTargetIndex, setInventoryTargetIndex] = useState(0);
   const [confirmNewQuote, setConfirmNewQuote] = useState(false);
   const [quoteResetVersion, setQuoteResetVersion] = useState(0);
 
@@ -4657,13 +4652,7 @@ function QuoteDialog({ form, products, productCategories, requirementProfiles, q
     if (!form.open) {
       setConfirmNewQuote(false);
       setIdentityLoading(false);
-      setIdentityNotice(undefined);
-      setInventorySearch('');
-      setInventoryItems([]);
-      setInventoryError('');
-      setInventoryLoading(false);
-      setInventoryTargetIndex(0);
-    }
+      setIdentityNotice(undefined);    }
   }, [form.open]);
 
   const lookupIdentity = async (value: typeof emptyQuote, set: (patch: Partial<typeof emptyQuote>) => void) => {
@@ -4701,32 +4690,6 @@ function QuoteDialog({ form, products, productCategories, requirementProfiles, q
       setIdentityNotice({ type: 'error', text: apiError(err) });
     } finally {
       setIdentityLoading(false);
-    }
-  };
-
-  const searchExternalInventory = async () => {
-    const term = inventorySearch.trim();
-    if (term.length < 2) {
-      setInventoryError('Digite al menos 2 caracteres para buscar en inventario.');
-      setInventoryItems([]);
-      return;
-    }
-
-    setInventoryLoading(true);
-    setInventoryError('');
-    try {
-      const { data } = await api.get<ExternalInventoryItem[]>('/api/external-inventory', {
-        params: { search: term, take: 40 }
-      });
-      setInventoryItems(data);
-      if (!data.length) {
-        setInventoryError('No se encontraron existencias con ese criterio.');
-      }
-    } catch (err) {
-      setInventoryItems([]);
-      setInventoryError(apiError(err));
-    } finally {
-      setInventoryLoading(false);
     }
   };
 
@@ -4768,25 +4731,6 @@ function QuoteDialog({ form, products, productCategories, requirementProfiles, q
           inventoryChassisNumber: ''
         });
       };
-      const useInventoryItem = (index: number, inventoryItem: ExternalInventoryItem) => {
-        if (!inventoryItem.productId) return;
-        const selected = products.find((product) => product.id === inventoryItem.productId);
-        const chargeValues = quoteChargeDefaults(selected, activeChargeConcepts);
-        const chargeTotals = quoteChargeTotals({ ...emptyQuoteItem, chargeValues }, activeChargeConcepts, selected);
-        updateItem(index, {
-          productId: inventoryItem.productId,
-          productPrice: Number(inventoryItem.productPrice ?? selected?.price ?? 0),
-          insurance: chargeTotals.insurance,
-          administrativeFees: chargeTotals.administrativeFees,
-          chargeValues,
-          inventoryWarehouseCode: inventoryItem.warehouseCode ?? '',
-          inventoryWarehouseName: inventoryItem.warehouseName ?? '',
-          inventoryPresentation: inventoryItem.presentation ?? '',
-          inventorySerialNumber: inventoryItem.serialNumber ?? '',
-          inventoryEngineNumber: inventoryItem.engineNumber ?? '',
-          inventoryChassisNumber: inventoryItem.chassisNumber ?? ''
-        });
-      };
       const addItem = () => {
         if (quoteItems.length >= 4) return;
         const selected = products[0];
@@ -4816,18 +4760,14 @@ function QuoteDialog({ form, products, productCategories, requirementProfiles, q
           items: [{ ...emptyQuoteItem, chargeValues: {}, initialPaymentSchedule: [] }]
         });
         setIdentityNotice(undefined);
-        setInventorySearch('');
-        setInventoryItems([]);
-        setInventoryError('');
-        setInventoryTargetIndex(0);
         setConfirmNewQuote(false);
         setQuoteResetVersion((version) => version + 1);
       };
       return <Stack key={quoteResetVersion} spacing={1.75}>
         <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', sm: 'center' }} gap={1}>
           <Typography variant="body2" color="text.secondary">Para otro cliente, limpie esta cotizacion. Se conserva la sede seleccionada.</Typography>
-          <Button type="button" variant="outlined" startIcon={<Add />} disabled={controls.saving || identityLoading || inventoryLoading} onClick={() => {
-            if (JSON.stringify(v) !== JSON.stringify(initial) || inventorySearch) setConfirmNewQuote(true);
+          <Button type="button" variant="outlined" startIcon={<Add />} disabled={controls.saving || identityLoading} onClick={() => {
+            if (JSON.stringify(v) !== JSON.stringify(initial)) setConfirmNewQuote(true);
             else resetQuote();
           }}>Nueva cotizacion</Button>
         </Stack>
@@ -4898,76 +4838,6 @@ function QuoteDialog({ form, products, productCategories, requirementProfiles, q
             </Box>
             <Button variant="outlined" startIcon={<Add />} disabled={quoteItems.length >= 4 || !products.length} onClick={addItem}>Agregar articulo</Button>
           </Stack>
-          <Paper variant="outlined" sx={{ p: 1.5, bgcolor: '#fbfdff' }}>
-            <Stack spacing={1.25}>
-              <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.25} alignItems={{ xs: 'stretch', md: 'center' }}>
-                <TextField
-                  fullWidth
-                  label="Buscar inventario en tiempo real"
-                  placeholder="Codigo, nombre, serial, chasis o bodega"
-                  value={inventorySearch}
-                  onChange={(e) => setInventorySearch(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      void searchExternalInventory();
-                    }
-                  }}
-                  InputProps={{ startAdornment: <InputAdornment position="start"><Search fontSize="small" /></InputAdornment> }}
-                />
-                <TextField
-                  select
-                  label="Aplicar a"
-                  value={Math.min(inventoryTargetIndex, Math.max(quoteItems.length - 1, 0))}
-                  onChange={(e) => setInventoryTargetIndex(Number(e.target.value))}
-                  sx={{ minWidth: { md: 150 } }}
-                >
-                  {quoteItems.map((_, index) => <MenuItem key={index} value={index}>Articulo {index + 1}</MenuItem>)}
-                </TextField>
-                <Button variant="contained" startIcon={<Search />} disabled={inventoryLoading} onClick={() => void searchExternalInventory()}>
-                  {inventoryLoading ? 'Buscando...' : 'Buscar'}
-                </Button>
-              </Stack>
-              {inventoryLoading && <LinearProgress />}
-              {inventoryError && <Alert severity={inventoryItems.length ? 'info' : 'warning'}>{inventoryError}</Alert>}
-              {!!inventoryItems.length && <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' }, gap: 1 }}>
-                {inventoryItems.map((item, index) => (
-                  <Paper key={`${item.warehouseCode}-${item.code}-${item.serialNumber ?? index}`} variant="outlined" sx={{ p: 1.25, bgcolor: '#fff' }}>
-                    <Stack spacing={1}>
-                      <Stack direction="row" justifyContent="space-between" alignItems="flex-start" gap={1}>
-                        <Box sx={{ minWidth: 0 }}>
-                          <Typography fontWeight={900} noWrap>{item.name}</Typography>
-                          <Typography variant="caption" color="text.secondary">{item.code}{item.presentation ? ` - ${item.presentation}` : ''}</Typography>
-                        </Box>
-                        <Chip size="small" color={item.quantity > 0 ? 'success' : 'default'} label={`${item.quantity} disp.`} />
-                      </Stack>
-                      <Typography variant="caption" color="text.secondary">{item.warehouseName || 'Bodega sin nombre'} ({item.warehouseCode || 'N/A'})</Typography>
-                      {(item.engineNumber || item.chassisNumber) && <Typography variant="caption" color="text.secondary">
-                        {item.engineNumber ? `Motor: ${item.engineNumber}` : ''}{item.engineNumber && item.chassisNumber ? ' · ' : ''}{item.chassisNumber ? `Chasis: ${item.chassisNumber}` : ''}
-                      </Typography>}
-                      <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
-                        {item.isInCatalog && item.productId
-                          ? <Typography variant="caption" color="success.main" fontWeight={800}>
-                            {Number(item.productPrice ?? 0) > 0 ? `Catalogo CRM: ${money(item.productPrice ?? 0)}` : 'Catalogo CRM: precio pendiente'}
-                          </Typography>
-                          : <Typography variant="caption" color="warning.main" fontWeight={800}>
-                            {!item.productId ? 'Sin producto CRM' : !item.productActive ? 'Producto inactivo' : 'Sin precio CRM'}
-                          </Typography>}
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          disabled={!item.isInCatalog || !item.productId}
-                          onClick={() => useInventoryItem(Math.min(inventoryTargetIndex, quoteItems.length - 1), item)}
-                        >
-                          Usar
-                        </Button>
-                      </Stack>
-                    </Stack>
-                  </Paper>
-                ))}
-              </Box>}
-            </Stack>
-          </Paper>
           {quoteItems.map((item, index) => {
             const selectedProduct = products.find((product) => product.id === item.productId);
             const chargeValues = quoteChargeValues(item, activeChargeConcepts, selectedProduct);
