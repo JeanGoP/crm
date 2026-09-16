@@ -5007,12 +5007,12 @@ function QuoteDialog({ form, products, productCategories, requirementProfiles, q
                   {(item.inventoryChassisNumber || item.inventoryEngineNumber || item.inventoryWarehouseName) && <Alert severity="info" sx={{ gridColumn: { md: '1 / -1' }, py: 0.5 }}>
                     Unidad seleccionada: {item.inventoryWarehouseName || 'Bodega'}{item.inventoryChassisNumber ? ` · Chasis ${item.inventoryChassisNumber}` : ''}{item.inventoryEngineNumber ? ` · Motor ${item.inventoryEngineNumber}` : ''}
                   </Alert>}
-                  <TextField fullWidth label="Inicial total" type="number" value={item.downPayment} onChange={(e) => {
+                  <TextField fullWidth label="Cuota inicial" type="number" value={item.downPayment} onChange={(e) => {
                     const nextDownPayment = Number(e.target.value);
                     const keepPaidInSync = Number(item.initialPaymentPaidToday) === Number(item.downPayment);
                     updateItem(index, { downPayment: nextDownPayment, initialPaymentPaidToday: keepPaidInSync ? nextDownPayment : item.initialPaymentPaidToday });
                   }} />
-                  <TextField fullWidth label="Paga hoy" type="number" value={item.initialPaymentPaidToday} onChange={(e) => updateItem(index, { initialPaymentPaidToday: Number(e.target.value) })} />
+                  <TextField fullWidth label="Cuota extra" type="number" value={item.initialPaymentPaidToday} onChange={(e) => updateItem(index, { initialPaymentPaidToday: Number(e.target.value) })} />
                   <TextField fullWidth label="Precio" type="number" value={item.productPrice} onChange={(e) => updateItem(index, { productPrice: Number(e.target.value) })} />
                   <TextField fullWidth label="Cuotas" type="number" value={item.termMonths} onChange={(e) => updateItem(index, { termMonths: Number(e.target.value) })} />
                   {activeChargeConcepts.map((concept) => <TextField
