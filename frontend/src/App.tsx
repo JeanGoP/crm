@@ -4650,9 +4650,12 @@ function QuoteDialog({ form, products, productCategories, requirementProfiles, q
   const [inventoryLoading, setInventoryLoading] = useState(false);
   const [inventoryError, setInventoryError] = useState('');
   const [inventoryTargetIndex, setInventoryTargetIndex] = useState(0);
+  const [confirmNewQuote, setConfirmNewQuote] = useState(false);
+  const [quoteResetVersion, setQuoteResetVersion] = useState(0);
 
   useEffect(() => {
     if (!form.open) {
+      setConfirmNewQuote(false);
       setIdentityLoading(false);
       setIdentityNotice(undefined);
       setInventorySearch('');
@@ -4728,7 +4731,7 @@ function QuoteDialog({ form, products, productCategories, requirementProfiles, q
   };
 
   return <FormDialog title="Nueva cotizacion" open={form.open} initial={initial} onClose={onClose} onSave={onSave} maxWidth="lg">
-    {(v, set) => {
+    {(v, set, controls) => {
       const quoteItems = v.items?.length ? v.items : [{ ...emptyQuoteItem, productId: v.productId }];
       const selectedSalesPointId = v.salesPointId || salesPoints[0]?.id || '';
       const selectedSalesPoint = salesPoints.find((salesPoint) => salesPoint.id === selectedSalesPointId);
@@ -4804,7 +4807,31 @@ function QuoteDialog({ form, products, productCategories, requirementProfiles, q
         const normalized = items.length ? items : [{ ...emptyQuoteItem, productId: products[0]?.id ?? '' }];
         set({ items: normalized, productId: normalized[0]?.productId ?? '' });
       };
-      return <>
+      const resetQuote = () => {
+        controls.reset({
+          ...emptyQuote,
+          salesPointId: selectedSalesPointId,
+          salesPointRateId: salesPointRates[0]?.id ?? '',
+          requirementProfileId: requirementProfiles[0]?.id ?? '',
+          items: [{ ...emptyQuoteItem, chargeValues: {}, initialPaymentSchedule: [] }]
+        });
+        setIdentityNotice(undefined);
+        setInventorySearch('');
+        setInventoryItems([]);
+        setInventoryError('');
+        setInventoryTargetIndex(0);
+        setConfirmNewQuote(false);
+        setQuoteResetVersion((version) => version + 1);
+      };
+      return <Stack key={quoteResetVersion} spacing={1.75}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', sm: 'center' }} gap={1}>
+          <Typography variant="body2" color="text.secondary">Para otro cliente, limpie esta cotizacion. Se conserva la sede seleccionada.</Typography>
+          <Button type="button" variant="outlined" startIcon={<Add />} disabled={controls.saving || identityLoading || inventoryLoading} onClick={() => {
+            if (JSON.stringify(v) !== JSON.stringify(initial) || inventorySearch) setConfirmNewQuote(true);
+            else resetQuote();
+          }}>Nueva cotizacion</Button>
+        </Stack>
+        <ConfirmDialog open={confirmNewQuote} title="Iniciar nueva cotizacion" text="Se borraran los datos sin guardar del cliente, productos, cuota inicial, cuota extra y observaciones. Se conservara la sede seleccionada. ¿Desea continuar?" confirmLabel="Limpiar y empezar" onClose={() => setConfirmNewQuote(false)} onConfirm={async () => resetQuote()} />
         <Paper variant="outlined" sx={{ p: 2, bgcolor: '#fbfdff' }}>
           <Stack spacing={2}>
             <Typography variant="subtitle1" fontWeight={900}>Datos del cliente</Typography>
@@ -5044,7 +5071,7 @@ function QuoteDialog({ form, products, productCategories, requirementProfiles, q
           </Alert>}
         </Stack>
         <TextField label="Observaciones" value={v.notes} onChange={(e) => set({ notes: e.target.value })} multiline minRows={2} />
-      </>;
+      </Stack>;
     }}
   </FormDialog>;
 }
@@ -5757,7 +5784,7 @@ function SectionTitle({ title }: { title: string }) {
   </Stack>;
 }
 
-function FormDialog<T extends Record<string, unknown>>({ title, open, initial, children, onClose, onSave, maxWidth = 'sm' }: { title: string; open: boolean; initial: T; children: (value: T, set: (patch: Partial<T>) => void) => ReactNode; onClose: () => void; onSave: (payload: T) => Promise<void>; maxWidth?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' }) {
+function FormDialog<T extends Record<string, unknown>>({ title, open, initial, children, onClose, onSave, maxWidth = 'sm' }: { title: string; open: boolean; initial: T; children: (value: T, set: (patch: Partial<T>) => void, controls: { saving: boolean; reset: (value: T) => void }) => ReactNode; onClose: () => void; onSave: (payload: T) => Promise<void>; maxWidth?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' }) {
   const muiTheme = useTheme();
   const fullScreen = useMediaQuery(muiTheme.breakpoints.down('sm'));
   const [value, setValue] = useState(initial);
@@ -5801,7 +5828,7 @@ function FormDialog<T extends Record<string, unknown>>({ title, open, initial, c
     </DialogTitle>
     <DialogContent sx={{ px: { xs: 1.5, sm: 2.5 }, py: { xs: 1.5, sm: 2.25 }, bgcolor: '#f4f7fb', overflowX: 'hidden' }}>
       <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 }, bgcolor: '#fff', borderColor: '#dbe4ee', minWidth: 0, overflowX: 'hidden' }}>
-        <Stack spacing={1.75}>{error && <Alert severity="error">{error}</Alert>}{children(value, (patch) => setValue((prev) => ({ ...prev, ...patch })))}</Stack>
+        <Stack spacing={1.75}>{error && <Alert severity="error">{error}</Alert>}{children(value, (patch) => setValue((prev) => ({ ...prev, ...patch })), { saving, reset: (next) => { if (!saveGuard.active) { setValue(next); setError(''); } } })}</Stack>
       </Paper>
     </DialogContent>
     <DialogActions sx={{ px: { xs: 2, sm: 3 }, py: 1.75, flexWrap: 'wrap', borderTop: `1px solid ${uiBorder}`, bgcolor: '#fff', gap: 1, '& .MuiButton-root': { width: { xs: '100%', sm: 'auto' } } }}>
