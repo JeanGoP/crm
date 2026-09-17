@@ -70,7 +70,6 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
                 ?? throw new KeyNotFoundException("Cotizacion no encontrada.")
             : null;
         var dealId = await ResolveQuoteDealAsync(quote, dto.CustomerId, cancellationToken);
-        var requirementProfile = await ResolveRequirementProfileAsync(dto.RequirementProfileId ?? quote?.PerfilRequisitoId, cancellationToken);
 
         var entity = new SolicitudCredito
         {
@@ -79,8 +78,6 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             ProductoId = product.Id,
             CotizacionId = dto.QuoteId,
             NegocioId = dealId,
-            PerfilRequisitoId = requirementProfile?.Id,
-            PerfilRequisito = requirementProfile,
             TipoIdentificacion = dto.IdentificationType,
             NumeroIdentificacion = dto.IdentificationNumber.Trim(),
             FechaNacimiento = dto.BirthDate,
@@ -113,7 +110,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             Observaciones = dto.Notes
         };
 
-        AddChecklistDocuments(entity, requirementProfile);
+        AddChecklistDocuments(entity, null);
 
         db.SolicitudesCredito.Add(entity);
         await SyncPipelineAsync(entity, cancellationToken);
@@ -142,7 +139,6 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             ? await db.Cotizaciones.FirstOrDefaultAsync(x => x.Id == dto.QuoteId.Value, cancellationToken)
                 ?? throw new KeyNotFoundException("Cotizacion no encontrada.")
             : null;
-        var requirementProfile = await ResolveRequirementProfileAsync(dto.RequirementProfileId ?? quote?.PerfilRequisitoId, cancellationToken);
 
         var dealId = quote is not null
             ? await ResolveQuoteDealAsync(quote, dto.CustomerId, cancellationToken)
@@ -152,8 +148,6 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         entity.ProductoId = dto.ProductId;
         entity.CotizacionId = dto.QuoteId;
         entity.NegocioId = dealId;
-        entity.PerfilRequisitoId = requirementProfile?.Id;
-        entity.PerfilRequisito = requirementProfile;
         entity.TipoIdentificacion = dto.IdentificationType;
         entity.NumeroIdentificacion = dto.IdentificationNumber.Trim();
         entity.FechaNacimiento = dto.BirthDate;
@@ -184,7 +178,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         entity.CodeudorReferencia2Relacion = Normalize(dto.CoDebtorReference2Relationship);
         entity.Estado = dto.Status;
         entity.Observaciones = dto.Notes;
-        AddMissingChecklistDocuments(entity, requirementProfile);
+        AddMissingChecklistDocuments(entity, null);
 
         await SyncPipelineAsync(entity, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);

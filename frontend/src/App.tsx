@@ -38,7 +38,7 @@ import ChevronRight from '@mui/icons-material/ChevronRight';
 import { AxiosError } from 'axios';
 import { api } from './api';
 import { useAuthStore } from './store';
-import { Activity, ColombianIdentityLookup, CollectionOrder, CommercialInventory, CommercialInventorySummary, CommercialReports, Company, CreditApplication, CreditDocument, Customer, Customer360, CustomerAiAnalysis, CustomerTimelineItem, Dashboard, Deal, DealStage, ExternalInventoryItem, ExternalInventoryWarehouse, FinancialSettings, Lead, LoginAccessReport, MotorcycleDelivery, Procedure, Product, ProductCategory, ProductPhoto, Promotion, Quote, QuoteChargeConcept, QuoteSalesPoint, QuoteSimulationResult, RequirementProfile, SalesPoint, SalesPointRate, User } from './types';
+import { Activity, ColombianIdentityLookup, CollectionOrder, CommercialInventory, CommercialInventorySummary, CommercialReports, Company, CreditApplication, CreditDocument, Customer, Customer360, CustomerAiAnalysis, CustomerTimelineItem, Dashboard, Deal, DealStage, ExternalInventoryItem, ExternalInventoryWarehouse, FinancialSettings, Lead, LoginAccessReport, MotorcycleDelivery, Procedure, Product, ProductCategory, ProductPhoto, Promotion, Quote, QuoteChargeConcept, QuoteSalesPoint, QuoteSimulationResult, SalesPoint, SalesPointRate, User } from './types';
 
 const drawerWidth = 272;
 const today = new Date().toISOString().slice(0, 10);
@@ -287,7 +287,7 @@ const emptyPromotion = { name: '', code: '', discountType: 'Valor', discountValu
 const emptyQuoteItem = { productId: '', productPrice: 0, downPayment: 0, initialPaymentPaidToday: 0, initialPaymentSchedule: [] as { dueDate: string; amount: number }[], insurance: 0, administrativeFees: 0, chargeValues: {} as Record<string, number>, termMonths: 24, monthlyInterestRate: 2.2, inventoryWarehouseCode: '', inventoryWarehouseName: '', inventoryPresentation: '', inventorySerialNumber: '', inventoryEngineNumber: '', inventoryChassisNumber: '' };
 const emptyQuote = { identificationType: 1, identificationNumber: '', customerFirstNames: '', customerLastNames: '', customerFirstName: '', customerMiddleName: '', customerLastName: '', customerSecondLastName: '', phoneCountryCode: '+57', phoneNumber: '', requirementProfileId: '', salesPointId: '', salesPointRateId: '', productId: '', downPayment: 0, insurance: 0, administrativeFees: 0, termMonths: 24, monthlyInterestRate: 2.2, items: [emptyQuoteItem], notes: '' };
 const emptyCreditApplication = {
-  customerId: '', productId: '', quoteId: '', dealId: '', requirementProfileId: '', identificationType: 1, identificationNumber: '', birthDate: '', mobile: '', address: '', city: '', occupation: '',
+  customerId: '', productId: '', quoteId: '', dealId: '', identificationType: 1, identificationNumber: '', birthDate: '', mobile: '', address: '', city: '', occupation: '',
   monthlyIncome: 0, downPayment: 0, termMonths: 24, motorcycleValue: 0,
   coDebtorName: '', coDebtorIdentification: '', coDebtorMobile: '', coDebtorRelationship: '', coDebtorMonthlyIncome: 0,
   reference1Name: '', reference1Mobile: '', reference1Relationship: '', reference2Name: '', reference2Mobile: '', reference2Relationship: '',
@@ -1063,7 +1063,7 @@ function Customer360Page() {
             {creditApplications.length ? creditApplications.slice(0, 5).map((s) => <Customer360ListItem
               key={s.id}
               title={`${s.number} - ${s.productName}`}
-              description={`${creditStatus(s.status)} - perfil ${s.requirementProfileName || 'sin perfil'}`}
+              description={creditStatus(s.status)}
               meta={money(s.motorcycleValue)}
               tone={s.status === 3 ? 'success' : s.status === 4 ? 'error' : 'warning'}
             />) : <EmptyState text="Sin solicitudes" />}
@@ -1705,7 +1705,6 @@ function CreditApplicationsPage() {
   const { data: customers = [] } = useResource<Customer[]>('/api/customers', []);
   const { data: products = [] } = useResource<Product[]>('/api/products', []);
   const { data: quotes = [] } = useResource<Quote[]>('/api/quotes', []);
-  const { data: requirementProfiles = [] } = useResource<RequirementProfile[]>('/api/requirement-profiles', []);
   const [form, setForm] = useState<FormMode<CreditApplication>>({ open: false });
   const [management, setManagement] = useState<CreditApplication>();
   const [analysis, setAnalysis] = useState<CustomerAiAnalysis>();
@@ -1742,7 +1741,7 @@ function CreditApplicationsPage() {
       ...payload,
       quoteId: payload.quoteId || null,
       dealId: payload.dealId || null,
-      requirementProfileId: payload.requirementProfileId || null,
+      requirementProfileId: null,
       identificationType: Number(payload.identificationType),
       birthDate: payload.birthDate ? new Date(payload.birthDate).toISOString() : null,
       monthlyIncome: Number(payload.monthlyIncome),
@@ -1955,7 +1954,6 @@ function CreditApplicationsPage() {
       rows={rows.map((r) => [
         <Stack spacing={.2} sx={{ minWidth: 0 }}>
           <Typography fontWeight={800} sx={{ fontSize: 12.5, lineHeight: 1.25, wordBreak: 'break-word' }}>{r.number}</Typography>
-          <Typography color="text.secondary" sx={{ fontSize: 11.5, lineHeight: 1.2 }}>{r.requirementProfileName || 'Sin perfil'}</Typography>
         </Stack>,
         <Stack spacing={.2} sx={{ minWidth: 0 }}>
           <Typography fontWeight={900} sx={{ fontSize: 12.5, lineHeight: 1.25, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.customerName}</Typography>
@@ -1973,7 +1971,7 @@ function CreditApplicationsPage() {
         </Stack>
       ])}
     />
-    <CreditApplicationDialog form={form} customers={customers} products={products.filter((x) => x.active)} quotes={quotes} requirementProfiles={requirementProfiles.filter((x) => x.active)} onClose={() => setForm({ open: false })} onSave={save} />
+    <CreditApplicationDialog form={form} customers={customers} products={products.filter((x) => x.active)} quotes={quotes} onClose={() => setForm({ open: false })} onSave={save} />
     <CreditApplicationManagementDialog
       application={managementApplication}
       initialTab={searchParams.get('tab') === 'proceso' ? 4 : 0}
@@ -5019,7 +5017,7 @@ function QuotePdfPreviewDialog({ quote, onClose, onDownload }: { quote?: Quote; 
   </Dialog>;
 }
 
-function CreditApplicationDialog({ form, customers, products, quotes, requirementProfiles, onClose, onSave }: DialogProps<CreditApplication, typeof emptyCreditApplication> & { customers: Customer[]; products: Product[]; quotes: Quote[]; requirementProfiles: RequirementProfile[] }) {
+function CreditApplicationDialog({ form, customers, products, quotes, onClose, onSave }: DialogProps<CreditApplication, typeof emptyCreditApplication> & { customers: Customer[]; products: Product[]; quotes: Quote[]; }) {
   const [referenceDialog, setReferenceDialog] = useState<'client' | 'coDebtor'>();
   useEffect(() => {
     if (!form.open) setReferenceDialog(undefined);
@@ -5030,7 +5028,6 @@ function CreditApplicationDialog({ form, customers, products, quotes, requiremen
     productId: form.item.productId,
     quoteId: form.item.quoteId ?? '',
     dealId: form.item.dealId ?? '',
-    requirementProfileId: form.item.requirementProfileId ?? '',
     identificationType: form.item.identificationType,
     identificationNumber: form.item.identificationNumber,
     birthDate: form.item.birthDate?.slice(0, 10) ?? '',
@@ -5061,7 +5058,7 @@ function CreditApplicationDialog({ form, customers, products, quotes, requiremen
     coDebtorReference2Relationship: form.item.coDebtorReference2Relationship ?? '',
     status: form.item.status,
     notes: form.item.notes ?? ''
-  } : { ...emptyCreditApplication, customerId: customers[0]?.id ?? '', productId: products[0]?.id ?? '', requirementProfileId: requirementProfiles[0]?.id ?? '', motorcycleValue: products[0]?.price ?? 0 };
+  } : { ...emptyCreditApplication, customerId: customers[0]?.id ?? '', productId: products[0]?.id ?? '', motorcycleValue: products[0]?.price ?? 0 };
   return <FormDialog title={form.item ? 'Editar solicitud de credito' : 'Nueva solicitud de credito'} open={form.open} initial={initial} onClose={onClose} onSave={onSave} maxWidth="lg">
     {(v, set) => {
       const selectedQuote = quotes.find((x) => x.id === v.quoteId);
@@ -5106,7 +5103,6 @@ function CreditApplicationDialog({ form, customers, products, quotes, requiremen
                   quoteId: selected?.id ?? '',
                   customerId: selected?.customerId ?? v.customerId,
                   productId: selected?.productId ?? v.productId,
-                  requirementProfileId: selected?.requirementProfileId ?? v.requirementProfileId,
                   identificationType: selected?.identificationType ?? v.identificationType,
                   identificationNumber: selected?.identificationNumber ?? v.identificationNumber,
                   motorcycleValue: selected?.productPrice ?? v.motorcycleValue,
@@ -5116,12 +5112,6 @@ function CreditApplicationDialog({ form, customers, products, quotes, requiremen
               }} />
               <TextField required select disabled={!!selectedQuote} label="Cliente" value={v.customerId} onChange={(e) => set({ customerId: e.target.value })} helperText={selectedQuote ? 'Cliente asociado a la cotización seleccionada.' : undefined}>{customers.map((x) => <MenuItem key={x.id} value={x.id}>{x.firstNames || x.name} {x.lastNames}</MenuItem>)}</TextField>
             </FieldGrid>
-            <Box sx={{ maxWidth: { md: 520 } }}>
-              <TextField fullWidth select label="Perfil de requisitos" value={v.requirementProfileId} onChange={(e) => set({ requirementProfileId: e.target.value })} helperText="Define el checklist inicial de documentos de esta solicitud.">
-                <MenuItem value="">Empleado por defecto</MenuItem>
-                {requirementProfiles.map((profile) => <MenuItem key={profile.id} value={profile.id}>{profile.name}{profile.isCash ? ' - contado' : ''}</MenuItem>)}
-              </TextField>
-            </Box>
             <Box sx={{
               display: 'grid',
               gridTemplateColumns: { xs: '1fr', md: '260px minmax(260px, 1fr) auto' },
