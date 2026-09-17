@@ -238,7 +238,8 @@ public sealed record QuoteSimulationDto(
     int TermMonths,
     decimal MonthlyInterestRate,
     Guid? SalesPointId,
-    Guid? SalesPointRateId);
+    Guid? SalesPointRateId,
+    bool IsCash = false);
 public sealed record QuoteSimulationResultDto(
     decimal DownPayment,
     decimal Insurance,
@@ -377,7 +378,8 @@ public sealed record CreateQuoteDto(
     decimal MonthlyInterestRate,
     Guid? SalesPointId,
     Guid? SalesPointRateId,
-    string? Notes);
+    string? Notes,
+    bool IsCash = false);
 
 public sealed record ColombianIdentityLookupDto(
     string DocumentNumber,

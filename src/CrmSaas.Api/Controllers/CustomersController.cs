@@ -166,8 +166,8 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
     private static QuoteDto ToQuoteDto(Cotizacion x)
     {
         var productName = x.Producto is null ? "Producto" : ProductName(x.Producto);
-        var termMonths = x.PlazoMeses <= 0 ? 24 : x.PlazoMeses;
-        var financedAmount = x.ValorFinanciado <= 0 && x.CuotaMensualEstimada <= 0
+        var termMonths = x.TipoCredito == "Contado" ? 0 : x.PlazoMeses <= 0 ? 24 : x.PlazoMeses;
+        var financedAmount = x.TipoCredito == "Contado" ? 0 : x.ValorFinanciado <= 0 && x.CuotaMensualEstimada <= 0
             ? Math.Max(DiscountedPrice(x.PrecioProducto, x.DescuentoPromocion) + x.Seguro + x.GastosAdministrativos - x.CuotaInicial, 0)
             : x.ValorFinanciado;
         var totalPayment = x.TotalPagarEstimado <= 0 ? x.CuotaInicial + financedAmount : x.TotalPagarEstimado;
@@ -245,7 +245,7 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
                 DeserializeInitialPaymentPlan(quote.PlanCuotaInicialJson),
                 quote.Seguro,
                 quote.GastosAdministrativos,
-                quote.PlazoMeses <= 0 ? 24 : quote.PlazoMeses,
+                quote.TipoCredito == "Contado" ? 0 : quote.PlazoMeses <= 0 ? 24 : quote.PlazoMeses,
                 quote.TasaInteresMensual,
                 quote.ValorFinanciado,
                 quote.CuotaMensualEstimada,
@@ -258,7 +258,7 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
 
     private static QuoteItemDto ToItemDto(CotizacionItem item)
     {
-        var financedAmount = item.ValorFinanciado <= 0 && item.CuotaMensualEstimada <= 0
+        var financedAmount = item.TipoCredito == "Contado" ? 0 : item.ValorFinanciado <= 0 && item.CuotaMensualEstimada <= 0
             ? Math.Max(DiscountedPrice(item.PrecioProducto, item.DescuentoPromocion) + item.Seguro + item.GastosAdministrativos - item.CuotaInicial, 0)
             : item.ValorFinanciado;
         var totalPayment = item.TotalPagarEstimado <= 0 ? item.CuotaInicial + financedAmount : item.TotalPagarEstimado;
@@ -278,7 +278,7 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
             DeserializeInitialPaymentPlan(item.PlanCuotaInicialJson),
             item.Seguro,
             item.GastosAdministrativos,
-            item.PlazoMeses <= 0 ? 24 : item.PlazoMeses,
+            item.TipoCredito == "Contado" ? 0 : item.PlazoMeses <= 0 ? 24 : item.PlazoMeses,
             item.TasaInteresMensual,
             financedAmount,
             item.CuotaMensualEstimada,

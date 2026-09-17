@@ -488,6 +488,16 @@ public static class SimplePdfGenerator
 
     private static void DrawCommercialValues(StringBuilder commands, QuoteDto quote)
     {
+        if (quote.CreditType == "Contado")
+        {
+            DrawPanel(commands, 132, 200, 435, 214, "COTIZACION DE CONTADO");
+            CenterText(commands, 350, 352, quote.ProductName.ToUpperInvariant(), 12, true, 40);
+            CenterText(commands, 350, 315, "PRECIO DE CONTADO", 11, true);
+            CenterText(commands, 350, 282, Money(quote.EstimatedTotalPayment), 20, true);
+            if (quote.PromotionDiscount > 0)
+                CenterText(commands, 350, 252, "Descuento: " + Money(quote.PromotionDiscount), 10, false);
+            return;
+        }
         var inventoryItem = quote.Items.OrderBy(x => x.Order).FirstOrDefault();
         var boxX = 132;
         var boxY = 200;
@@ -496,8 +506,8 @@ public static class SimplePdfGenerator
         DrawRoundedLikeBox(commands, boxX, boxY, boxW, boxH);
         CenterText(commands, boxX + boxW / 2, boxY + boxH - 22, quote.ProductName.ToUpperInvariant(), 12, true, 32);
         var financingLabel = string.IsNullOrWhiteSpace(quote.SalesPointRateName)
-            ? Value(quote.CreditType, "CONTADO")
-            : $"{Value(quote.CreditType, "CONTADO")} / {quote.SalesPointRateName}";
+            ? "CREDITO"
+            : $"CREDITO / {quote.SalesPointRateName}";
         CenterText(commands, boxX + boxW / 2, boxY + boxH - 50, financingLabel.ToUpperInvariant(), 9, true, 40);
 
         var labels = new[]
@@ -508,7 +518,7 @@ public static class SimplePdfGenerator
         };
         var values = new[]
         {
-            Value(quote.CreditType, "CONTADO"),
+            "CREDITO",
             Money(quote.ProductPrice),
             Money(quote.AdministrativeFees),
             "-",
@@ -609,7 +619,8 @@ public static class SimplePdfGenerator
     {
         DrawPanel(commands, x, y, 520, 214, "COMPARATIVO DE ARTICULOS");
         commands.AppendLine($"0.90 0.94 0.96 rg {x + 16} {y + 158} 488 24 re f");
-        var headers = new[] { "Producto", "Precio", "Inicial", "Financiado" };
+        var cash = items.All(item => item.CreditType == "Contado");
+        var headers = cash ? new[] { "Producto", "Precio contado" } : new[] { "Producto", "Precio", "Inicial", "Financiado" };
         var columns = new[] { x + 24, x + 210, x + 318, x + 410 };
         for (var i = 0; i < headers.Length; i++)
         {
@@ -626,8 +637,11 @@ public static class SimplePdfGenerator
                 commands.AppendLine($"0.36 0.42 0.48 rg BT /F1 6 Tf {columns[0]} {rowY - 9} Td ({Escape(Shorten("Chasis: " + item.InventoryChassisNumber, 34))}) Tj ET");
             }
             commands.AppendLine($"0.08 0.10 0.14 rg BT /F1 8 Tf {columns[1]} {rowY} Td ({Escape(Money(item.DiscountedProductPrice))}) Tj ET");
+            if (!cash)
+            {
             commands.AppendLine($"0.08 0.10 0.14 rg BT /F1 8 Tf {columns[2]} {rowY} Td ({Escape(Money(item.DownPayment))}) Tj ET");
             commands.AppendLine($"0.08 0.10 0.14 rg BT /F1 8 Tf {columns[3]} {rowY} Td ({Escape(Money(item.FinancedAmount))}) Tj ET");
+            }
             if (item.CreditStartDate.HasValue && item.InitialPaymentSchedule.Count > 0)
             {
                 commands.AppendLine($"0.36 0.42 0.48 rg BT /F1 6 Tf {columns[2]} {rowY - 9} Td ({Escape("Inicio credito: " + Date(item.CreditStartDate.Value))}) Tj ET");

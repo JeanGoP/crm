@@ -138,6 +138,27 @@ foreach (var wrongSchedule in new[] { 100000m, 800000m })
 normalizePlan.Invoke(null, [quoteItem with { DownPayment = 500000, InitialPaymentSchedule = [] }, quoteDate]);
 Console.WriteLine("OK: contrato de cotización, inicial completa, cuota extra y financiación.");
 
+var cashItem = (CreateQuoteItemDto)typeof(QuotesController).GetMethod("NormalizeCashItem", BindingFlags.NonPublic | BindingFlags.Static)!.Invoke(null, [quoteItem])!;
+Check(cashItem.ProductId == quoteItem.ProductId && cashItem.ProductPrice == quoteItem.ProductPrice, "Contado conserva producto y precio.");
+Check(cashItem.DownPayment == 0 && cashItem.InitialPaymentPaidToday == 0 && cashItem.InitialPaymentSchedule!.Count == 0 && cashItem.TermMonths == 0 && cashItem.MonthlyInterestRate == 0 && cashItem.Insurance == 0 && cashItem.AdministrativeFees == 0, "Contado descarta valores de crédito ocultos.");
+var cashCalculation = typeof(QuotesController).GetMethod("CashSimulation", BindingFlags.NonPublic | BindingFlags.Static)!.Invoke(null, [4500000m])!;
+Check((decimal)cashCalculation.GetType().GetProperty("TotalPayment")!.GetValue(cashCalculation)! == 4500000, "Contado paga sólo precio después del descuento.");
+Check((decimal)cashCalculation.GetType().GetProperty("FinancedAmount")!.GetValue(cashCalculation)! == 0, "Contado no financia.");
+var cashQuote = new Cotizacion { TipoCredito = "Contado", PrecioProducto = 5000000, DescuentoPromocion = 500000, TotalPagarEstimado = 4500000, PlazoMeses = 0 };
+cashQuote.Items.Add(new CotizacionItem { TipoCredito = "Contado", PrecioProducto = 5000000, DescuentoPromocion = 500000, TotalPagarEstimado = 4500000, PlazoMeses = 0 });
+var cashDto = (QuoteDto)typeof(QuotesController).GetMethod("ToDto", BindingFlags.NonPublic | BindingFlags.Static)!.Invoke(null, [cashQuote])!;
+Check(cashDto.TermMonths == 0 && cashDto.FinancedAmount == 0 && cashDto.EstimatedTotalPayment == 4500000, "Leer contado no reconstruye crédito de 24 cuotas.");
+Check(cashDto.Items.Single().TermMonths == 0 && cashDto.Items.Single().FinancedAmount == 0, "Leer artículos respeta contado.");
+var customerCashDto = (QuoteDto)typeof(CustomersController).GetMethod("ToQuoteDto", BindingFlags.NonPublic | BindingFlags.Static)!.Invoke(null, [cashQuote])!;
+Check(customerCashDto.TermMonths == 0 && customerCashDto.FinancedAmount == 0, "Vista 360 conserva modalidad contado.");
+var cashPdf = new System.Text.StringBuilder();
+typeof(SimplePdfGenerator).GetMethod("DrawCommercialValues", BindingFlags.NonPublic | BindingFlags.Static)!.Invoke(null, [cashPdf, cashDto]);
+Check(cashPdf.ToString().Contains("CONTADO") && !cashPdf.ToString().Contains("Nro de Cuotas") && !cashPdf.ToString().Contains("Inicio Credito"), "PDF contado sin condiciones de financiación.");
+var comparisonPdf = new System.Text.StringBuilder();
+typeof(SimplePdfGenerator).GetMethod("DrawComparison", BindingFlags.NonPublic | BindingFlags.Static)!.Invoke(null, [comparisonPdf, 40, 200, cashDto.Items]);
+Check(comparisonPdf.ToString().Contains("Precio contado") && !comparisonPdf.ToString().Contains("Financiado"), "Comparativo contado muestra precios.");
+Console.WriteLine("OK: contado normalizado, precio con descuento, DTOs y PDF sin financiación.");
+
 sealed class TestTenant : ITenantContext
 {
     public Guid? EmpresaId { get; private set; } = Guid.NewGuid();

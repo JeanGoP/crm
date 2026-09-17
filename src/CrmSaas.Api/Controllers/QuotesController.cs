@@ -82,10 +82,10 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
         if (string.IsNullOrWhiteSpace(lastName)) throw new ValidationException("El primer apellido del cliente es obligatorio.");
         if (string.IsNullOrWhiteSpace(NormalizePhoneDigits(dto.PhoneNumber))) throw new ValidationException("El telefono del cliente es obligatorio.");
 
-        var financialSettings = await GetFinancialSettingsAsync(cancellationToken);
+        var financialSettings = dto.IsCash ? null : await GetFinancialSettingsAsync(cancellationToken);
         var salesPoint = await GetCurrentSalesPointAsync(dto.SalesPointId, true, cancellationToken);
-        var salesPointRate = await ResolveSalesPointRateAsync(salesPoint, dto.SalesPointRateId, cancellationToken);
-        var requestedItems = NormalizeQuoteItems(dto);
+        var salesPointRate = dto.IsCash ? null : await ResolveSalesPointRateAsync(salesPoint, dto.SalesPointRateId, cancellationToken);
+        var requestedItems = NormalizeQuoteItems(dto).Select(item => dto.IsCash ? NormalizeCashItem(item) : item).ToList();
         if (requestedItems.Count == 0) throw new ValidationException("Debe seleccionar al menos un producto para cotizar.");
         if (requestedItems.Count > 4) throw new ValidationException("Puede comparar maximo 4 productos por cotizacion.");
 
@@ -104,15 +104,15 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             if (item.InitialPaymentPaidToday < 0) throw new ValidationException("El pago de inicial de hoy no puede ser negativo.");
             if (item.Insurance < 0) throw new ValidationException("El seguro no puede ser negativo.");
             if (item.AdministrativeFees < 0) throw new ValidationException("Los gastos administrativos no pueden ser negativos.");
-            if (item.TermMonths <= 0) throw new ValidationException("El plazo debe ser mayor a cero.");
+            if (!dto.IsCash && item.TermMonths <= 0) throw new ValidationException("El plazo debe ser mayor a cero.");
             if (item.MonthlyInterestRate < 0) throw new ValidationException("La tasa mensual no puede ser negativa.");
             var product = products[item.ProductId];
             var configuredProductPrice = ResolveProductPrice(product, salesPoint);
             var productPrice = item.ProductPrice > 0 ? item.ProductPrice : configuredProductPrice;
-            var insurance = item.Insurance > 0 ? item.Insurance : product.Soat;
-            var administrativeFees = item.AdministrativeFees > 0 ? item.AdministrativeFees : product.Matricula + product.Impuestos;
+            var insurance = dto.IsCash ? 0 : item.Insurance > 0 ? item.Insurance : product.Soat;
+            var administrativeFees = dto.IsCash ? 0 : item.AdministrativeFees > 0 ? item.AdministrativeFees : product.Matricula + product.Impuestos;
             var promotion = ResolvePromotion(product, salesPoint, promotions, productPrice);
-            var simulation = CalculateSimulation(promotion.DiscountedProductPrice, item.DownPayment, insurance, administrativeFees, item.TermMonths, item.MonthlyInterestRate, financialSettings, salesPoint, salesPointRate);
+            var simulation = dto.IsCash ? CashSimulation(promotion.DiscountedProductPrice) : CalculateSimulation(promotion.DiscountedProductPrice, item.DownPayment, insurance, administrativeFees, item.TermMonths, item.MonthlyInterestRate, financialSettings, salesPoint, salesPointRate);
             var initialPlan = NormalizeInitialPaymentPlan(item, now);
             return new { Source = item, Product = product, ProductPrice = productPrice, Promotion = promotion, Simulation = simulation, InitialPlan = initialPlan, Order = index + 1 };
         }).ToList();
@@ -130,7 +130,7 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
         var quotePromotionDiscount = quoteAsBundle ? calculatedItems.Sum(x => x.Promotion.DiscountAmount) : primary.Promotion.DiscountAmount;
         var quotePromotion = quoteAsBundle ? null : primary.Promotion.Promotion;
         var quotePromotionName = quoteAsBundle && quotePromotionDiscount > 0 ? "Promociones aplicadas" : primary.Promotion.Promotion?.Nombre;
-        var simulation = quoteAsBundle
+        var simulation = dto.IsCash ? CashSimulation(quoteAsBundle ? calculatedItems.Sum(x => x.Promotion.DiscountedProductPrice) : primary.Promotion.DiscountedProductPrice) : quoteAsBundle
             ? CalculateSimulation(
                 calculatedItems.Sum(x => x.Promotion.DiscountedProductPrice),
                 primary.Simulation.DownPayment,
@@ -240,7 +240,7 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             CuotaInicial = simulation.DownPayment,
             CuotaInicialPagadaHoy = primary.InitialPlan.PaidToday,
             PlanCuotaInicialJson = SerializeInitialPaymentPlan(primary.InitialPlan.Schedule),
-            FechaInicioCreditoEstimada = primary.InitialPlan.CreditStartDate,
+            FechaInicioCreditoEstimada = dto.IsCash ? null : primary.InitialPlan.CreditStartDate,
             Seguro = simulation.Insurance,
             GastosAdministrativos = simulation.AdministrativeFees,
             PlazoMeses = simulation.TermMonths,
@@ -268,7 +268,7 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
                 CuotaInicial = item.Simulation.DownPayment,
                 CuotaInicialPagadaHoy = item.InitialPlan.PaidToday,
                 PlanCuotaInicialJson = SerializeInitialPaymentPlan(item.InitialPlan.Schedule),
-                FechaInicioCreditoEstimada = item.InitialPlan.CreditStartDate,
+                FechaInicioCreditoEstimada = dto.IsCash ? null : item.InitialPlan.CreditStartDate,
                 Seguro = item.Simulation.Insurance,
                 GastosAdministrativos = item.Simulation.AdministrativeFees,
                 PlazoMeses = item.Simulation.TermMonths,
@@ -326,25 +326,26 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
     [HttpPost("simulate")]
     public async Task<ActionResult<QuoteSimulationResultDto>> Simulate(QuoteSimulationDto dto, CancellationToken cancellationToken)
     {
+        if (dto.IsCash) dto = dto with { DownPayment = 0, Insurance = 0, AdministrativeFees = 0, TermMonths = 0, MonthlyInterestRate = 0, SalesPointRateId = null };
         if (dto.ProductId == Guid.Empty) throw new ValidationException("Debe seleccionar un producto.");
         if (dto.DownPayment < 0) throw new ValidationException("La cuota inicial no puede ser negativa.");
         if (dto.Insurance < 0) throw new ValidationException("El seguro no puede ser negativo.");
         if (dto.AdministrativeFees < 0) throw new ValidationException("Los gastos administrativos no pueden ser negativos.");
-        if (dto.TermMonths <= 0) throw new ValidationException("El plazo debe ser mayor a cero.");
+        if (!dto.IsCash && dto.TermMonths <= 0) throw new ValidationException("El plazo debe ser mayor a cero.");
 
         var product = await db.Productos
             .Include(x => x.PreciosPorSede)
             .FirstOrDefaultAsync(x => x.Id == dto.ProductId && x.Activo, cancellationToken)
             ?? throw new KeyNotFoundException("Producto no encontrado o inactivo.");
-        var financialSettings = await GetFinancialSettingsAsync(cancellationToken);
+        var financialSettings = dto.IsCash ? null : await GetFinancialSettingsAsync(cancellationToken);
         var salesPoint = await GetCurrentSalesPointAsync(dto.SalesPointId, true, cancellationToken);
-        var salesPointRate = await ResolveSalesPointRateAsync(salesPoint, dto.SalesPointRateId, cancellationToken);
+        var salesPointRate = dto.IsCash ? null : await ResolveSalesPointRateAsync(salesPoint, dto.SalesPointRateId, cancellationToken);
         var configuredProductPrice = ResolveProductPrice(product, salesPoint);
         var productPrice = dto.ProductPrice > 0 ? dto.ProductPrice : configuredProductPrice;
         var promotion = ResolvePromotion(product, salesPoint, await GetActivePromotionsAsync(ColombiaTime.Now, cancellationToken), productPrice);
-        var insurance = dto.Insurance > 0 ? dto.Insurance : product.Soat;
-        var administrativeFees = dto.AdministrativeFees > 0 ? dto.AdministrativeFees : product.Matricula + product.Impuestos;
-        var simulation = CalculateSimulation(promotion.DiscountedProductPrice, dto.DownPayment, insurance, administrativeFees, dto.TermMonths, dto.MonthlyInterestRate, financialSettings, salesPoint, salesPointRate);
+        var insurance = dto.IsCash ? 0 : dto.Insurance > 0 ? dto.Insurance : product.Soat;
+        var administrativeFees = dto.IsCash ? 0 : dto.AdministrativeFees > 0 ? dto.AdministrativeFees : product.Matricula + product.Impuestos;
+        var simulation = dto.IsCash ? CashSimulation(promotion.DiscountedProductPrice) : CalculateSimulation(promotion.DiscountedProductPrice, dto.DownPayment, insurance, administrativeFees, dto.TermMonths, dto.MonthlyInterestRate, financialSettings, salesPoint, salesPointRate);
 
         return Ok(new QuoteSimulationResultDto(
             simulation.DownPayment,
@@ -461,8 +462,8 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
         var productName = x.Producto is null
             ? "Producto"
             : ProductName(x.Producto);
-        var termMonths = x.PlazoMeses <= 0 ? 24 : x.PlazoMeses;
-        var financedAmount = x.ValorFinanciado <= 0 && x.CuotaMensualEstimada <= 0
+        var termMonths = x.TipoCredito == "Contado" ? 0 : x.PlazoMeses <= 0 ? 24 : x.PlazoMeses;
+        var financedAmount = x.TipoCredito == "Contado" ? 0 : x.ValorFinanciado <= 0 && x.CuotaMensualEstimada <= 0
             ? Math.Max(DiscountedPrice(x.PrecioProducto, x.DescuentoPromocion) + x.Seguro + x.GastosAdministrativos - x.CuotaInicial, 0)
             : x.ValorFinanciado;
         var totalPayment = x.TotalPagarEstimado <= 0 ? x.CuotaInicial + financedAmount : x.TotalPagarEstimado;
@@ -526,6 +527,13 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             ? []
             : [new CreateQuoteItemDto(dto.ProductId, 0, dto.DownPayment, dto.DownPayment, [], dto.Insurance, dto.AdministrativeFees, dto.TermMonths, dto.MonthlyInterestRate)];
     }
+
+    private static CreateQuoteItemDto NormalizeCashItem(CreateQuoteItemDto item) =>
+        item with { DownPayment = 0, InitialPaymentPaidToday = 0, InitialPaymentSchedule = [],
+            Insurance = 0, AdministrativeFees = 0, TermMonths = 0, MonthlyInterestRate = 0 };
+
+    private static CreditSimulation CashSimulation(decimal price) =>
+        new(0, 0, 0, 0, 0, 0, 0, price, "Contado", false);
 
     private static InitialPaymentPlan NormalizeInitialPaymentPlan(CreateQuoteItemDto item, DateTime now)
     {
@@ -610,7 +618,7 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
                 DeserializeInitialPaymentPlan(quote.PlanCuotaInicialJson),
                 quote.Seguro,
                 quote.GastosAdministrativos,
-                quote.PlazoMeses <= 0 ? 24 : quote.PlazoMeses,
+                quote.TipoCredito == "Contado" ? 0 : quote.PlazoMeses <= 0 ? 24 : quote.PlazoMeses,
                 quote.TasaInteresMensual,
                 quote.ValorFinanciado,
                 quote.CuotaMensualEstimada,
@@ -624,8 +632,8 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
     private static QuoteItemDto ToItemDto(CotizacionItem item)
     {
         var productName = item.Producto is null ? "Producto" : ProductName(item.Producto);
-        var termMonths = item.PlazoMeses <= 0 ? 24 : item.PlazoMeses;
-        var financedAmount = item.ValorFinanciado <= 0 && item.CuotaMensualEstimada <= 0
+        var termMonths = item.TipoCredito == "Contado" ? 0 : item.PlazoMeses <= 0 ? 24 : item.PlazoMeses;
+        var financedAmount = item.TipoCredito == "Contado" ? 0 : item.ValorFinanciado <= 0 && item.CuotaMensualEstimada <= 0
             ? Math.Max(DiscountedPrice(item.PrecioProducto, item.DescuentoPromocion) + item.Seguro + item.GastosAdministrativos - item.CuotaInicial, 0)
             : item.ValorFinanciado;
         var totalPayment = item.TotalPagarEstimado <= 0 ? item.CuotaInicial + financedAmount : item.TotalPagarEstimado;
