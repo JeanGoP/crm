@@ -115,6 +115,29 @@ Check(lines.Any(line => line.StartsWith("Primer vencimiento acordado:") && line.
 Check(lines.Any(line => line.StartsWith("Codeudor Persona 400 -")) && lines.Any(line => line.StartsWith("Cliente Cliente prueba -")), "PDF identifica el dueño de los documentos.");
 Console.WriteLine("OK: catálogos separados, seguimiento EF, no duplicación, tenant, DTO y contenido PDF.");
 
+var quoteDate = new DateTime(2026, 9, 17);
+var quoteItem = new CreateQuoteItemDto(Guid.NewGuid(), 5000000, 800000, 500000,
+    [new QuoteInitialPaymentDto(quoteDate.AddDays(30), 100000), new QuoteInitialPaymentDto(quoteDate.AddDays(60), 200000)],
+    0, 0, 24, 2);
+var normalizePlan = typeof(QuotesController).GetMethod("NormalizeInitialPaymentPlan", BindingFlags.NonPublic | BindingFlags.Static)!;
+var plan = normalizePlan.Invoke(null, [quoteItem, quoteDate])!;
+Check((decimal)plan.GetType().GetProperty("PaidToday")!.GetValue(plan)! == 500000, "API guarda la cuota inicial base.");
+Check(((IReadOnlyCollection<QuoteInitialPaymentDto>)plan.GetType().GetProperty("Schedule")!.GetValue(plan)!).Sum(x => x.Amount) == 300000, "API programa sólo la cuota extra.");
+var calculate = typeof(QuotesController).GetMethod("CalculateSimulation", BindingFlags.NonPublic | BindingFlags.Static)!;
+var calculation = calculate.Invoke(null, [5000000m, 800000m, 0m, 0m, 24, 2m, null, null, null])!;
+Check((decimal)calculation.GetType().GetProperty("FinancedAmount")!.GetValue(calculation)! == 4200000, "Financiación descuenta inicial más extra.");
+foreach (var wrongSchedule in new[] { 100000m, 800000m })
+{
+    try
+    {
+        normalizePlan.Invoke(null, [quoteItem with { InitialPaymentSchedule = [new QuoteInitialPaymentDto(quoteDate, wrongSchedule)] }, quoteDate]);
+        throw new Exception("Debe rechazar planes que no suman la cuota extra.");
+    }
+    catch (TargetInvocationException e) when (e.InnerException is ValidationException) { }
+}
+normalizePlan.Invoke(null, [quoteItem with { DownPayment = 500000, InitialPaymentSchedule = [] }, quoteDate]);
+Console.WriteLine("OK: contrato de cotización, inicial completa, cuota extra y financiación.");
+
 sealed class TestTenant : ITenantContext
 {
     public Guid? EmpresaId { get; private set; } = Guid.NewGuid();

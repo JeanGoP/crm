@@ -37,6 +37,7 @@ import ExpandMore from '@mui/icons-material/ExpandMore';
 import ChevronRight from '@mui/icons-material/ChevronRight';
 import { AxiosError } from 'axios';
 import { api } from './api';
+import { quotePayments } from './quotePayments';
 import { useAuthStore } from './store';
 import { Activity, ColombianIdentityLookup, CollectionOrder, CommercialInventory, CommercialInventorySummary, CommercialReports, Company, CreditApplication, CreditCoDebtor, CreditDocument, Customer, Customer360, CustomerAiAnalysis, CustomerTimelineItem, Dashboard, Deal, DealStage, ExternalInventoryItem, ExternalInventoryWarehouse, FinancialSettings, Lead, LoginAccessReport, MotorcycleDelivery, Procedure, Product, ProductCategory, ProductPhoto, Promotion, Quote, QuoteChargeConcept, QuoteSalesPoint, QuoteSimulationResult, SalesPoint, SalesPointRate, User } from './types';
 
@@ -284,7 +285,7 @@ const emptyQuoteChargeConcept = { name: '', code: '', calculationGroup: 'Gasto',
 const emptySalesPointRate = { id: '', name: 'Tasa general', factorMonthlyRate: 4.5, maxTermMonths: 30, active: true };
 const emptySalesPoint = { name: '', code: '', city: '', address: '', phone: '', mainBrand: 'Honda', brandLogoDataUrl: '', factorMonthlyRate: 4.5, maxTermMonths: 30, quoteValidityDays: 7, deliveryMode: 'ConSoat', soatDays: 14, registrationDays: 20, soatProvider: '', registrationAgent: '', commercialTerms: 'Cotizacion sujeta a disponibilidad del producto, validacion comercial y aprobacion final.', externalInventoryWarehouseCodes: '', rates: [emptySalesPointRate], active: true };
 const emptyPromotion = { name: '', code: '', discountType: 'Valor', discountValue: 0, productId: '', brand: '', color: '', salesPointIds: [] as string[], validFrom: today, validUntil: today, active: true };
-const emptyQuoteItem = { productId: '', productPrice: 0, downPayment: 0, initialPaymentPaidToday: 0, initialPaymentSchedule: [] as { dueDate: string; amount: number }[], insurance: 0, administrativeFees: 0, chargeValues: {} as Record<string, number>, termMonths: 24, monthlyInterestRate: 2.2, inventoryWarehouseCode: '', inventoryWarehouseName: '', inventoryPresentation: '', inventorySerialNumber: '', inventoryEngineNumber: '', inventoryChassisNumber: '' };
+const emptyQuoteItem = { productId: '', productPrice: 0, downPayment: 0, extraPayment: 0, initialPaymentSchedule: [] as { dueDate: string; amount: number }[], insurance: 0, administrativeFees: 0, chargeValues: {} as Record<string, number>, termMonths: 24, monthlyInterestRate: 2.2, inventoryWarehouseCode: '', inventoryWarehouseName: '', inventoryPresentation: '', inventorySerialNumber: '', inventoryEngineNumber: '', inventoryChassisNumber: '' };
 const emptyQuote = { identificationType: 1, identificationNumber: '', customerFirstNames: '', customerLastNames: '', customerFirstName: '', customerMiddleName: '', customerLastName: '', customerSecondLastName: '', phoneCountryCode: '+57', phoneNumber: '', requirementProfileId: '', salesPointId: '', salesPointRateId: '', productId: '', downPayment: 0, insurance: 0, administrativeFees: 0, termMonths: 24, monthlyInterestRate: 2.2, items: [emptyQuoteItem], notes: '' };
 const emptyCoDebtor: CreditCoDebtor = { name: '', identification: '', mobile: '', relationship: '', monthlyIncome: 0, reference1Name: '', reference1Mobile: '', reference1Relationship: '', reference2Name: '', reference2Mobile: '', reference2Relationship: '', active: true };
 const emptyCreditApplication = {
@@ -1473,16 +1474,19 @@ function QuotesPage() {
     if (!customerLastName) throw new Error('El primer apellido del cliente es obligatorio.');
     if (!phoneDigits) throw new Error('El telefono del cliente es obligatorio.');
     const activeChargeConcepts = normalizedQuoteChargeConcepts(quoteChargeConcepts);
-    const quoteItems = (payload.items?.length ? payload.items : [{ ...emptyQuoteItem, productId: payload.productId, productPrice: 0, downPayment: payload.downPayment, initialPaymentPaidToday: payload.downPayment, insurance: payload.insurance, administrativeFees: payload.administrativeFees, termMonths: payload.termMonths, monthlyInterestRate: payload.monthlyInterestRate }])
+    const quoteItems = (payload.items?.length ? payload.items : [{ ...emptyQuoteItem, productId: payload.productId, productPrice: 0, downPayment: payload.downPayment, extraPayment: 0, insurance: payload.insurance, administrativeFees: payload.administrativeFees, termMonths: payload.termMonths, monthlyInterestRate: payload.monthlyInterestRate }])
       .filter((item) => item.productId)
       .map((item) => {
         const product = products.find((candidate) => candidate.id === item.productId);
         const chargeTotals = quoteChargeTotals(item, activeChargeConcepts, product);
+        if (item.downPayment < 0 || item.extraPayment < 0) throw new Error('La cuota inicial y la cuota extra no pueden ser negativas.');
+        const scheduled = item.initialPaymentSchedule.reduce((sum, payment) => sum + Number(payment.amount), 0);
+        if (Math.abs(scheduled - Number(item.extraPayment)) > 0.01) throw new Error('El plan de pagos debe sumar exactamente la cuota extra.');
         return {
           productId: item.productId,
           productPrice: Number(item.productPrice),
-          downPayment: Number(item.downPayment),
-          initialPaymentPaidToday: Number(item.initialPaymentPaidToday),
+          downPayment: quotePayments(item.downPayment, item.extraPayment).downPayment,
+          initialPaymentPaidToday: Number(item.downPayment),
           initialPaymentSchedule: (item.initialPaymentSchedule ?? [])
             .filter((payment) => Number(payment.amount) > 0 && payment.dueDate)
             .map((payment) => ({ dueDate: payment.dueDate, amount: Number(payment.amount) })),
@@ -4769,11 +4773,8 @@ function QuoteDialog({ form, products, productCategories, quoteChargeConcepts, s
                   {(item.inventoryChassisNumber || item.inventoryEngineNumber || item.inventoryWarehouseName) && <Alert severity="info" sx={{ gridColumn: { md: '1 / -1' }, py: 0.5 }}>
                     Unidad seleccionada: {item.inventoryWarehouseName || 'Bodega'}{item.inventoryChassisNumber ? ` · Chasis ${item.inventoryChassisNumber}` : ''}{item.inventoryEngineNumber ? ` · Motor ${item.inventoryEngineNumber}` : ''}
                   </Alert>}
-                  <CurrencyField label="Cuota inicial" value={item.downPayment} onChange={(nextDownPayment) => {
-                    const keepPaidInSync = Number(item.initialPaymentPaidToday) === Number(item.downPayment);
-                    updateItem(index, { downPayment: nextDownPayment, initialPaymentPaidToday: keepPaidInSync ? nextDownPayment : item.initialPaymentPaidToday });
-                  }} />
-                  <CurrencyField label="Cuota extra" value={item.initialPaymentPaidToday} onChange={(initialPaymentPaidToday) => updateItem(index, { initialPaymentPaidToday })} />
+                  <CurrencyField label="Cuota inicial" value={item.downPayment} onChange={(downPayment) => updateItem(index, { downPayment })} />
+                  <CurrencyField label="Cuota extra" value={item.extraPayment} onChange={(extraPayment) => updateItem(index, { extraPayment })} />
                   <CurrencyField label="Precio" value={item.productPrice} onChange={(productPrice) => updateItem(index, { productPrice })} />
                   <TextField fullWidth label="Cuotas" type="number" value={item.termMonths} onChange={(e) => updateItem(index, { termMonths: Number(e.target.value) })} />
                   {activeChargeConcepts.map((concept) => <CurrencyField
@@ -4809,6 +4810,7 @@ function QuoteDialog({ form, products, productCategories, quoteChargeConcepts, s
 }
 
 function QuoteSimulationPreview({ value, selectedProduct, salesPointId, salesPointRateId, compact = false }: { value: typeof emptyQuoteItem; selectedProduct?: Product; salesPointId?: string; salesPointRateId?: string; compact?: boolean }) {
+  const completeDownPayment = quotePayments(value.downPayment, value.extraPayment).downPayment;
   const [simulation, setSimulation] = useState<QuoteSimulationResult>();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -4827,7 +4829,7 @@ function QuoteSimulationPreview({ value, selectedProduct, salesPointId, salesPoi
       api.post<QuoteSimulationResult>('/api/quotes/simulate', {
         productId: selectedProduct.id,
         productPrice,
-        downPayment: Number(value.downPayment),
+        downPayment: completeDownPayment,
         insurance: Number(value.insurance),
         administrativeFees: Number(value.administrativeFees),
         termMonths: Number(value.termMonths),
@@ -4841,12 +4843,12 @@ function QuoteSimulationPreview({ value, selectedProduct, salesPointId, salesPoi
     }, 250);
 
     return () => window.clearTimeout(timer);
-  }, [selectedProduct?.id, productPrice, value.downPayment, value.insurance, value.administrativeFees, value.termMonths, value.monthlyInterestRate, salesPointId, salesPointRateId]);
+  }, [selectedProduct?.id, productPrice, completeDownPayment, value.insurance, value.administrativeFees, value.termMonths, value.monthlyInterestRate, salesPointId, salesPointRateId]);
 
   const insurance = Math.max(Number(value.insurance) || 0, 0);
   const administrativeFees = Math.max(Number(value.administrativeFees) || 0, 0);
   const totalToFinance = productPrice + insurance + administrativeFees;
-  const fallbackDownPayment = Math.min(Number(value.downPayment) || 0, totalToFinance);
+  const fallbackDownPayment = Math.min(completeDownPayment, totalToFinance);
   const fallbackTermMonths = Math.max(Number(value.termMonths) || 1, 1);
   const fallbackFinanced = Math.max(totalToFinance - fallbackDownPayment, 0);
   const fallbackPayment = estimateMonthlyPayment(fallbackFinanced, fallbackTermMonths, Number(value.monthlyInterestRate) || 0);
@@ -4892,10 +4894,9 @@ function QuoteSimulationPreview({ value, selectedProduct, salesPointId, salesPoi
 function InitialPaymentPlanEditor({ item, onChange }: { item: typeof emptyQuoteItem; onChange: (patch: Partial<typeof emptyQuoteItem>) => void }) {
   const schedule = item.initialPaymentSchedule ?? [];
   const downPayment = Math.max(Number(item.downPayment) || 0, 0);
-  const paidToday = Math.max(Number(item.initialPaymentPaidToday) || 0, 0);
+  const extraPayment = Math.max(Number(item.extraPayment) || 0, 0);
   const scheduledAmount = schedule.reduce((sum, payment) => sum + Math.max(Number(payment.amount) || 0, 0), 0);
-  const balance = Math.max(downPayment - paidToday - scheduledAmount, 0);
-  const overpaid = Math.max(paidToday + scheduledAmount - downPayment, 0);
+  const { balance, excess: overpaid, downPayment: completeDownPayment } = quotePayments(downPayment, extraPayment, scheduledAmount);
   const sortedPaymentDates = schedule.map((payment) => payment.dueDate).filter(Boolean).sort();
   const creditStartDate = sortedPaymentDates.length ? sortedPaymentDates[sortedPaymentDates.length - 1] : today;
   const updatePayment = (index: number, patch: Partial<{ dueDate: string; amount: number }>) => {
@@ -4908,21 +4909,22 @@ function InitialPaymentPlanEditor({ item, onChange }: { item: typeof emptyQuoteI
     onChange({ initialPaymentSchedule: schedule.filter((_, paymentIndex) => paymentIndex !== index) });
   };
 
-  if (downPayment <= 0) {
-    return <Alert severity="info" sx={{ py: 0.5 }}>Sin cuota inicial configurada para este articulo.</Alert>;
+  if (extraPayment <= 0 && !schedule.length) {
+    return <Alert severity="info" sx={{ py: 0.5 }}>Cuota inicial completa: {money(completeDownPayment)}. Sin cuota extra por programar.</Alert>;
   }
 
   return <Paper variant="outlined" sx={{ p: 1.5, bgcolor: '#fff' }}>
     <Stack spacing={1.25}>
       <Stack direction={{ xs: 'column', md: 'row' }} alignItems={{ xs: 'stretch', md: 'center' }} justifyContent="space-between" gap={1}>
         <Box>
-          <Typography fontWeight={900} fontSize={14}>Plan de cuota inicial</Typography>
+          <Typography fontWeight={900} fontSize={14}>Plan de pago de cuota extra</Typography>
           <Typography color="text.secondary" fontSize={12.5}>
-            El credito inicia cuando la inicial este completa{creditStartDate ? `: ${new Date(creditStartDate).toLocaleDateString()}` : ''}.
+            Distribuya únicamente la cuota extra. El crédito inicia cuando la inicial esté completa{creditStartDate ? `: ${new Date(creditStartDate).toLocaleDateString()}` : ''}.
           </Typography>
         </Box>
         <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-          <Chip size="small" label={`Inicial ${money(downPayment)}`} />
+          <Chip size="small" label={`Inicial completa ${money(completeDownPayment)}`} />
+          <Chip size="small" label={`Cuota extra ${money(extraPayment)}`} />
           <Chip size="small" color={balance > 0 ? 'warning' : overpaid > 0 ? 'error' : 'success'} label={overpaid > 0 ? `Exceso ${money(overpaid)}` : `Saldo ${money(balance)}`} />
           <Button size="small" variant="outlined" startIcon={<Add />} onClick={addPayment}>Agregar pago</Button>
         </Stack>
@@ -4939,8 +4941,8 @@ function InitialPaymentPlanEditor({ item, onChange }: { item: typeof emptyQuoteI
           <IconButton color="error" onClick={() => removePayment(index)}><Delete fontSize="small" /></IconButton>
         </Box>)}
       </Stack>}
-      {balance > 0 && <Alert severity="warning" sx={{ py: 0.5 }}>Falta programar {money(balance)} de la cuota inicial.</Alert>}
-      {overpaid > 0 && <Alert severity="error" sx={{ py: 0.5 }}>Los pagos superan la cuota inicial por {money(overpaid)}.</Alert>}
+      {balance > 0 && <Alert severity="warning" sx={{ py: 0.5 }}>Falta programar {money(balance)} de la cuota extra.</Alert>}
+      {overpaid > 0 && <Alert severity="error" sx={{ py: 0.5 }}>Los pagos superan la cuota extra por {money(overpaid)}.</Alert>}
     </Stack>
   </Paper>;
 }

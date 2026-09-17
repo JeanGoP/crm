@@ -503,8 +503,8 @@ public static class SimplePdfGenerator
         var labels = new[]
         {
             "Forma de pago", "Precio Vehiculo", "Valor Tramites", "Valor Bono",
-            "Valor Dcto", "Chasis", "Motor", "", "Bodega", "Cuota Inicial",
-            "Inicial Hoy", "Saldo Inicial", "Inicio Credito", "Nro de Cuotas", "Valor de Cuotas"
+            "Valor Dcto", "Chasis", "Motor", "", "Bodega", "Inicial completa",
+            "Cuota inicial", "Cuota extra", "Inicio Credito", "Nro de Cuotas", "Valor de Cuotas"
         };
         var values = new[]
         {
@@ -519,7 +519,7 @@ public static class SimplePdfGenerator
             Value(inventoryItem?.InventoryWarehouseName),
             quote.DownPayment > 0 ? Money(quote.DownPayment) : "-",
             quote.InitialPaymentPaidToday > 0 ? Money(quote.InitialPaymentPaidToday) : "-",
-            quote.InitialPaymentBalance > 0 ? Money(quote.InitialPaymentBalance) : "-",
+            Money(Math.Max(quote.DownPayment - quote.InitialPaymentPaidToday, 0)),
             quote.CreditStartDate.HasValue ? Date(quote.CreditStartDate.Value) : "-",
             quote.TermMonths > 0 ? quote.TermMonths.ToString(CultureInfo.InvariantCulture) : "-",
             quote.EstimatedMonthlyPayment > 0 ? Money(quote.EstimatedMonthlyPayment) : "-"
