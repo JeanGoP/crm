@@ -457,12 +457,16 @@ public sealed class SolicitudCredito : AuditableTenantEntity
     public string? ObservacionBienvenida { get; set; }
     public ICollection<DocumentoSolicitudCredito> Documentos { get; set; } = new List<DocumentoSolicitudCredito>();
     public bool DocumentacionCompleta { get; set; }
+    public DateTime? FechaPrimerVencimiento { get; set; }
+    public ICollection<CodeudorSolicitudCredito> Codeudores { get; set; } = new List<CodeudorSolicitudCredito>();
     public DateTime? FechaDocumentacionCompleta { get; set; }
     public string? UsuarioDocumentacionCompleta { get; set; }
 }
 
 public sealed class DocumentoSolicitudCredito : AuditableTenantEntity
 {
+    public Guid? CodeudorId { get; set; }
+    public CodeudorSolicitudCredito? Codeudor { get; set; }
     public Guid SolicitudCreditoId { get; set; }
     public SolicitudCredito? SolicitudCredito { get; set; }
     public Guid? ClienteId { get; set; }

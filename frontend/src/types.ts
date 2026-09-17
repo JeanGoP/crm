@@ -427,7 +427,24 @@ export interface ColombianIdentityLookup {
   source: 'database' | 'verifik' | string;
 }
 
+export interface CreditCoDebtor {
+  id?: string;
+  name: string;
+  identification: string;
+  mobile: string;
+  relationship: string;
+  monthlyIncome: number;
+  reference1Name: string;
+  reference1Mobile: string;
+  reference1Relationship: string;
+  reference2Name: string;
+  reference2Mobile: string;
+  reference2Relationship: string;
+  active: boolean;
+}
+
 export interface CreditDocument {
+  coDebtorId?: string;
   id: string;
   customerId?: string;
   type: number;
@@ -450,6 +467,8 @@ export interface CreditDocument {
 }
 
 export interface CreditApplication {
+  firstDueDate?: string;
+  coDebtors?: CreditCoDebtor[];
   id: string;
   number: string;
   createdAt: string;

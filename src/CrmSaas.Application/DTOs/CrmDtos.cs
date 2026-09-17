@@ -479,7 +479,14 @@ public sealed record CreditApplicationDto(
     IReadOnlyCollection<CreditDocumentDto> Documents,
     bool DocumentationCompleted = false,
     DateTime? DocumentationCompletedAt = null,
-    string? DocumentationCompletedBy = null);
+    string? DocumentationCompletedBy = null,
+    DateTime? FirstDueDate = null,
+    IReadOnlyCollection<CreditCoDebtorDto>? CoDebtors = null);
+
+public sealed record CreditCoDebtorDto(Guid? Id, string Name, string Identification, string Mobile,
+    string? Relationship, decimal MonthlyIncome, string? Reference1Name, string? Reference1Mobile,
+    string? Reference1Relationship, string? Reference2Name, string? Reference2Mobile,
+    string? Reference2Relationship, bool Active = true);
 
 public sealed record UpsertCreditApplicationDto(
     Guid CustomerId,
@@ -516,7 +523,9 @@ public sealed record UpsertCreditApplicationDto(
     string? CoDebtorReference2Mobile,
     string? CoDebtorReference2Relationship,
     EstadoSolicitudCredito Status,
-    string? Notes);
+    string? Notes,
+    DateTime? FirstDueDate = null,
+    IReadOnlyCollection<CreditCoDebtorDto>? CoDebtors = null);
 
 public sealed record CreditDocumentDto(
     Guid Id,
@@ -537,7 +546,8 @@ public sealed record CreditDocumentDto(
     string? FileName,
     string? ContentType,
     long? SizeBytes,
-    DateTime? UploadedAt);
+    DateTime? UploadedAt,
+    Guid? CoDebtorId = null);
 public sealed record UpsertCreditDocumentDto(TipoDocumentoCredito Type, string Name, EstadoDocumentoCredito Status, DateTime? ReceivedAt, DateTime? ExpiresAt, string? Notes, string? RejectionReason);
 public sealed record ChangeCreditApplicationStatusDto(EstadoSolicitudCredito Status);
 public sealed record CreditApplicationDecisionDto(

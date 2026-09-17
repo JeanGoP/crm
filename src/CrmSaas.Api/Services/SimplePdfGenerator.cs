@@ -70,34 +70,41 @@ public static class SimplePdfGenerator
         $"Valor producto: {Money(app.MotorcycleValue)}",
         $"Cuota inicial: {Money(app.DownPayment)}",
         $"Plazo: {app.TermMonths} meses",
+        $"Primer vencimiento acordado: {Date(app.FirstDueDate)}",
         $"Cotizacion relacionada: {Value(app.QuoteId?.ToString())}",
         "",
-        "CODEUDOR",
-        $"Nombre: {Value(app.CoDebtorName)}",
-        $"Identificacion: {Value(app.CoDebtorIdentification)}",
-        $"Celular: {Value(app.CoDebtorMobile)}",
-        $"Relacion: {Value(app.CoDebtorRelationship)}",
-        $"Ingresos mensuales: {Money(app.CoDebtorMonthlyIncome)}",
-        "",
+        ..CoDebtorLines(app),
         "REFERENCIAS PERSONALES DEL CLIENTE",
         $"Referencia 1: {Value(app.Reference1Name)} - {Value(app.Reference1Mobile)} - {Value(app.Reference1Relationship)}",
         $"Referencia 2: {Value(app.Reference2Name)} - {Value(app.Reference2Mobile)} - {Value(app.Reference2Relationship)}",
         "",
-        "REFERENCIAS PERSONALES DEL CODEUDOR",
-        $"Referencia 1: {Value(app.CoDebtorReference1Name)} - {Value(app.CoDebtorReference1Mobile)} - {Value(app.CoDebtorReference1Relationship)}",
-        $"Referencia 2: {Value(app.CoDebtorReference2Name)} - {Value(app.CoDebtorReference2Mobile)} - {Value(app.CoDebtorReference2Relationship)}",
-        "",
         "DOCUMENTOS",
-        ..app.Documents.OrderBy(x => x.Type).Select(x => $"{x.Name}: {DocumentStatus(x.Status)}"),
+        ..app.Documents.OrderBy(x => x.CoDebtorId).ThenBy(x => x.Type).Select(x => $"{DocumentOwner(app, x)} - {x.Name}: {DocumentStatus(x.Status)}"),
         "",
         "OBSERVACIONES",
         Value(app.Notes),
         "",
         "FIRMAS",
         "Solicitante: ____________________________________",
-        "Codeudor: _______________________________________",
+        ..(app.CoDebtors ?? []).Where(x => x.Active).Select(x => $"Codeudor {x.Name}: ______________________________"),
         "Asesor: _________________________________________"
     ];
+
+    private static IEnumerable<string> CoDebtorLines(CreditApplicationDto app) =>
+        (app.CoDebtors ?? []).Where(x => x.Active).SelectMany((x, index) => new[]
+        {
+            $"CODEUDOR {index + 1}", $"Nombre: {x.Name}", $"Identificacion: {x.Identification}",
+            $"Celular: {x.Mobile}", $"Relacion: {Value(x.Relationship)}", $"Ingresos mensuales: {Money(x.MonthlyIncome)}",
+            $"Referencia 1: {Value(x.Reference1Name)} - {Value(x.Reference1Mobile)} - {Value(x.Reference1Relationship)}",
+            $"Referencia 2: {Value(x.Reference2Name)} - {Value(x.Reference2Mobile)} - {Value(x.Reference2Relationship)}", ""
+        });
+
+    private static string DocumentOwner(CreditApplicationDto app, CreditDocumentDto document)
+    {
+        if (!document.CoDebtorId.HasValue) return $"Cliente {app.CustomerName}";
+        var person = app.CoDebtors?.FirstOrDefault(x => x.Id == document.CoDebtorId);
+        return $"Codeudor {person?.Name ?? document.CoDebtorId.ToString()}{(person?.Active == false ? " (retirado)" : "")}";
+    }
 
     private static List<string> DataAuthorization(CreditApplicationDto app, string companyName) =>
     [

@@ -35,7 +35,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             .Include(x => x.Cliente)
             .Include(x => x.Producto)
             .Include(x => x.PerfilRequisito)
-            .Include(x => x.Documentos)
+            .Include(x => x.Documentos).Include(x => x.Codeudores)
             .OrderByDescending(x => x.FechaCreacion)
             .ToListAsync(cancellationToken);
 
@@ -50,7 +50,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             .Include(x => x.Cliente)
             .Include(x => x.Producto)
             .Include(x => x.PerfilRequisito)
-            .Include(x => x.Documentos)
+            .Include(x => x.Documentos).Include(x => x.Codeudores)
             .OrderByDescending(x => x.FechaCreacion)
             .ToListAsync(cancellationToken);
 
@@ -113,6 +113,8 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         AddChecklistDocuments(entity, null);
 
         db.SolicitudesCredito.Add(entity);
+        entity.FechaPrimerVencimiento = dto.FirstDueDate?.Date;
+        SyncCoDebtors(entity, dto.CoDebtors);
         await SyncPipelineAsync(entity, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         entity.Cliente = customer;
@@ -128,7 +130,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             .Include(x => x.Cliente)
             .Include(x => x.Producto)
             .Include(x => x.PerfilRequisito)
-            .Include(x => x.Documentos)
+            .Include(x => x.Documentos).Include(x => x.Codeudores)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
             ?? throw new KeyNotFoundException("Solicitud de credito no encontrada.");
 
@@ -179,6 +181,8 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         entity.Estado = dto.Status;
         entity.Observaciones = dto.Notes;
         AddMissingChecklistDocuments(entity, null);
+        entity.FechaPrimerVencimiento = dto.FirstDueDate?.Date;
+        SyncCoDebtors(entity, dto.CoDebtors);
 
         await SyncPipelineAsync(entity, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
@@ -193,7 +197,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             .Include(x => x.Cliente)
             .Include(x => x.Producto)
             .Include(x => x.PerfilRequisito)
-            .Include(x => x.Documentos)
+            .Include(x => x.Documentos).Include(x => x.Codeudores)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
             ?? throw new KeyNotFoundException("Solicitud de credito no encontrada.");
 
@@ -218,7 +222,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             .Include(x => x.Cliente)
             .Include(x => x.Producto)
             .Include(x => x.PerfilRequisito)
-            .Include(x => x.Documentos)
+            .Include(x => x.Documentos).Include(x => x.Codeudores)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
             ?? throw new KeyNotFoundException("Solicitud de credito no encontrada.");
 
@@ -239,7 +243,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             .Include(x => x.Cliente)
             .Include(x => x.Producto)
             .Include(x => x.PerfilRequisito)
-            .Include(x => x.Documentos)
+            .Include(x => x.Documentos).Include(x => x.Codeudores)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
             ?? throw new KeyNotFoundException("Solicitud de credito no encontrada.");
 
@@ -267,7 +271,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             .Include(x => x.Cliente)
             .Include(x => x.Producto)
             .Include(x => x.PerfilRequisito)
-            .Include(x => x.Documentos)
+            .Include(x => x.Documentos).Include(x => x.Codeudores)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
             ?? throw new KeyNotFoundException("Solicitud de credito no encontrada.");
 
@@ -289,7 +293,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             .Include(x => x.Cliente)
             .Include(x => x.Producto)
             .Include(x => x.PerfilRequisito)
-            .Include(x => x.Documentos)
+            .Include(x => x.Documentos).Include(x => x.Codeudores)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
             ?? throw new KeyNotFoundException("Solicitud de credito no encontrada.");
         var document = entity.Documentos.FirstOrDefault(x => x.Id == documentId)
@@ -297,7 +301,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
 
         document.Tipo = dto.Type;
         document.Nombre = string.IsNullOrWhiteSpace(dto.Name) ? document.Nombre : dto.Name.Trim();
-        document.ClienteId = entity.ClienteId;
+        document.ClienteId = document.CodeudorId.HasValue ? null : entity.ClienteId;
         document.FechaVencimiento = null;
         if (dto.Status is EstadoDocumentoCredito.Validado or EstadoDocumentoCredito.Rechazado && !CanValidateDocuments())
         {
@@ -340,7 +344,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             .Include(x => x.Cliente)
             .Include(x => x.Producto)
             .Include(x => x.PerfilRequisito)
-            .Include(x => x.Documentos)
+            .Include(x => x.Documentos).Include(x => x.Codeudores)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
             ?? throw new KeyNotFoundException("Solicitud de credito no encontrada.");
         var document = entity.Documentos.FirstOrDefault(x => x.Id == documentId)
@@ -366,7 +370,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         document.FechaCarga = ColombiaTime.Now;
         document.Estado = EstadoDocumentoCredito.Recibido;
         document.FechaRecepcion = ColombiaTime.Now;
-        document.ClienteId = entity.ClienteId;
+        document.ClienteId = document.CodeudorId.HasValue ? null : entity.ClienteId;
         document.FechaVencimiento = null;
         ApplyDocumentAudit(document, EstadoDocumentoCredito.Recibido, null);
 
@@ -402,7 +406,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             .Include(x => x.Cliente)
             .Include(x => x.Producto)
             .Include(x => x.PerfilRequisito)
-            .Include(x => x.Documentos)
+            .Include(x => x.Documentos).Include(x => x.Codeudores)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
             ?? throw new KeyNotFoundException("Solicitud de credito no encontrada.");
         var document = entity.Documentos.FirstOrDefault(x => x.Id == documentId)
@@ -523,7 +527,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             .Include(x => x.Cliente)
             .Include(x => x.Producto)
             .Include(x => x.PerfilRequisito)
-            .Include(x => x.Documentos)
+            .Include(x => x.Documentos).Include(x => x.Codeudores)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
             ?? throw new KeyNotFoundException("Solicitud de credito no encontrada.");
 
@@ -561,7 +565,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         if (string.IsNullOrWhiteSpace(dto.Reference2Name)) throw new ValidationException("El nombre de la referencia 2 es obligatorio.");
         if (string.IsNullOrWhiteSpace(dto.Reference2Mobile)) throw new ValidationException("El celular de la referencia 2 es obligatorio.");
         if (string.IsNullOrWhiteSpace(dto.Reference2Relationship)) throw new ValidationException("La relacion de la referencia 2 es obligatoria.");
-        if (!string.IsNullOrWhiteSpace(dto.CoDebtorName))
+        if (dto.CoDebtors is null && !string.IsNullOrWhiteSpace(dto.CoDebtorName))
         {
             if (string.IsNullOrWhiteSpace(dto.CoDebtorReference1Name)) throw new ValidationException("El nombre de la referencia 1 del codeudor es obligatorio.");
             if (string.IsNullOrWhiteSpace(dto.CoDebtorReference1Mobile)) throw new ValidationException("El celular de la referencia 1 del codeudor es obligatorio.");
@@ -577,7 +581,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             .Include(x => x.Cliente)
             .Include(x => x.Producto)
             .Include(x => x.PerfilRequisito)
-            .Include(x => x.Documentos)
+            .Include(x => x.Documentos).Include(x => x.Codeudores)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
         ?? throw new KeyNotFoundException("Solicitud de crédito no encontrada.");
 
@@ -598,23 +602,6 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         entity.ObservacionBienvenida = null;
     }
 
-    private async Task<PerfilRequisito?> ResolveRequirementProfileAsync(Guid? profileId, CancellationToken cancellationToken)
-    {
-        if (profileId.HasValue)
-        {
-            return await db.PerfilesRequisito
-                .Include(x => x.Documentos)
-                .FirstOrDefaultAsync(x => x.Id == profileId.Value && x.Activo, cancellationToken)
-                ?? throw new KeyNotFoundException("Perfil de requisitos no encontrado o inactivo.");
-        }
-
-        return await db.PerfilesRequisito
-            .Include(x => x.Documentos)
-            .Where(x => x.Activo)
-            .OrderByDescending(x => x.Codigo == "EMPLEADO")
-            .ThenBy(x => x.Nombre)
-            .FirstOrDefaultAsync(cancellationToken);
-    }
 
 
     private static void AddChecklistDocuments(SolicitudCredito entity, PerfilRequisito? profile)
@@ -628,7 +615,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
 
     private void AddMissingChecklistDocuments(SolicitudCredito entity, PerfilRequisito? profile)
     {
-        var names = entity.Documentos.Select(x => x.Nombre).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var names = entity.Documentos.Where(x => x.CodeudorId == null).Select(x => x.Nombre).ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var document in CreditDocumentCatalog.Create().Where(x => !names.Contains(x.Nombre)))
         {
             PrepareDocument(entity, document);
@@ -641,8 +628,32 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
 
     private static void PrepareDocument(SolicitudCredito entity, DocumentoSolicitudCredito document)
     {
-        document.ClienteId = entity.ClienteId;
+        document.ClienteId = document.CodeudorId.HasValue ? null : entity.ClienteId;
         document.FechaVencimiento = null;
+    }
+
+    private void SyncCoDebtors(SolicitudCredito entity, IReadOnlyCollection<CreditCoDebtorDto>? requested)
+    {
+        var existingIds = entity.Codeudores.Select(x => x.Id).ToHashSet();
+        if (CreditCoDebtorService.Apply(entity, requested))
+        {
+            ClearDocumentationConfirmation(entity);
+            entity.DataCreditoCodeudorConsultado = false;
+            entity.DataCreditoPuntajeCodeudor = null;
+        }
+        foreach (var person in entity.Codeudores.Where(x => x.Activo))
+        {
+            if (!existingIds.Contains(person.Id)) db.CodeudoresSolicitudCredito.Add(person);
+            var names = entity.Documentos.Where(x => x.CodeudorId == person.Id).Select(x => x.Nombre).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            foreach (var document in CreditDocumentCatalog.Create().Where(x => !names.Contains(x.Nombre)))
+            {
+                document.SolicitudCreditoId = entity.Id;
+                document.EmpresaId = entity.EmpresaId;
+                document.CodeudorId = person.Id;
+                entity.Documentos.Add(document);
+                db.DocumentosSolicitudCredito.Add(document);
+            }
+        }
     }
 
     private static void ClearDocumentationConfirmation(SolicitudCredito entity)
@@ -658,7 +669,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
     public async Task<ActionResult<CreditApplicationDto>> ConfirmDocumentation(Guid id, CreditWorkflowMilestoneDto dto, CancellationToken cancellationToken)
     {
         var entity = await db.SolicitudesCredito.Include(x => x.Cliente).Include(x => x.Producto)
-            .Include(x => x.PerfilRequisito).Include(x => x.Documentos)
+            .Include(x => x.PerfilRequisito).Include(x => x.Documentos).Include(x => x.Codeudores)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
             ?? throw new KeyNotFoundException("Solicitud no encontrada.");
         ClearDocumentationConfirmation(entity);
@@ -1005,7 +1016,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             x.UsuarioBienvenida,
             x.ObservacionBienvenida,
             x.Documentos.OrderBy(d => Array.IndexOf(CreditDocumentCatalog.Names, d.Nombre) is var index && index >= 0 ? index : 999).ThenBy(d => d.Nombre).Select(ToDocumentDto).ToList(),
-            x.DocumentacionCompleta, x.FechaDocumentacionCompleta, x.UsuarioDocumentacionCompleta);
+            x.DocumentacionCompleta, x.FechaDocumentacionCompleta, x.UsuarioDocumentacionCompleta, x.FechaPrimerVencimiento, x.Codeudores.OrderBy(c => c.Orden).Select(CreditCoDebtorService.ToDto).ToList());
     }
 
     private static CreditDocumentDto ToDocumentDto(DocumentoSolicitudCredito d) =>
@@ -1028,7 +1039,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             d.NombreArchivo,
             d.ContentType,
             d.TamanoBytes,
-            d.FechaCarga);
+            d.FechaCarga, d.CodeudorId);
 
     private static string ProductName(Producto product)
     {

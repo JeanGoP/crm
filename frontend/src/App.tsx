@@ -38,7 +38,7 @@ import ChevronRight from '@mui/icons-material/ChevronRight';
 import { AxiosError } from 'axios';
 import { api } from './api';
 import { useAuthStore } from './store';
-import { Activity, ColombianIdentityLookup, CollectionOrder, CommercialInventory, CommercialInventorySummary, CommercialReports, Company, CreditApplication, CreditDocument, Customer, Customer360, CustomerAiAnalysis, CustomerTimelineItem, Dashboard, Deal, DealStage, ExternalInventoryItem, ExternalInventoryWarehouse, FinancialSettings, Lead, LoginAccessReport, MotorcycleDelivery, Procedure, Product, ProductCategory, ProductPhoto, Promotion, Quote, QuoteChargeConcept, QuoteSalesPoint, QuoteSimulationResult, SalesPoint, SalesPointRate, User } from './types';
+import { Activity, ColombianIdentityLookup, CollectionOrder, CommercialInventory, CommercialInventorySummary, CommercialReports, Company, CreditApplication, CreditCoDebtor, CreditDocument, Customer, Customer360, CustomerAiAnalysis, CustomerTimelineItem, Dashboard, Deal, DealStage, ExternalInventoryItem, ExternalInventoryWarehouse, FinancialSettings, Lead, LoginAccessReport, MotorcycleDelivery, Procedure, Product, ProductCategory, ProductPhoto, Promotion, Quote, QuoteChargeConcept, QuoteSalesPoint, QuoteSimulationResult, SalesPoint, SalesPointRate, User } from './types';
 
 const drawerWidth = 272;
 const today = new Date().toISOString().slice(0, 10);
@@ -286,7 +286,9 @@ const emptySalesPoint = { name: '', code: '', city: '', address: '', phone: '', 
 const emptyPromotion = { name: '', code: '', discountType: 'Valor', discountValue: 0, productId: '', brand: '', color: '', salesPointIds: [] as string[], validFrom: today, validUntil: today, active: true };
 const emptyQuoteItem = { productId: '', productPrice: 0, downPayment: 0, initialPaymentPaidToday: 0, initialPaymentSchedule: [] as { dueDate: string; amount: number }[], insurance: 0, administrativeFees: 0, chargeValues: {} as Record<string, number>, termMonths: 24, monthlyInterestRate: 2.2, inventoryWarehouseCode: '', inventoryWarehouseName: '', inventoryPresentation: '', inventorySerialNumber: '', inventoryEngineNumber: '', inventoryChassisNumber: '' };
 const emptyQuote = { identificationType: 1, identificationNumber: '', customerFirstNames: '', customerLastNames: '', customerFirstName: '', customerMiddleName: '', customerLastName: '', customerSecondLastName: '', phoneCountryCode: '+57', phoneNumber: '', requirementProfileId: '', salesPointId: '', salesPointRateId: '', productId: '', downPayment: 0, insurance: 0, administrativeFees: 0, termMonths: 24, monthlyInterestRate: 2.2, items: [emptyQuoteItem], notes: '' };
+const emptyCoDebtor: CreditCoDebtor = { name: '', identification: '', mobile: '', relationship: '', monthlyIncome: 0, reference1Name: '', reference1Mobile: '', reference1Relationship: '', reference2Name: '', reference2Mobile: '', reference2Relationship: '', active: true };
 const emptyCreditApplication = {
+  firstDueDate: '', coDebtors: [] as CreditCoDebtor[],
   customerId: '', productId: '', quoteId: '', dealId: '', identificationType: 1, identificationNumber: '', birthDate: '', mobile: '', address: '', city: '', occupation: '',
   monthlyIncome: 0, downPayment: 0, termMonths: 24, motorcycleValue: 0,
   coDebtorName: '', coDebtorIdentification: '', coDebtorMobile: '', coDebtorRelationship: '', coDebtorMonthlyIncome: 0,
@@ -1734,9 +1736,10 @@ function CreditApplicationsPage() {
     const clientReferencesComplete = [payload.reference1Name, payload.reference1Mobile, payload.reference1Relationship, payload.reference2Name, payload.reference2Mobile, payload.reference2Relationship]
       .every((value) => value.trim());
     if (!clientReferencesComplete) throw new Error('Debe completar las dos referencias personales del cliente.');
-    const coDebtorReferencesComplete = [payload.coDebtorReference1Name, payload.coDebtorReference1Mobile, payload.coDebtorReference1Relationship, payload.coDebtorReference2Name, payload.coDebtorReference2Mobile, payload.coDebtorReference2Relationship]
-      .every((value) => value.trim());
-    if (payload.coDebtorName.trim() && !coDebtorReferencesComplete) throw new Error('Debe completar las dos referencias personales del codeudor.');
+    for (const person of payload.coDebtors) {
+      if (!person.name.trim() || !person.identification.trim() || !person.mobile.trim()) throw new Error('Complete nombre, identificación y celular de cada codeudor.');
+      if (![person.reference1Name, person.reference1Mobile, person.reference1Relationship, person.reference2Name, person.reference2Mobile, person.reference2Relationship].every((value) => value?.trim())) throw new Error(`Complete las dos referencias de ${person.name}.`);
+    }
     const body = {
       ...payload,
       quoteId: payload.quoteId || null,
@@ -1744,6 +1747,8 @@ function CreditApplicationsPage() {
       requirementProfileId: null,
       identificationType: Number(payload.identificationType),
       birthDate: payload.birthDate ? new Date(payload.birthDate).toISOString() : null,
+      firstDueDate: payload.firstDueDate ? `${payload.firstDueDate}T00:00:00` : null,
+      coDebtors: payload.coDebtors.map((person) => ({ ...person, id: person.id || null })),
       monthlyIncome: Number(payload.monthlyIncome),
       downPayment: Number(payload.downPayment),
       termMonths: Number(payload.termMonths),
@@ -2107,7 +2112,8 @@ function CreditApplicationManagementDialog({
             <Typography variant="subtitle2" fontWeight={900}>Resumen</Typography>
             <InfoLine label="Ingresos" value={money(application.monthlyIncome)} />
             <InfoLine label="Cuota inicial" value={money(application.downPayment)} />
-            <InfoLine label="Codeudor" value={application.coDebtorName || 'Sin codeudor'} />
+            <InfoLine label="Codeudores" value={(application.coDebtors ?? []).filter((person) => person.active).map((person) => person.name).join(' · ') || 'Sin codeudor'} />
+            <InfoLine label="Primer vencimiento" value={application.firstDueDate?.slice(0, 10) || 'Sin acordar'} />
             <InfoLine label="Referencias" value={[application.reference1Name, application.reference2Name].filter(Boolean).join(', ') || 'Sin referencias'} />
           </Paper>
         </Stack>
@@ -2229,9 +2235,9 @@ function CreditWorkflowControls({ application, onCreditBureau, onMilestone }: {
           <TextField type="number" label="Puntaje del cliente (opcional)" value={form.clientScore} onChange={(event) => setForm((current) => ({ ...current, clientScore: event.target.value }))} inputProps={{ min: 0, max: 1000 }} />
           {application.coDebtorName && <>
             <Divider />
-            <Typography fontWeight={800}>Codeudor: {application.coDebtorName}</Typography>
-            <FormControlLabel control={<Checkbox checked={form.coDebtorChecked} onChange={(event) => setForm((current) => ({ ...current, coDebtorChecked: event.target.checked }))} />} label="Datacredito del codeudor consultado" />
-            <TextField type="number" label="Puntaje del codeudor (opcional)" value={form.coDebtorScore} onChange={(event) => setForm((current) => ({ ...current, coDebtorScore: event.target.value }))} inputProps={{ min: 0, max: 1000 }} />
+            <Typography fontWeight={800}>Codeudores: {(application.coDebtors ?? []).filter((person) => person.active).map((person) => person.name).join(' · ')}</Typography>
+            <FormControlLabel control={<Checkbox checked={form.coDebtorChecked} onChange={(event) => setForm((current) => ({ ...current, coDebtorChecked: event.target.checked }))} />} label="Datacrédito consultado para todos los codeudores" />
+            <TextField type="number" label="Puntaje del primer codeudor (opcional)" value={form.coDebtorScore} onChange={(event) => setForm((current) => ({ ...current, coDebtorScore: event.target.value }))} inputProps={{ min: 0, max: 1000 }} />
           </>}
           <TextField multiline minRows={3} label="Observaciones" value={form.notes} onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} />
         </Stack> : <Stack spacing={2}>
@@ -5018,12 +5024,14 @@ function QuotePdfPreviewDialog({ quote, onClose, onDownload }: { quote?: Quote; 
 }
 
 function CreditApplicationDialog({ form, customers, products, quotes, onClose, onSave }: DialogProps<CreditApplication, typeof emptyCreditApplication> & { customers: Customer[]; products: Product[]; quotes: Quote[]; }) {
-  const [referenceDialog, setReferenceDialog] = useState<'client' | 'coDebtor'>();
+  const [referenceDialog, setReferenceDialog] = useState<'client' | number>();
   useEffect(() => {
     if (!form.open) setReferenceDialog(undefined);
   }, [form.open]);
   const quote = quotes.find((x) => x.id === (form.item?.quoteId ?? ''));
   const initial = form.item ? {
+    firstDueDate: form.item.firstDueDate?.slice(0, 10) ?? '',
+    coDebtors: (form.item.coDebtors ?? []).filter((person) => person.active).map((person) => ({ ...emptyCoDebtor, ...person })),
     customerId: form.item.customerId,
     productId: form.item.productId,
     quoteId: form.item.quoteId ?? '',
@@ -5065,8 +5073,8 @@ function CreditApplicationDialog({ form, customers, products, quotes, onClose, o
       const selectedProduct = products.find((x) => x.id === v.productId);
       const selectedCustomer = customers.find((x) => x.id === v.customerId);
       const clientReferencesComplete = [v.reference1Name, v.reference1Mobile, v.reference1Relationship, v.reference2Name, v.reference2Mobile, v.reference2Relationship].every((value) => value.trim());
-      const hasCoDebtor = Boolean(v.coDebtorName.trim());
-      const coDebtorReferencesComplete = [v.coDebtorReference1Name, v.coDebtorReference1Mobile, v.coDebtorReference1Relationship, v.coDebtorReference2Name, v.coDebtorReference2Mobile, v.coDebtorReference2Relationship].every((value) => value.trim());
+      const selectedCoDebtor = typeof referenceDialog === 'number' ? v.coDebtors[referenceDialog] : undefined;
+      const updateCoDebtor = (index: number, patch: Partial<CreditCoDebtor>) => set({ coDebtors: v.coDebtors.map((person, i) => i === index ? { ...person, ...patch } : person) });
       return <>
         <Paper variant="outlined" sx={{ p: 2, bgcolor: '#fbfdff' }}>
           <Stack spacing={2}>
@@ -5149,29 +5157,42 @@ function CreditApplicationDialog({ form, customers, products, quotes, onClose, o
               <TextField fullWidth label="Plazo meses" type="number" value={v.termMonths} onChange={(e) => set({ termMonths: Number(e.target.value) })} />
               <TextField fullWidth label="Valor producto" type="number" value={v.motorcycleValue || selectedQuote?.productPrice || selectedProduct?.price || 0} onChange={(e) => set({ motorcycleValue: Number(e.target.value) })} />
             </Box>
+            <TextField label="Fecha del primer vencimiento" type="date" value={v.firstDueDate} onChange={(e) => set({ firstDueDate: e.target.value })} InputLabelProps={{ shrink: true }} helperText="Fecha de la primera cuota acordada con el cliente." />
             <TextField label="Ocupacion" value={v.occupation} onChange={(e) => set({ occupation: e.target.value })} />
           </Stack>
         </Paper>
 
-        <Paper variant="outlined" sx={{ p: 2, bgcolor: '#fbfdff' }}>
+        <Paper variant="outlined" sx={{ p: 2 }}>
           <Stack spacing={2}>
-            <Typography variant="subtitle1" fontWeight={900}>Codeudor y referencias</Typography>
-            <FieldGrid columns={4}>
-              <TextField fullWidth label="Nombre codeudor" value={v.coDebtorName} onChange={(e) => set({ coDebtorName: e.target.value })} />
-              <TextField fullWidth label="Identificacion codeudor" value={v.coDebtorIdentification} onChange={(e) => set({ coDebtorIdentification: e.target.value })} />
-              <TextField fullWidth label="Celular codeudor" value={v.coDebtorMobile} onChange={(e) => set({ coDebtorMobile: e.target.value })} />
-              <TextField fullWidth label="Parentesco / relacion" value={v.coDebtorRelationship} onChange={(e) => set({ coDebtorRelationship: e.target.value })} />
-            </FieldGrid>
-            <Box sx={{ maxWidth: { md: 260 } }}>
-              <TextField fullWidth label="Ingresos codeudor" type="number" value={v.coDebtorMonthlyIncome} onChange={(e) => set({ coDebtorMonthlyIncome: Number(e.target.value) })} />
-            </Box>
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems={{ xs: 'stretch', sm: 'center' }}>
-              <Button type="button" variant="outlined" onClick={() => setReferenceDialog('client')}>Referencias del cliente</Button>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Button variant="outlined" onClick={() => setReferenceDialog('client')}>Referencias del cliente</Button>
               <StatusChip label={clientReferencesComplete ? 'Completas' : 'Pendientes'} tone={clientReferencesComplete ? 'success' : 'warning'} />
-              <Button type="button" variant="outlined" disabled={!hasCoDebtor} onClick={() => setReferenceDialog('coDebtor')}>Referencias del codeudor</Button>
-              <StatusChip label={!hasCoDebtor ? 'Sin codeudor' : coDebtorReferencesComplete ? 'Completas' : 'Pendientes'} tone={!hasCoDebtor ? 'default' : coDebtorReferencesComplete ? 'success' : 'warning'} />
             </Stack>
-            {hasCoDebtor && !coDebtorReferencesComplete && <Typography variant="caption" color="text.secondary">Al registrar un codeudor debe completar también sus dos referencias.</Typography>}
+            <Stack direction="row" justifyContent="space-between" alignItems="center">
+              <Typography fontWeight={900}>Codeudores ({v.coDebtors.length})</Typography>
+              <Button startIcon={<Add />} onClick={() => set({ coDebtors: [...v.coDebtors, { ...emptyCoDebtor }] })}>Agregar codeudor</Button>
+            </Stack>
+            {!v.coDebtors.length && <Typography color="text.secondary">Puede agregar uno o varios codeudores según el caso.</Typography>}
+            {v.coDebtors.map((person, index) => <Paper key={person.id ?? index} variant="outlined" sx={{ p: 2 }}>
+              <Stack spacing={2}>
+                <Stack direction="row" justifyContent="space-between" alignItems="center">
+                  <Typography fontWeight={800}>Codeudor {index + 1}</Typography>
+                  <Button color="error" startIcon={<Delete />} onClick={() => {
+                    if (!window.confirm('¿Retirar este codeudor? Sus archivos existentes se conservarán en el historial de documentos.')) return;
+                    setReferenceDialog(undefined);
+                    set({ coDebtors: v.coDebtors.filter((_, i) => i !== index) });
+                  }}>Retirar</Button>
+                </Stack>
+                <FieldGrid columns={2}>
+                  <TextField required label="Nombre completo" value={person.name} onChange={(e) => updateCoDebtor(index, { name: e.target.value })} />
+                  <TextField required label="Identificación" value={person.identification} onChange={(e) => updateCoDebtor(index, { identification: e.target.value })} />
+                  <TextField required label="Celular" value={person.mobile} onChange={(e) => updateCoDebtor(index, { mobile: e.target.value })} />
+                  <TextField label="Parentesco / relación" value={person.relationship ?? ''} onChange={(e) => updateCoDebtor(index, { relationship: e.target.value })} />
+                  <TextField label="Ingresos mensuales" type="number" value={person.monthlyIncome} onChange={(e) => updateCoDebtor(index, { monthlyIncome: Number(e.target.value) })} />
+                </FieldGrid>
+                <Button variant="outlined" onClick={() => setReferenceDialog(index)}>Referencias de {person.name || `codeudor ${index + 1}`}</Button>
+              </Stack>
+            </Paper>)}
           </Stack>
         </Paper>
 
@@ -5194,19 +5215,19 @@ function CreditApplicationDialog({ form, customers, products, quotes, onClose, o
           <DialogActions><Button variant="contained" onClick={() => setReferenceDialog(undefined)}>Listo</Button></DialogActions>
         </Dialog>
 
-        <Dialog open={referenceDialog === 'coDebtor'} onClose={() => setReferenceDialog(undefined)} fullWidth maxWidth="md">
-          <DialogTitle>Referencias personales del codeudor</DialogTitle>
+        <Dialog open={!!selectedCoDebtor} onClose={() => setReferenceDialog(undefined)} fullWidth maxWidth="md">
+          <DialogTitle>Referencias de {selectedCoDebtor?.name}</DialogTitle>
           <DialogContent>
             <Stack spacing={2} sx={{ pt: 1 }}>
               <FieldGrid columns={3}>
-                <TextField fullWidth required={hasCoDebtor} label="Nombre referencia 1" value={v.coDebtorReference1Name} onChange={(e) => set({ coDebtorReference1Name: e.target.value })} />
-                <TextField fullWidth required={hasCoDebtor} label="Celular referencia 1" value={v.coDebtorReference1Mobile} onChange={(e) => set({ coDebtorReference1Mobile: e.target.value })} />
-                <TextField fullWidth required={hasCoDebtor} label="Relacion referencia 1" value={v.coDebtorReference1Relationship} onChange={(e) => set({ coDebtorReference1Relationship: e.target.value })} />
+                <TextField fullWidth required label="Nombre referencia 1" value={selectedCoDebtor?.reference1Name ?? ''} onChange={(e) => typeof referenceDialog === 'number' && updateCoDebtor(referenceDialog, { reference1Name: e.target.value })} />
+                <TextField fullWidth required label="Celular referencia 1" value={selectedCoDebtor?.reference1Mobile ?? ''} onChange={(e) => typeof referenceDialog === 'number' && updateCoDebtor(referenceDialog, { reference1Mobile: e.target.value })} />
+                <TextField fullWidth required label="Relacion referencia 1" value={selectedCoDebtor?.reference1Relationship ?? ''} onChange={(e) => typeof referenceDialog === 'number' && updateCoDebtor(referenceDialog, { reference1Relationship: e.target.value })} />
               </FieldGrid>
               <FieldGrid columns={3}>
-                <TextField fullWidth required={hasCoDebtor} label="Nombre referencia 2" value={v.coDebtorReference2Name} onChange={(e) => set({ coDebtorReference2Name: e.target.value })} />
-                <TextField fullWidth required={hasCoDebtor} label="Celular referencia 2" value={v.coDebtorReference2Mobile} onChange={(e) => set({ coDebtorReference2Mobile: e.target.value })} />
-                <TextField fullWidth required={hasCoDebtor} label="Relacion referencia 2" value={v.coDebtorReference2Relationship} onChange={(e) => set({ coDebtorReference2Relationship: e.target.value })} />
+                <TextField fullWidth required label="Nombre referencia 2" value={selectedCoDebtor?.reference2Name ?? ''} onChange={(e) => typeof referenceDialog === 'number' && updateCoDebtor(referenceDialog, { reference2Name: e.target.value })} />
+                <TextField fullWidth required label="Celular referencia 2" value={selectedCoDebtor?.reference2Mobile ?? ''} onChange={(e) => typeof referenceDialog === 'number' && updateCoDebtor(referenceDialog, { reference2Mobile: e.target.value })} />
+                <TextField fullWidth required label="Relacion referencia 2" value={selectedCoDebtor?.reference2Relationship ?? ''} onChange={(e) => typeof referenceDialog === 'number' && updateCoDebtor(referenceDialog, { reference2Relationship: e.target.value })} />
               </FieldGrid>
             </Stack>
           </DialogContent>
@@ -5239,6 +5260,9 @@ function DocumentSummary({ application, onUpdate, onUpload, onDownload, onDelete
 }) {
   const canValidate = useCanManage();
   const statusOptions = canValidate ? [1, 2, 3, 4] : [1, 2];
+  const [owner, setOwner] = useState('client');
+  useEffect(() => setOwner('client'), [application.id]);
+  const ownerDocuments = application.documents.filter((document) => owner === 'client' ? !document.coDebtorId : document.coDebtorId === owner);
   const [confirmComplete, setConfirmComplete] = useState(false);
   const [saving, setSaving] = useState(false);
   const [completionError, setCompletionError] = useState('');
@@ -5247,7 +5271,7 @@ function DocumentSummary({ application, onUpdate, onUpload, onDownload, onDelete
     { title: 'Soportes laborales y financieros', names: [creditDocumentNames[2], creditDocumentNames[3], creditDocumentNames[8], creditDocumentNames[9]] },
     { title: 'Propiedad y actividad económica', names: [...creditDocumentNames.slice(4, 8), ...creditDocumentNames.slice(10, 14)] },
     { title: 'Otros soportes', names: [creditDocumentNames[14]] },
-    { title: 'Documentos anteriores conservados', names: application.documents.filter((d) => d.hasFile && !creditDocumentNames.includes(d.name)).map((d) => d.name) }
+    { title: 'Documentos anteriores conservados', names: ownerDocuments.filter((d) => d.hasFile && !creditDocumentNames.includes(d.name)).map((d) => d.name) }
   ];
 
   const handleStatus = (document: CreditDocument, status: number) => {
@@ -5278,10 +5302,15 @@ function DocumentSummary({ application, onUpdate, onUpload, onDownload, onDelete
       catch (err) { setCompletionError(apiError(err)); throw err; }
       finally { setSaving(false); }
     }} />
+    <TextField select label="Documentos de" value={owner} onChange={(e) => setOwner(e.target.value)} helperText="Cada persona tiene sus propios archivos. La confirmación de documentación completa corresponde a toda la solicitud.">
+      <MenuItem value="client">Cliente: {application.customerName}</MenuItem>
+      {(application.coDebtors ?? []).map((person, index) => <MenuItem key={person.id} value={person.id}>Codeudor {index + 1}: {person.name} · {person.identification}{!person.active ? ' (retirado)' : ''}</MenuItem>)}
+    </TextField>
+    <Typography variant="body2">{ownerDocuments.filter((d) => d.hasFile).length} archivos de esta persona</Typography>
     {groups.filter((group) => group.names.length > 0).map((group) => <Box key={group.title} sx={{ pt: 1.5 }}>
       <Typography variant="subtitle1" fontWeight={800} sx={{ mb: 1 }}>{group.title}</Typography>
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' }, gap: 1.25 }}>
-    {application.documents.filter((document) => group.names.includes(document.name)).map((document) => {
+    {ownerDocuments.filter((document) => group.names.includes(document.name)).map((document) => {
       const documentStatusOptions = statusOptions.includes(document.status) ? statusOptions : [...statusOptions, document.status];
       return <Stack key={document.id} spacing={.75} sx={{ p: 1, border: '1px solid #e2e8f0', borderRadius: 1, bgcolor: '#fff' }}>
       <Stack spacing={1}>

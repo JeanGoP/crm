@@ -1,4 +1,5 @@
 using CrmSaas.Application.DTOs;
+using CrmSaas.Api.Services;
 using CrmSaas.Application.Services;
 using CrmSaas.Domain.Common;
 using CrmSaas.Domain.Entities;
@@ -38,7 +39,7 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
             .Include(x => x.Cliente)
             .Include(x => x.Producto)
             .Include(x => x.PerfilRequisito)
-            .Include(x => x.Documentos)
+            .Include(x => x.Documentos).Include(x => x.Codeudores)
             .Where(x => x.ClienteId == id)
             .OrderByDescending(x => x.FechaCreacion)
             .ToListAsync(cancellationToken);
@@ -96,7 +97,7 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
         var creditApplications = await db.SolicitudesCredito
             .Include(x => x.Producto)
             .Include(x => x.PerfilRequisito)
-            .Include(x => x.Documentos)
+            .Include(x => x.Documentos).Include(x => x.Codeudores)
             .Where(x => x.ClienteId == id)
             .OrderByDescending(x => x.FechaCreacion)
             .ToListAsync(cancellationToken);
@@ -398,7 +399,7 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
                 d.NombreArchivo,
                 d.ContentType,
                 d.TamanoBytes,
-                d.FechaCarga)).ToList(), x.DocumentacionCompleta, x.FechaDocumentacionCompleta, x.UsuarioDocumentacionCompleta);
+                d.FechaCarga, d.CodeudorId)).ToList(), x.DocumentacionCompleta, x.FechaDocumentacionCompleta, x.UsuarioDocumentacionCompleta, x.FechaPrimerVencimiento, x.Codeudores.OrderBy(c => c.Orden).Select(CreditCoDebtorService.ToDto).ToList());
     }
 
     private static IReadOnlyCollection<CustomerTimelineItemDto> BuildTimeline(
