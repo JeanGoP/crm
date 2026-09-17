@@ -1538,7 +1538,7 @@ function QuotesPage() {
   };
 
   return <Stack spacing={3}>
-    <Header title="cotizaciónnnnn" action="Nueva cotizacion" onAction={() => setForm({ open: true })} onRefresh={reload} />
+    <Header title="Cotizaciones" action="Nueva cotizacion" onAction={() => setForm({ open: true })} onRefresh={reload} />
     <StatusBar loading={loading} error={error} />
     <EntityTable
       headers={['Numero', 'Cliente', 'Sede', 'Promocion', 'Productos', 'Total financiado', 'Cuota aprox.', 'Valida hasta', 'Acciones']}
