@@ -30,3 +30,12 @@ assert.equal(bundle([{ productId: 'a' }, { productId: '' }], products, categorie
 assert.equal(bundle([], products, categories), false);
 assert.equal(bundle([{ productId: 'a' }], products, []), false);
 console.log('OK: paquete desde un articulo, categorias mixtas e individuales permanecen comparativas.');
+assert.equal(context.exports.quoteTermLimit('Electrodomésticos'), 24);
+assert.equal(context.exports.quoteTermLimit('ELECTRODOMESTICOS'), 24);
+assert.equal(context.exports.quoteTermLimit('Motos'), 40);
+assert.equal(context.exports.quoteTermLimit(), 40);
+assert.equal(context.exports.quoteCustomerName('María José Muñoz'), 'MARÍA JOSÉ MUÑOZ');
+assert.equal(context.exports.currencyInputValue(1500000), '1.500.000');
+assert.equal(context.exports.currencyInputValue(0), '');
+assert.equal(context.exports.currencyInputValue(undefined), '');
+console.log('OK: limites 40/24, nombres con tildes en mayusculas, miles y cero vacio.');

@@ -72,6 +72,11 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
     [HttpPost]
     public async Task<ActionResult<QuoteDto>> Create(CreateQuoteDto dto, CancellationToken cancellationToken)
     {
+        dto = dto with {
+            CustomerFirstName = NormalizeCustomerName(dto.CustomerFirstName), CustomerMiddleName = NormalizeCustomerName(dto.CustomerMiddleName),
+            CustomerLastName = NormalizeCustomerName(dto.CustomerLastName), CustomerSecondLastName = NormalizeCustomerName(dto.CustomerSecondLastName),
+            CustomerFirstNames = NormalizeCustomerName(dto.CustomerFirstNames), CustomerLastNames = NormalizeCustomerName(dto.CustomerLastNames)
+        };
         var firstName = Clean(dto.CustomerFirstName) ?? Split(dto.CustomerFirstNames).ElementAtOrDefault(0) ?? string.Empty;
         var middleName = Clean(dto.CustomerMiddleName) ?? Join(Split(dto.CustomerFirstNames).Skip(1));
         var lastName = Clean(dto.CustomerLastName) ?? Split(dto.CustomerLastNames).ElementAtOrDefault(0) ?? string.Empty;
@@ -120,6 +125,7 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             if (!dto.IsCash && item.TermMonths <= 0) throw new ValidationException("El plazo debe ser mayor a cero.");
             if (item.MonthlyInterestRate < 0) throw new ValidationException("La tasa mensual no puede ser negativa.");
             var product = products[item.ProductId];
+            if (!dto.IsCash) ValidateQuoteTerm(item.TermMonths, product.Categoria);
             var configuredProductPrice = ResolveProductPrice(product, salesPoint);
             var productPrice = item.ProductPrice > 0 ? item.ProductPrice : configuredProductPrice;
             var insurance = dto.IsCash ? 0 : item.Insurance > 0 ? item.Insurance : product.Soat;
@@ -347,6 +353,8 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
         var ids = sources.Select(x => x.ProductId).Distinct().ToArray();
         var products = await db.Productos.Include(x => x.PreciosPorSede).Where(x => ids.Contains(x.Id) && x.Activo).ToDictionaryAsync(x => x.Id, cancellationToken);
         if (products.Count != ids.Length) throw new KeyNotFoundException("Producto no encontrado o inactivo.");
+        if (!dto.IsCash)
+            foreach (var product in products.Values) ValidateQuoteTerm(dto.TermMonths, product.Categoria);
         if (dto.Items is not null)
         {
             var categories = products.Values.Select(x => x.Categoria.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
@@ -829,6 +837,15 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
     private static bool IsApplianceCategory(string category) =>
         (category ?? string.Empty).Contains("electrodom", StringComparison.OrdinalIgnoreCase);
 
+    private static string? NormalizeCustomerName(string? value) => Clean(value)?.ToUpperInvariant();
+
+    private static void ValidateQuoteTerm(int months, string category)
+    {
+        var maximum = IsApplianceCategory(category) ? 24 : 40;
+        if (months < 1 || months > maximum)
+            throw new ValidationException($"El plazo debe estar entre 1 y {maximum} cuotas para {category}.");
+    }
+
     private static decimal PromotionDiscount(decimal productPrice, Promocion promotion)
     {
         var discount = promotion.TipoDescuento.Equals("Porcentaje", StringComparison.OrdinalIgnoreCase)
@@ -846,14 +863,12 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
         var totalToFinance = productPrice + normalizedInsurance + normalizedAdministrativeFees;
         var normalizedDownPayment = Math.Min(downPayment, totalToFinance);
         var financedAmount = Math.Max(totalToFinance - normalizedDownPayment, 0);
-        var normalizedTermMonths = Math.Max(termMonths, 1);
+        // Category-specific limits are validated before simulation. Never silently change the selected term.
+        ValidateQuoteTerm(termMonths, string.Empty);
+        var normalizedTermMonths = termMonths;
 
         if (financialSettings is { UsarTablaMontelibano: true, Activa: true })
         {
-            var maxTermMonths = salesPointRate?.PlazoMaximoMeses > 0
-                ? salesPointRate.PlazoMaximoMeses
-                : salesPoint?.PlazoMaximoMeses > 0 ? salesPoint.PlazoMaximoMeses : financialSettings.PlazoMaximoMeses;
-            normalizedTermMonths = Math.Min(normalizedTermMonths, maxTermMonths);
             var creditType = financedAmount <= financialSettings.SalarioMinimoVigente * 2 ? "Bajo monto" : "Consumo";
             var annualRate = creditType == "Bajo monto" ? financialSettings.TasaBajoMontoEa : financialSettings.TasaConsumoEa;
             var legalMonthlyRate = AnnualEffectiveToMonthly(annualRate);
@@ -880,10 +895,6 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
                 true);
         }
 
-        if (salesPointRate?.PlazoMaximoMeses > 0)
-        {
-            normalizedTermMonths = Math.Min(normalizedTermMonths, salesPointRate.PlazoMaximoMeses);
-        }
         var effectiveMonthlyInterestRate = salesPointRate?.TasaFactorMensual ?? monthlyInterestRate;
         var monthlyRate = effectiveMonthlyInterestRate / 100;
         var monthlyPayment = financedAmount == 0

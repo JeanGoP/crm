@@ -188,6 +188,25 @@ if (args.Length > 0)
 }
 Console.WriteLine("OK: inicial global, plan unico, articulo sin duplicados, DTO y PDF de paquete.");
 
+var validateTerm = typeof(QuotesController).GetMethod("ValidateQuoteTerm", BindingFlags.NonPublic | BindingFlags.Static)!;
+foreach (var valid in new[] { (1, "Motos"), (40, "Motos"), (1, "Electrodomésticos"), (24, "ELECTRODOMESTICOS") })
+    validateTerm.Invoke(null, [valid.Item1, valid.Item2]);
+foreach (var invalid in new[] { (0, "Motos"), (-1, "Motos"), (41, "Motos"), (25, "Electrodomésticos"), (40, "ELECTRODOMESTICOS") })
+{
+    try { validateTerm.Invoke(null, [invalid.Item1, invalid.Item2]); throw new Exception("Debe rechazar plazo fuera de rango."); }
+    catch (TargetInvocationException e) when (e.InnerException is ValidationException) { }
+}
+var rateWithOldLimit = new TasaPuntoVenta { PlazoMaximoMeses = 30, TasaFactorMensual = 2 };
+foreach (var financial in new ConfiguracionFinancieraEmpresa?[] { null, new() { PlazoMaximoMeses = 30 } })
+{
+    var forty = calculate.Invoke(null, [5000000m, 0m, 0m, 0m, 40, 2m, financial, null, rateWithOldLimit])!;
+    Check((int)forty.GetType().GetProperty("TermMonths")!.GetValue(forty)! == 40, "No recorta silenciosamente las 40 cuotas elegidas a 30.");
+}
+var normalizeName = typeof(QuotesController).GetMethod("NormalizeCustomerName", BindingFlags.NonPublic | BindingFlags.Static)!;
+Check((string)normalizeName.Invoke(null, ["  María José Muñoz  "])! == "MARÍA JOSÉ MUÑOZ", "Nombre en mayusculas conserva tildes y elimina espacios externos.");
+Check(normalizeName.Invoke(null, [" "]) is null, "Nombre opcional vacio permanece vacio.");
+Console.WriteLine("OK: limites backend 1-40/1-24, plazo exacto con tasas antiguas y nombres en mayusculas.");
+
 sealed class TestTenant : ITenantContext
 {
     public Guid? EmpresaId { get; private set; } = Guid.NewGuid();

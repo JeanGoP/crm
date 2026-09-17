@@ -37,7 +37,7 @@ import ExpandMore from '@mui/icons-material/ExpandMore';
 import ChevronRight from '@mui/icons-material/ChevronRight';
 import { AxiosError } from 'axios';
 import { api } from './api';
-import { quotePayments, isQuoteBundle } from './quotePayments';
+import { quotePayments, isQuoteBundle, quoteTermLimit, quoteCustomerName, currencyInputValue } from './quotePayments';
 import { useAuthStore } from './store';
 import { Activity, ColombianIdentityLookup, CollectionOrder, CommercialInventory, CommercialInventorySummary, CommercialReports, Company, CreditApplication, CreditCoDebtor, CreditDocument, Customer, Customer360, CustomerAiAnalysis, CustomerTimelineItem, Dashboard, Deal, DealStage, ExternalInventoryItem, ExternalInventoryWarehouse, FinancialSettings, Lead, LoginAccessReport, MotorcycleDelivery, Procedure, Product, ProductCategory, ProductPhoto, Promotion, Quote, QuoteChargeConcept, QuoteSalesPoint, QuoteSimulationResult, SalesPoint, SalesPointRate, User } from './types';
 
@@ -1477,6 +1477,9 @@ function QuotesPage() {
     const bundle = isQuoteBundle(payload.items, products, productCategories);
     const globalPayment = payload.bundlePayment;
     if (bundle && !payload.isCash) {
+      const maximum = Math.min(...payload.items.map(item => quoteTermLimit(products.find(p => p.id === item.productId)?.category)));
+      if (!Number.isInteger(globalPayment.termMonths) || globalPayment.termMonths < 1 || globalPayment.termMonths > maximum)
+        throw new Error(`Seleccione un plazo entre 1 y ${maximum} cuotas para el paquete.`);
       if (globalPayment.downPayment < 0 || globalPayment.extraPayment < 0) throw new Error('La inicial y la extra no pueden ser negativas.');
       if (Math.abs(globalPayment.initialPaymentSchedule.reduce((sum, p) => sum + Number(p.amount), 0) - globalPayment.extraPayment) > .01)
         throw new Error('El plan del paquete debe sumar exactamente la cuota extra.');
@@ -1487,6 +1490,8 @@ function QuotesPage() {
         const item = bundle ? { ...sourceItem, downPayment: 0, extraPayment: 0, initialPaymentSchedule: [], termMonths: globalPayment.termMonths, monthlyInterestRate: globalPayment.monthlyInterestRate } : sourceItem;
         const product = products.find((candidate) => candidate.id === item.productId);
         const chargeTotals = quoteChargeTotals(item, activeChargeConcepts, product);
+        if (!payload.isCash && (!Number.isInteger(item.termMonths) || item.termMonths < 1 || item.termMonths > quoteTermLimit(product?.category)))
+          throw new Error(`Seleccione un plazo entre 1 y ${quoteTermLimit(product?.category)} cuotas.`);
         if (!payload.isCash && (item.downPayment < 0 || item.extraPayment < 0)) throw new Error('La cuota inicial y la cuota extra no pueden ser negativas.');
         const scheduled = item.initialPaymentSchedule.reduce((sum, payment) => sum + Number(payment.amount), 0);
         if (!payload.isCash && Math.abs(scheduled - Number(item.extraPayment)) > 0.01) throw new Error('El plan de pagos debe sumar exactamente la cuota extra.');
@@ -1521,8 +1526,12 @@ function QuotesPage() {
         termMonths: globalPayment.termMonths,
         monthlyInterestRate: globalPayment.monthlyInterestRate
       } : null,
-      customerFirstNames: fullFirstNames(payload.customerFirstName, payload.customerMiddleName, payload.customerFirstNames),
-      customerLastNames: fullLastNames(payload.customerLastName, payload.customerSecondLastName, payload.customerLastNames),
+      customerFirstName: quoteCustomerName(payload.customerFirstName).trim(),
+      customerMiddleName: quoteCustomerName(payload.customerMiddleName).trim(),
+      customerLastName: quoteCustomerName(payload.customerLastName).trim(),
+      customerSecondLastName: quoteCustomerName(payload.customerSecondLastName).trim(),
+      customerFirstNames: quoteCustomerName(fullFirstNames(payload.customerFirstName, payload.customerMiddleName, payload.customerFirstNames)),
+      customerLastNames: quoteCustomerName(fullLastNames(payload.customerLastName, payload.customerSecondLastName, payload.customerLastNames)),
       identificationType: Number(payload.identificationType),
       identificationNumber: payload.identificationNumber || null,
       phoneCountryCode: payload.phoneCountryCode || '+57',
@@ -2300,8 +2309,8 @@ function CreditStudySummary({ application, onStep0, onRecalculate, onDecision }:
     notes: application.step0Notes ?? ''
   });
 
-  const requestNumber = (label: string, current: number) => {
-    const value = window.prompt(label, String(current || 0));
+  const requestNumber = (label: string, current: number, monetary = true) => {
+    const value = window.prompt(label, monetary ? currencyInputValue(current) : String(current || ''));
     if (value === null) return undefined;
     const number = Number(value.replace(/\D/g, ''));
     return Number.isFinite(number) ? number : undefined;
@@ -2332,7 +2341,7 @@ function CreditStudySummary({ application, onStep0, onRecalculate, onDecision }:
     if (amount === undefined) return;
     const downPayment = requestNumber('Cuota inicial aprobada', approvedDownPayment);
     if (downPayment === undefined) return;
-    const term = requestNumber('Plazo aprobado en meses', approvedTerm);
+    const term = requestNumber('Plazo aprobado en meses', approvedTerm, false);
     if (term === undefined) return;
     const payment = requestNumber('Cuota mensual aprobada', approvedPayment);
     if (payment === undefined) return;
@@ -2518,13 +2527,13 @@ function CollectionOrderDialog({ form, applications, onClose, onSave }: DialogPr
         </FieldGrid>
         {application && <Alert severity="info">Solicitud {application.number}: {application.customerName} · {creditStatus(application.status)}</Alert>}
         <FieldGrid columns={3}>
-          <TextField label="Vehiculo" type="number" value={v.vehicleAmount} onChange={(e) => set({ vehicleAmount: Number(e.target.value) })} />
-          <TextField label="Documentos" type="number" value={v.documentsAmount} onChange={(e) => set({ documentsAmount: Number(e.target.value) })} />
-          <TextField label="Anticipo" type="number" value={v.advanceAmount} onChange={(e) => set({ advanceAmount: Number(e.target.value) })} />
+          <CurrencyField label="Vehiculo" value={v.vehicleAmount} onChange={amount => set({ vehicleAmount: amount })} />
+          <CurrencyField label="Documentos" value={v.documentsAmount} onChange={amount => set({ documentsAmount: amount })} />
+          <CurrencyField label="Anticipo" value={v.advanceAmount} onChange={amount => set({ advanceAmount: amount })} />
         </FieldGrid>
         <FieldGrid columns={3}>
           <TextField label="Total" value={money(total)} InputProps={{ readOnly: true }} />
-          <TextField label="Valor pagado" type="number" value={v.paidAmount} onChange={(e) => set({ paidAmount: Number(e.target.value) })} />
+          <CurrencyField label="Valor pagado" value={v.paidAmount} onChange={amount => set({ paidAmount: amount })} />
           <TextField select label="Estado" value={v.status} onChange={(e) => set({ status: Number(e.target.value) })}>
             {[1, 2, 3, 4, 5].map((x) => <MenuItem key={x} value={x}>{collectionOrderStatus(x)}</MenuItem>)}
           </TextField>
@@ -3795,7 +3804,7 @@ function QuoteChargeConceptDialog({ form, onClose, onSave }: DialogProps<QuoteCh
         <MenuItem value="ImpuestosProducto">Impuestos del producto</MenuItem>
         <MenuItem value="ValorFijo">Valor fijo del concepto</MenuItem>
       </TextField>
-      <TextField type="number" label="Valor fijo" value={v.defaultAmount} onChange={(e) => set({ defaultAmount: Number(e.target.value) })} helperText="Solo se usa cuando el valor sugerido es Valor fijo." />
+      <CurrencyField label="Valor fijo" value={v.defaultAmount} onChange={amount => set({ defaultAmount: amount })} helperText="Solo se usa cuando el valor sugerido es Valor fijo." />
       <FormControlLabel control={<Checkbox checked={v.active} onChange={(e) => set({ active: e.target.checked })} />} label="Concepto activo" />
       <Alert severity="info">Los conceptos tipo Seguro se suman al seguro de la cotizacion. Los tipo Gasto se suman a gastos, matricula y tramites.</Alert>
     </Stack>}
@@ -4022,7 +4031,9 @@ function PromotionDialog({ form, products, salesPoints, onClose, onSave }: Dialo
           <MenuItem value="Valor">Valor fijo</MenuItem>
           <MenuItem value="Porcentaje">Porcentaje</MenuItem>
         </TextField>
-        <TextField fullWidth required type="number" label={v.discountType === 'Porcentaje' ? 'Porcentaje' : 'Valor descuento'} value={v.discountValue} onChange={(e) => set({ discountValue: Number(e.target.value) })} />
+        {v.discountType === 'Porcentaje'
+          ? <TextField fullWidth required type="number" label="Porcentaje" value={v.discountValue} onChange={e => set({ discountValue: Number(e.target.value) })} />
+          : <CurrencyField required label="Valor descuento" value={v.discountValue} onChange={discountValue => set({ discountValue })} />}
         <FormControlLabel control={<Checkbox checked={v.active} onChange={(e) => set({ active: e.target.checked })} />} label="Promocion activa" />
       </FieldGrid>
       <SectionTitle title="Alcance" />
@@ -4144,7 +4155,7 @@ function FinancialSettingsDialog({ form, onClose, onSave }: DialogProps<Financia
     {(v, set) => <>
       <FormControlLabel control={<Checkbox checked={v.active} onChange={(e) => set({ active: e.target.checked })} />} label="Configuracion activa" />
       <FormControlLabel control={<Checkbox checked={v.useMontelibanoTable} onChange={(e) => set({ useMontelibanoTable: e.target.checked })} />} label="Usar tabla financiera en cotizaciones" />
-      <TextField required label="Salario minimo vigente" type="number" value={v.minimumWage} onChange={(e) => set({ minimumWage: Number(e.target.value) })} />
+      <CurrencyField required label="Salario minimo vigente" value={v.minimumWage} onChange={amount => set({ minimumWage: amount })} />
       <Grid container spacing={1.5}>
         <Grid item xs={12} sm={6}><TextField fullWidth required label="Tasa consumo EA (%)" type="number" value={v.consumerAnnualRate} onChange={(e) => set({ consumerAnnualRate: Number(e.target.value) })} /></Grid>
         <Grid item xs={12} sm={6}><TextField fullWidth required label="Tasa bajo monto EA (%)" type="number" value={v.lowAmountAnnualRate} onChange={(e) => set({ lowAmountAnnualRate: Number(e.target.value) })} /></Grid>
@@ -4152,7 +4163,7 @@ function FinancialSettingsDialog({ form, onClose, onSave }: DialogProps<Financia
       <Grid container spacing={1.5}>
         <Grid item xs={12} sm={4}><TextField fullWidth required label="Factor mensual (%)" type="number" value={v.factorMonthlyRate} onChange={(e) => set({ factorMonthlyRate: Number(e.target.value) })} /></Grid>
         <Grid item xs={12} sm={4}><TextField fullWidth required label="Plazo maximo" type="number" value={v.maxTermMonths} onChange={(e) => set({ maxTermMonths: Number(e.target.value) })} /></Grid>
-        <Grid item xs={12} sm={4}><TextField fullWidth required label="Redondeo cuota" type="number" value={v.paymentRounding} onChange={(e) => set({ paymentRounding: Number(e.target.value) })} /></Grid>
+        <Grid item xs={12} sm={4}><CurrencyField fullWidth label="Redondeo cuota" value={v.paymentRounding} onChange={amount => set({ paymentRounding: amount })} /></Grid>
       </Grid>
     </>}
   </FormDialog>;
@@ -4285,10 +4296,10 @@ function ProductDialog({ form, categories, salesPoints, onClose, onSave, onChang
       <TextField label="Ficha tecnica estructurada" value={v.technicalSheet} onChange={(e) => set({ technicalSheet: e.target.value })} multiline minRows={3} placeholder="Ej: Motor: 125 cc&#10;Transmision: 5 velocidades&#10;Freno delantero: Disco" />
       <SectionTitle title="Precio y cargos" />
       <FieldGrid columns={4}>
-        <TextField fullWidth required label="Precio base" type="number" value={v.price} onChange={(e) => set({ price: Number(e.target.value) })} />
-        <TextField fullWidth label="SOAT" type="number" value={v.soat} onChange={(e) => set({ soat: Number(e.target.value) })} />
-        <TextField fullWidth label="Matricula" type="number" value={v.registrationFee} onChange={(e) => set({ registrationFee: Number(e.target.value) })} />
-        <TextField fullWidth label="Impuestos" type="number" value={v.taxes} onChange={(e) => set({ taxes: Number(e.target.value) })} />
+        <CurrencyField fullWidth required label="Precio base" value={v.price} onChange={amount => set({ price: amount })} />
+        <CurrencyField fullWidth label="SOAT" value={v.soat} onChange={amount => set({ soat: amount })} />
+        <CurrencyField fullWidth label="Matricula" value={v.registrationFee} onChange={amount => set({ registrationFee: amount })} />
+        <CurrencyField fullWidth label="Impuestos" value={v.taxes} onChange={amount => set({ taxes: amount })} />
       </FieldGrid>
       {usesSalesPointPrices && <Paper variant="outlined" sx={{ p: 2, bgcolor: '#f8fafc' }}>
         <Stack spacing={1.5}>
@@ -4318,7 +4329,7 @@ function ProductDialog({ form, categories, salesPoints, onClose, onSave, onChang
                   label="Activo"
                 />
               </Box>
-              <TextField fullWidth size="small" label="Precio sede" type="number" value={pointPrice?.price ?? ''} onChange={(e) => updateSalesPointPrice(point.id, { price: e.target.value === '' ? '' : Number(e.target.value) })} />
+              <CurrencyField size="small" label="Precio sede" value={Number(pointPrice?.price) || 0} onChange={price => updateSalesPointPrice(point.id, { price: price || '' })} />
               <TextField fullWidth size="small" label="Vigente desde" type="date" value={pointPrice?.priceValidFrom ?? ''} onChange={(e) => updateSalesPointPrice(point.id, { priceValidFrom: e.target.value })} InputLabelProps={{ shrink: true }} />
             </Box>;
           })}
@@ -4559,12 +4570,12 @@ function QuoteDialog({ form, products, productCategories, quoteChargeConcepts, s
       const { data } = await api.get<ColombianIdentityLookup>('/api/identity/colombia/cedula', { params: { documentNumber: digits } });
       set({
         identificationNumber: data.documentNumber || digits,
-        customerFirstName: data.firstName ?? value.customerFirstName,
-        customerMiddleName: data.middleName ?? value.customerMiddleName,
-        customerLastName: data.lastName ?? value.customerLastName,
-        customerSecondLastName: data.secondLastName ?? value.customerSecondLastName,
-        customerFirstNames: fullFirstNames(data.firstName ?? value.customerFirstName, data.middleName ?? value.customerMiddleName, value.customerFirstNames),
-        customerLastNames: fullLastNames(data.lastName ?? value.customerLastName, data.secondLastName ?? value.customerSecondLastName, value.customerLastNames)
+        customerFirstName: quoteCustomerName(data.firstName ?? value.customerFirstName),
+        customerMiddleName: quoteCustomerName(data.middleName ?? value.customerMiddleName),
+        customerLastName: quoteCustomerName(data.lastName ?? value.customerLastName),
+        customerSecondLastName: quoteCustomerName(data.secondLastName ?? value.customerSecondLastName),
+        customerFirstNames: quoteCustomerName(fullFirstNames(data.firstName ?? value.customerFirstName, data.middleName ?? value.customerMiddleName, value.customerFirstNames)),
+        customerLastNames: quoteCustomerName(fullLastNames(data.lastName ?? value.customerLastName, data.secondLastName ?? value.customerSecondLastName, value.customerLastNames))
       });
       const extra = [data.expeditionCity, data.expeditionDepartment].filter(Boolean).join(', ');
       setIdentityNotice({
@@ -4682,10 +4693,10 @@ function QuoteDialog({ form, products, productCategories, quoteChargeConcepts, s
               </Stack>
             </Box>
             <FieldGrid columns={4}>
-              <TextField fullWidth required label="Primer nombre" value={v.customerFirstName} onChange={(e) => set({ customerFirstName: e.target.value, customerFirstNames: fullFirstNames(e.target.value, v.customerMiddleName) })} />
-              <TextField fullWidth label="Segundo nombre" value={v.customerMiddleName} onChange={(e) => set({ customerMiddleName: e.target.value, customerFirstNames: fullFirstNames(v.customerFirstName, e.target.value) })} />
-              <TextField fullWidth required label="Primer apellido" value={v.customerLastName} onChange={(e) => set({ customerLastName: e.target.value, customerLastNames: fullLastNames(e.target.value, v.customerSecondLastName) })} />
-              <TextField fullWidth label="Segundo apellido" value={v.customerSecondLastName} onChange={(e) => set({ customerSecondLastName: e.target.value, customerLastNames: fullLastNames(v.customerLastName, e.target.value) })} />
+              <TextField fullWidth required label="Primer nombre" value={v.customerFirstName} onChange={(e) => set({ customerFirstName: quoteCustomerName(e.target.value), customerFirstNames: fullFirstNames(quoteCustomerName(e.target.value), v.customerMiddleName) })} />
+              <TextField fullWidth label="Segundo nombre" value={v.customerMiddleName} onChange={(e) => set({ customerMiddleName: quoteCustomerName(e.target.value), customerFirstNames: fullFirstNames(v.customerFirstName, quoteCustomerName(e.target.value)) })} />
+              <TextField fullWidth required label="Primer apellido" value={v.customerLastName} onChange={(e) => set({ customerLastName: quoteCustomerName(e.target.value), customerLastNames: fullLastNames(quoteCustomerName(e.target.value), v.customerSecondLastName) })} />
+              <TextField fullWidth label="Segundo apellido" value={v.customerSecondLastName} onChange={(e) => set({ customerSecondLastName: quoteCustomerName(e.target.value), customerLastNames: fullLastNames(v.customerLastName, quoteCustomerName(e.target.value)) })} />
             </FieldGrid>
             <Box sx={{
               display: 'grid',
@@ -4793,7 +4804,7 @@ function QuoteDialog({ form, products, productCategories, quoteChargeConcepts, s
                   {!v.isCash && !isBundleQuote && <CurrencyField label="Cuota inicial" value={item.downPayment} onChange={(downPayment) => updateItem(index, { downPayment })} />}
                   {!v.isCash && !isBundleQuote && <CurrencyField label="Cuota extra" value={item.extraPayment} onChange={(extraPayment) => updateItem(index, { extraPayment })} />}
                   <CurrencyField label="Precio" value={item.productPrice} onChange={(productPrice) => updateItem(index, { productPrice })} />
-                  {!v.isCash && !isBundleQuote && <TextField fullWidth label="Cuotas" type="number" value={item.termMonths} onChange={(e) => updateItem(index, { termMonths: Number(e.target.value) })} />}
+                  {!v.isCash && !isBundleQuote && <QuoteTermField label="Cuotas" value={item.termMonths} maximum={quoteTermLimit(selectedProduct?.category)} onChange={termMonths => updateItem(index, { termMonths })} />}
                   {!v.isCash && activeChargeConcepts.map((concept) => <CurrencyField
                     key={concept.id}
                     sx={{ minWidth: 0 }}
@@ -4824,7 +4835,7 @@ function QuoteDialog({ form, products, productCategories, quoteChargeConcepts, s
                 <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' }, gap: 1.5 }}>
                   <CurrencyField label="Cuota inicial del paquete" value={v.bundlePayment.downPayment} onChange={downPayment => set({ bundlePayment: { ...v.bundlePayment, downPayment } })} />
                   <CurrencyField label="Cuota extra del paquete" value={v.bundlePayment.extraPayment} onChange={extraPayment => set({ bundlePayment: { ...v.bundlePayment, extraPayment } })} />
-                  <TextField label="Cuotas del paquete" type="number" value={v.bundlePayment.termMonths} onChange={e => set({ bundlePayment: { ...v.bundlePayment, termMonths: Number(e.target.value) } })} />
+                  <QuoteTermField label="Cuotas del paquete" value={v.bundlePayment.termMonths} maximum={Math.min(...quoteItems.map(item => quoteTermLimit(products.find(p => p.id === item.productId)?.category)))} onChange={termMonths => set({ bundlePayment: { ...v.bundlePayment, termMonths } })} />
                 </Box>
                 <InitialPaymentPlanEditor item={v.bundlePayment} onChange={patch => set({ bundlePayment: { ...v.bundlePayment, ...patch } })} />
               </>}
@@ -5194,10 +5205,10 @@ function CreditApplicationDialog({ form, customers, products, quotes, onClose, o
                 const product = products.find((x) => x.id === e.target.value);
                 set({ productId: e.target.value, motorcycleValue: product?.price ?? v.motorcycleValue });
               }}>{products.map((x) => <MenuItem key={x.id} value={x.id}>{productName(x)} ({x.category}) - {money(x.price)}</MenuItem>)}</TextField>
-              <TextField fullWidth label="Ingresos" type="number" value={v.monthlyIncome} onChange={(e) => set({ monthlyIncome: Number(e.target.value) })} />
-              <TextField fullWidth label="Cuota inicial" type="number" value={v.downPayment} onChange={(e) => set({ downPayment: Number(e.target.value) })} />
+              <CurrencyField fullWidth label="Ingresos" value={v.monthlyIncome} onChange={amount => set({ monthlyIncome: amount })} />
+              <CurrencyField fullWidth label="Cuota inicial" value={v.downPayment} onChange={amount => set({ downPayment: amount })} />
               <TextField fullWidth label="Plazo meses" type="number" value={v.termMonths} onChange={(e) => set({ termMonths: Number(e.target.value) })} />
-              <TextField fullWidth label="Valor producto" type="number" value={v.motorcycleValue || selectedQuote?.productPrice || selectedProduct?.price || 0} onChange={(e) => set({ motorcycleValue: Number(e.target.value) })} />
+              <CurrencyField label="Valor producto" value={v.motorcycleValue} onChange={motorcycleValue => set({ motorcycleValue })} />
             </Box>
             <TextField label="Fecha del primer vencimiento" type="date" value={v.firstDueDate} onChange={(e) => set({ firstDueDate: e.target.value })} InputLabelProps={{ shrink: true }} helperText="Fecha de la primera cuota acordada con el cliente." />
             <TextField label="Ocupacion" value={v.occupation} onChange={(e) => set({ occupation: e.target.value })} />
@@ -5230,7 +5241,7 @@ function CreditApplicationDialog({ form, customers, products, quotes, onClose, o
                   <TextField required label="Identificación" value={person.identification} onChange={(e) => updateCoDebtor(index, { identification: e.target.value })} />
                   <TextField required label="Celular" value={person.mobile} onChange={(e) => updateCoDebtor(index, { mobile: e.target.value })} />
                   <TextField label="Parentesco / relación" value={person.relationship ?? ''} onChange={(e) => updateCoDebtor(index, { relationship: e.target.value })} />
-                  <TextField label="Ingresos mensuales" type="number" value={person.monthlyIncome} onChange={(e) => updateCoDebtor(index, { monthlyIncome: Number(e.target.value) })} />
+                  <CurrencyField label="Ingresos mensuales" value={person.monthlyIncome} onChange={monthlyIncome => updateCoDebtor(index, { monthlyIncome })} />
                 </FieldGrid>
                 <Button variant="outlined" onClick={() => setReferenceDialog(index)}>Referencias de {person.name || `codeudor ${index + 1}`}</Button>
               </Stack>
@@ -5444,7 +5455,7 @@ function DealDialog({ form, stages, customers, defaultStageId, onClose, onSave }
       <TextField required label="Cliente y producto" placeholder="Juan Perez - AKT NKD 125 a credito" value={v.title} onChange={(e) => set({ title: e.target.value })} />
       <TextField select label="Cliente" value={v.customerId} onChange={(e) => set({ customerId: e.target.value })}><MenuItem value="">Sin cliente</MenuItem>{customers.map((x) => <MenuItem key={x.id} value={x.id}>{x.name}</MenuItem>)}</TextField>
       <TextField required select label="Etapa" value={v.stageId} onChange={(e) => set({ stageId: e.target.value })}>{stages.map((x) => <MenuItem key={x.id} value={x.id}>{x.name}</MenuItem>)}</TextField>
-      <TextField label="Valor del producto / credito" type="number" value={v.value} onChange={(e) => set({ value: Number(e.target.value) })} />
+      <CurrencyField label="Valor del producto / credito" value={v.value} onChange={amount => set({ value: amount })} />
       <TextField label="Probabilidad" type="number" value={v.closeProbability} onChange={(e) => set({ closeProbability: Number(e.target.value) })} />
       <TextField label="Fecha estimada" type="date" value={v.estimatedCloseDate} onChange={(e) => set({ estimatedCloseDate: e.target.value })} InputLabelProps={{ shrink: true }} />
       <TextField select label="Estado" value={v.status} onChange={(e) => set({ status: Number(e.target.value) })}>{[1, 2, 3].map((x) => <MenuItem key={x} value={x}>{dealStatus(x)}</MenuItem>)}</TextField>
@@ -6009,22 +6020,30 @@ function toActivityPayload(payload: typeof emptyActivity | Activity) {
   };
 }
 
-function CurrencyField({ label, value, onChange, size = 'small', fullWidth = true, sx }: { label: string; value?: number; onChange: (value: number) => void; size?: 'small' | 'medium'; fullWidth?: boolean; sx?: SxProps<Theme> }) {
-  const displayValue = Number(value) > 0
-    ? new Intl.NumberFormat('es-CO', { maximumFractionDigits: 0 }).format(Number(value))
-    : '';
+function QuoteTermField({ label, value, maximum, onChange }: { label: string; value: number; maximum: number; onChange: (value: number) => void }) {
+  const valid = Number.isInteger(value) && value >= 1 && value <= maximum;
+  return <TextField fullWidth required select label={label} value={valid ? value : ''} onChange={e => onChange(Number(e.target.value))}
+    error={!valid} helperText={`Seleccione de 1 a ${maximum} cuotas.`}>
+    {Array.from({ length: maximum }, (_, index) => index + 1).map(months => <MenuItem key={months} value={months}>{months}</MenuItem>)}
+  </TextField>;
+}
+
+function CurrencyField({ label, value, onChange, size = 'small', fullWidth = true, sx, required = false, helperText }: { label: string; value?: number; onChange: (value: number) => void; size?: 'small' | 'medium'; fullWidth?: boolean; sx?: SxProps<Theme>; required?: boolean; helperText?: string }) {
+  const displayValue = currencyInputValue(value);
 
   return <TextField
     fullWidth={fullWidth}
     size={size}
     sx={sx}
     label={label}
+    required={required}
+    helperText={helperText}
     value={displayValue}
     onChange={(event) => {
       const digits = event.target.value.replace(/\D/g, '');
       onChange(digits ? Number(digits) : 0);
     }}
-    inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
+    inputProps={{ inputMode: 'numeric' }}
   />;
 }
 
