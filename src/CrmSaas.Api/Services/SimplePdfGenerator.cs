@@ -458,7 +458,11 @@ public static class SimplePdfGenerator
         }
 
         var quoteItems = quote.Items.Count > 0 ? quote.Items.OrderBy(x => x.Order).ToList() : [];
-        if (quoteItems.Count > 1)
+        if (quote.IsBundle)
+        {
+            DrawBundle(commands, quote);
+        }
+        else if (quoteItems.Count > 1)
         {
             DrawComparison(commands, 45, 200, quoteItems);
         }
@@ -613,6 +617,28 @@ public static class SimplePdfGenerator
         commands.AppendLine($"1 1 1 rg {x} {y} {width} {height} re f");
         commands.AppendLine($"0.84 0.88 0.92 RG 0.8 w {x} {y} {width} {height} re S");
         commands.AppendLine($"0.082 0.373 0.459 rg BT /F2 10 Tf {x + 14} {y + height - 20} Td ({Escape(title)}) Tj ET");
+    }
+
+    private static void DrawBundle(StringBuilder commands, QuoteDto quote)
+    {
+        DrawPanel(commands, 45, 200, 520, 214, "PAQUETE DE ARTICULOS - " + (quote.CreditType == "Contado" ? "CONTADO" : "CREDITO"));
+        var y = 373;
+        foreach (var item in quote.Items.OrderBy(x => x.Order).Take(4))
+        {
+            commands.AppendLine($"0.08 0.10 0.14 rg BT /F1 9 Tf 60 {y} Td ({Escape(Shorten(item.ProductName, 58))}) Tj ET");
+            commands.AppendLine($"0.08 0.10 0.14 rg BT /F2 9 Tf 458 {y} Td ({Escape(Money(item.DiscountedProductPrice))}) Tj ET");
+            y -= 19;
+        }
+        KeyValue(commands, 60, 288, "Total articulos", Money(quote.DiscountedProductPrice), 120, 22);
+        if (quote.CreditType == "Contado") return;
+        KeyValue(commands, 310, 288, "Cargos", Money(quote.Insurance + quote.AdministrativeFees), 112, 22);
+        KeyValue(commands, 60, 269, "Cuota inicial", Money(quote.InitialPaymentPaidToday), 120, 22);
+        KeyValue(commands, 310, 269, "Cuota extra", Money(Math.Max(quote.DownPayment - quote.InitialPaymentPaidToday, 0)), 112, 22);
+        KeyValue(commands, 60, 250, "Inicial completa", Money(quote.DownPayment), 120, 22);
+        KeyValue(commands, 310, 250, "Financiado", Money(quote.FinancedAmount), 112, 22);
+        KeyValue(commands, 60, 231, "Cuotas", $"{quote.TermMonths} x {Money(quote.EstimatedMonthlyPayment)}", 120, 22);
+        KeyValue(commands, 310, 231, "Inicio credito", Date(quote.CreditStartDate), 112, 22);
+        commands.AppendLine($"0.36 0.42 0.48 rg BT /F1 8 Tf 60 212 Td ({Escape("Tasa: " + Value(quote.SalesPointRateName) + " - Plan unico de cuota extra: " + quote.InitialPaymentSchedule.Count + " pagos")}) Tj ET");
     }
 
     private static void DrawComparison(StringBuilder commands, int x, int y, IReadOnlyCollection<QuoteItemDto> items)

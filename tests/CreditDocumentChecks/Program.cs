@@ -159,6 +159,35 @@ typeof(SimplePdfGenerator).GetMethod("DrawComparison", BindingFlags.NonPublic | 
 Check(comparisonPdf.ToString().Contains("Precio contado") && !comparisonPdf.ToString().Contains("Financiado"), "Comparativo contado muestra precios.");
 Console.WriteLine("OK: contado normalizado, precio con descuento, DTOs y PDF sin financiación.");
 
+// A global initial can exceed the first article, but must be deducted only once from the whole package.
+var globalItem = quoteItem with { ProductPrice = 400000, DownPayment = 1500000, InitialPaymentPaidToday = 1000000,
+    InitialPaymentSchedule = [new QuoteInitialPaymentDto(quoteDate.AddDays(30), 500000)] };
+var normalizedBundleItem = (CreateQuoteItemDto)typeof(QuotesController).GetMethod("NormalizeBundleItem", BindingFlags.NonPublic | BindingFlags.Static)!.Invoke(null, [quoteItem, globalItem])!;
+Check(normalizedBundleItem.DownPayment == 0 && normalizedBundleItem.InitialPaymentPaidToday == 0 && normalizedBundleItem.InitialPaymentSchedule!.Count == 0, "El articulo no duplica inicial ni plan global.");
+Check(normalizedBundleItem.ProductPrice == quoteItem.ProductPrice && normalizedBundleItem.TermMonths == globalItem.TermMonths, "Paquete conserva precio y aplica plazo global.");
+var bundleCalculation = calculate.Invoke(null, [2000000m, globalItem.DownPayment, 0m, 0m, globalItem.TermMonths, 2m, null, null, null])!;
+Check((decimal)bundleCalculation.GetType().GetProperty("FinancedAmount")!.GetValue(bundleCalculation)! == 500000, "Paquete resta 1.5 millones completos, aunque el primer articulo valga 400 mil.");
+var globalPlan = normalizePlan.Invoke(null, [globalItem, quoteDate])!;
+Check(((IReadOnlyCollection<QuoteInitialPaymentDto>)globalPlan.GetType().GetProperty("Schedule")!.GetValue(globalPlan)!).Sum(x => x.Amount) == 500000, "Un solo plan para la extra del paquete.");
+var bundleDto = cashDto with { IsBundle = true, CreditType = "Manual", ProductName = "Paquete de electrodomesticos", ProductPrice = 2000000,
+    DiscountedProductPrice = 2000000, PromotionDiscount = 0, DownPayment = 1500000, InitialPaymentPaidToday = 1000000,
+    FinancedAmount = 500000, TermMonths = 24, EstimatedMonthlyPayment = 31000, InitialPaymentSchedule = globalItem.InitialPaymentSchedule!,
+    CreditStartDate = quoteDate.AddDays(30), QuoteDate = quoteDate, ValidUntil = quoteDate.AddDays(7),
+    Items = Enumerable.Range(1, 4).Select(i => cashDto.Items.Single() with { ProductName = "Electrodomestico de prueba " + i, DiscountedProductPrice = 500000, Order = i }).ToArray() };
+var bundlePdf = new System.Text.StringBuilder();
+typeof(SimplePdfGenerator).GetMethod("DrawBundle", BindingFlags.NonPublic | BindingFlags.Static)!.Invoke(null, [bundlePdf, bundleDto]);
+Check(bundlePdf.ToString().Contains("PAQUETE DE ARTICULOS") && !bundlePdf.ToString().Contains("Menor precio"), "PDF de paquete no se presenta como comparativo.");
+Check(bundlePdf.ToString().Contains("INICIAL COMPLETA") && bundlePdf.ToString().Contains("FINANCIADO"), "PDF muestra condiciones globales.");
+cashQuote.EsPaquete = true;
+var persistedBundle = (QuoteDto)typeof(QuotesController).GetMethod("ToDto", BindingFlags.NonPublic | BindingFlags.Static)!.Invoke(null, [cashQuote])!;
+Check(persistedBundle.IsBundle, "La modalidad paquete se conserva al leer la cotizacion.");
+if (args.Length > 0)
+{
+    Directory.CreateDirectory(args[0]);
+    File.WriteAllBytes(Path.Combine(args[0], "bundle-quote.pdf"), SimplePdfGenerator.Quote(bundleDto, "Empresa de prueba"));
+}
+Console.WriteLine("OK: inicial global, plan unico, articulo sin duplicados, DTO y PDF de paquete.");
+
 sealed class TestTenant : ITenantContext
 {
     public Guid? EmpresaId { get; private set; } = Guid.NewGuid();

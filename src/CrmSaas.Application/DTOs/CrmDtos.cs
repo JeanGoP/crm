@@ -239,7 +239,11 @@ public sealed record QuoteSimulationDto(
     decimal MonthlyInterestRate,
     Guid? SalesPointId,
     Guid? SalesPointRateId,
-    bool IsCash = false);
+    bool IsCash = false,
+    IReadOnlyCollection<QuoteSimulationItemDto>? Items = null);
+public sealed record QuoteSimulationItemDto(Guid ProductId, decimal ProductPrice, decimal Insurance, decimal AdministrativeFees);
+public sealed record QuoteBundlePaymentDto(decimal DownPayment, decimal InitialPaymentPaidToday,
+    IReadOnlyCollection<QuoteInitialPaymentDto>? InitialPaymentSchedule, int TermMonths, decimal MonthlyInterestRate);
 public sealed record QuoteSimulationResultDto(
     decimal DownPayment,
     decimal Insurance,
@@ -356,7 +360,8 @@ public sealed record QuoteDto(
     DateTime QuoteDate,
     DateTime ValidUntil,
     string? Notes,
-    IReadOnlyCollection<QuoteItemDto> Items);
+    IReadOnlyCollection<QuoteItemDto> Items,
+    bool IsBundle = false);
 public sealed record CreateQuoteDto(
     TipoIdentificacionColombia IdentificationType,
     string? IdentificationNumber,
@@ -379,7 +384,8 @@ public sealed record CreateQuoteDto(
     Guid? SalesPointId,
     Guid? SalesPointRateId,
     string? Notes,
-    bool IsCash = false);
+    bool IsCash = false,
+    QuoteBundlePaymentDto? BundlePayment = null);
 
 public sealed record ColombianIdentityLookupDto(
     string DocumentNumber,

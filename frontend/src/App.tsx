@@ -37,7 +37,7 @@ import ExpandMore from '@mui/icons-material/ExpandMore';
 import ChevronRight from '@mui/icons-material/ChevronRight';
 import { AxiosError } from 'axios';
 import { api } from './api';
-import { quotePayments } from './quotePayments';
+import { quotePayments, isQuoteBundle } from './quotePayments';
 import { useAuthStore } from './store';
 import { Activity, ColombianIdentityLookup, CollectionOrder, CommercialInventory, CommercialInventorySummary, CommercialReports, Company, CreditApplication, CreditCoDebtor, CreditDocument, Customer, Customer360, CustomerAiAnalysis, CustomerTimelineItem, Dashboard, Deal, DealStage, ExternalInventoryItem, ExternalInventoryWarehouse, FinancialSettings, Lead, LoginAccessReport, MotorcycleDelivery, Procedure, Product, ProductCategory, ProductPhoto, Promotion, Quote, QuoteChargeConcept, QuoteSalesPoint, QuoteSimulationResult, SalesPoint, SalesPointRate, User } from './types';
 
@@ -286,7 +286,7 @@ const emptySalesPointRate = { id: '', name: 'Tasa general', factorMonthlyRate: 4
 const emptySalesPoint = { name: '', code: '', city: '', address: '', phone: '', mainBrand: 'Honda', brandLogoDataUrl: '', factorMonthlyRate: 4.5, maxTermMonths: 30, quoteValidityDays: 7, deliveryMode: 'ConSoat', soatDays: 14, registrationDays: 20, soatProvider: '', registrationAgent: '', commercialTerms: 'Cotizacion sujeta a disponibilidad del producto, validacion comercial y aprobacion final.', externalInventoryWarehouseCodes: '', rates: [emptySalesPointRate], active: true };
 const emptyPromotion = { name: '', code: '', discountType: 'Valor', discountValue: 0, productId: '', brand: '', color: '', salesPointIds: [] as string[], validFrom: today, validUntil: today, active: true };
 const emptyQuoteItem = { productId: '', productPrice: 0, downPayment: 0, extraPayment: 0, initialPaymentSchedule: [] as { dueDate: string; amount: number }[], insurance: 0, administrativeFees: 0, chargeValues: {} as Record<string, number>, termMonths: 24, monthlyInterestRate: 2.2, inventoryWarehouseCode: '', inventoryWarehouseName: '', inventoryPresentation: '', inventorySerialNumber: '', inventoryEngineNumber: '', inventoryChassisNumber: '' };
-const emptyQuote = { isCash: false, identificationType: 1, identificationNumber: '', customerFirstNames: '', customerLastNames: '', customerFirstName: '', customerMiddleName: '', customerLastName: '', customerSecondLastName: '', phoneCountryCode: '+57', phoneNumber: '', requirementProfileId: '', salesPointId: '', salesPointRateId: '', productId: '', downPayment: 0, insurance: 0, administrativeFees: 0, termMonths: 24, monthlyInterestRate: 2.2, items: [emptyQuoteItem], notes: '' };
+const emptyQuote = { bundlePayment: { ...emptyQuoteItem }, isCash: false, identificationType: 1, identificationNumber: '', customerFirstNames: '', customerLastNames: '', customerFirstName: '', customerMiddleName: '', customerLastName: '', customerSecondLastName: '', phoneCountryCode: '+57', phoneNumber: '', requirementProfileId: '', salesPointId: '', salesPointRateId: '', productId: '', downPayment: 0, insurance: 0, administrativeFees: 0, termMonths: 24, monthlyInterestRate: 2.2, items: [emptyQuoteItem], notes: '' };
 const emptyCoDebtor: CreditCoDebtor = { name: '', identification: '', mobile: '', relationship: '', monthlyIncome: 0, reference1Name: '', reference1Mobile: '', reference1Relationship: '', reference2Name: '', reference2Mobile: '', reference2Relationship: '', active: true };
 const emptyCreditApplication = {
   firstDueDate: '', coDebtors: [] as CreditCoDebtor[],
@@ -1474,9 +1474,17 @@ function QuotesPage() {
     if (!customerLastName) throw new Error('El primer apellido del cliente es obligatorio.');
     if (!phoneDigits) throw new Error('El telefono del cliente es obligatorio.');
     const activeChargeConcepts = normalizedQuoteChargeConcepts(quoteChargeConcepts);
+    const bundle = isQuoteBundle(payload.items, products, productCategories);
+    const globalPayment = payload.bundlePayment;
+    if (bundle && !payload.isCash) {
+      if (globalPayment.downPayment < 0 || globalPayment.extraPayment < 0) throw new Error('La inicial y la extra no pueden ser negativas.');
+      if (Math.abs(globalPayment.initialPaymentSchedule.reduce((sum, p) => sum + Number(p.amount), 0) - globalPayment.extraPayment) > .01)
+        throw new Error('El plan del paquete debe sumar exactamente la cuota extra.');
+    }
     const quoteItems = (payload.items?.length ? payload.items : [{ ...emptyQuoteItem, productId: payload.productId, productPrice: 0, downPayment: payload.downPayment, extraPayment: 0, insurance: payload.insurance, administrativeFees: payload.administrativeFees, termMonths: payload.termMonths, monthlyInterestRate: payload.monthlyInterestRate }])
       .filter((item) => item.productId)
-      .map((item) => {
+      .map((sourceItem) => {
+        const item = bundle ? { ...sourceItem, downPayment: 0, extraPayment: 0, initialPaymentSchedule: [], termMonths: globalPayment.termMonths, monthlyInterestRate: globalPayment.monthlyInterestRate } : sourceItem;
         const product = products.find((candidate) => candidate.id === item.productId);
         const chargeTotals = quoteChargeTotals(item, activeChargeConcepts, product);
         if (!payload.isCash && (item.downPayment < 0 || item.extraPayment < 0)) throw new Error('La cuota inicial y la cuota extra no pueden ser negativas.');
@@ -1506,6 +1514,13 @@ function QuotesPage() {
     const firstItem = quoteItems[0];
     const body = {
       ...payload,
+      bundlePayment: bundle && !payload.isCash ? {
+        downPayment: quotePayments(globalPayment.downPayment, globalPayment.extraPayment).downPayment,
+        initialPaymentPaidToday: globalPayment.downPayment,
+        initialPaymentSchedule: globalPayment.initialPaymentSchedule,
+        termMonths: globalPayment.termMonths,
+        monthlyInterestRate: globalPayment.monthlyInterestRate
+      } : null,
       customerFirstNames: fullFirstNames(payload.customerFirstName, payload.customerMiddleName, payload.customerFirstNames),
       customerLastNames: fullLastNames(payload.customerLastName, payload.customerSecondLastName, payload.customerLastNames),
       identificationType: Number(payload.identificationType),
@@ -1555,7 +1570,7 @@ function QuotesPage() {
           <Typography variant="body2" color="text.secondary" sx={{ mt: .25 }}>{r.creditType === 'Contado' ? 'Contado' : r.salesPointRateName || 'Tasa general'}</Typography>
         </Box>,
         r.promotionDiscount > 0 ? <Row primary={r.promotionName ?? 'Promocion'} secondary={`-${money(r.promotionDiscount)}`} /> : '-',
-        (r.items?.length ?? 0) > 1 ? `${r.items.length} productos` : r.productName,
+        r.isBundle ? `Paquete: ${r.items.length} articulo(s)` : (r.items?.length ?? 0) > 1 ? `${r.items.length} productos` : r.productName,
         r.creditType === 'Contado' ? `Contado: ${money(r.estimatedTotalPayment)}` : money(r.financedAmount),
         r.estimatedMonthlyPayment > 0 ? `${money(r.estimatedMonthlyPayment)} x ${r.termMonths}` : r.creditType === 'Contado' ? 'No aplica' : 'Sin simulacion',
         new Date(r.validUntil).toLocaleDateString(),
@@ -4574,12 +4589,7 @@ function QuoteDialog({ form, products, productCategories, quoteChargeConcepts, s
       const selectedSalesPointRateId = salesPointRates.some((rate) => rate.id === v.salesPointRateId)
         ? v.salesPointRateId
         : salesPointRates[0]?.id ?? '';
-      const selectedProducts = quoteItems.map((item) => products.find((product) => product.id === item.productId)).filter(Boolean) as Product[];
-      const selectedCategory = selectedProducts.map((product) => product.category).filter(Boolean)[0];
-      const isBundleQuote = quoteItems.length > 1
-        && selectedProducts.length === quoteItems.length
-        && selectedProducts.every((product) => product.category === selectedCategory)
-        && productCategories.some((category) => category.name === selectedCategory && category.quoteAsBundle);
+      const isBundleQuote = isQuoteBundle(quoteItems, products, productCategories);
       const bundleTotal = quoteItems.reduce((sum, item) => sum + Number(item.productPrice || 0), 0);
       const updateItem = (index: number, patch: Partial<typeof emptyQuoteItem>) => {
         const items = quoteItems.map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item);
@@ -4605,7 +4615,10 @@ function QuoteDialog({ form, products, productCategories, quoteChargeConcepts, s
       };
       const addItem = () => {
         if (quoteItems.length >= 4) return;
-        const selected = products[0];
+        const bundleCategory = products.find(p => p.id === quoteItems[0]?.productId)?.category;
+        const selected = isBundleQuote
+          ? products.find(p => p.category === bundleCategory && !quoteItems.some(item => item.productId === p.id)) ?? products.find(p => p.category === bundleCategory)
+          : products[0];
         const chargeValues = quoteChargeDefaults(selected, activeChargeConcepts);
         const chargeTotals = quoteChargeTotals({ ...emptyQuoteItem, chargeValues }, activeChargeConcepts, selected);
         const items = [...quoteItems, {
@@ -4706,7 +4719,7 @@ function QuoteDialog({ form, products, productCategories, quoteChargeConcepts, s
           <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', sm: 'center' }} gap={1}>
             <Box>
               <Typography variant="subtitle1" fontWeight={900}>Articulos a cotizar</Typography>
-              <Typography variant="body2" color="text.secondary">Agregue varios productos para imprimir la cotizacion como comparativo.</Typography>
+              <Typography variant="body2" color="text.secondary">Las categorias configuradas como paquete comparten una sola inicial y financiacion. Los demas productos se cotizan como comparativo.</Typography>
             </Box>
             <Button variant="outlined" startIcon={<Add />} disabled={quoteItems.length >= 4 || !products.length} onClick={addItem}>Agregar articulo</Button>
           </Stack>
@@ -4777,10 +4790,10 @@ function QuoteDialog({ form, products, productCategories, quoteChargeConcepts, s
                   {(item.inventoryChassisNumber || item.inventoryEngineNumber || item.inventoryWarehouseName) && <Alert severity="info" sx={{ gridColumn: { md: '1 / -1' }, py: 0.5 }}>
                     Unidad seleccionada: {item.inventoryWarehouseName || 'Bodega'}{item.inventoryChassisNumber ? ` · Chasis ${item.inventoryChassisNumber}` : ''}{item.inventoryEngineNumber ? ` · Motor ${item.inventoryEngineNumber}` : ''}
                   </Alert>}
-                  {!v.isCash && <CurrencyField label="Cuota inicial" value={item.downPayment} onChange={(downPayment) => updateItem(index, { downPayment })} />}
-                  {!v.isCash && <CurrencyField label="Cuota extra" value={item.extraPayment} onChange={(extraPayment) => updateItem(index, { extraPayment })} />}
+                  {!v.isCash && !isBundleQuote && <CurrencyField label="Cuota inicial" value={item.downPayment} onChange={(downPayment) => updateItem(index, { downPayment })} />}
+                  {!v.isCash && !isBundleQuote && <CurrencyField label="Cuota extra" value={item.extraPayment} onChange={(extraPayment) => updateItem(index, { extraPayment })} />}
                   <CurrencyField label="Precio" value={item.productPrice} onChange={(productPrice) => updateItem(index, { productPrice })} />
-                  {!v.isCash && <TextField fullWidth label="Cuotas" type="number" value={item.termMonths} onChange={(e) => updateItem(index, { termMonths: Number(e.target.value) })} />}
+                  {!v.isCash && !isBundleQuote && <TextField fullWidth label="Cuotas" type="number" value={item.termMonths} onChange={(e) => updateItem(index, { termMonths: Number(e.target.value) })} />}
                   {!v.isCash && activeChargeConcepts.map((concept) => <CurrencyField
                     key={concept.id}
                     sx={{ minWidth: 0 }}
@@ -4792,17 +4805,34 @@ function QuoteDialog({ form, products, productCategories, quoteChargeConcepts, s
                       updateItem(index, { chargeValues: nextChargeValues, insurance: totals.insurance, administrativeFees: totals.administrativeFees });
                     }}
                   />)}
-                  <Box sx={{ gridColumn: { xs: '1', sm: 'span 2', lg: 'span 2' }, minWidth: 0 }}>
+                  {!isBundleQuote && <Box sx={{ gridColumn: { xs: '1', sm: 'span 2', lg: 'span 2' }, minWidth: 0 }}>
                     <QuoteSimulationPreview isCash={v.isCash} value={simulationItem} selectedProduct={selectedProduct} salesPointId={selectedSalesPointId} salesPointRateId={selectedSalesPointRateId} compact />
-                  </Box>
+                  </Box>}
                 </Box>
-                {!v.isCash && <InitialPaymentPlanEditor
+                {!v.isCash && !isBundleQuote && <InitialPaymentPlanEditor
                   item={item}
                   onChange={(patch) => updateItem(index, patch)}
                 />}
               </Stack>
             </Paper>;
           })}
+          {isBundleQuote && <Paper variant="outlined" sx={{ p: 2 }}>
+            <Stack spacing={2}>
+              <Typography fontWeight={900}>Condiciones del paquete</Typography>
+              <Typography>Total de artículos antes de promociones: {money(bundleTotal)}</Typography>
+              {!v.isCash && <>
+                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' }, gap: 1.5 }}>
+                  <CurrencyField label="Cuota inicial del paquete" value={v.bundlePayment.downPayment} onChange={downPayment => set({ bundlePayment: { ...v.bundlePayment, downPayment } })} />
+                  <CurrencyField label="Cuota extra del paquete" value={v.bundlePayment.extraPayment} onChange={extraPayment => set({ bundlePayment: { ...v.bundlePayment, extraPayment } })} />
+                  <TextField label="Cuotas del paquete" type="number" value={v.bundlePayment.termMonths} onChange={e => set({ bundlePayment: { ...v.bundlePayment, termMonths: Number(e.target.value) } })} />
+                </Box>
+                <InitialPaymentPlanEditor item={v.bundlePayment} onChange={patch => set({ bundlePayment: { ...v.bundlePayment, ...patch } })} />
+              </>}
+              <QuoteSimulationPreview isCash={v.isCash} value={{ ...v.bundlePayment, productPrice: bundleTotal }}
+                bundleItems={quoteItems.map(item => ({ ...item, ...quoteChargeTotals(item, activeChargeConcepts, products.find(p => p.id === item.productId)) }))}
+                selectedProduct={products.find(p => p.id === quoteItems[0]?.productId)} salesPointId={selectedSalesPointId} salesPointRateId={selectedSalesPointRateId} compact />
+            </Stack>
+          </Paper>}
           {isBundleQuote && <Alert severity="info">
             Esta categoria cotiza como paquete: se sumaran los articulos seleccionados por un valor de {money(bundleTotal)} antes de promociones{v.isCash ? ', de contado.' : ', antes de descontar la inicial completa.'}
           </Alert>}
@@ -4813,12 +4843,13 @@ function QuoteDialog({ form, products, productCategories, quoteChargeConcepts, s
   </FormDialog>;
 }
 
-function QuoteSimulationPreview({ value, selectedProduct, salesPointId, salesPointRateId, compact = false, isCash = false }: { isCash?: boolean; value: typeof emptyQuoteItem; selectedProduct?: Product; salesPointId?: string; salesPointRateId?: string; compact?: boolean }) {
+function QuoteSimulationPreview({ value, selectedProduct, salesPointId, salesPointRateId, compact = false, isCash = false, bundleItems }: { bundleItems?: typeof emptyQuoteItem[]; isCash?: boolean; value: typeof emptyQuoteItem; selectedProduct?: Product; salesPointId?: string; salesPointRateId?: string; compact?: boolean }) {
   const completeDownPayment = isCash ? 0 : quotePayments(value.downPayment, value.extraPayment).downPayment;
   const [simulation, setSimulation] = useState<QuoteSimulationResult>();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const productPrice = Math.max(Number(value.productPrice) || 0, 0);
+  const bundleRequest = JSON.stringify(bundleItems?.map(item => ({ productId: item.productId, productPrice: item.productPrice, insurance: item.insurance, administrativeFees: item.administrativeFees })));
 
   useEffect(() => {
     if (!selectedProduct?.id) {
@@ -4834,6 +4865,7 @@ function QuoteSimulationPreview({ value, selectedProduct, salesPointId, salesPoi
       setError('');
       api.post<QuoteSimulationResult>('/api/quotes/simulate', {
         isCash,
+        items: bundleRequest ? JSON.parse(bundleRequest) : null,
         productId: selectedProduct.id,
         productPrice,
         downPayment: completeDownPayment,
@@ -4850,7 +4882,7 @@ function QuoteSimulationPreview({ value, selectedProduct, salesPointId, salesPoi
     }, 250);
 
     return () => { cancelled = true; window.clearTimeout(timer); };
-  }, [isCash, selectedProduct?.id, productPrice, completeDownPayment, value.insurance, value.administrativeFees, value.termMonths, value.monthlyInterestRate, salesPointId, salesPointRateId]);
+  }, [bundleRequest, isCash, selectedProduct?.id, productPrice, completeDownPayment, value.insurance, value.administrativeFees, value.termMonths, value.monthlyInterestRate, salesPointId, salesPointRateId]);
 
   const insurance = isCash ? 0 : Math.max(Number(value.insurance) || 0, 0);
   const administrativeFees = isCash ? 0 : Math.max(Number(value.administrativeFees) || 0, 0);
@@ -4878,6 +4910,7 @@ function QuoteSimulationPreview({ value, selectedProduct, salesPointId, salesPoi
     usedCompanyFinancialSettings: false
   };
 
+  if (bundleItems && !simulation) return <Paper variant="outlined" sx={{ p: 2 }}>{error ? <Alert severity="warning">{error}</Alert> : <><LinearProgress /><Typography>Calculando el paquete...</Typography></>}</Paper>;
   return <Paper variant="outlined" sx={{ p: compact ? 1.25 : 2, bgcolor: compact ? '#ffffff' : '#f8fafc', height: '100%' }}>
     <Stack spacing={compact ? 0.75 : 1.5}>
       {loading && <LinearProgress />}

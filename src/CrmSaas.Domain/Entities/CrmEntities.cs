@@ -240,6 +240,7 @@ public sealed class TasaPuntoVenta : AuditableTenantEntity
 
 public sealed class Cotizacion : AuditableTenantEntity
 {
+    public bool EsPaquete { get; set; }
     public Guid? NegocioId { get; set; }
     public Negocio? Negocio { get; set; }
     public string Numero { get; set; } = string.Empty;

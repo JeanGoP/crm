@@ -362,6 +362,7 @@ export interface QuoteItem {
 }
 
 export interface Quote {
+  isBundle?: boolean;
   id: string;
   number: string;
   identificationType: number;

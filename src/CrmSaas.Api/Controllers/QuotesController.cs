@@ -95,6 +95,19 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             .Where(x => productIds.Contains(x.Id) && x.Activo)
             .ToDictionaryAsync(x => x.Id, cancellationToken);
         if (products.Count != productIds.Length) throw new KeyNotFoundException("Uno de los productos no existe o esta inactivo.");
+        var categories = products.Values.Select(x => x.Categoria.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        var quoteCategory = categories.Count == 1 ? categories[0] : null;
+        var quoteAsBundle = !string.IsNullOrWhiteSpace(quoteCategory)
+            && await db.CategoriasProducto.AnyAsync(x => x.Nombre == quoteCategory && x.Activa && x.CotizarComoPaquete, cancellationToken);
+        if (!quoteAsBundle && dto.BundlePayment is not null)
+            throw new ValidationException("Las condiciones globales solo aplican a productos de una misma categoria configurada como paquete.");
+        var globalSource = requestedItems[0];
+        if (quoteAsBundle && !dto.IsCash && dto.BundlePayment is { } payment)
+            globalSource = globalSource with { DownPayment = payment.DownPayment, InitialPaymentPaidToday = payment.InitialPaymentPaidToday,
+                InitialPaymentSchedule = payment.InitialPaymentSchedule, TermMonths = payment.TermMonths, MonthlyInterestRate = payment.MonthlyInterestRate };
+        if (quoteAsBundle && !dto.IsCash && (globalSource.DownPayment < 0 || globalSource.InitialPaymentPaidToday < 0 || globalSource.TermMonths <= 0 || globalSource.MonthlyInterestRate < 0))
+            throw new ValidationException("Revise la inicial, cuota extra y plazo del paquete.");
+        if (quoteAsBundle) requestedItems = requestedItems.Select(item => NormalizeBundleItem(item, globalSource)).ToList();
         var now = ColombiaTime.Now;
         var promotions = await GetActivePromotionsAsync(now, cancellationToken);
 
@@ -118,14 +131,9 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
         }).ToList();
         var primary = calculatedItems[0];
         var product = primary.Product;
-        var quoteCategories = calculatedItems
-            .Select(x => x.Product.Categoria.Trim())
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
-        var quoteCategory = quoteCategories.Count == 1 ? quoteCategories[0] : null;
-        var quoteAsBundle = calculatedItems.Count > 1
-            && !string.IsNullOrWhiteSpace(quoteCategory)
-            && await db.CategoriasProducto.AnyAsync(x => x.Nombre == quoteCategory && x.Activa && x.CotizarComoPaquete, cancellationToken);
+        var quoteInitialPlan = quoteAsBundle ? NormalizeInitialPaymentPlan(globalSource, now) : primary.InitialPlan;
+        if (quoteAsBundle && globalSource.DownPayment > calculatedItems.Sum(x => x.Promotion.DiscountedProductPrice + x.Simulation.Insurance + x.Simulation.AdministrativeFees))
+            throw new ValidationException("La inicial completa no puede superar el valor total del paquete.");
         var quoteProductPrice = quoteAsBundle ? calculatedItems.Sum(x => x.ProductPrice) : primary.ProductPrice;
         var quotePromotionDiscount = quoteAsBundle ? calculatedItems.Sum(x => x.Promotion.DiscountAmount) : primary.Promotion.DiscountAmount;
         var quotePromotion = quoteAsBundle ? null : primary.Promotion.Promotion;
@@ -133,11 +141,11 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
         var simulation = dto.IsCash ? CashSimulation(quoteAsBundle ? calculatedItems.Sum(x => x.Promotion.DiscountedProductPrice) : primary.Promotion.DiscountedProductPrice) : quoteAsBundle
             ? CalculateSimulation(
                 calculatedItems.Sum(x => x.Promotion.DiscountedProductPrice),
-                primary.Simulation.DownPayment,
+                globalSource.DownPayment,
                 calculatedItems.Sum(x => x.Simulation.Insurance),
                 calculatedItems.Sum(x => x.Simulation.AdministrativeFees),
-                primary.Simulation.TermMonths,
-                primary.Simulation.MonthlyInterestRate,
+                globalSource.TermMonths,
+                globalSource.MonthlyInterestRate,
                 financialSettings,
                 salesPoint,
                 salesPointRate)
@@ -238,9 +246,10 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             DescuentoPromocion = quotePromotionDiscount,
             PrecioProducto = quoteProductPrice,
             CuotaInicial = simulation.DownPayment,
-            CuotaInicialPagadaHoy = primary.InitialPlan.PaidToday,
-            PlanCuotaInicialJson = SerializeInitialPaymentPlan(primary.InitialPlan.Schedule),
-            FechaInicioCreditoEstimada = dto.IsCash ? null : primary.InitialPlan.CreditStartDate,
+            EsPaquete = quoteAsBundle,
+            CuotaInicialPagadaHoy = quoteInitialPlan.PaidToday,
+            PlanCuotaInicialJson = SerializeInitialPaymentPlan(quoteInitialPlan.Schedule),
+            FechaInicioCreditoEstimada = dto.IsCash ? null : quoteInitialPlan.CreditStartDate,
             Seguro = simulation.Insurance,
             GastosAdministrativos = simulation.AdministrativeFees,
             PlazoMeses = simulation.TermMonths,
@@ -333,19 +342,37 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
         if (dto.AdministrativeFees < 0) throw new ValidationException("Los gastos administrativos no pueden ser negativos.");
         if (!dto.IsCash && dto.TermMonths <= 0) throw new ValidationException("El plazo debe ser mayor a cero.");
 
-        var product = await db.Productos
-            .Include(x => x.PreciosPorSede)
-            .FirstOrDefaultAsync(x => x.Id == dto.ProductId && x.Activo, cancellationToken)
-            ?? throw new KeyNotFoundException("Producto no encontrado o inactivo.");
+        var sources = dto.Items?.ToList() ?? [new QuoteSimulationItemDto(dto.ProductId, dto.ProductPrice, dto.Insurance, dto.AdministrativeFees)];
+        if (sources.Count == 0 || sources.Count > 4) throw new ValidationException("Seleccione entre uno y cuatro articulos.");
+        var ids = sources.Select(x => x.ProductId).Distinct().ToArray();
+        var products = await db.Productos.Include(x => x.PreciosPorSede).Where(x => ids.Contains(x.Id) && x.Activo).ToDictionaryAsync(x => x.Id, cancellationToken);
+        if (products.Count != ids.Length) throw new KeyNotFoundException("Producto no encontrado o inactivo.");
+        if (dto.Items is not null)
+        {
+            var categories = products.Values.Select(x => x.Categoria.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            if (categories.Count != 1 || !await db.CategoriasProducto.AnyAsync(x => x.Nombre == categories[0] && x.Activa && x.CotizarComoPaquete, cancellationToken))
+                throw new ValidationException("Los articulos deben pertenecer a una misma categoria configurada como paquete.");
+        }
         var financialSettings = dto.IsCash ? null : await GetFinancialSettingsAsync(cancellationToken);
         var salesPoint = await GetCurrentSalesPointAsync(dto.SalesPointId, true, cancellationToken);
         var salesPointRate = dto.IsCash ? null : await ResolveSalesPointRateAsync(salesPoint, dto.SalesPointRateId, cancellationToken);
-        var configuredProductPrice = ResolveProductPrice(product, salesPoint);
-        var productPrice = dto.ProductPrice > 0 ? dto.ProductPrice : configuredProductPrice;
-        var promotion = ResolvePromotion(product, salesPoint, await GetActivePromotionsAsync(ColombiaTime.Now, cancellationToken), productPrice);
-        var insurance = dto.IsCash ? 0 : dto.Insurance > 0 ? dto.Insurance : product.Soat;
-        var administrativeFees = dto.IsCash ? 0 : dto.AdministrativeFees > 0 ? dto.AdministrativeFees : product.Matricula + product.Impuestos;
-        var simulation = dto.IsCash ? CashSimulation(promotion.DiscountedProductPrice) : CalculateSimulation(promotion.DiscountedProductPrice, dto.DownPayment, insurance, administrativeFees, dto.TermMonths, dto.MonthlyInterestRate, financialSettings, salesPoint, salesPointRate);
+        var promotions = await GetActivePromotionsAsync(ColombiaTime.Now, cancellationToken);
+        var values = sources.Select(item => {
+            var product = products[item.ProductId];
+            var price = item.ProductPrice > 0 ? item.ProductPrice : ResolveProductPrice(product, salesPoint);
+            if (!dto.IsCash && (item.Insurance < 0 || item.AdministrativeFees < 0)) throw new ValidationException("Los cargos no pueden ser negativos.");
+            return new { Promotion = ResolvePromotion(product, salesPoint, promotions, price),
+                Insurance = dto.IsCash ? 0 : item.Insurance > 0 ? item.Insurance : product.Soat,
+                Fees = dto.IsCash ? 0 : item.AdministrativeFees > 0 ? item.AdministrativeFees : product.Matricula + product.Impuestos };
+        }).ToList();
+        var discountedPrice = values.Sum(x => x.Promotion.DiscountedProductPrice);
+        var discount = values.Sum(x => x.Promotion.DiscountAmount);
+        var promotion = values.Count == 1 ? values[0].Promotion.Promotion : null;
+        var insurance = values.Sum(x => x.Insurance);
+        var administrativeFees = values.Sum(x => x.Fees);
+        if (dto.Items is not null && dto.DownPayment > discountedPrice + insurance + administrativeFees)
+            throw new ValidationException("La inicial completa no puede superar el valor total del paquete.");
+        var simulation = dto.IsCash ? CashSimulation(discountedPrice) : CalculateSimulation(discountedPrice, dto.DownPayment, insurance, administrativeFees, dto.TermMonths, dto.MonthlyInterestRate, financialSettings, salesPoint, salesPointRate);
 
         return Ok(new QuoteSimulationResultDto(
             simulation.DownPayment,
@@ -355,10 +382,10 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             simulation.MonthlyInterestRate,
             salesPointRate?.Id,
             salesPointRate?.Nombre,
-            promotion.Promotion?.Id,
-            promotion.Promotion?.Nombre,
-            promotion.DiscountAmount,
-            promotion.DiscountedProductPrice,
+            promotion?.Id,
+            promotion?.Nombre ?? (discount > 0 ? "Promociones aplicadas" : null),
+            discount,
+            discountedPrice,
             simulation.FinancedAmount,
             simulation.MonthlyPayment,
             simulation.TotalPayment,
@@ -513,7 +540,7 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             x.FechaCotizacion,
             x.ValidaHasta,
             x.Observaciones,
-            QuoteItems(x).ToList());
+            QuoteItems(x).ToList(), x.EsPaquete);
     }
 
     private static IReadOnlyCollection<CreateQuoteItemDto> NormalizeQuoteItems(CreateQuoteDto dto)
@@ -531,6 +558,10 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
     private static CreateQuoteItemDto NormalizeCashItem(CreateQuoteItemDto item) =>
         item with { DownPayment = 0, InitialPaymentPaidToday = 0, InitialPaymentSchedule = [],
             Insurance = 0, AdministrativeFees = 0, TermMonths = 0, MonthlyInterestRate = 0 };
+
+    private static CreateQuoteItemDto NormalizeBundleItem(CreateQuoteItemDto item, CreateQuoteItemDto payment) =>
+        item with { DownPayment = 0, InitialPaymentPaidToday = 0, InitialPaymentSchedule = [],
+            TermMonths = payment.TermMonths, MonthlyInterestRate = payment.MonthlyInterestRate };
 
     private static CreditSimulation CashSimulation(decimal price) =>
         new(0, 0, 0, 0, 0, 0, 0, price, "Contado", false);

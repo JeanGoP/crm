@@ -217,7 +217,7 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
             x.FechaCotizacion,
             x.ValidaHasta,
             x.Observaciones,
-            QuoteItems(x).ToList());
+            QuoteItems(x).ToList(), x.EsPaquete);
     }
 
     private static IEnumerable<QuoteItemDto> QuoteItems(Cotizacion quote)
