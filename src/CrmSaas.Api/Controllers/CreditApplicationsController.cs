@@ -115,6 +115,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         db.SolicitudesCredito.Add(entity);
         entity.FechaPrimerVencimiento = dto.FirstDueDate?.Date;
         SyncCoDebtors(entity, dto.CoDebtors);
+        CreditPhoneValidation.Validate(entity);
         await SyncPipelineAsync(entity, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         entity.Cliente = customer;
@@ -183,7 +184,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         AddMissingChecklistDocuments(entity, null);
         entity.FechaPrimerVencimiento = dto.FirstDueDate?.Date;
         SyncCoDebtors(entity, dto.CoDebtors);
-
+        CreditPhoneValidation.Validate(entity);
         await SyncPipelineAsync(entity, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         entity.Producto = product;

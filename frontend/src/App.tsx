@@ -38,6 +38,7 @@ import ChevronRight from '@mui/icons-material/ChevronRight';
 import { AxiosError } from 'axios';
 import { api } from './api';
 import { quotePayments, isQuoteBundle, quoteTermLimit, quoteCustomerName, currencyInputValue, updateQuoteTerms } from './quotePayments';
+import { findDuplicateCreditPhones, duplicateCreditPhoneMessage, creditPhoneFieldError } from './creditPhones';
 import { useAuthStore } from './store';
 import { Activity, ColombianIdentityLookup, CollectionOrder, CommercialInventory, CommercialInventorySummary, CommercialReports, Company, CreditApplication, CreditCoDebtor, CreditDocument, Customer, Customer360, CustomerAiAnalysis, CustomerTimelineItem, Dashboard, Deal, DealStage, ExternalInventoryItem, ExternalInventoryWarehouse, FinancialSettings, Lead, LoginAccessReport, MotorcycleDelivery, Procedure, Product, ProductCategory, ProductPhoto, Promotion, Quote, QuoteChargeConcept, QuoteSalesPoint, QuoteSimulationResult, SalesPoint, SalesPointRate, User } from './types';
 
@@ -1765,6 +1766,8 @@ function CreditApplicationsPage() {
   };
 
   const save = async (payload: typeof emptyCreditApplication) => {
+    const duplicatePhones = findDuplicateCreditPhones(payload);
+    if (duplicatePhones.length) throw new Error(duplicateCreditPhoneMessage(duplicatePhones));
     const clientReferencesComplete = [payload.reference1Name, payload.reference1Mobile, payload.reference1Relationship, payload.reference2Name, payload.reference2Mobile, payload.reference2Relationship]
       .every((value) => value.trim());
     if (!clientReferencesComplete) throw new Error('Debe completar las dos referencias personales del cliente.');
@@ -5135,8 +5138,19 @@ function CreditApplicationDialog({ form, customers, products, quotes, onClose, o
       const selectedCustomer = customers.find((x) => x.id === v.customerId);
       const clientReferencesComplete = [v.reference1Name, v.reference1Mobile, v.reference1Relationship, v.reference2Name, v.reference2Mobile, v.reference2Relationship].every((value) => value.trim());
       const selectedCoDebtor = typeof referenceDialog === 'number' ? v.coDebtors[referenceDialog] : undefined;
+      const duplicatePhones = findDuplicateCreditPhones(v);
+      const phoneFieldProps = (path: string) => {
+        const helperText = creditPhoneFieldError(duplicatePhones, path);
+        return { error: !!helperText, helperText };
+      };
       const updateCoDebtor = (index: number, patch: Partial<CreditCoDebtor>) => set({ coDebtors: v.coDebtors.map((person, i) => i === index ? { ...person, ...patch } : person) });
       return <>
+        {duplicatePhones.length > 0 && <Alert severity="error">
+          <Typography fontWeight={800}>Corrija los teléfonos repetidos antes de guardar.</Typography>
+          {duplicatePhones.map(group => <Typography key={group.phone} variant="body2" sx={{ mt: 0.5 }}>
+            {group.phone}: {group.fields.map(field => field.label).join(' · ')}
+          </Typography>)}
+        </Alert>}
         <Paper variant="outlined" sx={{ p: 2, bgcolor: '#fbfdff' }}>
           <Stack spacing={2}>
             <Typography variant="subtitle1" fontWeight={900}>Origen y cliente</Typography>
@@ -5193,7 +5207,7 @@ function CreditApplicationDialog({ form, customers, products, quotes, onClose, o
             </Box>
             <FieldGrid columns={4}>
               <TextField fullWidth label="Fecha nacimiento" type="date" value={v.birthDate} onChange={(e) => set({ birthDate: e.target.value })} InputLabelProps={{ shrink: true }} />
-              <TextField fullWidth required label="Celular / WhatsApp" value={v.mobile} onChange={(e) => set({ mobile: e.target.value })} />
+              <TextField fullWidth required label="Celular / WhatsApp" value={v.mobile} onChange={(e) => set({ mobile: e.target.value })} {...phoneFieldProps('mobile')} />
               <TextField fullWidth label="Direccion" value={v.address} onChange={(e) => set({ address: e.target.value })} />
               <TextField fullWidth label="Ciudad" value={v.city} onChange={(e) => set({ city: e.target.value })} />
             </FieldGrid>
@@ -5247,7 +5261,7 @@ function CreditApplicationDialog({ form, customers, products, quotes, onClose, o
                 <FieldGrid columns={2}>
                   <TextField required label="Nombre completo" value={person.name} onChange={(e) => updateCoDebtor(index, { name: e.target.value })} />
                   <TextField required label="Identificación" value={person.identification} onChange={(e) => updateCoDebtor(index, { identification: e.target.value })} />
-                  <TextField required label="Celular" value={person.mobile} onChange={(e) => updateCoDebtor(index, { mobile: e.target.value })} />
+                  <TextField required label="Celular" value={person.mobile} onChange={(e) => updateCoDebtor(index, { mobile: e.target.value })} {...phoneFieldProps(`coDebtors.${index}.mobile`)} />
                   <TextField label="Parentesco / relación" value={person.relationship ?? ''} onChange={(e) => updateCoDebtor(index, { relationship: e.target.value })} />
                   <CurrencyField label="Ingresos mensuales" value={person.monthlyIncome} onChange={monthlyIncome => updateCoDebtor(index, { monthlyIncome })} />
                 </FieldGrid>
@@ -5263,12 +5277,12 @@ function CreditApplicationDialog({ form, customers, products, quotes, onClose, o
             <Stack spacing={2} sx={{ pt: 1 }}>
               <FieldGrid columns={3}>
                 <TextField fullWidth required label="Nombre referencia 1" value={v.reference1Name} onChange={(e) => set({ reference1Name: e.target.value })} />
-                <TextField fullWidth required label="Celular referencia 1" value={v.reference1Mobile} onChange={(e) => set({ reference1Mobile: e.target.value })} />
+                <TextField fullWidth required label="Celular referencia 1" value={v.reference1Mobile} onChange={(e) => set({ reference1Mobile: e.target.value })} {...phoneFieldProps('reference1Mobile')} />
                 <TextField fullWidth required label="Relacion referencia 1" value={v.reference1Relationship} onChange={(e) => set({ reference1Relationship: e.target.value })} />
               </FieldGrid>
               <FieldGrid columns={3}>
                 <TextField fullWidth required label="Nombre referencia 2" value={v.reference2Name} onChange={(e) => set({ reference2Name: e.target.value })} />
-                <TextField fullWidth required label="Celular referencia 2" value={v.reference2Mobile} onChange={(e) => set({ reference2Mobile: e.target.value })} />
+                <TextField fullWidth required label="Celular referencia 2" value={v.reference2Mobile} onChange={(e) => set({ reference2Mobile: e.target.value })} {...phoneFieldProps('reference2Mobile')} />
                 <TextField fullWidth required label="Relacion referencia 2" value={v.reference2Relationship} onChange={(e) => set({ reference2Relationship: e.target.value })} />
               </FieldGrid>
             </Stack>
@@ -5282,12 +5296,12 @@ function CreditApplicationDialog({ form, customers, products, quotes, onClose, o
             <Stack spacing={2} sx={{ pt: 1 }}>
               <FieldGrid columns={3}>
                 <TextField fullWidth required label="Nombre referencia 1" value={selectedCoDebtor?.reference1Name ?? ''} onChange={(e) => typeof referenceDialog === 'number' && updateCoDebtor(referenceDialog, { reference1Name: e.target.value })} />
-                <TextField fullWidth required label="Celular referencia 1" value={selectedCoDebtor?.reference1Mobile ?? ''} onChange={(e) => typeof referenceDialog === 'number' && updateCoDebtor(referenceDialog, { reference1Mobile: e.target.value })} />
+                <TextField fullWidth required label="Celular referencia 1" value={selectedCoDebtor?.reference1Mobile ?? ''} onChange={(e) => typeof referenceDialog === 'number' && updateCoDebtor(referenceDialog, { reference1Mobile: e.target.value })} {...phoneFieldProps(`coDebtors.${referenceDialog}.reference1Mobile`)} />
                 <TextField fullWidth required label="Relacion referencia 1" value={selectedCoDebtor?.reference1Relationship ?? ''} onChange={(e) => typeof referenceDialog === 'number' && updateCoDebtor(referenceDialog, { reference1Relationship: e.target.value })} />
               </FieldGrid>
               <FieldGrid columns={3}>
                 <TextField fullWidth required label="Nombre referencia 2" value={selectedCoDebtor?.reference2Name ?? ''} onChange={(e) => typeof referenceDialog === 'number' && updateCoDebtor(referenceDialog, { reference2Name: e.target.value })} />
-                <TextField fullWidth required label="Celular referencia 2" value={selectedCoDebtor?.reference2Mobile ?? ''} onChange={(e) => typeof referenceDialog === 'number' && updateCoDebtor(referenceDialog, { reference2Mobile: e.target.value })} />
+                <TextField fullWidth required label="Celular referencia 2" value={selectedCoDebtor?.reference2Mobile ?? ''} onChange={(e) => typeof referenceDialog === 'number' && updateCoDebtor(referenceDialog, { reference2Mobile: e.target.value })} {...phoneFieldProps(`coDebtors.${referenceDialog}.reference2Mobile`)} />
                 <TextField fullWidth required label="Relacion referencia 2" value={selectedCoDebtor?.reference2Relationship ?? ''} onChange={(e) => typeof referenceDialog === 'number' && updateCoDebtor(referenceDialog, { reference2Relationship: e.target.value })} />
               </FieldGrid>
             </Stack>

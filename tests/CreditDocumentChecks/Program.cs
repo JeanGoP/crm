@@ -231,6 +231,7 @@ if (args.Length > 0)
 Console.WriteLine("OK: multiplazos, deduplicacion, limites, persistencia de cuotas y PDF paginado.");
 
 QuotePdfLayoutChecks.Run(optionsQuote, args);
+CreditPhoneChecks.Run();
 
 sealed class TestTenant : ITenantContext
 {
