@@ -4240,7 +4240,7 @@ function ProductDialog({ form, categories, salesPoints, onClose, onSave, onChang
       active: price.active
     }))
   } : { ...emptyProduct, category: categories[0]?.name ?? emptyProduct.category };
-  return <FormDialog title={form.item ? 'Editar producto' : 'Nuevo producto'} open={form.open} initial={initial} onClose={onClose} onSave={onSave}>
+  return <FormDialog title={form.item ? 'Editar producto' : 'Nuevo producto'} open={form.open} initial={initial} onClose={onClose} onSave={onSave} maxWidth="lg">
     {(v, set) => {
       const usesSalesPointPrices = isApplianceCategoryName(v.category);
       const priceForSalesPoint = (salesPointId: string) => v.salesPointPrices.find((price) => price.salesPointId === salesPointId);
@@ -4250,6 +4250,8 @@ function ProductDialog({ form, categories, salesPoints, onClose, onSave, onChang
         set({ salesPointPrices: [...v.salesPointPrices.filter((price) => price.salesPointId !== salesPointId), next] });
       };
       return <>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'minmax(0, 1.2fr) minmax(0, 1fr)' }, gap: 2, alignItems: 'start', '& .MuiTextField-root': { width: '100%' } }}>
+      <Stack spacing={1.75} sx={{ p: 2, minWidth: 0, border: `1px solid ${uiBorder}`, borderRadius: 2, bgcolor: '#fbfdff' }}>
       <SectionTitle title="Datos comerciales" />
       <FieldGrid columns={2}>
         <TextField fullWidth required label="Nombre del producto" value={v.name} onChange={(e) => set({ name: e.target.value })} />
@@ -4270,20 +4272,25 @@ function ProductDialog({ form, categories, salesPoints, onClose, onSave, onChang
         <TextField fullWidth label="Color" value={v.color} onChange={(e) => set({ color: e.target.value })} />
       </FieldGrid>
       <TextField label="Descripcion comercial" value={v.description} onChange={(e) => set({ description: e.target.value })} multiline minRows={2} />
+      <TextField select label="Estado" value={String(v.active)} onChange={(e) => set({ active: e.target.value === 'true' })}><MenuItem value="true">Activa</MenuItem><MenuItem value="false">Inactiva</MenuItem></TextField>
+      </Stack>
+      <Stack spacing={1.75} sx={{ p: 2, minWidth: 0, border: `1px solid ${uiBorder}`, borderRadius: 2, bgcolor: '#f4f7fb' }}>
       <SectionTitle title="Ficha tecnica" />
-      <FieldGrid columns={3}>
+      <FieldGrid columns={2}>
         <TextField fullWidth label="Cilindraje" type="number" value={v.engineCc} onChange={(e) => set({ engineCc: e.target.value })} />
         <TextField fullWidth label="Ano" type="number" value={v.year} onChange={(e) => set({ year: e.target.value })} />
-        <TextField fullWidth label="Vigente desde" type="date" value={v.priceValidFrom} onChange={(e) => set({ priceValidFrom: e.target.value })} InputLabelProps={{ shrink: true }} />
+        <TextField fullWidth label="Vigente desde" type="date" value={v.priceValidFrom} onChange={(e) => set({ priceValidFrom: e.target.value })} InputLabelProps={{ shrink: true }} sx={{ gridColumn: '1 / -1' }} />
       </FieldGrid>
       <TextField label="Ficha tecnica estructurada" value={v.technicalSheet} onChange={(e) => set({ technicalSheet: e.target.value })} multiline minRows={3} placeholder="Ej: Motor: 125 cc&#10;Transmision: 5 velocidades&#10;Freno delantero: Disco" />
       <SectionTitle title="Precio y cargos" />
-      <FieldGrid columns={4}>
+      <FieldGrid columns={2}>
         <CurrencyField fullWidth required label="Precio base" value={v.price} onChange={amount => set({ price: amount })} />
         <CurrencyField fullWidth label="SOAT" value={v.soat} onChange={amount => set({ soat: amount })} />
         <CurrencyField fullWidth label="Matricula" value={v.registrationFee} onChange={amount => set({ registrationFee: amount })} />
         <CurrencyField fullWidth label="Impuestos" value={v.taxes} onChange={amount => set({ taxes: amount })} />
       </FieldGrid>
+      </Stack>
+      </Box>
       {usesSalesPointPrices && <Paper variant="outlined" sx={{ p: 2, bgcolor: '#f8fafc' }}>
         <Stack spacing={1.5}>
           <Box>
@@ -4318,7 +4325,6 @@ function ProductDialog({ form, categories, salesPoints, onClose, onSave, onChang
           })}
         </Stack>
       </Paper>}
-      <TextField select label="Estado" value={String(v.active)} onChange={(e) => set({ active: e.target.value === 'true' })}><MenuItem value="true">Activa</MenuItem><MenuItem value="false">Inactiva</MenuItem></TextField>
       {form.item && <ProductPhotosManager product={form.item} onChanged={onChanged} />}
       {!form.item && <Alert severity="info">Guarde el producto primero. Luego podra editarlo para adjuntar una o varias fotos y elegir la foto principal del PDF.</Alert>}
     </>;
@@ -5489,12 +5495,14 @@ function ActivityDialog({ form, customers, deals, onClose, onSave }: DialogProps
     {(v, set) => <>
       <TextField required label="Titulo" value={v.title} onChange={(e) => set({ title: e.target.value })} />
       <TextField label="Descripcion" value={v.description} onChange={(e) => set({ description: e.target.value })} multiline minRows={2} />
+      <FieldGrid>
       <TextField select label="Tipo" value={v.type} onChange={(e) => set({ type: Number(e.target.value) })}>{[1, 2, 3].map((x) => <MenuItem key={x} value={x}>{typeLabel(x)}</MenuItem>)}</TextField>
       <TextField select label="Estado" value={v.status} onChange={(e) => set({ status: Number(e.target.value) })}>{[1, 2, 3, 4].map((x) => <MenuItem key={x} value={x}>{activityStatus(x)}</MenuItem>)}</TextField>
       <TextField label="Fecha programada" type="datetime-local" value={v.scheduledAt} onChange={(e) => set({ scheduledAt: e.target.value })} InputLabelProps={{ shrink: true }} />
       <TextField label="Recordatorio" type="datetime-local" value={v.reminderAt} onChange={(e) => set({ reminderAt: e.target.value })} InputLabelProps={{ shrink: true }} />
       <TextField select label="Cliente" value={v.customerId} onChange={(e) => set({ customerId: e.target.value })}><MenuItem value="">Sin cliente</MenuItem>{customers.map((x) => <MenuItem key={x.id} value={x.id}>{x.name}</MenuItem>)}</TextField>
       <TextField select label="Negocio" value={v.dealId} onChange={(e) => set({ dealId: e.target.value })}><MenuItem value="">Sin negocio</MenuItem>{deals.map((x) => <MenuItem key={x.id} value={x.id}>{x.title}</MenuItem>)}</TextField>
+      </FieldGrid>
     </>}
   </FormDialog>;
 }
@@ -5607,7 +5615,7 @@ function SectionTitle({ title }: { title: string }) {
   </Stack>;
 }
 
-function FormDialog<T extends Record<string, unknown>>({ title, open, initial, children, onClose, onSave, maxWidth = 'sm' }: { title: string; open: boolean; initial: T; children: (value: T, set: (patch: Partial<T>) => void, controls: { saving: boolean; reset: (value: T) => void }) => ReactNode; onClose: () => void; onSave: (payload: T) => Promise<void>; maxWidth?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' }) {
+function FormDialog<T extends Record<string, unknown>>({ title, open, initial, children, onClose, onSave, maxWidth = 'md' }: { title: string; open: boolean; initial: T; children: (value: T, set: (patch: Partial<T>) => void, controls: { saving: boolean; reset: (value: T) => void }) => ReactNode; onClose: () => void; onSave: (payload: T) => Promise<void>; maxWidth?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' }) {
   const muiTheme = useTheme();
   const fullScreen = useMediaQuery(muiTheme.breakpoints.down('sm'));
   const [value, setValue] = useState(initial);
