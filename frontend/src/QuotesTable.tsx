@@ -14,7 +14,7 @@ const date = (value: string) => {
 const customerName = (q: Quote) => [q.customerFirstName ? [q.customerFirstName, q.customerMiddleName].filter(Boolean).join(' ') : q.customerFirstNames,
   q.customerLastName ? [q.customerLastName, q.customerSecondLastName].filter(Boolean).join(' ') : q.customerLastNames].filter(Boolean).join(' ');
 const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-const border = '#dce3ec';
+const border = '#d9e2ec';
 
 function CellText({ value }: { value: string }) {
   return <Tooltip title={value}><Box component="span" sx={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value || '-'}</Box></Tooltip>;
@@ -52,10 +52,10 @@ export function QuotesTable({ rows, onPreview, onAnalyze }: {
     <TableContainer sx={{ overflowX: 'auto', maxHeight: '65vh' }} tabIndex={0} aria-label="Tabla de cotizaciones; desplace horizontalmente para ver todas las columnas">
       <Table size="small" stickyHeader aria-label="Cotizaciones" sx={{ tableLayout: 'fixed', minWidth: 1722,
         '& th, & td': { borderRight: `1px solid ${border}`, borderBottom: `1px solid ${border}`, px: 1, py: .8, fontSize: 12, lineHeight: 1.4, verticalAlign: 'middle' },
-        '& th': { bgcolor: '#edf3ff', color: '#31578d', fontWeight: 700, whiteSpace: 'nowrap' },
-        '& .quote-row:nth-of-type(4n + 1)': { bgcolor: '#f7f8fa' },
-        '& .quote-row:hover': { bgcolor: '#eef5fc' },
-        '& .MuiIconButton-root': { border: `1px solid ${border}`, borderRadius: .5, p: .35, bgcolor: '#fff', color: '#31578d' },
+        '& th': { bgcolor: '#eef6f8', color: 'primary.main', fontWeight: 700, whiteSpace: 'nowrap' },
+        '& .quote-row:nth-of-type(4n + 1)': { bgcolor: '#fbfdff' },
+        '& .quote-row:hover': { bgcolor: '#eef9fb' },
+        '& .MuiIconButton-root': { border: `1px solid ${border}`, borderRadius: .5, p: .35, bgcolor: '#fff', color: 'primary.main' },
         '& .MuiSvgIcon-root': { fontSize: 17 },
       }}>
         <TableHead><TableRow>{headers.map(([label, width]) => <TableCell key={label} sx={{ width, textAlign: label === 'Valor contado / financiado' ? 'right' : 'left' }}>{label}</TableCell>)}</TableRow></TableHead>
@@ -68,14 +68,14 @@ export function QuotesTable({ rows, onPreview, onAnalyze }: {
               ? q.items.flatMap(i => i.financingOptions?.map(o => o.termMonths) ?? [i.termMonths])
               : options.length ? options.map(o => o.termMonths) : [q.termMonths]).filter(t => t > 0))).sort((a, b) => a - b);
             return <Fragment key={q.id}>
-              <TableRow className="quote-row" sx={{ bgcolor: open ? '#eaf2fc !important' : undefined }}>
+              <TableRow className="quote-row" sx={{ bgcolor: open ? '#eef9fb !important' : undefined }}>
                 <TableCell><Stack direction="row" spacing={.5}>
                   <Tooltip title={open ? 'Ocultar detalle' : 'Ver detalle'}><IconButton size="small" aria-label={`${open ? 'Ocultar' : 'Ver'} detalle ${q.number}`} aria-expanded={open} aria-controls={`quote-detail-${q.id}`} onClick={() => setExpanded(open ? undefined : q.id)}><ChevronRight sx={{ transform: open ? 'rotate(90deg)' : undefined }} /></IconButton></Tooltip>
                   <Tooltip title="Ver / descargar PDF"><IconButton size="small" aria-label={`Ver PDF ${q.number}`} onClick={() => onPreview(q)}><Visibility /></IconButton></Tooltip>
                   <Tooltip title="Análisis del cliente"><IconButton size="small" aria-label={`Analizar cliente de ${q.number}`} onClick={() => onAnalyze(q)}><AutoAwesome /></IconButton></Tooltip>
                 </Stack></TableCell>
                 <TableCell><Chip size="small" label={cash ? 'Contado' : 'Crédito'} sx={{ height: 22, borderRadius: .5, fontSize: 11, fontWeight: 700,
-                  bgcolor: cash ? '#e6f3ee' : '#e8f2fd', color: cash ? '#176b51' : '#245b95', borderLeft: `4px solid ${cash ? '#239573' : '#389bd4'}` }} /></TableCell>
+                  bgcolor: cash ? '#e6f3ee' : '#eef6f8', color: cash ? '#0f766e' : 'primary.main', borderLeft: '4px solid', borderLeftColor: cash ? '#0f766e' : 'primary.main' }} /></TableCell>
                 <TableCell><CellText value={q.number} /></TableCell>
                 <TableCell sx={{ whiteSpace: 'nowrap' }}>{date(q.quoteDate)}</TableCell>
                 <TableCell><CellText value={q.identificationNumber || '-'} /></TableCell>
@@ -88,7 +88,7 @@ export function QuotesTable({ rows, onPreview, onAnalyze }: {
               </TableRow>
               <TableRow><TableCell colSpan={headers.length} sx={{ p: '0 !important', borderBottom: open ? undefined : '0 !important' }}>
                 <Collapse in={open} timeout="auto" unmountOnExit>
-                  <Box id={`quote-detail-${q.id}`} sx={{ p: 2, bgcolor: '#f3f7fc' }}>
+                  <Box id={`quote-detail-${q.id}`} sx={{ p: 2, bgcolor: '#f4f7fb' }}>
                     <Typography fontWeight={700} fontSize={13}>{q.number} · {customerName(q)}</Typography>
                     <Typography variant="body2" sx={{ mt: .5, mb: 1 }}>{q.salesPointName || 'Sin sede'} · {cash ? 'Contado' : `Tasa: ${q.salesPointRateName || 'Tasa general'}`}</Typography>
                     <Stack direction="row" flexWrap="wrap" gap={1.5}>
