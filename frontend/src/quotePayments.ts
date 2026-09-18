@@ -3,6 +3,12 @@ export function quoteTermLimit(category?: string) {
   return (category ?? '').toLowerCase().includes('electrodom') ? 24 : 40;
 }
 
+export function updateQuoteTerms(values: number[], term: number, maximum: number, toggle = true) {
+  if (toggle && values.includes(term)) return values.filter(value => value !== term);
+  if (!Number.isInteger(term) || term < 1 || term > maximum) return values;
+  return Array.from(new Set([...values, term])).sort((a, b) => a - b);
+}
+
 export function quoteCustomerName(value?: string) { return (value ?? '').toLocaleUpperCase('es-CO'); }
 
 export function currencyInputValue(value?: number) {

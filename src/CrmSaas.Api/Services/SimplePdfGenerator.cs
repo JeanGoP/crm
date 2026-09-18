@@ -9,7 +9,7 @@ namespace CrmSaas.Api.Services;
 
 public sealed record QuotePdfImage(byte[] Data, string ContentType, string FileName);
 
-public static class SimplePdfGenerator
+public static partial class SimplePdfGenerator
 {
     private static readonly CultureInfo ColombianCulture = CultureInfo.GetCultureInfo("es-CO");
 
@@ -371,13 +371,19 @@ public static class SimplePdfGenerator
         AddImageObject(objects, xObjects, "BrandLogo", brandLogoImage);
         AddImageObject(objects, xObjects, "Product", pdfImage);
 
-        var pageNumber = objects.Count + 1;
-        var contentNumber = pageNumber + 1;
         var xObjectResources = xObjects.Count > 0 ? $" /XObject << {string.Join(" ", xObjects)} >>" : string.Empty;
         var resources = $"<< /Font << /F1 3 0 R /F2 4 0 R >>{xObjectResources} >>";
-        objects.Add(new($"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources {resources} /Contents {contentNumber} 0 R >>"));
-        objects.Add(new($"<< /Length {Encoding.ASCII.GetByteCount(content)} >>", Encoding.ASCII.GetBytes(content)));
-        objects[1] = new($"<< /Type /Pages /Kids [{pageNumber} 0 R] /Count 1 >>");
+        var pages = new List<string> { content };
+        pages.AddRange(FinancingPages(quote));
+        var pageRefs = new List<string>();
+        foreach (var pageContent in pages)
+        {
+            var pageNumber = objects.Count + 1;
+            pageRefs.Add($"{pageNumber} 0 R");
+            objects.Add(new($"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources {resources} /Contents {pageNumber + 1} 0 R >>"));
+            objects.Add(new($"<< /Length {Encoding.ASCII.GetByteCount(pageContent)} >>", Encoding.ASCII.GetBytes(pageContent)));
+        }
+        objects[1] = new($"<< /Type /Pages /Kids [{string.Join(" ", pageRefs)}] /Count {pages.Count} >>");
 
         return BuildPdf(objects, $"{quote.Number}.pdf");
     }
@@ -535,8 +541,8 @@ public static class SimplePdfGenerator
             quote.InitialPaymentPaidToday > 0 ? Money(quote.InitialPaymentPaidToday) : "-",
             Money(Math.Max(quote.DownPayment - quote.InitialPaymentPaidToday, 0)),
             quote.CreditStartDate.HasValue ? Date(quote.CreditStartDate.Value) : "-",
-            quote.TermMonths > 0 ? quote.TermMonths.ToString(CultureInfo.InvariantCulture) : "-",
-            quote.EstimatedMonthlyPayment > 0 ? Money(quote.EstimatedMonthlyPayment) : "-"
+            quote.FinancingOptions is { Count: > 1 } ? "Ver alternativas anexas" : quote.TermMonths > 0 ? quote.TermMonths.ToString(CultureInfo.InvariantCulture) : "-",
+            quote.FinancingOptions is { Count: > 1 } ? "Ver alternativas anexas" : quote.EstimatedMonthlyPayment > 0 ? Money(quote.EstimatedMonthlyPayment) : "-"
         };
 
         var y = boxY + boxH - 70;
@@ -636,7 +642,7 @@ public static class SimplePdfGenerator
         KeyValue(commands, 310, 269, "Cuota extra", Money(Math.Max(quote.DownPayment - quote.InitialPaymentPaidToday, 0)), 112, 22);
         KeyValue(commands, 60, 250, "Inicial completa", Money(quote.DownPayment), 120, 22);
         KeyValue(commands, 310, 250, "Financiado", Money(quote.FinancedAmount), 112, 22);
-        KeyValue(commands, 60, 231, "Cuotas", $"{quote.TermMonths} x {Money(quote.EstimatedMonthlyPayment)}", 120, 22);
+        KeyValue(commands, 60, 231, "Cuotas", quote.FinancingOptions is { Count: > 1 } ? "Ver alternativas anexas" : $"{quote.TermMonths} x {Money(quote.EstimatedMonthlyPayment)}", 120, 24);
         KeyValue(commands, 310, 231, "Inicio credito", Date(quote.CreditStartDate), 112, 22);
         commands.AppendLine($"0.36 0.42 0.48 rg BT /F1 8 Tf 60 212 Td ({Escape("Tasa: " + Value(quote.SalesPointRateName) + " - Plan unico de cuota extra: " + quote.InitialPaymentSchedule.Count + " pagos")}) Tj ET");
     }

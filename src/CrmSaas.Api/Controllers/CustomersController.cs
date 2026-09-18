@@ -217,7 +217,8 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
             x.FechaCotizacion,
             x.ValidaHasta,
             x.Observaciones,
-            QuoteItems(x).ToList(), x.EsPaquete);
+            QuoteItems(x).ToList(), x.EsPaquete,
+            QuoteFinancingOptions.Read(x.AlternativasPlazoJson, x.TipoCredito, termMonths, x.CuotaMensualEstimada, totalPayment));
     }
 
     private static IEnumerable<QuoteItemDto> QuoteItems(Cotizacion quote)
@@ -291,7 +292,8 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
             item.PresentacionInventario,
             item.NumeroSerieInventario,
             item.NumeroMotorInventario,
-            item.NumeroChasisInventario);
+            item.NumeroChasisInventario,
+            QuoteFinancingOptions.Read(item.AlternativasPlazoJson, item.TipoCredito, item.PlazoMeses <= 0 ? 24 : item.PlazoMeses, item.CuotaMensualEstimada, totalPayment));
     }
 
     private static CreditApplicationDto ToCreditApplicationDto(SolicitudCredito x)

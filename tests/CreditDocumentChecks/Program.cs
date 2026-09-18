@@ -207,6 +207,45 @@ Check((string)normalizeName.Invoke(null, ["  María José Muñoz  "])! == "MARÍ
 Check(normalizeName.Invoke(null, [" "]) is null, "Nombre opcional vacio permanece vacio.");
 Console.WriteLine("OK: limites backend 1-40/1-24, plazo exacto con tasas antiguas y nombres en mayusculas.");
 
+var resolveTerms = typeof(QuotesController).GetMethod("ResolveTerms", BindingFlags.NonPublic | BindingFlags.Static)!;
+var selectedTerms = (int[])resolveTerms.Invoke(null, [new[] { 24, 12, 18, 12 }, 24, "Electrodomesticos"])!;
+Check(selectedTerms.SequenceEqual(new[] { 12, 18, 24 }), "Alternativas ordenadas sin duplicados.");
+Check(((int[])resolveTerms.Invoke(null, [null, 18, "Motos"])!).Single() == 18, "Contrato anterior conserva un plazo.");
+foreach (var invalidTerms in new[] { Array.Empty<int>(), new[] { 12, 25 }, new[] { 0, 12 }, new[] { 41 } })
+{
+    try { resolveTerms.Invoke(null, [invalidTerms, 24, "Electrodomesticos"]); throw new Exception("Debe validar cada alternativa."); }
+    catch (TargetInvocationException e) when (e.InnerException is ValidationException) { }
+}
+var calculateOptions = typeof(QuotesController).GetMethod("CalculateOptions", BindingFlags.NonPublic | BindingFlags.Static)!;
+var financingOptions = (IReadOnlyCollection<QuoteFinancingOptionDto>)calculateOptions.Invoke(null, [selectedTerms, 1500000m, 300000m, 0m, 0m, 0m, null, null, null])!;
+Check(financingOptions.Select(x => x.MonthlyPayment).SequenceEqual(new[] { 100000m, 66667m, 50000m }), "Cada plazo calcula su propia cuota sobre el mismo saldo.");
+var savedOptions = System.Text.Json.JsonSerializer.Serialize(financingOptions);
+Check(QuoteFinancingOptions.Read(savedOptions, "Manual", 12, 100000, 1500000).SequenceEqual(financingOptions), "Recupera valores guardados sin recalcular tasas actuales.");
+Check(QuoteFinancingOptions.Read(savedOptions, "Contado", 12, 100000, 1500000).Count == 0, "Contado no muestra alternativas ocultas.");
+cashQuote.TipoCredito = "Manual";
+cashQuote.AlternativasPlazoJson = savedOptions;
+cashQuote.Items.Single().TipoCredito = "Manual";
+cashQuote.Items.Single().AlternativasPlazoJson = savedOptions;
+var readOptions = (QuoteDto)typeof(QuotesController).GetMethod("ToDto", BindingFlags.NonPublic | BindingFlags.Static)!.Invoke(null, [cashQuote])!;
+Check(readOptions.FinancingOptions!.Count == 3 && readOptions.Items.Single().FinancingOptions!.Count == 3, "DTO devuelve todas las alternativas del registro y articulo.");
+var readCustomerOptions = (QuoteDto)typeof(CustomersController).GetMethod("ToQuoteDto", BindingFlags.NonPublic | BindingFlags.Static)!.Invoke(null, [cashQuote])!;
+Check(readCustomerOptions.FinancingOptions!.Count == 3 && readCustomerOptions.Items.Single().FinancingOptions!.Count == 3, "Vista de cliente conserva alternativas.");
+var optionsQuote = bundleDto with { Number = "COT-PRUEBA-PLAZOS", FinancingOptions = financingOptions, DownPayment = 300000, FinancedAmount = 1200000,
+    InitialPaymentPaidToday = 300000, ProductPrice = 1500000, DiscountedProductPrice = 1500000, SalesPointRateName = "Tasa de prueba" };
+var financingPagesMethod = typeof(SimplePdfGenerator).GetMethod("FinancingPages", BindingFlags.NonPublic | BindingFlags.Static)!;
+var optionPages = ((IEnumerable<string>)financingPagesMethod.Invoke(null, [optionsQuote])!).ToList();
+Check(optionPages.Count == 1 && selectedTerms.All(term => optionPages[0].Contains(term + " cuotas")), "PDF incluye 12, 18 y 24 con sus valores.");
+var manyOptions = Enumerable.Range(1, 40).Select(term => new QuoteFinancingOptionDto(term, 1200000m / term, 1500000)).ToArray();
+Check(((IEnumerable<string>)financingPagesMethod.Invoke(null, [optionsQuote with { FinancingOptions = manyOptions }])!).Count() == 2, "PDF pagina sin truncar hasta 40 alternativas.");
+var comparative = optionsQuote with { IsBundle = false, Items = optionsQuote.Items.Take(2).Select(x => x with { FinancingOptions = financingOptions }).ToArray() };
+Check(((IEnumerable<string>)financingPagesMethod.Invoke(null, [comparative])!).Count() == 2, "Comparativo separa alternativas por articulo.");
+if (args.Length > 0)
+{
+    File.WriteAllBytes(Path.Combine(args[0], "term-options.pdf"), SimplePdfGenerator.Quote(optionsQuote, "Empresa de prueba"));
+    File.WriteAllBytes(Path.Combine(args[0], "term-options-40.pdf"), SimplePdfGenerator.Quote(optionsQuote with { FinancingOptions = manyOptions }, "Empresa de prueba"));
+}
+Console.WriteLine("OK: multiplazos, deduplicacion, limites, persistencia de cuotas y PDF paginado.");
+
 sealed class TestTenant : ITenantContext
 {
     public Guid? EmpresaId { get; private set; } = Guid.NewGuid();

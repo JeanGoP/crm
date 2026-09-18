@@ -37,7 +37,7 @@ import ExpandMore from '@mui/icons-material/ExpandMore';
 import ChevronRight from '@mui/icons-material/ChevronRight';
 import { AxiosError } from 'axios';
 import { api } from './api';
-import { quotePayments, isQuoteBundle, quoteTermLimit, quoteCustomerName, currencyInputValue } from './quotePayments';
+import { quotePayments, isQuoteBundle, quoteTermLimit, quoteCustomerName, currencyInputValue, updateQuoteTerms } from './quotePayments';
 import { useAuthStore } from './store';
 import { Activity, ColombianIdentityLookup, CollectionOrder, CommercialInventory, CommercialInventorySummary, CommercialReports, Company, CreditApplication, CreditCoDebtor, CreditDocument, Customer, Customer360, CustomerAiAnalysis, CustomerTimelineItem, Dashboard, Deal, DealStage, ExternalInventoryItem, ExternalInventoryWarehouse, FinancialSettings, Lead, LoginAccessReport, MotorcycleDelivery, Procedure, Product, ProductCategory, ProductPhoto, Promotion, Quote, QuoteChargeConcept, QuoteSalesPoint, QuoteSimulationResult, SalesPoint, SalesPointRate, User } from './types';
 
@@ -285,7 +285,7 @@ const emptyQuoteChargeConcept = { name: '', code: '', calculationGroup: 'Gasto',
 const emptySalesPointRate = { id: '', name: 'Tasa general', factorMonthlyRate: 4.5, maxTermMonths: 30, active: true };
 const emptySalesPoint = { name: '', code: '', city: '', address: '', phone: '', mainBrand: 'Honda', brandLogoDataUrl: '', factorMonthlyRate: 4.5, maxTermMonths: 30, quoteValidityDays: 7, deliveryMode: 'ConSoat', soatDays: 14, registrationDays: 20, soatProvider: '', registrationAgent: '', commercialTerms: 'Cotizacion sujeta a disponibilidad del producto, validacion comercial y aprobacion final.', externalInventoryWarehouseCodes: '', rates: [emptySalesPointRate], active: true };
 const emptyPromotion = { name: '', code: '', discountType: 'Valor', discountValue: 0, productId: '', brand: '', color: '', salesPointIds: [] as string[], validFrom: today, validUntil: today, active: true };
-const emptyQuoteItem = { productId: '', productPrice: 0, downPayment: 0, extraPayment: 0, initialPaymentSchedule: [] as { dueDate: string; amount: number }[], insurance: 0, administrativeFees: 0, chargeValues: {} as Record<string, number>, termMonths: 24, monthlyInterestRate: 2.2, inventoryWarehouseCode: '', inventoryWarehouseName: '', inventoryPresentation: '', inventorySerialNumber: '', inventoryEngineNumber: '', inventoryChassisNumber: '' };
+const emptyQuoteItem = { terms: [24] as number[], productId: '', productPrice: 0, downPayment: 0, extraPayment: 0, initialPaymentSchedule: [] as { dueDate: string; amount: number }[], insurance: 0, administrativeFees: 0, chargeValues: {} as Record<string, number>, termMonths: 24, monthlyInterestRate: 2.2, inventoryWarehouseCode: '', inventoryWarehouseName: '', inventoryPresentation: '', inventorySerialNumber: '', inventoryEngineNumber: '', inventoryChassisNumber: '' };
 const emptyQuote = { bundlePayment: { ...emptyQuoteItem }, isCash: false, identificationType: 1, identificationNumber: '', customerFirstNames: '', customerLastNames: '', customerFirstName: '', customerMiddleName: '', customerLastName: '', customerSecondLastName: '', phoneCountryCode: '+57', phoneNumber: '', requirementProfileId: '', salesPointId: '', salesPointRateId: '', productId: '', downPayment: 0, insurance: 0, administrativeFees: 0, termMonths: 24, monthlyInterestRate: 2.2, items: [emptyQuoteItem], notes: '' };
 const emptyCoDebtor: CreditCoDebtor = { name: '', identification: '', mobile: '', relationship: '', monthlyIncome: 0, reference1Name: '', reference1Mobile: '', reference1Relationship: '', reference2Name: '', reference2Mobile: '', reference2Relationship: '', active: true };
 const emptyCreditApplication = {
@@ -1478,7 +1478,7 @@ function QuotesPage() {
     const globalPayment = payload.bundlePayment;
     if (bundle && !payload.isCash) {
       const maximum = Math.min(...payload.items.map(item => quoteTermLimit(products.find(p => p.id === item.productId)?.category)));
-      if (!Number.isInteger(globalPayment.termMonths) || globalPayment.termMonths < 1 || globalPayment.termMonths > maximum)
+      if (!globalPayment.terms.length || globalPayment.terms.some(term => !Number.isInteger(term) || term < 1 || term > maximum))
         throw new Error(`Seleccione un plazo entre 1 y ${maximum} cuotas para el paquete.`);
       if (globalPayment.downPayment < 0 || globalPayment.extraPayment < 0) throw new Error('La inicial y la extra no pueden ser negativas.');
       if (Math.abs(globalPayment.initialPaymentSchedule.reduce((sum, p) => sum + Number(p.amount), 0) - globalPayment.extraPayment) > .01)
@@ -1487,10 +1487,10 @@ function QuotesPage() {
     const quoteItems = (payload.items?.length ? payload.items : [{ ...emptyQuoteItem, productId: payload.productId, productPrice: 0, downPayment: payload.downPayment, extraPayment: 0, insurance: payload.insurance, administrativeFees: payload.administrativeFees, termMonths: payload.termMonths, monthlyInterestRate: payload.monthlyInterestRate }])
       .filter((item) => item.productId)
       .map((sourceItem) => {
-        const item = bundle ? { ...sourceItem, downPayment: 0, extraPayment: 0, initialPaymentSchedule: [], termMonths: globalPayment.termMonths, monthlyInterestRate: globalPayment.monthlyInterestRate } : sourceItem;
+        const item = bundle ? { ...sourceItem, downPayment: 0, extraPayment: 0, initialPaymentSchedule: [], terms: globalPayment.terms, termMonths: globalPayment.terms[0], monthlyInterestRate: globalPayment.monthlyInterestRate } : sourceItem;
         const product = products.find((candidate) => candidate.id === item.productId);
         const chargeTotals = quoteChargeTotals(item, activeChargeConcepts, product);
-        if (!payload.isCash && (!Number.isInteger(item.termMonths) || item.termMonths < 1 || item.termMonths > quoteTermLimit(product?.category)))
+        if (!payload.isCash && (!item.terms.length || item.terms.some(term => !Number.isInteger(term) || term < 1 || term > quoteTermLimit(product?.category))))
           throw new Error(`Seleccione un plazo entre 1 y ${quoteTermLimit(product?.category)} cuotas.`);
         if (!payload.isCash && (item.downPayment < 0 || item.extraPayment < 0)) throw new Error('La cuota inicial y la cuota extra no pueden ser negativas.');
         const scheduled = item.initialPaymentSchedule.reduce((sum, payment) => sum + Number(payment.amount), 0);
@@ -1505,7 +1505,8 @@ function QuotesPage() {
             .map((payment) => ({ dueDate: payment.dueDate, amount: Number(payment.amount) })),
           insurance: payload.isCash ? 0 : chargeTotals.insurance,
           administrativeFees: payload.isCash ? 0 : chargeTotals.administrativeFees,
-          termMonths: payload.isCash ? 0 : Number(item.termMonths),
+          terms: payload.isCash ? null : item.terms,
+          termMonths: payload.isCash ? 0 : item.terms[0],
           monthlyInterestRate: payload.isCash ? 0 : Number(item.monthlyInterestRate),
           inventoryWarehouseCode: item.inventoryWarehouseCode || null,
           inventoryWarehouseName: item.inventoryWarehouseName || null,
@@ -1523,7 +1524,8 @@ function QuotesPage() {
         downPayment: quotePayments(globalPayment.downPayment, globalPayment.extraPayment).downPayment,
         initialPaymentPaidToday: globalPayment.downPayment,
         initialPaymentSchedule: globalPayment.initialPaymentSchedule,
-        termMonths: globalPayment.termMonths,
+        terms: globalPayment.terms,
+        termMonths: globalPayment.terms[0],
         monthlyInterestRate: globalPayment.monthlyInterestRate
       } : null,
       customerFirstName: quoteCustomerName(payload.customerFirstName).trim(),
@@ -1581,7 +1583,9 @@ function QuotesPage() {
         r.promotionDiscount > 0 ? <Row primary={r.promotionName ?? 'Promocion'} secondary={`-${money(r.promotionDiscount)}`} /> : '-',
         r.isBundle ? `Paquete: ${r.items.length} articulo(s)` : (r.items?.length ?? 0) > 1 ? `${r.items.length} productos` : r.productName,
         r.creditType === 'Contado' ? `Contado: ${money(r.estimatedTotalPayment)}` : money(r.financedAmount),
-        r.estimatedMonthlyPayment > 0 ? `${money(r.estimatedMonthlyPayment)} x ${r.termMonths}` : r.creditType === 'Contado' ? 'No aplica' : 'Sin simulacion',
+        r.creditType === 'Contado' ? 'No aplica' : (r.financingOptions?.length ?? 0) > 1
+          ? <Stack spacing={.5}>{r.financingOptions!.map(option => <Typography key={option.termMonths} variant="body2">{option.termMonths} cuotas de {money(option.monthlyPayment)}</Typography>)}</Stack>
+          : r.estimatedMonthlyPayment > 0 ? `${money(r.estimatedMonthlyPayment)} x ${r.termMonths}` : 'Sin simulacion',
         new Date(r.validUntil).toLocaleDateString(),
         <Actions onAi={() => analyzeCustomer(r.customerId, customers.find((x) => x.id === r.customerId)?.phone)} onDownload={() => setPreviewQuote(r)} />
       ])}
@@ -4804,7 +4808,7 @@ function QuoteDialog({ form, products, productCategories, quoteChargeConcepts, s
                   {!v.isCash && !isBundleQuote && <CurrencyField label="Cuota inicial" value={item.downPayment} onChange={(downPayment) => updateItem(index, { downPayment })} />}
                   {!v.isCash && !isBundleQuote && <CurrencyField label="Cuota extra" value={item.extraPayment} onChange={(extraPayment) => updateItem(index, { extraPayment })} />}
                   <CurrencyField label="Precio" value={item.productPrice} onChange={(productPrice) => updateItem(index, { productPrice })} />
-                  {!v.isCash && !isBundleQuote && <QuoteTermField label="Cuotas" value={item.termMonths} maximum={quoteTermLimit(selectedProduct?.category)} onChange={termMonths => updateItem(index, { termMonths })} />}
+                  {!v.isCash && !isBundleQuote && <QuoteTermField label="Plazos a cotizar" values={item.terms} maximum={quoteTermLimit(selectedProduct?.category)} onChange={terms => updateItem(index, { terms, termMonths: terms[0] || 0 })} />}
                   {!v.isCash && activeChargeConcepts.map((concept) => <CurrencyField
                     key={concept.id}
                     sx={{ minWidth: 0 }}
@@ -4835,7 +4839,7 @@ function QuoteDialog({ form, products, productCategories, quoteChargeConcepts, s
                 <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' }, gap: 1.5 }}>
                   <CurrencyField label="Cuota inicial del paquete" value={v.bundlePayment.downPayment} onChange={downPayment => set({ bundlePayment: { ...v.bundlePayment, downPayment } })} />
                   <CurrencyField label="Cuota extra del paquete" value={v.bundlePayment.extraPayment} onChange={extraPayment => set({ bundlePayment: { ...v.bundlePayment, extraPayment } })} />
-                  <QuoteTermField label="Cuotas del paquete" value={v.bundlePayment.termMonths} maximum={Math.min(...quoteItems.map(item => quoteTermLimit(products.find(p => p.id === item.productId)?.category)))} onChange={termMonths => set({ bundlePayment: { ...v.bundlePayment, termMonths } })} />
+                  <QuoteTermField label="Plazos del paquete" values={v.bundlePayment.terms} maximum={Math.min(...quoteItems.map(item => quoteTermLimit(products.find(p => p.id === item.productId)?.category)))} onChange={terms => set({ bundlePayment: { ...v.bundlePayment, terms, termMonths: terms[0] || 0 } })} />
                 </Box>
                 <InitialPaymentPlanEditor item={v.bundlePayment} onChange={patch => set({ bundlePayment: { ...v.bundlePayment, ...patch } })} />
               </>}
@@ -4860,6 +4864,7 @@ function QuoteSimulationPreview({ value, selectedProduct, salesPointId, salesPoi
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const productPrice = Math.max(Number(value.productPrice) || 0, 0);
+  const termsRequest = JSON.stringify(value.terms);
   const bundleRequest = JSON.stringify(bundleItems?.map(item => ({ productId: item.productId, productPrice: item.productPrice, insurance: item.insurance, administrativeFees: item.administrativeFees })));
 
   useEffect(() => {
@@ -4876,6 +4881,7 @@ function QuoteSimulationPreview({ value, selectedProduct, salesPointId, salesPoi
       setError('');
       api.post<QuoteSimulationResult>('/api/quotes/simulate', {
         isCash,
+        terms: isCash ? null : JSON.parse(termsRequest),
         items: bundleRequest ? JSON.parse(bundleRequest) : null,
         productId: selectedProduct.id,
         productPrice,
@@ -4893,7 +4899,7 @@ function QuoteSimulationPreview({ value, selectedProduct, salesPointId, salesPoi
     }, 250);
 
     return () => { cancelled = true; window.clearTimeout(timer); };
-  }, [bundleRequest, isCash, selectedProduct?.id, productPrice, completeDownPayment, value.insurance, value.administrativeFees, value.termMonths, value.monthlyInterestRate, salesPointId, salesPointRateId]);
+  }, [termsRequest, bundleRequest, isCash, selectedProduct?.id, productPrice, completeDownPayment, value.insurance, value.administrativeFees, value.termMonths, value.monthlyInterestRate, salesPointId, salesPointRateId]);
 
   const insurance = isCash ? 0 : Math.max(Number(value.insurance) || 0, 0);
   const administrativeFees = isCash ? 0 : Math.max(Number(value.administrativeFees) || 0, 0);
@@ -4921,7 +4927,7 @@ function QuoteSimulationPreview({ value, selectedProduct, salesPointId, salesPoi
     usedCompanyFinancialSettings: false
   };
 
-  if (bundleItems && !simulation) return <Paper variant="outlined" sx={{ p: 2 }}>{error ? <Alert severity="warning">{error}</Alert> : <><LinearProgress /><Typography>Calculando el paquete...</Typography></>}</Paper>;
+  if (!isCash && !simulation) return <Paper variant="outlined" sx={{ p: 2 }}>{error ? <Alert severity="warning">{error}</Alert> : <><LinearProgress /><Typography>Calculando alternativas...</Typography></>}</Paper>;
   return <Paper variant="outlined" sx={{ p: compact ? 1.25 : 2, bgcolor: compact ? '#ffffff' : '#f8fafc', height: '100%' }}>
     <Stack spacing={compact ? 0.75 : 1.5}>
       {loading && <LinearProgress />}
@@ -4931,7 +4937,9 @@ function QuoteSimulationPreview({ value, selectedProduct, salesPointId, salesPoi
         ? <Stack spacing={0.5}>
           {preview.promotionDiscount > 0 && <Typography variant="caption" color="success.main" fontWeight={800}>{preview.promotionName ?? 'Promocion'}: -{money(preview.promotionDiscount)}</Typography>}
           <Box><Typography variant="caption" color="text.secondary">Financiado</Typography><Typography fontWeight={800}>{money(preview.financedAmount)}</Typography></Box>
-          <Box><Typography variant="caption" color="text.secondary">Cuota aprox.</Typography><Typography fontWeight={800}>{money(preview.estimatedMonthlyPayment)}</Typography></Box>
+          {(simulation?.financingOptions ?? []).map(option => <Stack key={option.termMonths} direction="row" justifyContent="space-between" gap={1}>
+            <Typography>{option.termMonths} cuotas</Typography><Typography fontWeight={800}>{money(option.monthlyPayment)} cada una</Typography>
+          </Stack>)}
         </Stack>
         : <FieldGrid columns={3}>
           <Box><Typography variant="caption" color="text.secondary">Valor producto</Typography><Typography fontWeight={700}>{money(preview.discountedProductPrice)}</Typography>{preview.promotionDiscount > 0 && <Typography variant="caption" color="success.main">Descuento {money(preview.promotionDiscount)}</Typography>}</Box>
@@ -6020,12 +6028,34 @@ function toActivityPayload(payload: typeof emptyActivity | Activity) {
   };
 }
 
-function QuoteTermField({ label, value, maximum, onChange }: { label: string; value: number; maximum: number; onChange: (value: number) => void }) {
-  const valid = Number.isInteger(value) && value >= 1 && value <= maximum;
-  return <TextField fullWidth required select label={label} value={valid ? value : ''} onChange={e => onChange(Number(e.target.value))}
-    error={!valid} helperText={`Seleccione de 1 a ${maximum} cuotas.`}>
-    {Array.from({ length: maximum }, (_, index) => index + 1).map(months => <MenuItem key={months} value={months}>{months}</MenuItem>)}
-  </TextField>;
+function QuoteTermField({ label, values, maximum, onChange }: { label: string; values: number[]; maximum: number; onChange: (values: number[]) => void }) {
+  const [custom, setCustom] = useState('');
+  const validCustom = Number.isInteger(Number(custom)) && Number(custom) >= 1 && Number(custom) <= maximum;
+  const change = (term: number) => onChange(updateQuoteTerms(values, term, maximum));
+  const addCustom = () => {
+    if (!validCustom) return;
+    onChange(updateQuoteTerms(values, Number(custom), maximum, false));
+    setCustom('');
+  };
+  return <Box sx={{ gridColumn: '1 / -1', minWidth: 0 }}>
+    <Typography fontWeight={800}>{label}</Typography>
+    <Typography variant="caption" color="text.secondary">Marca uno o varios. Hasta {maximum} cuotas.</Typography>
+    <Stack direction="row" gap={1} flexWrap="wrap" sx={{ mt: 1 }}>
+      {[6, 12, 18, 24, 36, 40].filter(term => term <= maximum).map(term => <Button key={term} type="button" size="small"
+        aria-pressed={values.includes(term)} variant={values.includes(term) ? 'contained' : 'outlined'} onClick={() => change(term)}>{term} cuotas</Button>)}
+    </Stack>
+    <Stack direction="row" gap={1} sx={{ mt: 1 }} alignItems="center">
+      <TextField size="small" type="number" label="Otro plazo" value={custom} onChange={e => setCustom(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCustom(); } }}
+        inputProps={{ min: 1, max: maximum, step: 1 }} sx={{ width: 130 }} />
+      <Button type="button" onClick={addCustom} disabled={!validCustom}>Agregar plazo</Button>
+    </Stack>
+    <Stack direction="row" gap={.75} flexWrap="wrap" sx={{ mt: 1 }}>
+      {values.map(term => <Chip key={term} label={`${term} cuotas`} color={term > maximum || term < 1 ? 'error' : 'primary'} variant="outlined"
+        onDelete={() => change(term)} />)}
+    </Stack>
+    {(!values.length || values.some(term => term > maximum || term < 1)) && <Typography color="error" variant="caption">Selecciona al menos un plazo válido entre 1 y {maximum}.</Typography>}
+  </Box>;
 }
 
 function CurrencyField({ label, value, onChange, size = 'small', fullWidth = true, sx, required = false, helperText }: { label: string; value?: number; onChange: (value: number) => void; size?: 'small' | 'medium'; fullWidth?: boolean; sx?: SxProps<Theme>; required?: boolean; helperText?: string }) {

@@ -240,6 +240,7 @@ public sealed class TasaPuntoVenta : AuditableTenantEntity
 
 public sealed class Cotizacion : AuditableTenantEntity
 {
+    public string? AlternativasPlazoJson { get; set; }
     public bool EsPaquete { get; set; }
     public Guid? NegocioId { get; set; }
     public Negocio? Negocio { get; set; }
@@ -343,6 +344,7 @@ public sealed class PromocionPuntoVenta : AuditableTenantEntity
 
 public sealed class CotizacionItem : AuditableTenantEntity
 {
+    public string? AlternativasPlazoJson { get; set; }
     public Guid CotizacionId { get; set; }
     public Cotizacion? Cotizacion { get; set; }
     public Guid ProductoId { get; set; }

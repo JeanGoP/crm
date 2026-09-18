@@ -240,10 +240,13 @@ public sealed record QuoteSimulationDto(
     Guid? SalesPointId,
     Guid? SalesPointRateId,
     bool IsCash = false,
-    IReadOnlyCollection<QuoteSimulationItemDto>? Items = null);
+    IReadOnlyCollection<QuoteSimulationItemDto>? Items = null,
+    IReadOnlyCollection<int>? Terms = null);
 public sealed record QuoteSimulationItemDto(Guid ProductId, decimal ProductPrice, decimal Insurance, decimal AdministrativeFees);
 public sealed record QuoteBundlePaymentDto(decimal DownPayment, decimal InitialPaymentPaidToday,
-    IReadOnlyCollection<QuoteInitialPaymentDto>? InitialPaymentSchedule, int TermMonths, decimal MonthlyInterestRate);
+    IReadOnlyCollection<QuoteInitialPaymentDto>? InitialPaymentSchedule, int TermMonths, decimal MonthlyInterestRate,
+    IReadOnlyCollection<int>? Terms = null);
+public sealed record QuoteFinancingOptionDto(int TermMonths, decimal MonthlyPayment, decimal TotalPayment);
 public sealed record QuoteSimulationResultDto(
     decimal DownPayment,
     decimal Insurance,
@@ -260,7 +263,8 @@ public sealed record QuoteSimulationResultDto(
     decimal EstimatedMonthlyPayment,
     decimal EstimatedTotalPayment,
     string CreditType,
-    bool UsedCompanyFinancialSettings);
+    bool UsedCompanyFinancialSettings,
+    IReadOnlyCollection<QuoteFinancingOptionDto>? FinancingOptions = null);
 
 public sealed record QuoteInitialPaymentDto(
     DateTime DueDate,
@@ -295,7 +299,8 @@ public sealed record QuoteItemDto(
     string? InventoryPresentation = null,
     string? InventorySerialNumber = null,
     string? InventoryEngineNumber = null,
-    string? InventoryChassisNumber = null);
+    string? InventoryChassisNumber = null,
+    IReadOnlyCollection<QuoteFinancingOptionDto>? FinancingOptions = null);
 
 public sealed record CreateQuoteItemDto(
     Guid ProductId,
@@ -312,7 +317,8 @@ public sealed record CreateQuoteItemDto(
     string? InventoryPresentation = null,
     string? InventorySerialNumber = null,
     string? InventoryEngineNumber = null,
-    string? InventoryChassisNumber = null);
+    string? InventoryChassisNumber = null,
+    IReadOnlyCollection<int>? Terms = null);
 
 public sealed record QuoteDto(
     Guid Id,
@@ -361,7 +367,8 @@ public sealed record QuoteDto(
     DateTime ValidUntil,
     string? Notes,
     IReadOnlyCollection<QuoteItemDto> Items,
-    bool IsBundle = false);
+    bool IsBundle = false,
+    IReadOnlyCollection<QuoteFinancingOptionDto>? FinancingOptions = null);
 public sealed record CreateQuoteDto(
     TipoIdentificacionColombia IdentificationType,
     string? IdentificationNumber,

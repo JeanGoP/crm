@@ -306,6 +306,7 @@ export interface Promotion {
 }
 
 export interface QuoteSimulationResult {
+  financingOptions?: QuoteFinancingOption[];
   downPayment: number;
   insurance: number;
   administrativeFees: number;
@@ -324,12 +325,15 @@ export interface QuoteSimulationResult {
   usedCompanyFinancialSettings: boolean;
 }
 
+export interface QuoteFinancingOption { termMonths: number; monthlyPayment: number; totalPayment: number; }
+
 export interface QuoteInitialPayment {
   dueDate: string;
   amount: number;
 }
 
 export interface QuoteItem {
+  financingOptions?: QuoteFinancingOption[];
   id: string;
   productId: string;
   productName: string;
@@ -362,6 +366,7 @@ export interface QuoteItem {
 }
 
 export interface Quote {
+  financingOptions?: QuoteFinancingOption[];
   isBundle?: boolean;
   id: string;
   number: string;

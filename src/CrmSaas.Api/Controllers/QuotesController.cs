@@ -109,7 +109,12 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
         var globalSource = requestedItems[0];
         if (quoteAsBundle && !dto.IsCash && dto.BundlePayment is { } payment)
             globalSource = globalSource with { DownPayment = payment.DownPayment, InitialPaymentPaidToday = payment.InitialPaymentPaidToday,
-                InitialPaymentSchedule = payment.InitialPaymentSchedule, TermMonths = payment.TermMonths, MonthlyInterestRate = payment.MonthlyInterestRate };
+                InitialPaymentSchedule = payment.InitialPaymentSchedule, TermMonths = payment.TermMonths, MonthlyInterestRate = payment.MonthlyInterestRate, Terms = payment.Terms };
+        if (!dto.IsCash && quoteAsBundle)
+        {
+            var terms = ResolveTerms(globalSource.Terms, globalSource.TermMonths, quoteCategory!);
+            globalSource = globalSource with { Terms = terms, TermMonths = terms[0] };
+        }
         if (quoteAsBundle && !dto.IsCash && (globalSource.DownPayment < 0 || globalSource.InitialPaymentPaidToday < 0 || globalSource.TermMonths <= 0 || globalSource.MonthlyInterestRate < 0))
             throw new ValidationException("Revise la inicial, cuota extra y plazo del paquete.");
         if (quoteAsBundle) requestedItems = requestedItems.Select(item => NormalizeBundleItem(item, globalSource)).ToList();
@@ -118,6 +123,8 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
 
         var calculatedItems = requestedItems.Select((item, index) =>
         {
+            var selectedTerms = dto.IsCash ? [] : ResolveTerms(item.Terms, item.TermMonths, products[item.ProductId].Categoria);
+            if (!dto.IsCash) item = item with { TermMonths = selectedTerms[0], Terms = selectedTerms };
             if (item.DownPayment < 0) throw new ValidationException("La cuota inicial no puede ser negativa.");
             if (item.InitialPaymentPaidToday < 0) throw new ValidationException("El pago de inicial de hoy no puede ser negativo.");
             if (item.Insurance < 0) throw new ValidationException("El seguro no puede ser negativo.");
@@ -133,7 +140,8 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             var promotion = ResolvePromotion(product, salesPoint, promotions, productPrice);
             var simulation = dto.IsCash ? CashSimulation(promotion.DiscountedProductPrice) : CalculateSimulation(promotion.DiscountedProductPrice, item.DownPayment, insurance, administrativeFees, item.TermMonths, item.MonthlyInterestRate, financialSettings, salesPoint, salesPointRate);
             var initialPlan = NormalizeInitialPaymentPlan(item, now);
-            return new { Source = item, Product = product, ProductPrice = productPrice, Promotion = promotion, Simulation = simulation, InitialPlan = initialPlan, Order = index + 1 };
+            var options = dto.IsCash || quoteAsBundle ? [] : CalculateOptions(selectedTerms, promotion.DiscountedProductPrice, item.DownPayment, insurance, administrativeFees, item.MonthlyInterestRate, financialSettings, salesPoint, salesPointRate);
+            return new { Source = item, Product = product, ProductPrice = productPrice, Promotion = promotion, Simulation = simulation, InitialPlan = initialPlan, Options = options, Order = index + 1 };
         }).ToList();
         var primary = calculatedItems[0];
         var product = primary.Product;
@@ -156,6 +164,10 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
                 salesPoint,
                 salesPointRate)
             : primary.Simulation;
+        var quoteOptions = dto.IsCash ? [] : quoteAsBundle
+            ? CalculateOptions(globalSource.Terms!, calculatedItems.Sum(x => x.Promotion.DiscountedProductPrice), globalSource.DownPayment,
+                simulation.Insurance, simulation.AdministrativeFees, globalSource.MonthlyInterestRate, financialSettings, salesPoint, salesPointRate)
+            : primary.Options;
         var initialStage = await db.EtapasNegocio
             .Where(x => x.Activa)
             .OrderBy(x => x.Orden)
@@ -253,6 +265,7 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             PrecioProducto = quoteProductPrice,
             CuotaInicial = simulation.DownPayment,
             EsPaquete = quoteAsBundle,
+            AlternativasPlazoJson = quoteOptions.Count == 0 ? null : JsonSerializer.Serialize(quoteOptions),
             CuotaInicialPagadaHoy = quoteInitialPlan.PaidToday,
             PlanCuotaInicialJson = SerializeInitialPaymentPlan(quoteInitialPlan.Schedule),
             FechaInicioCreditoEstimada = dto.IsCash ? null : quoteInitialPlan.CreditStartDate,
@@ -281,6 +294,7 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
                 NombrePromocion = item.Promotion.Promotion?.Nombre,
                 DescuentoPromocion = item.Promotion.DiscountAmount,
                 CuotaInicial = item.Simulation.DownPayment,
+                AlternativasPlazoJson = item.Options.Count == 0 ? null : JsonSerializer.Serialize(item.Options),
                 CuotaInicialPagadaHoy = item.InitialPlan.PaidToday,
                 PlanCuotaInicialJson = SerializeInitialPaymentPlan(item.InitialPlan.Schedule),
                 FechaInicioCreditoEstimada = dto.IsCash ? null : item.InitialPlan.CreditStartDate,
@@ -346,15 +360,16 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
         if (dto.DownPayment < 0) throw new ValidationException("La cuota inicial no puede ser negativa.");
         if (dto.Insurance < 0) throw new ValidationException("El seguro no puede ser negativo.");
         if (dto.AdministrativeFees < 0) throw new ValidationException("Los gastos administrativos no pueden ser negativos.");
-        if (!dto.IsCash && dto.TermMonths <= 0) throw new ValidationException("El plazo debe ser mayor a cero.");
+        if (!dto.IsCash && dto.Terms is null && dto.TermMonths <= 0) throw new ValidationException("El plazo debe ser mayor a cero.");
 
         var sources = dto.Items?.ToList() ?? [new QuoteSimulationItemDto(dto.ProductId, dto.ProductPrice, dto.Insurance, dto.AdministrativeFees)];
         if (sources.Count == 0 || sources.Count > 4) throw new ValidationException("Seleccione entre uno y cuatro articulos.");
         var ids = sources.Select(x => x.ProductId).Distinct().ToArray();
         var products = await db.Productos.Include(x => x.PreciosPorSede).Where(x => ids.Contains(x.Id) && x.Activo).ToDictionaryAsync(x => x.Id, cancellationToken);
         if (products.Count != ids.Length) throw new KeyNotFoundException("Producto no encontrado o inactivo.");
-        if (!dto.IsCash)
-            foreach (var product in products.Values) ValidateQuoteTerm(dto.TermMonths, product.Categoria);
+        var selectedTerms = dto.IsCash ? [] : ResolveTerms(dto.Terms, dto.TermMonths,
+            products.Values.Any(x => IsApplianceCategory(x.Categoria)) ? "Electrodomesticos" : string.Empty);
+        if (!dto.IsCash) dto = dto with { TermMonths = selectedTerms[0] };
         if (dto.Items is not null)
         {
             var categories = products.Values.Select(x => x.Categoria.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
@@ -398,7 +413,8 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             simulation.MonthlyPayment,
             simulation.TotalPayment,
             simulation.CreditType,
-            simulation.UsedCompanyFinancialSettings));
+            simulation.UsedCompanyFinancialSettings,
+            dto.IsCash ? [] : CalculateOptions(selectedTerms, discountedPrice, dto.DownPayment, insurance, administrativeFees, dto.MonthlyInterestRate, financialSettings, salesPoint, salesPointRate)));
     }
 
     [HttpGet("{id:guid}/pdf")]
@@ -548,7 +564,8 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             x.FechaCotizacion,
             x.ValidaHasta,
             x.Observaciones,
-            QuoteItems(x).ToList(), x.EsPaquete);
+            QuoteItems(x).ToList(), x.EsPaquete,
+            QuoteFinancingOptions.Read(x.AlternativasPlazoJson, x.TipoCredito, termMonths, x.CuotaMensualEstimada, totalPayment));
     }
 
     private static IReadOnlyCollection<CreateQuoteItemDto> NormalizeQuoteItems(CreateQuoteDto dto)
@@ -565,11 +582,11 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
 
     private static CreateQuoteItemDto NormalizeCashItem(CreateQuoteItemDto item) =>
         item with { DownPayment = 0, InitialPaymentPaidToday = 0, InitialPaymentSchedule = [],
-            Insurance = 0, AdministrativeFees = 0, TermMonths = 0, MonthlyInterestRate = 0 };
+            Insurance = 0, AdministrativeFees = 0, TermMonths = 0, MonthlyInterestRate = 0, Terms = null };
 
     private static CreateQuoteItemDto NormalizeBundleItem(CreateQuoteItemDto item, CreateQuoteItemDto payment) =>
         item with { DownPayment = 0, InitialPaymentPaidToday = 0, InitialPaymentSchedule = [],
-            TermMonths = payment.TermMonths, MonthlyInterestRate = payment.MonthlyInterestRate };
+            TermMonths = payment.TermMonths, MonthlyInterestRate = payment.MonthlyInterestRate, Terms = payment.Terms };
 
     private static CreditSimulation CashSimulation(decimal price) =>
         new(0, 0, 0, 0, 0, 0, 0, price, "Contado", false);
@@ -705,7 +722,8 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             item.PresentacionInventario,
             item.NumeroSerieInventario,
             item.NumeroMotorInventario,
-            item.NumeroChasisInventario);
+            item.NumeroChasisInventario,
+            QuoteFinancingOptions.Read(item.AlternativasPlazoJson, item.TipoCredito, termMonths, item.CuotaMensualEstimada, totalPayment));
     }
 
     private async Task<ConfiguracionFinancieraEmpresa?> GetFinancialSettingsAsync(CancellationToken cancellationToken) =>
@@ -845,6 +863,22 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
         if (months < 1 || months > maximum)
             throw new ValidationException($"El plazo debe estar entre 1 y {maximum} cuotas para {category}.");
     }
+
+    private static int[] ResolveTerms(IReadOnlyCollection<int>? terms, int legacyTerm, string category)
+    {
+        if (terms is { Count: 0 } || terms?.Count > 40)
+            throw new ValidationException("Seleccione al menos un plazo y no mas de 40 alternativas.");
+        var result = (terms ?? [legacyTerm]).Distinct().Order().ToArray();
+        foreach (var term in result) ValidateQuoteTerm(term, category);
+        return result;
+    }
+
+    private static IReadOnlyCollection<QuoteFinancingOptionDto> CalculateOptions(IEnumerable<int> terms, decimal price, decimal initial,
+        decimal insurance, decimal fees, decimal rate, ConfiguracionFinancieraEmpresa? settings, PuntoVenta? salesPoint, TasaPuntoVenta? salesPointRate) =>
+        terms.Select(term => {
+            var result = CalculateSimulation(price, initial, insurance, fees, term, rate, settings, salesPoint, salesPointRate);
+            return new QuoteFinancingOptionDto(result.TermMonths, result.MonthlyPayment, result.TotalPayment);
+        }).ToArray();
 
     private static decimal PromotionDiscount(decimal productPrice, Promocion promotion)
     {
