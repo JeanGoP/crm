@@ -1479,10 +1479,10 @@ function QuotesPage() {
     if (bundle && !payload.isCash) {
       const maximum = Math.min(...payload.items.map(item => quoteTermLimit(products.find(p => p.id === item.productId)?.category)));
       if (!globalPayment.terms.length || globalPayment.terms.some(term => !Number.isInteger(term) || term < 1 || term > maximum))
-        throw new Error(`Seleccione un plazo entre 1 y ${maximum} cuotas para el paquete.`);
+        throw new Error(`Seleccione un plazo entre 1 y ${maximum} cuotas para esta cotización.`);
       if (globalPayment.downPayment < 0 || globalPayment.extraPayment < 0) throw new Error('La inicial y la extra no pueden ser negativas.');
       if (Math.abs(globalPayment.initialPaymentSchedule.reduce((sum, p) => sum + Number(p.amount), 0) - globalPayment.extraPayment) > .01)
-        throw new Error('El plan del paquete debe sumar exactamente la cuota extra.');
+        throw new Error('El plan de pagos debe sumar exactamente la cuota extra.');
     }
     const quoteItems = (payload.items?.length ? payload.items : [{ ...emptyQuoteItem, productId: payload.productId, productPrice: 0, downPayment: payload.downPayment, extraPayment: 0, insurance: payload.insurance, administrativeFees: payload.administrativeFees, termMonths: payload.termMonths, monthlyInterestRate: payload.monthlyInterestRate }])
       .filter((item) => item.productId)
@@ -1581,7 +1581,7 @@ function QuotesPage() {
           <Typography variant="body2" color="text.secondary" sx={{ mt: .25 }}>{r.creditType === 'Contado' ? 'Contado' : r.salesPointRateName || 'Tasa general'}</Typography>
         </Box>,
         r.promotionDiscount > 0 ? <Row primary={r.promotionName ?? 'Promocion'} secondary={`-${money(r.promotionDiscount)}`} /> : '-',
-        r.isBundle ? `Paquete: ${r.items.length} articulo(s)` : (r.items?.length ?? 0) > 1 ? `${r.items.length} productos` : r.productName,
+        r.isBundle ? `${r.items.length} artículo(s)` : (r.items?.length ?? 0) > 1 ? `${r.items.length} productos` : r.productName,
         r.creditType === 'Contado' ? `Contado: ${money(r.estimatedTotalPayment)}` : money(r.financedAmount),
         r.creditType === 'Contado' ? 'No aplica' : (r.financingOptions?.length ?? 0) > 1
           ? <Stack spacing={.5}>{r.financingOptions!.map(option => <Typography key={option.termMonths} variant="body2">{option.termMonths} cuotas de {money(option.monthlyPayment)}</Typography>)}</Stack>
@@ -3639,7 +3639,7 @@ function SettingsPage() {
         <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', sm: 'center' }} gap={1}>
           <Box>
             <Typography variant="h5" fontWeight={900}>Categorias de productos</Typography>
-            <Typography color="text.secondary" fontSize={14}>Maestro usado al crear productos y al calcular cotizaciones por paquetes.</Typography>
+            <Typography color="text.secondary" fontSize={14}>Categorías usadas al crear productos y definir cómo se cotizan.</Typography>
           </Box>
           {canManage && <Button variant="contained" startIcon={<Add />} onClick={() => setProductCategoryForm({ open: true })}>Nueva categoria</Button>}
         </Stack>
@@ -3649,7 +3649,7 @@ function SettingsPage() {
           empty="No hay categorias registradas"
           rows={productCategories.map((category) => [
             <Typography fontWeight={800}>{category.name}</Typography>,
-            category.quoteAsBundle ? <StatusChip label="Paquete / suma articulos" tone="warning" /> : <StatusChip label="Individual" tone="default" />,
+            category.quoteAsBundle ? <StatusChip label="Financiación conjunta" tone="warning" /> : <StatusChip label="Individual" tone="default" />,
             category.description || '-',
             <StatusChip label={category.active ? 'Activa' : 'Inactiva'} tone={category.active ? 'success' : 'default'} />,
             <Actions onEdit={canManage ? () => setProductCategoryForm({ open: true, item: category }) : undefined} />
@@ -3769,7 +3769,7 @@ function ProductCategoryDialog({ form, onClose, onSave }: DialogProps<ProductCat
       <TextField label="Descripcion" value={v.description} onChange={(e) => set({ description: e.target.value })} multiline minRows={2} />
       <FormControlLabel
         control={<Checkbox checked={v.quoteAsBundle} onChange={(e) => set({ quoteAsBundle: e.target.checked })} />}
-        label="Cotizar como paquete (sumar varios articulos de esta categoria en una sola financiacion)"
+        label="Sumar los artículos de esta categoría en una sola financiación"
       />
       <TextField select label="Estado" value={String(v.active)} onChange={(e) => set({ active: e.target.value === 'true' })}>
         <MenuItem value="true">Activa</MenuItem>
@@ -4276,7 +4276,7 @@ function ProductDialog({ form, categories, salesPoints, onClose, onSave, onChang
         <TextField fullWidth required label="Nombre del producto" value={v.name} onChange={(e) => set({ name: e.target.value })} />
         <TextField fullWidth required select label="Categoria" value={v.category} onChange={(e) => set({ category: e.target.value })}>
           {categories.length
-            ? categories.map((category) => <MenuItem key={category.id} value={category.name}>{category.name}{category.quoteAsBundle ? ' - paquete' : ''}</MenuItem>)
+            ? categories.map((category) => <MenuItem key={category.id} value={category.name}>{category.name}{category.quoteAsBundle ? ' - financiación conjunta' : ''}</MenuItem>)
             : <MenuItem value={v.category || 'Moto'}>{v.category || 'Sin categorias activas'}</MenuItem>}
         </TextField>
       </FieldGrid>
@@ -4734,7 +4734,7 @@ function QuoteDialog({ form, products, productCategories, quoteChargeConcepts, s
           <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', sm: 'center' }} gap={1}>
             <Box>
               <Typography variant="subtitle1" fontWeight={900}>Articulos a cotizar</Typography>
-              <Typography variant="body2" color="text.secondary">Las categorias configuradas como paquete comparten una sola inicial y financiacion. Los demas productos se cotizan como comparativo.</Typography>
+              <Typography variant="body2" color="text.secondary">Agrega los artículos que deseas cotizar y define sus condiciones de pago.</Typography>
             </Box>
             <Button variant="outlined" startIcon={<Add />} disabled={quoteItems.length >= 4 || !products.length} onClick={addItem}>Agregar articulo</Button>
           </Stack>
@@ -4833,13 +4833,13 @@ function QuoteDialog({ form, products, productCategories, quoteChargeConcepts, s
           })}
           {isBundleQuote && <Paper variant="outlined" sx={{ p: 2 }}>
             <Stack spacing={2}>
-              <Typography fontWeight={900}>Condiciones del paquete</Typography>
+              <Typography fontWeight={900}>Condiciones de pago</Typography>
               <Typography>Total de artículos antes de promociones: {money(bundleTotal)}</Typography>
               {!v.isCash && <>
                 <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' }, gap: 1.5 }}>
-                  <CurrencyField label="Cuota inicial del paquete" value={v.bundlePayment.downPayment} onChange={downPayment => set({ bundlePayment: { ...v.bundlePayment, downPayment } })} />
-                  <CurrencyField label="Cuota extra del paquete" value={v.bundlePayment.extraPayment} onChange={extraPayment => set({ bundlePayment: { ...v.bundlePayment, extraPayment } })} />
-                  <QuoteTermField label="Plazos del paquete" values={v.bundlePayment.terms} maximum={Math.min(...quoteItems.map(item => quoteTermLimit(products.find(p => p.id === item.productId)?.category)))} onChange={terms => set({ bundlePayment: { ...v.bundlePayment, terms, termMonths: terms[0] || 0 } })} />
+                  <CurrencyField label="Cuota inicial" value={v.bundlePayment.downPayment} onChange={downPayment => set({ bundlePayment: { ...v.bundlePayment, downPayment } })} />
+                  <CurrencyField label="Cuota extra" value={v.bundlePayment.extraPayment} onChange={extraPayment => set({ bundlePayment: { ...v.bundlePayment, extraPayment } })} />
+                  <QuoteTermField label="Plazos" values={v.bundlePayment.terms} maximum={Math.min(...quoteItems.map(item => quoteTermLimit(products.find(p => p.id === item.productId)?.category)))} onChange={terms => set({ bundlePayment: { ...v.bundlePayment, terms, termMonths: terms[0] || 0 } })} />
                 </Box>
                 <InitialPaymentPlanEditor item={v.bundlePayment} onChange={patch => set({ bundlePayment: { ...v.bundlePayment, ...patch } })} />
               </>}
@@ -4849,7 +4849,7 @@ function QuoteDialog({ form, products, productCategories, quoteChargeConcepts, s
             </Stack>
           </Paper>}
           {isBundleQuote && <Alert severity="info">
-            Esta categoria cotiza como paquete: se sumaran los articulos seleccionados por un valor de {money(bundleTotal)} antes de promociones{v.isCash ? ', de contado.' : ', antes de descontar la inicial completa.'}
+            Los artículos seleccionados suman {money(bundleTotal)} antes de promociones{v.isCash ? ', de contado.' : ', antes de descontar la inicial completa.'}
           </Alert>}
         </Stack>
         <TextField label="Observaciones" value={v.notes} onChange={(e) => set({ notes: e.target.value })} multiline minRows={2} />
