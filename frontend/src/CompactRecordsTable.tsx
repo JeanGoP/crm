@@ -6,7 +6,7 @@ const border = '#d9e2ec';
 const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
 export function CompactRecordsTable({ headers, rows, label, searchLabel, placeholder, empty }: {
-  headers: readonly (readonly [string, number])[];
+  headers: readonly (readonly [string, number, ('left' | 'right' | 'center')?])[];
   rows: { id: string; cells: ReactNode[]; searchText: string }[];
   label: string; searchLabel: string; placeholder: string; empty: string;
 }) {
@@ -36,10 +36,10 @@ export function CompactRecordsTable({ headers, rows, label, searchLabel, placeho
         '& .MuiSvgIcon-root': { fontSize: 17 },
         '& .MuiChip-root': { height: 22, borderRadius: .5, fontSize: 11, fontWeight: 700 },
       }}>
-        <TableHead><TableRow>{headers.map(([title, width]) => <TableCell key={title} sx={{ width }}>{title}</TableCell>)}</TableRow></TableHead>
+        <TableHead><TableRow>{headers.map(([title, width, align]) => <TableCell key={title} align={align} sx={{ width }}>{title}</TableCell>)}</TableRow></TableHead>
         <TableBody>
           {filtered.slice(safePage * pageSize, (safePage + 1) * pageSize).map(row => <TableRow key={row.id}>
-            {row.cells.map((cell, index) => <TableCell key={headers[index][0]}>{typeof cell === 'string' || cell == null
+            {row.cells.map((cell, index) => <TableCell key={headers[index][0]} align={headers[index][2]}>{typeof cell === 'string' || cell == null
               ? <Tooltip title={cell || ''}><Box component="span" sx={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cell || '-'}</Box></Tooltip>
               : index === 0 ? <Stack sx={{ '& > .MuiStack-root': { flexWrap: 'nowrap', mt: 0 } }}>{cell}</Stack> : cell}</TableCell>)}
           </TableRow>)}

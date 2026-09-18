@@ -1281,15 +1281,17 @@ function ProductsPage() {
       </Stack>
     </CardContent></Card>}
     <StatusBar loading={loading} error={error} />
-    <EntityTable
-      compact
-      headers={['Producto', 'Fotos', 'Categoria', 'Marca', 'Referencia', 'Caracteristicas', 'Cargos', 'Precio', 'Estado', 'Acciones']}
+    <CompactRecordsTable label="Productos" searchLabel="Buscar producto" placeholder="Producto, categoría, marca o referencia"
+      headers={[['Acciones', 85], ['Producto', 310], ['Fotos', 100], ['Categoría', 160], ['Marca', 145], ['Referencia', 190], ['Características', 260], ['Cargos', 170, 'right'], ['Precio', 150, 'right'], ['Estado', 155]]}
       empty="No hay productos registrados"
-      rows={rows.map((r) => [
+      rows={rows.map((r) => ({ id: r.id,
+        searchText: [productName(r), r.category, r.brand, r.reference, r.description, r.model, r.line, r.version, r.engineCc, r.year, r.color, r.active ? 'Activa' : 'Inactiva', r.price <= 0 ? 'Pendiente precio' : ''].join(' '),
+        cells: [
+        <Actions onEdit={canManage ? () => setForm({ open: true, item: r }) : undefined} onDelete={canManage && r.active ? () => setConfirm(r) : undefined} />,
         <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0 }}>
           <ProductPhotoThumb photo={(r.photos ?? []).find((photo) => photo.isQuoteDefault) ?? (r.photos ?? [])[0]} size={36} />
           <Box sx={{ minWidth: 0 }}>
-            <Typography fontWeight={900} sx={{ fontSize: 12.5, lineHeight: 1.25, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{productName(r)}</Typography>
+            <Tooltip title={productName(r)}><Typography fontWeight={900} sx={{ fontSize: 12.5, lineHeight: 1.25, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{productName(r)}</Typography></Tooltip>
             <Typography color="text.secondary" sx={{ fontSize: 11.5, lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.description ? 'Con descripcion' : 'Sin descripcion'}</Typography>
           </Box>
         </Stack>,
@@ -1297,23 +1299,22 @@ function ProductsPage() {
           <Chip size="small" label={`${r.photos?.length ?? 0}`} variant="outlined" />
           {(r.photos ?? []).some((photo) => photo.isQuoteDefault) && <Chip size="small" color="success" label="PDF" />}
         </Stack>,
-        <Typography sx={{ fontSize: 12.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.category}</Typography>,
-        <Typography sx={{ fontSize: 12.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.brand || '-'}</Typography>,
-        <Typography sx={{ fontSize: 12.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.reference}</Typography>,
-        <Typography sx={{ fontSize: 12.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{[r.model, r.line, r.version, r.engineCc ? `${r.engineCc} cc` : undefined, r.year, r.color].filter(Boolean).join(' / ') || '-'}</Typography>,
-        <Stack spacing={0.15}>
+        r.category,
+        r.brand,
+        r.reference,
+        [r.model, r.line, r.version, r.engineCc ? `${r.engineCc} cc` : undefined, r.year, r.color].filter(Boolean).join(' / '),
+        <Stack spacing={0.15} sx={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
           <Typography sx={{ fontSize: 12.5 }}>{money((r.soat ?? 0) + (r.registrationFee ?? 0) + (r.taxes ?? 0))}</Typography>
           <Typography color="text.secondary" sx={{ fontSize: 11.5, lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>S {money(r.soat ?? 0)} · M {money(r.registrationFee ?? 0)}</Typography>
         </Stack>,
-        <Stack spacing={0.15}>
+        <Stack spacing={0.15} sx={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
           <Typography sx={{ fontSize: 12.5 }}>{r.price > 0 ? money(r.price) : 'Sin precio'}</Typography>
           {isApplianceCategoryName(r.category) && (r.salesPointPrices?.length ?? 0) > 0 && <Typography color="text.secondary" sx={{ fontSize: 11.5, lineHeight: 1.2 }}>{r.salesPointPrices.length} sede(s)</Typography>}
         </Stack>,
         r.price <= 0
           ? <StatusChip label="Pendiente precio" tone="warning" />
-          : <StatusChip label={r.active ? 'Activa' : 'Inactiva'} tone={r.active ? 'success' : 'default'} />,
-        <Actions compact onEdit={canManage ? () => setForm({ open: true, item: r }) : undefined} onDelete={canManage && r.active ? () => setConfirm(r) : undefined} />
-      ])}
+          : <StatusChip label={r.active ? 'Activa' : 'Inactiva'} tone={r.active ? 'success' : 'default'} />
+      ] }))}
     />
     <ProductDialog form={form} categories={categories.filter((category) => category.active)} salesPoints={activeSalesPoints} onClose={() => setForm({ open: false })} onSave={save} onChanged={reload} />
     <ConfirmDialog title="Inactivar producto" text={`Se inactivara ${confirm ? productName(confirm) : ''}. Las cotizaciones existentes conservaran el historial.`} open={!!confirm} onClose={() => setConfirm(undefined)} onConfirm={remove} confirmLabel="Inactivar" />
@@ -1959,29 +1960,27 @@ function CreditApplicationsPage() {
   return <Stack spacing={3}>
     <Header title="Solicitudes de credito" action="Nueva solicitud" onAction={() => setForm({ open: true })} onRefresh={reload} />
     <StatusBar loading={loading} error={error} />
-    <EntityTable
-      compact
-      headers={['Solicitud', 'Cliente', 'Credito', 'Estado', 'Pendientes', 'Acciones']}
+    <CompactRecordsTable label="Solicitudes de crédito" searchLabel="Buscar solicitud" placeholder="Solicitud, cliente, cédula, teléfono o producto"
+      headers={[['Acciones', 165], ['Solicitud', 190], ['Estado', 165], ['Cliente', 250], ['Identificación', 145], ['Teléfono', 140], ['Producto', 260], ['Valor', 150, 'right'], ['Cuota inicial', 150, 'right'], ['Referencias', 100], ['Pendientes', 420]]}
       empty="No hay solicitudes de credito"
-      rows={rows.map((r) => [
-        <Stack spacing={.2} sx={{ minWidth: 0 }}>
-          <Typography fontWeight={800} sx={{ fontSize: 12.5, lineHeight: 1.25, wordBreak: 'break-word' }}>{r.number}</Typography>
-        </Stack>,
-        <Stack spacing={.2} sx={{ minWidth: 0 }}>
-          <Typography fontWeight={900} sx={{ fontSize: 12.5, lineHeight: 1.25, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.customerName}</Typography>
-          <Typography color="text.secondary" sx={{ fontSize: 11.5, lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{[r.identificationNumber, r.mobile].filter(Boolean).join(' · ') || '-'}</Typography>
-        </Stack>,
-        <Stack spacing={.2} sx={{ minWidth: 0 }}>
-          <Typography fontWeight={900} sx={{ fontSize: 12.5, lineHeight: 1.25, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.productName}</Typography>
-          <Typography color="text.secondary" sx={{ fontSize: 11.5, lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{money(r.motorcycleValue)} · Ini. {money(r.downPayment)} · {[r.reference1Name, r.reference2Name].filter(Boolean).length || 0} ref.</Typography>
-        </Stack>,
-        <StatusChip label={creditStatus(r.status)} tone={creditTone(r.status)} />,
-        <CreditApplicationPendingSummary application={r} compact />,
+      rows={rows.map((r) => ({ id: r.id,
+        searchText: [r.number, r.customerName, r.identificationNumber, r.mobile, r.productName, creditStatus(r.status), r.studyResult].join(' '),
+        cells: [
         <Stack direction="row" gap={.5} alignItems="center" flexWrap="nowrap">
           <Button size="small" variant="contained" onClick={() => setManagement(r)} sx={{ minHeight: 28, px: 1.25, fontSize: 11.5 }}>Gestionar</Button>
-          <Actions compact onAi={() => analyzeCustomer(r.customerId, r.mobile)} onEdit={() => setForm({ open: true, item: r })} />
-        </Stack>
-      ])}
+          <Actions onAi={() => analyzeCustomer(r.customerId, r.mobile)} onEdit={() => setForm({ open: true, item: r })} />
+        </Stack>,
+        r.number,
+        <StatusChip label={creditStatus(r.status)} tone={creditTone(r.status)} />,
+        r.customerName,
+        r.identificationNumber,
+        r.mobile,
+        r.productName,
+        <Box sx={{ textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{money(r.motorcycleValue)}</Box>,
+        <Box sx={{ textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{money(r.downPayment)}</Box>,
+        `${[r.reference1Name, r.reference2Name].filter(Boolean).length} ref.`,
+        <CreditApplicationPendingSummary application={r} compact />
+      ] }))}
     />
     <CreditApplicationDialog form={form} customers={customers} products={products.filter((x) => x.active)} quotes={quotes} onClose={() => setForm({ open: false })} onSave={save} />
     <CreditApplicationManagementDialog
