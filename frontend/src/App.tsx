@@ -41,6 +41,7 @@ import { quotePayments, isQuoteBundle, quoteTermLimit, quoteCustomerName, curren
 import { findDuplicateCreditPhones, duplicateCreditPhoneMessage, creditPhoneFieldError } from './creditPhones';
 import { QuotesTable } from './QuotesTable';
 import { CustomersTable } from './CustomersTable';
+import { CompactRecordsTable } from './CompactRecordsTable';
 import { useAuthStore } from './store';
 import { Activity, ColombianIdentityLookup, CollectionOrder, CommercialInventory, CommercialInventorySummary, CommercialReports, Company, CreditApplication, CreditCoDebtor, CreditDocument, Customer, Customer360, CustomerAiAnalysis, CustomerTimelineItem, Dashboard, Deal, DealStage, ExternalInventoryItem, ExternalInventoryWarehouse, FinancialSettings, Lead, LoginAccessReport, MotorcycleDelivery, Procedure, Product, ProductCategory, ProductPhoto, Promotion, Quote, QuoteChargeConcept, QuoteSalesPoint, QuoteSimulationResult, SalesPoint, SalesPointRate, User } from './types';
 
@@ -3159,15 +3160,12 @@ function ActivitiesPage() {
         </Stack>
       </Stack>
     </CardContent></Card>
-    <EntityTable
-      headers={['Seguimiento', 'Cliente', 'Negocio', 'Estado', 'Vence', 'Acciones']}
-      empty="No hay actividades registradas"
-      rows={visibleRows.map((r) => [
-        <Stack><Typography fontWeight={800}>{r.title}</Typography><Typography color="text.secondary" fontSize={13}>{typeLabel(r.type)}{r.description ? ` - ${r.description}` : ''}</Typography></Stack>,
-        r.customerName || customers.find((x) => x.id === r.customerId)?.name,
-        r.dealTitle || deals.find((x) => x.id === r.dealId)?.title,
-        <StatusChip label={activityStatus(r.status)} tone={activityTone(r)} />,
-        <Stack><Typography>{new Date(r.scheduledAt).toLocaleString()}</Typography><Typography color={activityDueState(r) === 'overdue' ? 'error.main' : 'text.secondary'} fontSize={13}>{activityDueLabel(r)}</Typography></Stack>,
+    <CompactRecordsTable key={`${statusFilter}|${dueFilter}`} label="Actividades" searchLabel="Buscar actividad" placeholder="Seguimiento, cliente, negocio o descripción"
+      headers={[['Acciones', 195], ['Estado', 125], ['Seguimiento', 240], ['Tipo', 130], ['Cliente', 230], ['Negocio', 220], ['Fecha y hora', 190], ['Vencimiento', 160], ['Descripción', 300]]}
+      empty="No hay actividades para los filtros seleccionados."
+      rows={visibleRows.map((r) => ({ id: r.id,
+        searchText: [r.title, r.description, typeLabel(r.type), r.customerName || customers.find(x => x.id === r.customerId)?.name, r.dealTitle || deals.find(x => x.id === r.dealId)?.title, activityStatus(r.status)].join(' '),
+        cells: [
         <Actions
           onStart={r.status === 1 ? () => updateActivity(r, { status: 2 }, 'Actividad marcada en proceso.') : undefined}
           onComplete={r.status !== 3 ? () => updateActivity(r, { status: 3 }, 'Actividad completada.') : undefined}
@@ -3175,8 +3173,16 @@ function ActivitiesPage() {
           onCancel={r.status !== 4 ? () => updateActivity(r, { status: 4 }, 'Actividad cancelada.') : undefined}
           onEdit={() => setForm({ open: true, item: r })}
           onDelete={canDelete ? () => setConfirm(r) : undefined}
-        />
-      ])}
+        />,
+        <StatusChip label={activityStatus(r.status)} tone={activityTone(r)} />,
+        r.title,
+        typeLabel(r.type),
+        r.customerName || customers.find((x) => x.id === r.customerId)?.name,
+        r.dealTitle || deals.find((x) => x.id === r.dealId)?.title,
+        new Date(r.scheduledAt).toLocaleString(),
+        <Typography noWrap fontSize={12} color={activityDueState(r) === 'overdue' ? 'error.main' : 'text.secondary'}>{activityDueLabel(r)}</Typography>,
+        r.description
+      ] }))}
     />
     <ActivityDialog form={form} customers={customers} deals={deals} onClose={() => setForm({ open: false })} onSave={save} />
     <RescheduleActivityDialog activity={reschedule} onClose={() => setReschedule(undefined)} onSave={saveReschedule} />
