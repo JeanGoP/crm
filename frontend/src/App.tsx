@@ -40,6 +40,7 @@ import { api } from './api';
 import { quotePayments, isQuoteBundle, quoteTermLimit, quoteCustomerName, currencyInputValue, updateQuoteTerms } from './quotePayments';
 import { findDuplicateCreditPhones, duplicateCreditPhoneMessage, creditPhoneFieldError } from './creditPhones';
 import { QuotesTable } from './QuotesTable';
+import { CustomersTable } from './CustomersTable';
 import { useAuthStore } from './store';
 import { Activity, ColombianIdentityLookup, CollectionOrder, CommercialInventory, CommercialInventorySummary, CommercialReports, Company, CreditApplication, CreditCoDebtor, CreditDocument, Customer, Customer360, CustomerAiAnalysis, CustomerTimelineItem, Dashboard, Deal, DealStage, ExternalInventoryItem, ExternalInventoryWarehouse, FinancialSettings, Lead, LoginAccessReport, MotorcycleDelivery, Procedure, Product, ProductCategory, ProductPhoto, Promotion, Quote, QuoteChargeConcept, QuoteSalesPoint, QuoteSimulationResult, SalesPoint, SalesPointRate, User } from './types';
 
@@ -869,22 +870,9 @@ function CustomersPage() {
         </Stack>
       </Stack>
     </Paper>
-    <EntityTable
-      headers={['Identificacion', 'Primer nombre', 'Segundo nombre', 'Primer apellido', 'Segundo apellido', 'Telefono', 'Ciudad', 'Estado', 'Etiquetas', 'Acciones']}
-      empty={search ? 'No hay clientes que coincidan con la busqueda' : 'No hay clientes registrados'}
-      rows={filteredRows.map((r) => [
-        r.identificationNumber || '-',
-        r.firstName || r.firstNames || r.name,
-        r.middleName || '-',
-        r.lastName || r.lastNames,
-        r.secondLastName || '-',
-        r.phone,
-        r.city,
-        <StatusChip label={statusLabel(r.status)} tone={r.status === 1 ? 'success' : 'default'} />,
-        r.tags,
-        <Actions onView={() => navigate(`/clientes/${r.id}`)} onEdit={() => setForm({ open: true, item: r })} onDelete={canDelete ? () => setConfirm(r) : undefined} />
-      ])}
-    />
+    <CustomersTable key={`${search}|${customerView}`} rows={filteredRows} total={rows.length} filtered={!!search || customerView !== 'all'}
+      onView={customer => navigate(`/clientes/${customer.id}`)} onEdit={customer => setForm({ open: true, item: customer })}
+      onDelete={canDelete ? customer => setConfirm(customer) : undefined} />
     <CustomerDialog form={form} onClose={() => setForm({ open: false })} onSave={save} />
     <ConfirmDialog title="Eliminar cliente" text={`Se eliminara ${confirm?.name}.`} open={!!confirm} onClose={() => setConfirm(undefined)} onConfirm={remove} />
     <Notice notice={notice} onClose={() => setNotice(undefined)} />
