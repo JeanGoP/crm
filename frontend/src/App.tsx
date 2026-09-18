@@ -4938,7 +4938,7 @@ function QuoteSimulationPreview({ value, selectedProduct, salesPointId, salesPoi
           {preview.promotionDiscount > 0 && <Typography variant="caption" color="success.main" fontWeight={800}>{preview.promotionName ?? 'Promocion'}: -{money(preview.promotionDiscount)}</Typography>}
           <Box><Typography variant="caption" color="text.secondary">Financiado</Typography><Typography fontWeight={800}>{money(preview.financedAmount)}</Typography></Box>
           {(simulation?.financingOptions ?? []).map(option => <Stack key={option.termMonths} direction="row" justifyContent="space-between" gap={1}>
-            <Typography>{option.termMonths} cuotas</Typography><Typography fontWeight={800}>{money(option.monthlyPayment)} cada una</Typography>
+            <Typography>{option.termMonths} cuotas</Typography><Typography fontWeight={800}>{money(option.monthlyPayment)}</Typography>
           </Stack>)}
         </Stack>
         : <FieldGrid columns={3}>
