@@ -151,12 +151,6 @@ Check(cashDto.TermMonths == 0 && cashDto.FinancedAmount == 0 && cashDto.Estimate
 Check(cashDto.Items.Single().TermMonths == 0 && cashDto.Items.Single().FinancedAmount == 0, "Leer artículos respeta contado.");
 var customerCashDto = (QuoteDto)typeof(CustomersController).GetMethod("ToQuoteDto", BindingFlags.NonPublic | BindingFlags.Static)!.Invoke(null, [cashQuote])!;
 Check(customerCashDto.TermMonths == 0 && customerCashDto.FinancedAmount == 0, "Vista 360 conserva modalidad contado.");
-var cashPdf = new System.Text.StringBuilder();
-typeof(SimplePdfGenerator).GetMethod("DrawCommercialValues", BindingFlags.NonPublic | BindingFlags.Static)!.Invoke(null, [cashPdf, cashDto]);
-Check(cashPdf.ToString().Contains("CONTADO") && !cashPdf.ToString().Contains("Nro de Cuotas") && !cashPdf.ToString().Contains("Inicio Credito"), "PDF contado sin condiciones de financiación.");
-var comparisonPdf = new System.Text.StringBuilder();
-typeof(SimplePdfGenerator).GetMethod("DrawComparison", BindingFlags.NonPublic | BindingFlags.Static)!.Invoke(null, [comparisonPdf, 40, 200, cashDto.Items]);
-Check(comparisonPdf.ToString().Contains("Precio contado") && !comparisonPdf.ToString().Contains("Financiado"), "Comparativo contado muestra precios.");
 Console.WriteLine("OK: contado normalizado, precio con descuento, DTOs y PDF sin financiación.");
 
 // A global initial can exceed the first article, but must be deducted only once from the whole package.
@@ -174,10 +168,6 @@ var bundleDto = cashDto with { IsBundle = true, CreditType = "Manual", ProductNa
     FinancedAmount = 500000, TermMonths = 24, EstimatedMonthlyPayment = 31000, InitialPaymentSchedule = globalItem.InitialPaymentSchedule!,
     CreditStartDate = quoteDate.AddDays(30), QuoteDate = quoteDate, ValidUntil = quoteDate.AddDays(7),
     Items = Enumerable.Range(1, 4).Select(i => cashDto.Items.Single() with { ProductName = "Electrodomestico de prueba " + i, DiscountedProductPrice = 500000, Order = i }).ToArray() };
-var bundlePdf = new System.Text.StringBuilder();
-typeof(SimplePdfGenerator).GetMethod("DrawBundle", BindingFlags.NonPublic | BindingFlags.Static)!.Invoke(null, [bundlePdf, bundleDto]);
-Check(bundlePdf.ToString().Contains("PAQUETE DE ARTICULOS") && !bundlePdf.ToString().Contains("Menor precio"), "PDF de paquete no se presenta como comparativo.");
-Check(bundlePdf.ToString().Contains("INICIAL COMPLETA") && bundlePdf.ToString().Contains("FINANCIADO"), "PDF muestra condiciones globales.");
 cashQuote.EsPaquete = true;
 var persistedBundle = (QuoteDto)typeof(QuotesController).GetMethod("ToDto", BindingFlags.NonPublic | BindingFlags.Static)!.Invoke(null, [cashQuote])!;
 Check(persistedBundle.IsBundle, "La modalidad paquete se conserva al leer la cotizacion.");
@@ -232,19 +222,15 @@ var readCustomerOptions = (QuoteDto)typeof(CustomersController).GetMethod("ToQuo
 Check(readCustomerOptions.FinancingOptions!.Count == 3 && readCustomerOptions.Items.Single().FinancingOptions!.Count == 3, "Vista de cliente conserva alternativas.");
 var optionsQuote = bundleDto with { Number = "COT-PRUEBA-PLAZOS", FinancingOptions = financingOptions, DownPayment = 300000, FinancedAmount = 1200000,
     InitialPaymentPaidToday = 300000, ProductPrice = 1500000, DiscountedProductPrice = 1500000, SalesPointRateName = "Tasa de prueba" };
-var financingPagesMethod = typeof(SimplePdfGenerator).GetMethod("FinancingPages", BindingFlags.NonPublic | BindingFlags.Static)!;
-var optionPages = ((IEnumerable<string>)financingPagesMethod.Invoke(null, [optionsQuote])!).ToList();
-Check(optionPages.Count == 1 && selectedTerms.All(term => optionPages[0].Contains(term + " cuotas")), "PDF incluye 12, 18 y 24 con sus valores.");
 var manyOptions = Enumerable.Range(1, 40).Select(term => new QuoteFinancingOptionDto(term, 1200000m / term, 1500000)).ToArray();
-Check(((IEnumerable<string>)financingPagesMethod.Invoke(null, [optionsQuote with { FinancingOptions = manyOptions }])!).Count() == 2, "PDF pagina sin truncar hasta 40 alternativas.");
-var comparative = optionsQuote with { IsBundle = false, Items = optionsQuote.Items.Take(2).Select(x => x with { FinancingOptions = financingOptions }).ToArray() };
-Check(((IEnumerable<string>)financingPagesMethod.Invoke(null, [comparative])!).Count() == 2, "Comparativo separa alternativas por articulo.");
 if (args.Length > 0)
 {
     File.WriteAllBytes(Path.Combine(args[0], "term-options.pdf"), SimplePdfGenerator.Quote(optionsQuote, "Empresa de prueba"));
     File.WriteAllBytes(Path.Combine(args[0], "term-options-40.pdf"), SimplePdfGenerator.Quote(optionsQuote with { FinancingOptions = manyOptions }, "Empresa de prueba"));
 }
 Console.WriteLine("OK: multiplazos, deduplicacion, limites, persistencia de cuotas y PDF paginado.");
+
+QuotePdfLayoutChecks.Run(optionsQuote, args);
 
 sealed class TestTenant : ITenantContext
 {

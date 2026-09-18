@@ -434,21 +434,14 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             ?? throw new KeyNotFoundException("Cotizacion no encontrada.");
         var company = await db.Empresas.IgnoreQueryFilters().FirstOrDefaultAsync(x => x.Id == tenantContext.EmpresaId, cancellationToken);
         var dto = ToDto(quote);
-        var quotePhoto = ResolveQuotePhoto(quote);
-        var image = quotePhoto is null
-            ? null
-            : new QuotePdfImage(quotePhoto.Datos, quotePhoto.ContentType, quotePhoto.NombreArchivo);
-        var brandLogo = ToPdfImage(quote.PuntoVenta?.LogoMarcaDataUrl, "logo-marca.png");
         var companyLogo = ToPdfImage(company?.LogoDataUrl, "logo-empresa.png");
         var bytes = SimplePdfGenerator.Quote(
             dto,
             company?.Nombre ?? "Empresa",
-            image,
-            companyLogo,
-            brandLogo,
-            quote.Cliente?.Telefono,
-            quote.Cliente?.Direccion,
-            quote.UsuarioCreacion);
+            companyLogo: companyLogo,
+            customerPhone: quote.Cliente?.Telefono,
+            customerAddress: quote.Cliente?.Direccion,
+            advisor: quote.UsuarioCreacion);
         Response.Headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0";
         Response.Headers["Pragma"] = "no-cache";
         Response.Headers["Expires"] = "0";
