@@ -39,6 +39,7 @@ import { AxiosError } from 'axios';
 import { api } from './api';
 import { quotePayments, isQuoteBundle, quoteTermLimit, quoteCustomerName, currencyInputValue, updateQuoteTerms } from './quotePayments';
 import { findDuplicateCreditPhones, duplicateCreditPhoneMessage, creditPhoneFieldError } from './creditPhones';
+import { QuotesTable } from './QuotesTable';
 import { useAuthStore } from './store';
 import { Activity, ColombianIdentityLookup, CollectionOrder, CommercialInventory, CommercialInventorySummary, CommercialReports, Company, CreditApplication, CreditCoDebtor, CreditDocument, Customer, Customer360, CustomerAiAnalysis, CustomerTimelineItem, Dashboard, Deal, DealStage, ExternalInventoryItem, ExternalInventoryWarehouse, FinancialSettings, Lead, LoginAccessReport, MotorcycleDelivery, Procedure, Product, ProductCategory, ProductPhoto, Promotion, Quote, QuoteChargeConcept, QuoteSalesPoint, QuoteSimulationResult, SalesPoint, SalesPointRate, User } from './types';
 
@@ -1571,26 +1572,8 @@ function QuotesPage() {
   return <Stack spacing={3}>
     <Header title="Cotizaciones" action="Nueva cotizacion" onAction={() => setForm({ open: true })} onRefresh={reload} />
     <StatusBar loading={loading} error={error} />
-    <EntityTable
-      headers={['Numero', 'Cliente', 'Sede', 'Promocion', 'Productos', 'Valor contado / financiado', 'Cuota aprox.', 'Valida hasta', 'Acciones']}
-      empty="No hay cotizaciones registradas"
-      rows={rows.map((r) => [
-        r.number,
-        `${fullFirstNames(r.customerFirstName, r.customerMiddleName, r.customerFirstNames)} ${fullLastNames(r.customerLastName, r.customerSecondLastName, r.customerLastNames)}`.trim(),
-        <Box sx={{ minWidth: 0, whiteSpace: 'normal', wordBreak: 'normal', overflowWrap: 'break-word' }}>
-          <Typography variant="body2" fontWeight={700}>{r.salesPointName || '-'}</Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: .25 }}>{r.creditType === 'Contado' ? 'Contado' : r.salesPointRateName || 'Tasa general'}</Typography>
-        </Box>,
-        r.promotionDiscount > 0 ? <Row primary={r.promotionName ?? 'Promocion'} secondary={`-${money(r.promotionDiscount)}`} /> : '-',
-        r.isBundle ? `${r.items.length} artículo(s)` : (r.items?.length ?? 0) > 1 ? `${r.items.length} productos` : r.productName,
-        r.creditType === 'Contado' ? `Contado: ${money(r.estimatedTotalPayment)}` : money(r.financedAmount),
-        r.creditType === 'Contado' ? 'No aplica' : (r.financingOptions?.length ?? 0) > 1
-          ? <Stack spacing={.5}>{r.financingOptions!.map(option => <Typography key={option.termMonths} variant="body2">{option.termMonths} cuotas de {money(option.monthlyPayment)}</Typography>)}</Stack>
-          : r.estimatedMonthlyPayment > 0 ? `${money(r.estimatedMonthlyPayment)} x ${r.termMonths}` : 'Sin simulacion',
-        new Date(r.validUntil).toLocaleDateString(),
-        <Actions onAi={() => analyzeCustomer(r.customerId, customers.find((x) => x.id === r.customerId)?.phone)} onDownload={() => setPreviewQuote(r)} />
-      ])}
-    />
+    <QuotesTable rows={rows} onPreview={setPreviewQuote}
+      onAnalyze={quote => analyzeCustomer(quote.customerId, customers.find(customer => customer.id === quote.customerId)?.phone)} />
     <QuoteDialog form={form} products={products.filter((x) => x.active)} productCategories={productCategories.filter((x) => x.active)} quoteChargeConcepts={quoteChargeConcepts.filter((x) => x.active)} salesPoints={quoteSalesPoints} canChooseSalesPoint={currentUser?.roles.some((role) => role === 'Administrador' || role === 'Supervisor') ?? false} onClose={() => setForm({ open: false })} onSave={save} />
     <QuotePdfPreviewDialog quote={previewQuote} onClose={() => setPreviewQuote(undefined)} onDownload={downloadPdf} />
     <AiAnalysisDialog analysis={analysis} phone={analysisPhone} onClose={() => { setAnalysis(undefined); setAnalysisPhone(undefined); }} />
