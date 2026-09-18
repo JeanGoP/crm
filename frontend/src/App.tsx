@@ -4819,7 +4819,7 @@ function QuoteDialog({ form, products, productCategories, quoteChargeConcepts, s
           {isBundleQuote && <Paper variant="outlined" sx={{ p: 2 }}>
             <Stack spacing={2}>
               <Typography fontWeight={900}>Condiciones de pago</Typography>
-              <Typography>Total de artículos antes de promociones: {money(bundleTotal)}</Typography>
+              <Typography>Total de artículos: {money(bundleTotal)}</Typography>
               {!v.isCash && <>
                 <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' }, gap: 1.5 }}>
                   <CurrencyField label="Cuota inicial" value={v.bundlePayment.downPayment} onChange={downPayment => set({ bundlePayment: { ...v.bundlePayment, downPayment } })} />
