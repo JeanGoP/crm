@@ -57,10 +57,18 @@ public static partial class SimplePdfGenerator
                     Table("02  Condiciones de pago", ["Artículo", "Cuota inicial", "Cuota extra", "Inicial total", "Financiado"],
                         [171, 90, 90, 90, 90], groups.Select(x => new[] { x.Name, Money(x.Paid),
                             Money(Math.Max(0, x.Initial - x.Paid)), Money(x.Initial), Money(x.Financed) }).ToList());
-                foreach (var chunk in terms.Chunk(compact ? 3 : 5))
+                var baseWidths = compact
+                    ? new[] { quote.IsBundle ? 110d : 130d,
+                        Math.Max(65, groups.Max(x => Measure(Money(x.Initial), 8)) + 14),
+                        Math.Max(65, groups.Max(x => Measure(Money(x.Financed), 8)) + 14) }
+                    : new[] { quote.IsBundle ? 110d : 130d };
+                var termWidth = Math.Max(54, groups.SelectMany(x => x.Options)
+                    .Select(x => Measure(Money(x.MonthlyPayment), 8) + 14).DefaultIfEmpty(54).Max());
+                var termsPerRow = Math.Max(1, (int)((Width - baseWidths.Sum()) / termWidth));
+                foreach (var chunk in terms.Chunk(termsPerRow))
                 {
                     var columns = (compact ? new[] { "Artículo", "Inicial total", "Financiado" } : new[] { "Artículo" }).Concat(chunk.Select(x => $"{x} cuotas")).ToArray();
-                    var widths = (compact ? new[] { 156d, 75d, 75d } : new[] { 156d }).Concat(chunk.Select(_ => (compact ? 225d : 375d) / chunk.Length)).ToArray();
+                    var widths = baseWidths.Concat(chunk.Select(_ => (Width - baseWidths.Sum()) / chunk.Length)).ToArray();
                     Table(compact ? "02  Opciones de financiación" : "Opciones de financiación", columns, widths,
                         groups.Select(x => (compact ? new[] { x.Name, Money(x.Initial), Money(x.Financed) } : new[] { x.Name }).Concat(chunk.Select(term =>
                         x.Options.FirstOrDefault(o => o.TermMonths == term) is { } option ? Money(option.MonthlyPayment) : "-" )).ToArray()).ToList());
@@ -101,8 +109,8 @@ public static partial class SimplePdfGenerator
             const string employee = "EMPLEADO: Presenta carta laboral y colillas de pago; debe ganar más de 1 salario mínimo.";
             const string one = "DE ESTAS 3 OPCIONES DE CODEUDOR SOLO NECESITA UNO.";
             const string validity = "ESTA COTIZACIÓN ESTÁ SUJETA A CAMBIOS SIN PREVIO AVISO Y ES VÁLIDA SOLO POR EL DÍA EN QUE SE COTIZA.";
-            var height = Wrap(validity, Width - 20, 8.2).Count * 11 + 20;
-            if (!Cash) height += 18 + new[] { property, merchant, employee, one }.Sum(x => Wrap(x, Width, 8.2).Count * 11 + 7);
+            var height = Wrap(validity, Width - 20, 8.2, true).Count * 11 + 20;
+            if (!Cash) height += 18 + new[] { property, merchant, employee, one }.Sum(x => Wrap(x, Width, 8.2, x == one).Count * 11 + 7);
             Ensure(height);
             if (!Cash)
             {
@@ -125,7 +133,7 @@ public static partial class SimplePdfGenerator
             }
             else
             {
-                var companyLines = Wrap(Value(company), 270, 14);
+                var companyLines = Wrap(Value(company), 270, 14, true);
                 for (var i = 0; i < Math.Min(3, companyLines.Count); i++) Text(32, 799 - i * 17, companyLines[i], 14, true);
             }
             Text(365, 793, "COTIZACIÓN", 23, true);
@@ -169,7 +177,9 @@ public static partial class SimplePdfGenerator
                 var x = Left;
                 for (var i = 0; i < headers.Length; i++)
                 {
-                    Text(x + 7, y - 17, headers[i], Fit(headers[i], widths[i] - 14, 8), true, "1 1 1");
+                    var headerSize = Fit(headers[i], widths[i] - 14, 8, true);
+                    var headerX = i == 0 ? x + 7 : x + (widths[i] - Measure(headers[i], headerSize, true)) / 2;
+                    Text(headerX, y - 17, headers[i], headerSize, true, "1 1 1");
                     x += widths[i];
                 }
                 y -= headerHeight;
@@ -197,8 +207,7 @@ public static partial class SimplePdfGenerator
                         {
                             var value = lines[i][l];
                             var fontSize = Fit(value, widths[i] - 14, size);
-                            var tx = row[i].StartsWith("$", StringComparison.Ordinal)
-                                ? x + widths[i] - 7 - Measure(value, fontSize) : x + 7;
+                            var tx = i == 0 ? x + 7 : x + (widths[i] - Measure(value, fontSize)) / 2;
                             Text(tx, y - 17 - (l - offset) * 11, value, fontSize, false);
                         }
                         x += widths[i];
@@ -213,7 +222,7 @@ public static partial class SimplePdfGenerator
 
         private void ParagraphText(string text, double size, bool bold = false, bool shaded = false)
         {
-            var lines = Wrap(text, Width - (shaded ? 20 : 0), size);
+            var lines = Wrap(text, Width - (shaded ? 20 : 0), size, bold);
             var height = lines.Count * 11 + (shaded ? 20 : 7);
             if (height < 660) Ensure(height);
             if (shaded) Rect(Left, y - height, Width, height, Pale);
@@ -235,22 +244,25 @@ public static partial class SimplePdfGenerator
             page.AppendLine(FormattableString.Invariant($"{color} rg BT /{(bold ? "F2" : "F1")} {size:0.###} Tf {x:0.###} {bottom:0.###} Td <{Convert.ToHexString(encoded)}> Tj ET"));
         }
 
-        // Helvetica metrics for fitting money and wrapping text; a small safety margin covers bold.
-        private static double Measure(string text, double size) => text.Sum(c =>
-            "ilI.,:;'!|".Contains(c) ? 278 : c == ' ' ? 278 : "mwMW@%".Contains(c) ? 889 :
-            char.IsUpper(c) ? 722 : 556) * size / 1000d;
-        private static double Fit(string text, double width, double size) => Math.Min(size, size * width / Math.Max(1, Measure(text, size)));
-        private static List<string> Wrap(string? text, double width, double size)
+        // Standard Helvetica widths (ASCII 32-126), in 1/1000 em. Exact metrics keep
+        // regular amounts centered under bold headings, including the last partial group.
+        private static readonly int[] RegularWidths = [278,278,355,556,556,889,667,191,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,278,278,584,584,584,556,1015,667,667,722,722,667,611,778,722,278,500,667,556,833,722,778,667,778,722,667,611,722,667,944,667,667,611,278,278,278,469,556,333,556,556,500,556,556,278,556,556,222,222,500,222,833,556,556,556,556,333,500,278,556,500,722,500,500,500,334,260,334,584];
+        private static readonly int[] BoldWidths = [278,333,474,556,556,889,722,238,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,333,333,584,584,584,611,975,722,722,722,722,667,611,778,722,278,556,722,611,833,722,778,667,778,722,667,611,722,667,944,667,667,611,333,278,333,584,556,333,556,611,556,611,556,333,611,611,278,278,556,278,889,611,611,611,611,389,556,333,611,556,778,556,556,500,389,280,389,584];
+        private static double Measure(string text, double size, bool bold = false) => text.Normalize(NormalizationForm.FormD)
+            .Where(c => System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c) != System.Globalization.UnicodeCategory.NonSpacingMark)
+            .Sum(c => c is >= ' ' and <= '~' ? (bold ? BoldWidths : RegularWidths)[c - 32] : c == '\u00a0' ? 278 : 556) * size / 1000d;
+        private static double Fit(string text, double width, double size, bool bold = false) => Math.Min(size, size * width / Math.Max(1, Measure(text, size, bold)));
+        private static List<string> Wrap(string? text, double width, double size, bool bold = false)
         {
             var result = new List<string>();
             var current = "";
             foreach (var word in (text ?? "-").Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries))
             {
-                if (Measure(current.Length == 0 ? word : current + " " + word, size) > width && current.Length > 0)
+                if (Measure(current.Length == 0 ? word : current + " " + word, size, bold) > width && current.Length > 0)
                 { result.Add(current); current = ""; }
                 foreach (var c in (current.Length == 0 ? word : " " + word))
                 {
-                    if (Measure(current + c, size) > width && current.Length > 0) { result.Add(current); current = ""; }
+                    if (Measure(current + c, size, bold) > width && current.Length > 0) { result.Add(current); current = ""; }
                     current += c;
                 }
             }

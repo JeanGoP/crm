@@ -61,9 +61,20 @@ internal static class QuotePdfLayoutChecks
         Check(Read(Generate(legacy)).Contains("$ 321.000"), "Cotizaciones antiguas usan cuota guardada, no una simulación nueva.");
         var different = comparative with { Items = [item with { FinancingOptions = [terms[0]] }, item with { FinancingOptions = [terms[2]], Order = 2 }] };
         Check(Read(Generate(different)).Contains("-"), "Plazos no elegidos por un artículo no se inventan.");
+        var fourTerms = single with { IsBundle = true, InitialPaymentPaidToday = 200000, DownPayment = 200000,
+            FinancedAmount = 1800000, ProductPrice = 2000000, DiscountedProductPrice = 2000000, InitialPaymentSchedule = [],
+            Items = [item with { ProductName = "A/C KALLEY 12BTUINV220V KA 12B", ProductPrice = 2000000, DiscountedProductPrice = 2000000 }],
+            FinancingOptions = [new(6,338000,2228000), new(12,186000,2432000), new(18,136000,2648000), new(24,112000,2888000)] };
+        var fourPdf = Generate(fourTerms);
+        var rawFour = Encoding.ASCII.GetString(fourPdf);
+        var headerYs = new[] { 6, 12, 18, 24 }.Select(term =>
+            Regex.Match(rawFour, @"([0-9.]+) ([0-9.]+) Td <" + Convert.ToHexString(Encoding.Latin1.GetBytes(term + " cuotas")) + "> Tj").Groups[2].Value).ToArray();
+        Check(headerYs.All(y => y.Length > 0) && headerYs.Distinct().Count() == 1, "6, 12, 18 y 24 cuotas comparten una sola fila.");
+        Check(Regex.Matches(Read(fourPdf), "02  Opciones de financiación").Count == 1, "Sin bloque adicional innecesario para 24 cuotas.");
+        Check(PageCount(fourPdf) == 1, "Cuatro alternativas y requisitos caben en una página.");
         if (args.Length > 0)
         {
-            foreach (var sample in new[] { ("layout-single", pdf), ("layout-cash", cashPdf), ("layout-comparative", comparativePdf), ("layout-global", bundlePdf), ("layout-overflow", manyPdf) })
+            foreach (var sample in new[] { ("layout-single", pdf), ("layout-cash", cashPdf), ("layout-comparative", comparativePdf), ("layout-global", bundlePdf), ("layout-overflow", manyPdf), ("layout-four-terms", fourPdf) })
                 File.WriteAllBytes(Path.Combine(args[0], sample.Item1 + ".pdf"), sample.Item2);
         }
         Console.WriteLine("OK: nuevo PDF, logo único, acentos, contado, comparativo, inicial global, extra, históricos y paginación.");
