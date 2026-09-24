@@ -128,8 +128,6 @@ using (var scope = app.Services.CreateScope())
             scope.ServiceProvider.GetRequiredService<IPasswordHasher>(),
             app.Configuration["Seed:AdminPassword"] ?? throw new InvalidOperationException("Seed:AdminPassword no configurado."));
     }
-
-    await UserPasswordPolicy.ApplyToExistingUsersAsync(db, scope.ServiceProvider.GetRequiredService<IPasswordHasher>());
 }
 
 app.Run();
