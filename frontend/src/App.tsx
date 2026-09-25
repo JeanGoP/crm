@@ -5262,18 +5262,25 @@ function CreditApplicationDialog({ form, customers, products, quotes, onClose, o
         <Dialog open={referenceDialog === 'client'} onClose={() => setReferenceDialog(undefined)} fullWidth maxWidth="md">
           <DialogTitle>Referencias personales del cliente</DialogTitle>
           <DialogContent>
-            <CreditFormDetailsFields value={v.formDetails} onChange={formDetails => set({ formDetails })} group="references" />
             <Stack spacing={2} sx={{ pt: 1 }}>
-              <FieldGrid columns={3}>
+              <Paper component="section" variant="outlined" sx={{ p: 2, bgcolor: '#fbfdff' }} aria-label="Referencia 1">
+                <Typography fontWeight={800} color="primary.main" sx={{ mb: 2 }}>Referencia 1</Typography>
+              <FieldGrid columns={2}>
                 <TextField fullWidth required label="Nombre referencia 1" value={v.reference1Name} onChange={(e) => set({ reference1Name: e.target.value })} />
                 <TextField fullWidth required label="Celular referencia 1" value={v.reference1Mobile} onChange={(e) => set({ reference1Mobile: e.target.value })} {...phoneFieldProps('reference1Mobile')} />
                 <TextField fullWidth required label="Relacion referencia 1" value={v.reference1Relationship} onChange={(e) => set({ reference1Relationship: e.target.value })} />
+                <TextField fullWidth label="Dirección referencia 1" value={v.formDetails.reference1Address ?? ''} onChange={(e) => set({ formDetails: { ...v.formDetails, reference1Address: e.target.value } })} inputProps={{ maxLength: 500 }} />
               </FieldGrid>
-              <FieldGrid columns={3}>
+              </Paper>
+              <Paper component="section" variant="outlined" sx={{ p: 2, bgcolor: '#fbfdff' }} aria-label="Referencia 2">
+                <Typography fontWeight={800} color="primary.main" sx={{ mb: 2 }}>Referencia 2</Typography>
+              <FieldGrid columns={2}>
                 <TextField fullWidth required label="Nombre referencia 2" value={v.reference2Name} onChange={(e) => set({ reference2Name: e.target.value })} />
                 <TextField fullWidth required label="Celular referencia 2" value={v.reference2Mobile} onChange={(e) => set({ reference2Mobile: e.target.value })} {...phoneFieldProps('reference2Mobile')} />
                 <TextField fullWidth required label="Relacion referencia 2" value={v.reference2Relationship} onChange={(e) => set({ reference2Relationship: e.target.value })} />
+                <TextField fullWidth label="Dirección referencia 2" value={v.formDetails.reference2Address ?? ''} onChange={(e) => set({ formDetails: { ...v.formDetails, reference2Address: e.target.value } })} inputProps={{ maxLength: 500 }} />
               </FieldGrid>
+              </Paper>
             </Stack>
           </DialogContent>
           <DialogActions><Button variant="contained" onClick={() => setReferenceDialog(undefined)}>Listo</Button></DialogActions>
@@ -5282,18 +5289,25 @@ function CreditApplicationDialog({ form, customers, products, quotes, onClose, o
         <Dialog open={!!selectedCoDebtor} onClose={() => setReferenceDialog(undefined)} fullWidth maxWidth="md">
           <DialogTitle>Referencias de {selectedCoDebtor?.name}</DialogTitle>
           <DialogContent>
-            <CreditFormDetailsFields value={selectedCoDebtor?.formDetails} onChange={formDetails => typeof referenceDialog === 'number' && updateCoDebtor(referenceDialog, { formDetails })} group="references" />
             <Stack spacing={2} sx={{ pt: 1 }}>
-              <FieldGrid columns={3}>
+              <Paper component="section" variant="outlined" sx={{ p: 2, bgcolor: '#fbfdff' }} aria-label="Referencia 1">
+                <Typography fontWeight={800} color="primary.main" sx={{ mb: 2 }}>Referencia 1</Typography>
+              <FieldGrid columns={2}>
                 <TextField fullWidth required label="Nombre referencia 1" value={selectedCoDebtor?.reference1Name ?? ''} onChange={(e) => typeof referenceDialog === 'number' && updateCoDebtor(referenceDialog, { reference1Name: e.target.value })} />
                 <TextField fullWidth required label="Celular referencia 1" value={selectedCoDebtor?.reference1Mobile ?? ''} onChange={(e) => typeof referenceDialog === 'number' && updateCoDebtor(referenceDialog, { reference1Mobile: e.target.value })} {...phoneFieldProps(`coDebtors.${referenceDialog}.reference1Mobile`)} />
                 <TextField fullWidth required label="Relacion referencia 1" value={selectedCoDebtor?.reference1Relationship ?? ''} onChange={(e) => typeof referenceDialog === 'number' && updateCoDebtor(referenceDialog, { reference1Relationship: e.target.value })} />
+                <TextField fullWidth label="Dirección referencia 1" value={selectedCoDebtor?.formDetails?.reference1Address ?? ''} onChange={(e) => typeof referenceDialog === 'number' && updateCoDebtor(referenceDialog, { formDetails: { ...selectedCoDebtor?.formDetails, reference1Address: e.target.value } })} inputProps={{ maxLength: 500 }} />
               </FieldGrid>
-              <FieldGrid columns={3}>
+              </Paper>
+              <Paper component="section" variant="outlined" sx={{ p: 2, bgcolor: '#fbfdff' }} aria-label="Referencia 2">
+                <Typography fontWeight={800} color="primary.main" sx={{ mb: 2 }}>Referencia 2</Typography>
+              <FieldGrid columns={2}>
                 <TextField fullWidth required label="Nombre referencia 2" value={selectedCoDebtor?.reference2Name ?? ''} onChange={(e) => typeof referenceDialog === 'number' && updateCoDebtor(referenceDialog, { reference2Name: e.target.value })} />
                 <TextField fullWidth required label="Celular referencia 2" value={selectedCoDebtor?.reference2Mobile ?? ''} onChange={(e) => typeof referenceDialog === 'number' && updateCoDebtor(referenceDialog, { reference2Mobile: e.target.value })} {...phoneFieldProps(`coDebtors.${referenceDialog}.reference2Mobile`)} />
                 <TextField fullWidth required label="Relacion referencia 2" value={selectedCoDebtor?.reference2Relationship ?? ''} onChange={(e) => typeof referenceDialog === 'number' && updateCoDebtor(referenceDialog, { reference2Relationship: e.target.value })} />
+                <TextField fullWidth label="Dirección referencia 2" value={selectedCoDebtor?.formDetails?.reference2Address ?? ''} onChange={(e) => typeof referenceDialog === 'number' && updateCoDebtor(referenceDialog, { formDetails: { ...selectedCoDebtor?.formDetails, reference2Address: e.target.value } })} inputProps={{ maxLength: 500 }} />
               </FieldGrid>
+              </Paper>
             </Stack>
           </DialogContent>
           <DialogActions><Button variant="contained" onClick={() => setReferenceDialog(undefined)}>Listo</Button></DialogActions>
