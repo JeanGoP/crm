@@ -42,6 +42,7 @@ import { findDuplicateCreditPhones, duplicateCreditPhoneMessage, creditPhoneFiel
 import { QuotesTable } from './QuotesTable';
 import { CustomersTable } from './CustomersTable';
 import { CompactRecordsTable } from './CompactRecordsTable';
+import { CreditFormDetailsFields, type CreditFormDetails } from './CreditFormDetailsFields';
 import { useAuthStore } from './store';
 import { Activity, ColombianIdentityLookup, CollectionOrder, CommercialInventory, CommercialInventorySummary, CommercialReports, Company, CreditApplication, CreditCoDebtor, CreditDocument, Customer, Customer360, CustomerAiAnalysis, CustomerTimelineItem, Dashboard, Deal, DealStage, ExternalInventoryItem, ExternalInventoryWarehouse, FinancialSettings, Lead, LoginAccessReport, MotorcycleDelivery, Procedure, Product, ProductCategory, ProductPhoto, Promotion, Quote, QuoteChargeConcept, QuoteSalesPoint, QuoteSimulationResult, SalesPoint, SalesPointRate, User } from './types';
 
@@ -293,6 +294,7 @@ const emptyQuoteItem = { terms: [24] as number[], productId: '', productPrice: 0
 const emptyQuote = { bundlePayment: { ...emptyQuoteItem }, isCash: false, identificationType: 1, identificationNumber: '', customerFirstNames: '', customerLastNames: '', customerFirstName: '', customerMiddleName: '', customerLastName: '', customerSecondLastName: '', phoneCountryCode: '+57', phoneNumber: '', requirementProfileId: '', salesPointId: '', salesPointRateId: '', productId: '', downPayment: 0, insurance: 0, administrativeFees: 0, termMonths: 24, monthlyInterestRate: 2.2, items: [emptyQuoteItem], notes: '' };
 const emptyCoDebtor: CreditCoDebtor = { name: '', identification: '', mobile: '', relationship: '', monthlyIncome: 0, reference1Name: '', reference1Mobile: '', reference1Relationship: '', reference2Name: '', reference2Mobile: '', reference2Relationship: '', active: true };
 const emptyCreditApplication = {
+  formDetails: {} as CreditFormDetails,
   firstDueDate: '', coDebtors: [] as CreditCoDebtor[],
   customerId: '', productId: '', quoteId: '', dealId: '', identificationType: 1, identificationNumber: '', birthDate: '', mobile: '', address: '', city: '', occupation: '',
   monthlyIncome: 0, downPayment: 0, termMonths: 24, motorcycleValue: 0,
@@ -5077,6 +5079,7 @@ function CreditApplicationDialog({ form, customers, products, quotes, onClose, o
   const quote = quotes.find((x) => x.id === (form.item?.quoteId ?? ''));
   const initial = form.item ? {
     firstDueDate: form.item.firstDueDate?.slice(0, 10) ?? '',
+    formDetails: form.item.formDetails ?? {},
     coDebtors: (form.item.coDebtors ?? []).filter((person) => person.active).map((person) => ({ ...emptyCoDebtor, ...person })),
     customerId: form.item.customerId,
     productId: form.item.productId,
@@ -5194,6 +5197,8 @@ function CreditApplicationDialog({ form, customers, products, quotes, onClose, o
               <TextField fullWidth label="Ciudad" value={v.city} onChange={(e) => set({ city: e.target.value })} />
             </FieldGrid>
             {selectedCustomer && <Alert severity="info">Cliente seleccionado: {selectedCustomer.firstNames || selectedCustomer.name} {selectedCustomer.lastNames}</Alert>}
+            <TextField label="Ocupacion" value={v.occupation} onChange={(e) => set({ occupation: e.target.value })} />
+            <CreditFormDetailsFields value={v.formDetails} onChange={formDetails => set({ formDetails })} group="person" phoneError={creditPhoneFieldError(duplicatePhones, 'formDetails.workPhone')} />
           </Stack>
         </Paper>
 
@@ -5215,7 +5220,7 @@ function CreditApplicationDialog({ form, customers, products, quotes, onClose, o
               <CurrencyField label="Valor producto" value={v.motorcycleValue} onChange={motorcycleValue => set({ motorcycleValue })} />
             </Box>
             <TextField label="Fecha del primer vencimiento" type="date" value={v.firstDueDate} onChange={(e) => set({ firstDueDate: e.target.value })} InputLabelProps={{ shrink: true }} helperText="Fecha de la primera cuota acordada con el cliente." />
-            <TextField label="Ocupacion" value={v.occupation} onChange={(e) => set({ occupation: e.target.value })} />
+            <CreditFormDetailsFields value={v.formDetails} onChange={formDetails => set({ formDetails })} group="sale" />
           </Stack>
         </Paper>
 
@@ -5248,6 +5253,7 @@ function CreditApplicationDialog({ form, customers, products, quotes, onClose, o
                   <CurrencyField label="Ingresos mensuales" value={person.monthlyIncome} onChange={monthlyIncome => updateCoDebtor(index, { monthlyIncome })} />
                 </FieldGrid>
                 <Button variant="outlined" onClick={() => setReferenceDialog(index)}>Referencias de {person.name || `codeudor ${index + 1}`}</Button>
+                <CreditFormDetailsFields value={person.formDetails} onChange={formDetails => updateCoDebtor(index, { formDetails })} group="person" coDebtor phoneError={creditPhoneFieldError(duplicatePhones, `coDebtors.${index}.formDetails.workPhone`)} />
               </Stack>
             </Paper>)}
           </Stack>
@@ -5256,6 +5262,7 @@ function CreditApplicationDialog({ form, customers, products, quotes, onClose, o
         <Dialog open={referenceDialog === 'client'} onClose={() => setReferenceDialog(undefined)} fullWidth maxWidth="md">
           <DialogTitle>Referencias personales del cliente</DialogTitle>
           <DialogContent>
+            <CreditFormDetailsFields value={v.formDetails} onChange={formDetails => set({ formDetails })} group="references" />
             <Stack spacing={2} sx={{ pt: 1 }}>
               <FieldGrid columns={3}>
                 <TextField fullWidth required label="Nombre referencia 1" value={v.reference1Name} onChange={(e) => set({ reference1Name: e.target.value })} />
@@ -5275,6 +5282,7 @@ function CreditApplicationDialog({ form, customers, products, quotes, onClose, o
         <Dialog open={!!selectedCoDebtor} onClose={() => setReferenceDialog(undefined)} fullWidth maxWidth="md">
           <DialogTitle>Referencias de {selectedCoDebtor?.name}</DialogTitle>
           <DialogContent>
+            <CreditFormDetailsFields value={selectedCoDebtor?.formDetails} onChange={formDetails => typeof referenceDialog === 'number' && updateCoDebtor(referenceDialog, { formDetails })} group="references" />
             <Stack spacing={2} sx={{ pt: 1 }}>
               <FieldGrid columns={3}>
                 <TextField fullWidth required label="Nombre referencia 1" value={selectedCoDebtor?.reference1Name ?? ''} onChange={(e) => typeof referenceDialog === 'number' && updateCoDebtor(referenceDialog, { reference1Name: e.target.value })} />

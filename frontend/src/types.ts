@@ -434,6 +434,7 @@ export interface ColombianIdentityLookup {
 }
 
 export interface CreditCoDebtor {
+  formDetails?: import('./CreditFormDetailsFields').CreditFormDetails;
   id?: string;
   name: string;
   identification: string;
@@ -473,6 +474,7 @@ export interface CreditDocument {
 }
 
 export interface CreditApplication {
+  formDetails?: import('./CreditFormDetailsFields').CreditFormDetails;
   firstDueDate?: string;
   coDebtors?: CreditCoDebtor[];
   id: string;

@@ -1,4 +1,4 @@
-type PhoneOwner = { mobile?: string | null; reference1Mobile?: string | null; reference2Mobile?: string | null };
+type PhoneOwner = { mobile?: string | null; reference1Mobile?: string | null; reference2Mobile?: string | null; formDetails?: { workPhone?: string | null } };
 type ApplicationPhones = PhoneOwner & {
   coDebtors?: (PhoneOwner & { name?: string })[] | null;
   coDebtorName?: string | null;
@@ -19,6 +19,7 @@ export function normalizeCreditPhone(value?: string | null): string {
 export function findDuplicateCreditPhones(value: ApplicationPhones): DuplicatePhone[] {
   const fields: { path: string; label: string; value?: string | null }[] = [
     { path: 'mobile', label: 'Cliente - celular', value: value.mobile },
+    { path: 'formDetails.workPhone', label: 'Cliente - teléfono laboral', value: value.formDetails?.workPhone },
     { path: 'reference1Mobile', label: 'Cliente - referencia 1', value: value.reference1Mobile },
     { path: 'reference2Mobile', label: 'Cliente - referencia 2', value: value.reference2Mobile },
   ];
@@ -27,6 +28,7 @@ export function findDuplicateCreditPhones(value: ApplicationPhones): DuplicatePh
       const label = `Codeudor ${index + 1}${person.name ? ` (${person.name})` : ''}`;
       fields.push(
         { path: `coDebtors.${index}.mobile`, label: `${label} - celular`, value: person.mobile },
+        { path: `coDebtors.${index}.formDetails.workPhone`, label: `${label} - teléfono laboral`, value: person.formDetails?.workPhone },
         { path: `coDebtors.${index}.reference1Mobile`, label: `${label} - referencia 1`, value: person.reference1Mobile },
         { path: `coDebtors.${index}.reference2Mobile`, label: `${label} - referencia 2`, value: person.reference2Mobile },
       );

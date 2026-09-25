@@ -378,6 +378,7 @@ public sealed class CotizacionItem : AuditableTenantEntity
 
 public sealed class SolicitudCredito : AuditableTenantEntity
 {
+    public string? FormDetailsJson { get; set; }
     public string Numero { get; set; } = string.Empty;
     public Guid ClienteId { get; set; }
     public Cliente? Cliente { get; set; }

@@ -232,6 +232,7 @@ Console.WriteLine("OK: multiplazos, deduplicacion, limites, persistencia de cuot
 
 QuotePdfLayoutChecks.Run(optionsQuote, args);
 CreditPhoneChecks.Run();
+CreditFormDetailsChecks.Run();
 
 sealed class TestTenant : ITenantContext
 {

@@ -4,6 +4,7 @@ namespace CrmSaas.Domain.Entities;
 
 public sealed class CodeudorSolicitudCredito : AuditableTenantEntity
 {
+    public string? FormDetailsJson { get; set; }
     public Guid SolicitudCreditoId { get; set; }
     public SolicitudCredito? SolicitudCredito { get; set; }
     public string Nombre { get; set; } = string.Empty;

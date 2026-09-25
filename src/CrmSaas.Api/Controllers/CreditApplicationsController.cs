@@ -107,7 +107,8 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             CodeudorReferencia2Celular = Normalize(dto.CoDebtorReference2Mobile),
             CodeudorReferencia2Relacion = Normalize(dto.CoDebtorReference2Relationship),
             Estado = dto.Status,
-            Observaciones = dto.Notes
+            Observaciones = dto.Notes,
+            FormDetailsJson = CreditFormDetails.Save(dto.FormDetails)
         };
 
         AddChecklistDocuments(entity, null);
@@ -181,6 +182,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         entity.CodeudorReferencia2Relacion = Normalize(dto.CoDebtorReference2Relationship);
         entity.Estado = dto.Status;
         entity.Observaciones = dto.Notes;
+        entity.FormDetailsJson = CreditFormDetails.Save(dto.FormDetails, entity.FormDetailsJson);
         AddMissingChecklistDocuments(entity, null);
         entity.FechaPrimerVencimiento = dto.FirstDueDate?.Date;
         SyncCoDebtors(entity, dto.CoDebtors);
@@ -1017,7 +1019,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             x.UsuarioBienvenida,
             x.ObservacionBienvenida,
             x.Documentos.OrderBy(d => Array.IndexOf(CreditDocumentCatalog.Names, d.Nombre) is var index && index >= 0 ? index : 999).ThenBy(d => d.Nombre).Select(ToDocumentDto).ToList(),
-            x.DocumentacionCompleta, x.FechaDocumentacionCompleta, x.UsuarioDocumentacionCompleta, x.FechaPrimerVencimiento, x.Codeudores.OrderBy(c => c.Orden).Select(CreditCoDebtorService.ToDto).ToList());
+            x.DocumentacionCompleta, x.FechaDocumentacionCompleta, x.UsuarioDocumentacionCompleta, x.FechaPrimerVencimiento, x.Codeudores.OrderBy(c => c.Orden).Select(CreditCoDebtorService.ToDto).ToList(), CreditFormDetails.Read(x.FormDetailsJson));
     }
 
     private static CreditDocumentDto ToDocumentDto(DocumentoSolicitudCredito d) =>

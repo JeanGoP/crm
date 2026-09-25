@@ -9,7 +9,7 @@ public static class CreditCoDebtorService
     public static CreditCoDebtorDto ToDto(CodeudorSolicitudCredito x) => new(x.Id, x.Nombre,
         x.Identificacion, x.Celular, x.Parentesco, x.IngresosMensuales, x.Referencia1Nombre,
         x.Referencia1Celular, x.Referencia1Relacion, x.Referencia2Nombre, x.Referencia2Celular,
-        x.Referencia2Relacion, x.Activo);
+        x.Referencia2Relacion, x.Activo, CreditFormDetails.Read(x.FormDetailsJson));
 
     public static bool Apply(SolicitudCredito application, IReadOnlyCollection<CreditCoDebtorDto>? requested)
     {
@@ -70,6 +70,7 @@ public static class CreditCoDebtorService
             entity.Referencia2Nombre = item.Reference2Name?.Trim();
             entity.Referencia2Celular = item.Reference2Mobile?.Trim();
             entity.Referencia2Relacion = item.Reference2Relationship?.Trim();
+            entity.FormDetailsJson = CreditFormDetails.Save(item.FormDetails, entity.FormDetailsJson);
         }
         MirrorPrimary(application);
         return !before.SequenceEqual(application.Codeudores.OrderBy(x => x.Orden).Select(ToDto));

@@ -22,6 +22,7 @@ public static class CreditPhoneValidation
         var fields = new List<(string Label, string? Phone)>
         {
             ("Cliente - celular", application.Celular),
+            ("Cliente - teléfono laboral", CreditFormDetails.Read(application.FormDetailsJson)?.WorkPhone),
             ("Cliente - referencia 1", application.Referencia1Celular),
             ("Cliente - referencia 2", application.Referencia2Celular)
         };
@@ -30,6 +31,7 @@ public static class CreditPhoneValidation
         {
             var label = $"Codeudor {++index} ({person.Nombre})";
             fields.Add(($"{label} - celular", person.Celular));
+            fields.Add(($"{label} - teléfono laboral", CreditFormDetails.Read(person.FormDetailsJson)?.WorkPhone));
             fields.Add(($"{label} - referencia 1", person.Referencia1Celular));
             fields.Add(($"{label} - referencia 2", person.Referencia2Celular));
         }

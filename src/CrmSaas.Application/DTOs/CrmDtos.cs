@@ -496,12 +496,13 @@ public sealed record CreditApplicationDto(
     DateTime? DocumentationCompletedAt = null,
     string? DocumentationCompletedBy = null,
     DateTime? FirstDueDate = null,
-    IReadOnlyCollection<CreditCoDebtorDto>? CoDebtors = null);
+    IReadOnlyCollection<CreditCoDebtorDto>? CoDebtors = null,
+    CreditFormDetailsDto? FormDetails = null);
 
 public sealed record CreditCoDebtorDto(Guid? Id, string Name, string Identification, string Mobile,
     string? Relationship, decimal MonthlyIncome, string? Reference1Name, string? Reference1Mobile,
     string? Reference1Relationship, string? Reference2Name, string? Reference2Mobile,
-    string? Reference2Relationship, bool Active = true);
+    string? Reference2Relationship, bool Active = true, CreditFormDetailsDto? FormDetails = null);
 
 public sealed record UpsertCreditApplicationDto(
     Guid CustomerId,
@@ -540,7 +541,8 @@ public sealed record UpsertCreditApplicationDto(
     EstadoSolicitudCredito Status,
     string? Notes,
     DateTime? FirstDueDate = null,
-    IReadOnlyCollection<CreditCoDebtorDto>? CoDebtors = null);
+    IReadOnlyCollection<CreditCoDebtorDto>? CoDebtors = null,
+    CreditFormDetailsDto? FormDetails = null);
 
 public sealed record CreditDocumentDto(
     Guid Id,
