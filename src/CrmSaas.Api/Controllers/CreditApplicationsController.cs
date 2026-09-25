@@ -547,7 +547,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
 
         var company = await db.Empresas.IgnoreQueryFilters().FirstOrDefaultAsync(x => x.Id == tenantContext.EmpresaId, cancellationToken);
         var dto = ToDto(entity);
-        var bytes = SimplePdfGenerator.CreditApplication(dto, company?.Nombre ?? "Empresa", normalized);
+        var bytes = SimplePdfGenerator.CreditApplication(dto, company?.Nombre ?? "Empresa", normalized, company?.LogoDataUrl);
         return File(bytes, "application/pdf", SimplePdfGenerator.CreditTemplateFileName(dto, normalized));
     }
 

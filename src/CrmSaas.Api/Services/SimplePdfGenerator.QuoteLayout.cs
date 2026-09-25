@@ -252,7 +252,7 @@ public static partial class SimplePdfGenerator
             .Where(c => System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c) != System.Globalization.UnicodeCategory.NonSpacingMark)
             .Sum(c => c is >= ' ' and <= '~' ? (bold ? BoldWidths : RegularWidths)[c - 32] : c == '\u00a0' ? 278 : 556) * size / 1000d;
         private static double Fit(string text, double width, double size, bool bold = false) => Math.Min(size, size * width / Math.Max(1, Measure(text, size, bold)));
-        private static List<string> Wrap(string? text, double width, double size, bool bold = false)
+        internal static List<string> Wrap(string? text, double width, double size, bool bold = false)
         {
             var result = new List<string>();
             var current = "";
