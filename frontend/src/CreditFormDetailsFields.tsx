@@ -3,6 +3,11 @@ import ExpandMore from '@mui/icons-material/ExpandMore';
 import { currencyInputValue } from './quotePayments';
 
 export interface CreditFormDetails {
+  birthDate?: string | null;
+  companyTaxId?: string | null;
+  companyLocation?: string | null;
+  advancePayment?: number | null;
+  purchaseSupport?: string | null;
   identificationType?: string | null;
   housingType?: string | null;
   maritalStatus?: string | null;
@@ -42,6 +47,11 @@ export interface CreditFormDetails {
 }
 
 const labels = {
+  birthDate: 'Fecha de nacimiento',
+  companyTaxId: 'NIT de la empresa (para impresión)',
+  companyLocation: 'Ciudad / departamento de la empresa',
+  advancePayment: 'Anticipo',
+  purchaseSupport: 'Soporte de la compra',
   identificationType: 'Tipo de documento',
   housingType: 'Tipo de vivienda',
   maritalStatus: 'Estado civil',
@@ -79,24 +89,27 @@ const labels = {
   registration: 'Matrícula',
   totalCredit: 'Total crédito',
 };
-const numberFields = new Set<keyof CreditFormDetails>(['extraPayment', 'extraPaymentCount', 'monthlyPayment', 'soat', 'registration', 'totalCredit']);
-export function CreditFormDetailsFields({ value: suppliedValue, onChange, group, coDebtor = false, phoneError }: {
+const numberFields = new Set<keyof CreditFormDetails>(['advancePayment', 'extraPayment', 'extraPaymentCount', 'monthlyPayment', 'soat', 'registration', 'totalCredit']);
+export function CreditFormDetailsFields({ value: suppliedValue, onChange, group, coDebtor = false, phoneError, appliance = false }: {
   value?: CreditFormDetails | null; onChange: (value: CreditFormDetails) => void;
-  group: 'person' | 'references' | 'sale'; coDebtor?: boolean; phoneError?: string;
+  group: 'person' | 'references' | 'sale'; coDebtor?: boolean; phoneError?: string; appliance?: boolean;
 }) {
   const value = suppliedValue ?? {};
   const keys: (keyof CreditFormDetails)[] = group === 'references' ? ['reference1Address', 'reference2Address']
-    : group === 'sale' ? ['zone', 'advisor', 'salesPoint', 'businessType', 'extraPayment', 'extraPaymentCount', 'monthlyPayment', 'soat', 'registration', 'totalCredit', 'vehicleType', 'vehicleLine', 'vehicleVariant', 'vehicleModel', 'vehicleColor', 'vehicleEngineCc', 'vehiclePlate', 'vehicleChassis', 'vehicleBrand', 'vehicleEngine', 'vehicleNotes']
-    : [...(coDebtor ? ['identificationType', 'address', 'city', 'occupation'] as const : []), 'housingType', 'maritalStatus', 'email', 'employer', 'jobTitle', 'workPhone', 'workAddress', 'workEmail', 'locationReference'];
+    : group === 'sale' ? appliance
+      ? ['businessType', 'companyTaxId', 'companyLocation', 'advancePayment', 'monthlyPayment', 'purchaseSupport']
+      : ['zone', 'advisor', 'salesPoint', 'businessType', 'extraPayment', 'extraPaymentCount', 'monthlyPayment', 'soat', 'registration', 'totalCredit', 'vehicleType', 'vehicleLine', 'vehicleVariant', 'vehicleModel', 'vehicleColor', 'vehicleEngineCc', 'vehiclePlate', 'vehicleChassis', 'vehicleBrand', 'vehicleEngine', 'vehicleNotes']
+    : [...(coDebtor ? ['birthDate', 'identificationType', 'address', 'city', 'occupation'] as const : []), 'housingType', 'maritalStatus', 'email', 'employer', 'jobTitle', 'workPhone', 'workAddress', 'workEmail', 'locationReference'];
   const fields = <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))', md: 'repeat(3, minmax(0, 1fr))' }, gap: 2, pt: 1 }}>
-    {keys.map(key => <TextField key={key} fullWidth label={labels[key]} value={numberFields.has(key) && key !== 'extraPaymentCount' ? currencyInputValue(value[key] as number | undefined) : value[key] ?? ''}
-      type={key === 'extraPaymentCount' ? 'number' : key === 'email' || key === 'workEmail' ? 'email' : 'text'}
+    {keys.map(key => <TextField key={key} fullWidth label={key === 'businessType' && appliance ? 'Modalidad de crédito' : labels[key]} value={key === 'birthDate' ? value.birthDate?.slice(0, 10) ?? '' : numberFields.has(key) && key !== 'extraPaymentCount' ? currencyInputValue(value[key] as number | undefined) : value[key] ?? ''}
+      type={key === 'birthDate' ? 'date' : key === 'extraPaymentCount' ? 'number' : key === 'email' || key === 'workEmail' ? 'email' : 'text'}
+      InputLabelProps={key === 'birthDate' ? { shrink: true } : undefined}
       inputProps={numberFields.has(key) ? { min: 0, step: key === 'extraPaymentCount' ? 1 : 'any' } : { maxLength: 500 }}
       error={key === 'workPhone' && !!phoneError} helperText={key === 'workPhone' ? phoneError : undefined}
-      onChange={event => onChange({ ...value, [key]: numberFields.has(key) ? event.target.value === '' ? null : Number(key === 'extraPaymentCount' ? event.target.value : event.target.value.replace(/\D/g, '')) : event.target.value })} />)}
+      onChange={event => onChange({ ...value, [key]: key === 'birthDate' ? event.target.value || null : numberFields.has(key) ? event.target.value === '' ? null : Number(key === 'extraPaymentCount' ? event.target.value : event.target.value.replace(/\D/g, '')) : event.target.value })} />)}
   </Box>;
   return group === 'references' ? fields : <Accordion disableGutters variant="outlined" defaultExpanded={!!phoneError} sx={{ boxShadow: 'none', '&:before': { display: 'none' } }}>
-    <AccordionSummary expandIcon={<ExpandMore />}><Typography fontWeight={800}>{group === 'sale' ? 'Información de venta y características del vehículo / artículo' : 'Datos personales y actividad económica'}{phoneError ? ' · Teléfono repetido' : ''}</Typography></AccordionSummary>
+    <AccordionSummary expandIcon={<ExpandMore />}><Typography fontWeight={800}>{group === 'sale' ? appliance ? 'Información de la compra de electrodomésticos' : 'Información de venta y características del vehículo / artículo' : 'Datos personales y actividad económica'}{phoneError ? ' · Teléfono repetido' : ''}</Typography></AccordionSummary>
     <AccordionDetails>{fields}</AccordionDetails>
   </Accordion>;
 }

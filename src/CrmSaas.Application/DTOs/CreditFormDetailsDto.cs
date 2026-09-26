@@ -3,6 +3,11 @@ namespace CrmSaas.Application.DTOs;
 // Snapshot of the additional information supplied for the signed credit form.
 public sealed record CreditFormDetailsDto
 {
+    public DateTime? BirthDate { get; init; }
+    public string? CompanyTaxId { get; init; }
+    public string? CompanyLocation { get; init; }
+    public decimal? AdvancePayment { get; init; }
+    public string? PurchaseSupport { get; init; }
     public string? IdentificationType { get; init; }
     public string? HousingType { get; init; }
     public string? MaritalStatus { get; init; }

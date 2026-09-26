@@ -5220,7 +5220,7 @@ function CreditApplicationDialog({ form, customers, products, quotes, onClose, o
               <CurrencyField label="Valor producto" value={v.motorcycleValue} onChange={motorcycleValue => set({ motorcycleValue })} />
             </Box>
             <TextField label="Fecha del primer vencimiento" type="date" value={v.firstDueDate} onChange={(e) => set({ firstDueDate: e.target.value })} InputLabelProps={{ shrink: true }} helperText="Fecha de la primera cuota acordada con el cliente." />
-            <CreditFormDetailsFields value={v.formDetails} onChange={formDetails => set({ formDetails })} group="sale" />
+            <CreditFormDetailsFields value={v.formDetails} onChange={formDetails => set({ formDetails })} group="sale" appliance={(selectedProduct?.category ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().includes('electrodom')} />
           </Stack>
         </Paper>
 

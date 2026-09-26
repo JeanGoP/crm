@@ -6,7 +6,7 @@ namespace CrmSaas.Api.Services;
 
 public static partial class SimplePdfGenerator
 {
-    private static byte[] CreateCreditSignaturePdf(CreditApplicationDto app, string company, string? logoDataUrl)
+    private static byte[] CreateCreditSignaturePdf(CreditApplicationDto app, string company, string? logoDataUrl, CreditPrintContext? context)
     {
         PdfImageData? logo = null;
         if (logoDataUrl?.StartsWith("data:image/", StringComparison.OrdinalIgnoreCase) == true)
@@ -27,7 +27,7 @@ public static partial class SimplePdfGenerator
         var images = new List<string>();
         AddImageObject(objects, images, "Logo", logo);
         var resources = $"<< /Font << /F1 3 0 R /F2 4 0 R >> /XObject << {string.Join(" ", images)} >> >>";
-        var pages = new CreditSignatureLayout(app, company, logo).Render();
+        var pages = new CreditSignatureLayout(app, company, logo, context).Render();
         var pageRefs = new List<string>();
         foreach (var content in pages)
         {
@@ -40,9 +40,12 @@ public static partial class SimplePdfGenerator
         return BuildPdf(objects, $"{app.Number}-solicitud-credito.pdf");
     }
 
-    private sealed class CreditSignatureLayout(CreditApplicationDto app, string company, PdfImageData? logo)
+    private sealed partial class CreditSignatureLayout(CreditApplicationDto app, string company, PdfImageData? logo, CreditPrintContext? context)
     {
-        private const double Left = 30, Width = 535, Bottom = 807, Font = 7, Line = 8;
+        private const double Left = 30, Width = 535, Bottom = 807;
+        private bool Appliance => context?.IsAppliance == true;
+        private double Font => Appliance ? 8 : 7;
+        private double Line => Appliance ? 10 : 8;
         private const string Teal = "0.02 0.40 0.43";
         private readonly List<string> pages = [];
         private StringBuilder page = new();
@@ -72,6 +75,9 @@ public static partial class SimplePdfGenerator
                     app.CoDebtorMonthlyIncome ?? 0, app.CoDebtorReference1Name, app.CoDebtorReference1Mobile, app.CoDebtorReference1Relationship,
                     app.CoDebtorReference2Name, app.CoDebtorReference2Mobile, app.CoDebtorReference2Relationship));
             NewPage();
+            if (Appliance) ApplianceData(d, people);
+            else
+            {
             Row(("Fecha", Day(app.CreatedAt)), ("Zona", d.Zone), ("Punto de venta", d.SalesPoint));
             Row(("Asesor", d.Advisor), ("Consecutivo", app.Number));
             Section("DATOS DEL DEUDOR");
@@ -106,6 +112,7 @@ public static partial class SimplePdfGenerator
             Row(("Chasis", d.VehicleChassis), ("Motor", d.VehicleEngine));
             Row(("Observaciones vehículo", d.VehicleNotes));
             if (!string.IsNullOrWhiteSpace(app.Notes)) Row(("Observaciones solicitud", app.Notes));
+            }
 
             NewPage();
             Section("AUTORIZACIÓN DE TRATAMIENTO DE DATOS PERSONALES");
@@ -124,7 +131,7 @@ public static partial class SimplePdfGenerator
                 for (var i = 0; i < pair.Length; i++) Signature(Left + i * (Width / 2 + 5), Width / 2 - 5, pair[i], height);
                 y += height + 18;
             }
-            Ensure(50);
+            Ensure(Line + 3);
             Row(("Lugar de firma", ""), ("Fecha de firma", ""));
             Finish();
             return pages;
@@ -160,6 +167,7 @@ public static partial class SimplePdfGenerator
             if (page.Length > 0) Finish();
             page = new();
             section = "";
+            if (Appliance) { ApplianceHeader(); return; }
             Text("SOLICITUD DE CRÉDITO", Left, 29, 13, true, Teal);
             var names = QuoteLayout.Wrap(company, 380, 9, true);
             var top = 44d;

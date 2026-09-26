@@ -53,6 +53,7 @@ static class CreditSignaturePdfChecks
             File.WriteAllBytes(Path.Combine(args[0], "solicitud-credito-sin-detalles.pdf"), empty);
         }
         Console.WriteLine("OK: signature PDF, new form data, active co-debtors, pagination and optional details.");
+        ApplianceCreditPdfChecks.Run(sample, args);
     }
 
     private static string Decode(byte[] pdf) => string.Join("\n", Regex.Matches(Encoding.ASCII.GetString(pdf), @"<([0-9A-F]+)> Tj")

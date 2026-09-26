@@ -547,7 +547,12 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
 
         var company = await db.Empresas.IgnoreQueryFilters().FirstOrDefaultAsync(x => x.Id == tenantContext.EmpresaId, cancellationToken);
         var dto = ToDto(entity);
-        var bytes = SimplePdfGenerator.CreditApplication(dto, company?.Nombre ?? "Empresa", normalized, company?.LogoDataUrl);
+        Cotizacion? printQuote = null;
+        if (normalized == "solicitud-credito" && entity.CotizacionId.HasValue && CreditPrintContext.IsApplianceCategory(entity.Producto?.Categoria))
+            printQuote = await db.Cotizaciones.AsNoTracking().Include(x => x.Items).ThenInclude(x => x.Producto)
+                .FirstOrDefaultAsync(x => x.Id == entity.CotizacionId.Value, cancellationToken);
+        var bytes = SimplePdfGenerator.CreditApplication(dto, company?.Nombre ?? "Empresa", normalized, company?.LogoDataUrl,
+            CreditPrintContext.From(entity, printQuote));
         return File(bytes, "application/pdf", SimplePdfGenerator.CreditTemplateFileName(dto, normalized));
     }
 

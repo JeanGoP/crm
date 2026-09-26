@@ -18,10 +18,10 @@ public static partial class SimplePdfGenerator
         return CreateQuotePdf(quote, companyName, productImage, companyLogo, brandLogo, customerPhone, customerAddress, advisor);
     }
 
-    public static byte[] CreditApplication(CreditApplicationDto application, string companyName, string template, string? companyLogoDataUrl = null)
+    public static byte[] CreditApplication(CreditApplicationDto application, string companyName, string template, string? companyLogoDataUrl = null, CreditPrintContext? printContext = null)
     {
         var normalized = template.Trim().ToLowerInvariant();
-        if (normalized == "solicitud-credito") return CreateCreditSignaturePdf(application, companyName, companyLogoDataUrl);
+        if (normalized == "solicitud-credito") return CreateCreditSignaturePdf(application, companyName, companyLogoDataUrl, printContext);
         var lines = normalized switch
         {
             "solicitud-credito" => CreditRequest(application, companyName),
