@@ -46,6 +46,13 @@ static class ApplianceCreditPdfChecks
         Check(CreditFormDetails.Read(CreditFormDetails.Save(details)) == details, "Appliance fields round-trip without a database migration.");
         var bytes = SimplePdfGenerator.CreditApplication(sample, "EMPRESA DE DEMOSTRACIÓN", "solicitud-credito", printContext: context);
         var text = Decode(bytes);
+        Check(text.Contains("ANTICIPO\n$ 500.000"), "Anticipo comes from the application initial payment, not legacy details or quote advances.");
+        var editedInitial = Decode(SimplePdfGenerator.CreditApplication(sample with { DownPayment = 750000 }, "Empresa", "solicitud-credito", printContext: context));
+        Check(editedInitial.Contains("ANTICIPO\n$ 750.000"), "Editing initial payment updates the printed advance.");
+        var zeroInitial = Decode(SimplePdfGenerator.CreditApplication(sample with { DownPayment = 0 }, "Empresa", "solicitud-credito", printContext: context));
+        Check(zeroInitial.Contains("ANTICIPO\n$ 0"), "A zero initial payment must not fall back to an old advance.");
+        var withoutPrintContext = Decode(SimplePdfGenerator.CreditApplication(sample, "Empresa", "solicitud-credito", printContext: context with { Advance = null }));
+        Check(withoutPrintContext.Contains("ANTICIPO\n$ 500.000"), "Advance is available without quotation advance data.");
         foreach (var required in new[] { "ELECTRODOMÉSTICOS", "DATOS DEL DEUDOR", "DATOS DEL DEUDOR SOLIDARIO 1", "REFERENCIAS FAMILIARES", "DATOS DE LA COMPRA",
             "NEV-250", "LAV-012", "$ 2.900.000", "ANTICIPO", "18", "$ 180.000", "38", "Recibo de demostración 001", "FIRMAS Y HUELLAS" })
             Check(text.Contains(required), "Missing appliance PDF field: " + required);

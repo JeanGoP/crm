@@ -97,7 +97,7 @@ export function CreditFormDetailsFields({ value: suppliedValue, onChange, group,
   const value = suppliedValue ?? {};
   const keys: (keyof CreditFormDetails)[] = group === 'references' ? ['reference1Address', 'reference2Address']
     : group === 'sale' ? appliance
-      ? ['businessType', 'companyTaxId', 'companyLocation', 'advancePayment', 'monthlyPayment', 'purchaseSupport']
+      ? ['businessType', 'companyTaxId', 'companyLocation', 'monthlyPayment', 'purchaseSupport']
       : ['zone', 'advisor', 'salesPoint', 'businessType', 'extraPayment', 'extraPaymentCount', 'monthlyPayment', 'soat', 'registration', 'totalCredit', 'vehicleType', 'vehicleLine', 'vehicleVariant', 'vehicleModel', 'vehicleColor', 'vehicleEngineCc', 'vehiclePlate', 'vehicleChassis', 'vehicleBrand', 'vehicleEngine', 'vehicleNotes']
     : [...(coDebtor ? ['birthDate', 'identificationType', 'address', 'city', 'occupation'] as const : []), 'housingType', 'maritalStatus', 'email', 'employer', 'jobTitle', 'workPhone', 'workAddress', 'workEmail', 'locationReference'];
   const fields = <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))', md: 'repeat(3, minmax(0, 1fr))' }, gap: 2, pt: 1 }}>

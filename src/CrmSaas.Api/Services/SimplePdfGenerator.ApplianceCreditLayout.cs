@@ -85,7 +85,7 @@ public static partial class SimplePdfGenerator
             var summary = new (string Label, string Value)[]
             {
                 ("C. INICIAL", Amount(app.DownPayment)),
-                ("ANTICIPO", Amount(d.AdvancePayment ?? context?.Advance)),
+                ("ANTICIPO", Amount(app.DownPayment)),
                 ("N.º CUOTAS", app.TermMonths.ToString()),
                 ("VLR. CUOTA", Amount(d.MonthlyPayment ?? context?.MonthlyPayment)),
                 ("FECHA PAGO", Day(app.FirstDueDate))
