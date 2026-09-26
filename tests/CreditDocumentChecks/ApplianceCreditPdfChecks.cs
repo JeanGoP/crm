@@ -12,31 +12,42 @@ static class ApplianceCreditPdfChecks
 
     public static void Run(CreditApplicationDto original, string[] args)
     {
-        Check(CreditPrintContext.IsApplianceCategory("Electrodomésticos") && CreditPrintContext.IsApplianceCategory("ELECTRODOMESTICOS"), "Accent/case category detection.");
-        Check(!CreditPrintContext.IsApplianceCategory("Moto") && !CreditPrintContext.IsApplianceCategory(null), "Do not change vehicle format.");
         var product = new Producto { Nombre = "NEVERA DE DEMOSTRACIÓN 250 L", Referencia = "NEV-250", Categoria = "Electrodomésticos" };
         var washer = new Producto { Nombre = "LAVADORA DE DEMOSTRACIÓN 12 KG", Referencia = "LAV-012", Categoria = "Electrodomésticos" };
         var entity = new SolicitudCredito { EmpresaId = Guid.NewGuid(), ClienteId = Guid.NewGuid(), Producto = product, ProductoId = product.Id,
             ValorMoto = 2900000, CuotaInicial = 500000, PlazoMeses = 18 };
+        var category = new CategoriaProducto { EmpresaId = entity.EmpresaId, Nombre = "Línea hogar", CotizarComoPaquete = true };
+        product.Categoria = category.Nombre;
+        Check(CreditPrintContext.UsesApplianceFormat(entity, category), "A custom category name with joint financing uses appliance format.");
+        category.CotizarComoPaquete = false;
+        category.Nombre = product.Categoria = "Electrodomésticos";
+        Check(!CreditPrintContext.UsesApplianceFormat(entity, category), "The name alone must never enable appliance format.");
+        category.CotizarComoPaquete = true;
+        category.EmpresaId = Guid.NewGuid();
+        Check(!CreditPrintContext.UsesApplianceFormat(entity, category), "Another tenant's category cannot enable the format.");
+        category.EmpresaId = entity.EmpresaId;
+        category.Nombre = "Otra categoría";
+        Check(!CreditPrintContext.UsesApplianceFormat(entity, category) && !CreditPrintContext.UsesApplianceFormat(entity, null), "Only the selected product's configured category applies.");
+        category.Nombre = product.Categoria = "Línea hogar";
         var quote = new Cotizacion { EmpresaId = entity.EmpresaId, ClienteId = entity.ClienteId, ProductoId = product.Id, EsPaquete = true,
             PrecioProducto = 2900000, CuotaInicial = 500000, CuotaInicialPagadaHoy = 300000, PlazoMeses = 18, CuotaMensualEstimada = 180000, TipoCredito = "Crédito" };
         quote.Items.Add(new() { ProductoId = product.Id, Producto = product, PrecioProducto = 1700000, Orden = 0 });
         quote.Items.Add(new() { ProductoId = washer.Id, Producto = washer, PrecioProducto = 1200000, Orden = 1 });
         entity.CotizacionId = quote.Id;
-        var context = CreditPrintContext.From(entity, quote);
+        var context = CreditPrintContext.From(entity, quote, category);
         Check(context.IsAppliance && context.Items.Count == 2 && context.Items.Sum(i => i.Value) == 2900000, "Bundle includes all items once.");
         Check(context.Advance == 300000 && context.MonthlyPayment == 180000, "Use matching quotation conditions.");
         entity.PlazoMeses = 12;
-        Check(CreditPrintContext.From(entity, quote).MonthlyPayment is null, "Never use a different term's installment.");
+        Check(CreditPrintContext.From(entity, quote, category).MonthlyPayment is null, "Never use a different term's installment.");
         entity.PlazoMeses = 18;
         quote.EsPaquete = false;
-        Check(CreditPrintContext.From(entity, quote).Items.Count == 1, "Comparative quote prints only the chosen product.");
+        Check(CreditPrintContext.From(entity, quote, category).Items.Count == 1, "Comparative quote prints only the chosen product.");
         quote.EsPaquete = true;
         quote.EmpresaId = Guid.NewGuid();
-        Check(CreditPrintContext.From(entity, quote).Items.Count == 1 && CreditPrintContext.From(entity, quote).Advance is null, "Reject cross-company data.");
+        Check(CreditPrintContext.From(entity, quote, category).Items.Count == 1 && CreditPrintContext.From(entity, quote, category).Advance is null, "Reject cross-company data.");
         quote.EmpresaId = entity.EmpresaId;
         quote.ClienteId = Guid.NewGuid();
-        Check(CreditPrintContext.From(entity, quote).Items.Count == 1, "Reject unrelated customer.");
+        Check(CreditPrintContext.From(entity, quote, category).Items.Count == 1, "Reject unrelated customer.");
         var details = original.FormDetails! with { CompanyTaxId = "NIT DE PRUEBA", CompanyLocation = "Montelíbano - Córdoba", PurchaseSupport = "Recibo de demostración 001",
             AdvancePayment = 300000, MonthlyPayment = 180000, BusinessType = "Crédito directo" };
         var person = original.CoDebtors!.First();
@@ -59,7 +70,7 @@ static class ApplianceCreditPdfChecks
         foreach (var forbidden in new[] { "CHASIS", "Matrícula", "SOAT", "Cilindraje", "CASANOVA", "900499748" })
             Check(!text.Contains(forbidden), "Do not copy vehicle fields or another company's data: " + forbidden);
         Check(Regex.Matches(Encoding.ASCII.GetString(bytes), @"/Type /Page /").Count == 2, "One co-debtor template fits two pages including signatures.");
-        var withoutQuote = CreditPrintContext.From(entity, null);
+        var withoutQuote = CreditPrintContext.From(entity, null, category);
         Check(withoutQuote.IsAppliance && withoutQuote.Items.Count == 1, "Appliance works without a quote.");
         var legacy = SimplePdfGenerator.CreditApplication(original, "Empresa", "solicitud-credito", printContext: context with { IsAppliance = false });
         Check(Decode(legacy).Contains("CHASIS-DEMO-0001"), "Vehicle format retained.");

@@ -1,5 +1,3 @@
-using System.Globalization;
-using System.Text;
 using CrmSaas.Domain.Entities;
 
 namespace CrmSaas.Api.Services;
@@ -10,14 +8,15 @@ public sealed record CreditPurchaseLine(string Name, string Code, decimal Value,
 public sealed record CreditPrintContext(bool IsAppliance, IReadOnlyList<CreditPurchaseLine> Items,
     decimal? Advance = null, decimal? MonthlyPayment = null)
 {
-    public static bool IsApplianceCategory(string? category) => new string((category ?? "").Normalize(NormalizationForm.FormD)
-        .Where(c => CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark).ToArray())
-        .Contains("electrodom", StringComparison.OrdinalIgnoreCase);
+    public static bool UsesApplianceFormat(SolicitudCredito application, CategoriaProducto? category) =>
+        category?.CotizarComoPaquete == true && category.EmpresaId == application.EmpresaId
+        && !string.IsNullOrWhiteSpace(application.Producto?.Categoria)
+        && string.Equals(category.Nombre.Trim(), application.Producto.Categoria.Trim(), StringComparison.OrdinalIgnoreCase);
 
-    public static CreditPrintContext From(SolicitudCredito application, Cotizacion? quote)
+    public static CreditPrintContext From(SolicitudCredito application, Cotizacion? quote, CategoriaProducto? category)
     {
         var product = application.Producto;
-        var appliance = IsApplianceCategory(product?.Categoria);
+        var appliance = UsesApplianceFormat(application, category);
         // A linked quote may only contribute data for the same tenant, customer and chosen product.
         var valid = quote is not null && quote.EmpresaId == application.EmpresaId && quote.ClienteId == application.ClienteId
             && quote.Id == application.CotizacionId

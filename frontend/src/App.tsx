@@ -1711,6 +1711,7 @@ function CreditWorkflowBoardPage() {
 
 function CreditApplicationsPage() {
   const canManageCredit = useCanManage();
+  const { data: productCategories = [] } = useResource<ProductCategory[]>('/api/product-categories', []);
   const { data: rows = [], loading, error, reload, setData } = useResource<CreditApplication[]>('/api/credit-applications', []);
   const { data: customers = [] } = useResource<Customer[]>('/api/customers', []);
   const { data: products = [] } = useResource<Product[]>('/api/products', []);
@@ -1984,7 +1985,7 @@ function CreditApplicationsPage() {
         <CreditApplicationPendingSummary application={r} compact />
       ] }))}
     />
-    <CreditApplicationDialog form={form} customers={customers} products={products.filter((x) => x.active)} quotes={quotes} onClose={() => setForm({ open: false })} onSave={save} />
+    <CreditApplicationDialog form={form} customers={customers} products={products.filter((x) => x.active)} productCategories={productCategories} quotes={quotes} onClose={() => setForm({ open: false })} onSave={save} />
     <CreditApplicationManagementDialog
       application={managementApplication}
       initialTab={searchParams.get('tab') === 'proceso' ? 4 : 0}
@@ -5071,7 +5072,7 @@ function QuotePdfPreviewDialog({ quote, onClose, onDownload }: { quote?: Quote; 
   </Dialog>;
 }
 
-function CreditApplicationDialog({ form, customers, products, quotes, onClose, onSave }: DialogProps<CreditApplication, typeof emptyCreditApplication> & { customers: Customer[]; products: Product[]; quotes: Quote[]; }) {
+function CreditApplicationDialog({ form, customers, products, productCategories, quotes, onClose, onSave }: DialogProps<CreditApplication, typeof emptyCreditApplication> & { customers: Customer[]; products: Product[]; productCategories: ProductCategory[]; quotes: Quote[]; }) {
   const [referenceDialog, setReferenceDialog] = useState<'client' | number>();
   useEffect(() => {
     if (!form.open) setReferenceDialog(undefined);
@@ -5220,7 +5221,7 @@ function CreditApplicationDialog({ form, customers, products, quotes, onClose, o
               <CurrencyField label="Valor producto" value={v.motorcycleValue} onChange={motorcycleValue => set({ motorcycleValue })} />
             </Box>
             <TextField label="Fecha del primer vencimiento" type="date" value={v.firstDueDate} onChange={(e) => set({ firstDueDate: e.target.value })} InputLabelProps={{ shrink: true }} helperText="Fecha de la primera cuota acordada con el cliente." />
-            <CreditFormDetailsFields value={v.formDetails} onChange={formDetails => set({ formDetails })} group="sale" appliance={(selectedProduct?.category ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().includes('electrodom')} />
+            <CreditFormDetailsFields value={v.formDetails} onChange={formDetails => set({ formDetails })} group="sale" appliance={productCategories.some(category => category.quoteAsBundle && category.name.trim().toLowerCase() === selectedProduct?.category?.trim().toLowerCase())} />
           </Stack>
         </Paper>
 
