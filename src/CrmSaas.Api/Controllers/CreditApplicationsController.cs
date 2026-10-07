@@ -9,6 +9,7 @@ using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace CrmSaas.Api.Controllers;
 
@@ -31,7 +32,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
     [HttpGet]
     public async Task<ActionResult<IReadOnlyCollection<CreditApplicationDto>>> Get(CancellationToken cancellationToken)
     {
-        var rows = await db.SolicitudesCredito
+        var rows = await VisibleApplications()
             .Include(x => x.Cliente)
             .Include(x => x.Producto)
             .Include(x => x.PerfilRequisito)
@@ -66,7 +67,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         var product = await db.Productos.FirstOrDefaultAsync(x => x.Id == dto.ProductId, cancellationToken)
             ?? throw new KeyNotFoundException("Producto no encontrado.");
         var quote = dto.QuoteId.HasValue
-            ? await db.Cotizaciones.FirstOrDefaultAsync(x => x.Id == dto.QuoteId.Value, cancellationToken)
+            ? await VisibleQuotes().FirstOrDefaultAsync(x => x.Id == dto.QuoteId.Value, cancellationToken)
                 ?? throw new KeyNotFoundException("Cotizacion no encontrada.")
             : null;
         var dealId = await ResolveQuoteDealAsync(quote, dto.CustomerId, cancellationToken);
@@ -118,6 +119,14 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         SyncCoDebtors(entity, dto.CoDebtors);
         CreditPhoneValidation.Validate(entity);
         await SyncPipelineAsync(entity, cancellationToken);
+        if (dealId.HasValue)
+        {
+            var quoteFollowUps = await db.Actividades
+                .Where(x => x.NegocioId == dealId && x.Titulo == "Llamar al cliente mañana"
+                    && (x.Estado == EstadoActividad.Pendiente || x.Estado == EstadoActividad.EnProceso))
+                .ToListAsync(cancellationToken);
+            foreach (var followUp in quoteFollowUps) followUp.Estado = EstadoActividad.Cancelada;
+        }
         await db.SaveChangesAsync(cancellationToken);
         entity.Cliente = customer;
         entity.Producto = product;
@@ -128,7 +137,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
     public async Task<ActionResult<CreditApplicationDto>> Update(Guid id, UpsertCreditApplicationDto dto, CancellationToken cancellationToken)
     {
         Validate(dto);
-        var entity = await db.SolicitudesCredito
+        var entity = await VisibleApplications()
             .Include(x => x.Cliente)
             .Include(x => x.Producto)
             .Include(x => x.PerfilRequisito)
@@ -140,7 +149,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         var product = await db.Productos.FirstOrDefaultAsync(x => x.Id == dto.ProductId, cancellationToken)
             ?? throw new KeyNotFoundException("Producto no encontrado.");
         var quote = dto.QuoteId.HasValue
-            ? await db.Cotizaciones.FirstOrDefaultAsync(x => x.Id == dto.QuoteId.Value, cancellationToken)
+            ? await VisibleQuotes().FirstOrDefaultAsync(x => x.Id == dto.QuoteId.Value, cancellationToken)
                 ?? throw new KeyNotFoundException("Cotizacion no encontrada.")
             : null;
 
@@ -196,7 +205,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
     [HttpPost("{id:guid}/status")]
     public async Task<ActionResult<CreditApplicationDto>> ChangeStatus(Guid id, ChangeCreditApplicationStatusDto dto, CancellationToken cancellationToken)
     {
-        var entity = await db.SolicitudesCredito
+        var entity = await VisibleApplications()
             .Include(x => x.Cliente)
             .Include(x => x.Producto)
             .Include(x => x.PerfilRequisito)
@@ -292,7 +301,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
     [HttpPut("{id:guid}/documents/{documentId:guid}")]
     public async Task<ActionResult<CreditApplicationDto>> UpdateDocument(Guid id, Guid documentId, UpsertCreditDocumentDto dto, CancellationToken cancellationToken)
     {
-        var entity = await db.SolicitudesCredito
+        var entity = await VisibleApplications()
             .Include(x => x.Cliente)
             .Include(x => x.Producto)
             .Include(x => x.PerfilRequisito)
@@ -343,7 +352,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             throw new ValidationException("Solo se permiten archivos PDF o imagenes JPG, PNG y WEBP.");
         }
 
-        var entity = await db.SolicitudesCredito
+        var entity = await VisibleApplications()
             .Include(x => x.Cliente)
             .Include(x => x.Producto)
             .Include(x => x.PerfilRequisito)
@@ -386,6 +395,8 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
     [HttpGet("{id:guid}/documents/{documentId:guid}/file")]
     public async Task<IActionResult> DownloadDocument(Guid id, Guid documentId, CancellationToken cancellationToken)
     {
+        if (!await VisibleApplications().AnyAsync(x => x.Id == id, cancellationToken))
+            throw new KeyNotFoundException("Solicitud de credito no encontrada.");
         var document = await db.DocumentosSolicitudCredito
             .Where(x => x.SolicitudCreditoId == id && x.Id == documentId)
             .FirstOrDefaultAsync(cancellationToken)
@@ -405,7 +416,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
     [HttpDelete("{id:guid}/documents/{documentId:guid}/file")]
     public async Task<ActionResult<CreditApplicationDto>> DeleteDocumentFile(Guid id, Guid documentId, CancellationToken cancellationToken)
     {
-        var entity = await db.SolicitudesCredito
+        var entity = await VisibleApplications()
             .Include(x => x.Cliente)
             .Include(x => x.Producto)
             .Include(x => x.PerfilRequisito)
@@ -526,7 +537,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
     [HttpGet("{id:guid}/pdf/{template}")]
     public async Task<IActionResult> DownloadTemplate(Guid id, string template, CancellationToken cancellationToken)
     {
-        var entity = await db.SolicitudesCredito
+        var entity = await VisibleApplications()
             .Include(x => x.Cliente)
             .Include(x => x.Producto)
             .Include(x => x.PerfilRequisito)
@@ -587,8 +598,21 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         }
     }
 
+    private bool CanSeeAll =>
+        User.IsInRole("Administrador") || User.IsInRole("Supervisor")
+        || string.Equals(User.FindFirstValue("global_admin"), "true", StringComparison.OrdinalIgnoreCase);
+
+    private IQueryable<SolicitudCredito> VisibleApplications() => CanSeeAll
+        ? db.SolicitudesCredito
+        : db.SolicitudesCredito.Where(x => x.UsuarioCreacion == tenantContext.UsuarioActual
+            || x.Cotizacion != null && x.Cotizacion.UsuarioCreacion == tenantContext.UsuarioActual);
+
+    private IQueryable<Cotizacion> VisibleQuotes() => CanSeeAll
+        ? db.Cotizaciones
+        : db.Cotizaciones.Where(x => x.UsuarioCreacion == tenantContext.UsuarioActual);
+
     private async Task<SolicitudCredito> LoadApplicationAsync(Guid id, CancellationToken cancellationToken) =>
-        await db.SolicitudesCredito
+        await VisibleApplications()
             .Include(x => x.Cliente)
             .Include(x => x.Producto)
             .Include(x => x.PerfilRequisito)
@@ -679,7 +703,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
     [HttpPost("{id:guid}/workflow/documentation")]
     public async Task<ActionResult<CreditApplicationDto>> ConfirmDocumentation(Guid id, CreditWorkflowMilestoneDto dto, CancellationToken cancellationToken)
     {
-        var entity = await db.SolicitudesCredito.Include(x => x.Cliente).Include(x => x.Producto)
+        var entity = await VisibleApplications().Include(x => x.Cliente).Include(x => x.Producto)
             .Include(x => x.PerfilRequisito).Include(x => x.Documentos).Include(x => x.Codeudores)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
             ?? throw new KeyNotFoundException("Solicitud no encontrada.");

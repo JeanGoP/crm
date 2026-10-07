@@ -39,20 +39,70 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
         var quoteIds = quotes.Select(x => x.Id).ToArray();
         var applications = await db.SolicitudesCredito
             .Where(x => x.CotizacionId.HasValue && quoteIds.Contains(x.CotizacionId.Value))
-            .Select(x => new { x.CotizacionId, x.Estado, x.FechaCreacion, x.FechaActualizacion })
+            .Select(x => new { x.CotizacionId, x.Estado, x.DocumentacionCompleta, x.FechaCreacion, x.FechaActualizacion })
             .ToListAsync(cancellationToken);
-        var latestStatus = applications
+        var latestApplications = applications
             .GroupBy(x => x.CotizacionId!.Value)
-            .ToDictionary(group => group.Key, group => QuoteStatus(group
-                .OrderByDescending(x => x.FechaActualizacion ?? x.FechaCreacion).First().Estado));
+            .ToDictionary(group => group.Key, group => group
+                .OrderByDescending(x => x.FechaActualizacion ?? x.FechaCreacion).First());
+        var dealIds = quotes.Where(x => x.NegocioId.HasValue).Select(x => x.NegocioId!.Value).ToArray();
+        var activeFollowUps = await db.Actividades
+            .Where(x => x.NegocioId.HasValue && dealIds.Contains(x.NegocioId.Value)
+                && (x.Titulo == AutomaticFollowUpTitle || x.Titulo == "Próximo contacto de cotización")
+                && (x.Estado == EstadoActividad.Pendiente || x.Estado == EstadoActividad.EnProceso))
+            .Select(x => new { x.NegocioId, x.FechaProgramada })
+            .ToListAsync(cancellationToken);
+        var nextFollowUps = activeFollowUps.GroupBy(x => x.NegocioId!.Value)
+            .ToDictionary(group => group.Key, group => group.OrderBy(x => x.FechaProgramada).First().FechaProgramada);
+        var completedFollowUps = await db.Actividades
+            .Where(x => x.NegocioId.HasValue && dealIds.Contains(x.NegocioId.Value)
+                && x.Estado == EstadoActividad.Completada
+                && (x.Titulo == AutomaticFollowUpTitle || x.Titulo == "Próximo contacto de cotización" || x.Titulo == "Seguimiento de cotización"))
+            .Select(x => new { x.NegocioId, x.Descripcion, x.FechaActualizacion, x.FechaCreacion })
+            .ToListAsync(cancellationToken);
+        var lastOutcomes = completedFollowUps.GroupBy(x => x.NegocioId!.Value)
+            .ToDictionary(group => group.Key, group => group.OrderByDescending(x => x.FechaActualizacion ?? x.FechaCreacion).First().Descripcion);
         var advisorEmails = quotes.Select(x => x.UsuarioCreacion).Distinct().ToArray();
         var advisors = await db.Usuarios.Where(x => advisorEmails.Contains(x.Email))
             .Select(x => new { x.Email, x.NombreCompleto }).ToListAsync(cancellationToken);
         var advisorNames = advisors.ToDictionary(x => x.Email, x => x.NombreCompleto, StringComparer.OrdinalIgnoreCase);
-        return Ok(quotes.Select(x => ToDto(x,
-            latestStatus.GetValueOrDefault(x.Id, "Cotizada"),
-            advisorNames.GetValueOrDefault(x.UsuarioCreacion, x.UsuarioCreacion))).ToList());
+        return Ok(quotes.Select(x =>
+        {
+            var application = latestApplications.GetValueOrDefault(x.Id);
+            var followUpAt = x.NegocioId.HasValue && nextFollowUps.TryGetValue(x.NegocioId.Value, out var dueAt)
+                ? dueAt : (DateTime?)null;
+            var outcome = x.NegocioId.HasValue ? lastOutcomes.GetValueOrDefault(x.NegocioId.Value) : null;
+            var quoteStatus = application is not null ? QuoteStatus(application.Estado)
+                : outcome?.StartsWith("Resultado: No interesado.", StringComparison.Ordinal) == true ? "Desistida"
+                : outcome?.StartsWith("Resultado: Interesado.", StringComparison.Ordinal) == true ? "Interesado" : "Cotizada";
+            (string? Action, DateTime? At, string? Url) next = quoteStatus == "Desistida" ? (null, null, null)
+                : quoteStatus == "Interesado" && application is null
+                    ? ("Crear solicitud", (DateTime?)null, "/solicitudes-credito")
+                    : QuoteNextAction(application?.Estado, application?.DocumentacionCompleta, followUpAt);
+            return ToDto(x) with
+            {
+                Status = quoteStatus,
+                AdvisorName = advisorNames.GetValueOrDefault(x.UsuarioCreacion, x.UsuarioCreacion),
+                NextAction = next.Action,
+                NextActionAt = next.At,
+                NextActionUrl = next.Url
+            };
+        }).ToList());
     }
+
+    private static (string? Action, DateTime? At, string? Url) QuoteNextAction(
+        EstadoSolicitudCredito? status, bool? documentsComplete, DateTime? followUpAt) => status switch
+    {
+        EstadoSolicitudCredito.Rechazada or EstadoSolicitudCredito.Desistida or EstadoSolicitudCredito.Desembolsada => (null, null, null),
+        EstadoSolicitudCredito.DocumentosPendientes when documentsComplete != true => ("Confirmar documentación", null, "/solicitudes-credito"),
+        EstadoSolicitudCredito.DocumentosPendientes => ("Enviar a estudio", null, "/solicitudes-credito"),
+        EstadoSolicitudCredito.DocumentosRecibidos => ("Iniciar estudio", null, "/solicitudes-credito"),
+        EstadoSolicitudCredito.EnEstudio => ("Revisar decisión", null, "/solicitudes-credito"),
+        EstadoSolicitudCredito.Aprobada => ("Completar firmas y entrega", null, "/solicitudes-credito"),
+        EstadoSolicitudCredito.Borrador or EstadoSolicitudCredito.Interesado => ("Completar solicitud", null, "/solicitudes-credito"),
+        _ when followUpAt.HasValue => ("Realizar seguimiento", followUpAt, "/actividades"),
+        _ => ("Programar seguimiento", null, "/actividades")
+    };
 
     private static string QuoteStatus(EstadoSolicitudCredito status) => status switch
     {
@@ -366,7 +416,8 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             FechaProgramada = now.AddDays(1),
             RecordatorioEn = now.AddHours(20),
             ClienteId = customer.Id,
-            NegocioId = deal.Id
+            NegocioId = deal.Id,
+            UsuarioAsignadoId = Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var advisorId) ? advisorId : null
         };
 
         quote.Negocio = deal;
@@ -484,6 +535,87 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
         return File(bytes, "application/pdf", $"{quote.Numero}.pdf");
     }
 
+    [HttpPost("{id:guid}/follow-up")]
+    public async Task<IActionResult> RecordFollowUp(Guid id, QuoteFollowUpDto dto, CancellationToken cancellationToken)
+    {
+        var allowedOutcomes = new[] { "Contactado", "Sin respuesta", "Interesado", "No interesado" };
+        if (!allowedOutcomes.Contains(dto.Outcome)) throw new ValidationException("Seleccione un resultado válido del seguimiento.");
+        if (dto.Notes?.Length > 1000) throw new ValidationException("La nota no puede superar 1000 caracteres.");
+        var now = ColombiaTime.Now;
+        if (dto.NextContactAt.HasValue && dto.NextContactAt.Value <= now)
+            throw new ValidationException("El próximo contacto debe tener una fecha futura.");
+        if (dto.Outcome == "No interesado" && dto.NextContactAt.HasValue)
+            throw new ValidationException("Una cotización sin interés no debe programar otro contacto.");
+
+        var quote = await db.Cotizaciones.FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
+            ?? throw new KeyNotFoundException("Cotización no encontrada.");
+        var canSeeAll = User.IsInRole("Administrador") || User.IsInRole("Supervisor")
+            || string.Equals(User.FindFirstValue("global_admin"), "true", StringComparison.OrdinalIgnoreCase);
+        if (!canSeeAll && !string.Equals(quote.UsuarioCreacion, tenantContext.UsuarioActual, StringComparison.OrdinalIgnoreCase))
+            return Forbid();
+        if (!quote.NegocioId.HasValue) throw new ValidationException("La cotización no tiene un negocio asociado.");
+        if (await db.SolicitudesCredito.AnyAsync(x => x.CotizacionId == id
+            && (x.Estado == EstadoSolicitudCredito.Rechazada || x.Estado == EstadoSolicitudCredito.Desistida || x.Estado == EstadoSolicitudCredito.Desembolsada), cancellationToken))
+            throw new ValidationException("Esta cotización ya terminó su proceso.");
+        var advisorId = await db.Usuarios.Where(x => x.Email == quote.UsuarioCreacion)
+            .Select(x => (Guid?)x.Id).FirstOrDefaultAsync(cancellationToken);
+
+        var active = await db.Actividades
+            .Where(x => x.NegocioId == quote.NegocioId
+                && (x.Titulo == AutomaticFollowUpTitle || x.Titulo == "Próximo contacto de cotización")
+                && (x.Estado == EstadoActividad.Pendiente || x.Estado == EstadoActividad.EnProceso))
+            .OrderBy(x => x.FechaProgramada)
+            .FirstOrDefaultAsync(cancellationToken);
+        var description = $"Resultado: {dto.Outcome}." + (string.IsNullOrWhiteSpace(dto.Notes) ? string.Empty : $" {dto.Notes.Trim()}");
+        if (active is not null)
+        {
+            active.Estado = EstadoActividad.Completada;
+            active.Descripcion = description;
+        }
+        else
+        {
+            db.Actividades.Add(new Actividad
+            {
+                Titulo = "Seguimiento de cotización",
+                Descripcion = description,
+                Tipo = TipoActividad.Llamada,
+                Estado = EstadoActividad.Completada,
+                FechaProgramada = now,
+                ClienteId = quote.ClienteId,
+                NegocioId = quote.NegocioId,
+                UsuarioAsignadoId = advisorId
+            });
+        }
+        if (dto.Outcome == "No interesado")
+        {
+            var deal = await db.Negocios.FirstOrDefaultAsync(x => x.Id == quote.NegocioId, cancellationToken);
+            if (deal is not null) deal.Estado = EstadoNegocio.Perdido;
+            var otherFollowUps = await db.Actividades
+                .Where(x => x.NegocioId == quote.NegocioId && x.Id != (active == null ? Guid.Empty : active.Id)
+                    && x.Titulo == "Próximo contacto de cotización"
+                    && (x.Estado == EstadoActividad.Pendiente || x.Estado == EstadoActividad.EnProceso))
+                .ToListAsync(cancellationToken);
+            foreach (var followUp in otherFollowUps) followUp.Estado = EstadoActividad.Cancelada;
+        }
+        if (dto.NextContactAt.HasValue)
+        {
+            db.Actividades.Add(new Actividad
+            {
+                Titulo = "Próximo contacto de cotización",
+                Descripcion = $"Seguimiento de {quote.Numero}.",
+                Tipo = TipoActividad.Llamada,
+                Estado = EstadoActividad.Pendiente,
+                FechaProgramada = dto.NextContactAt.Value,
+                RecordatorioEn = dto.NextContactAt.Value.AddHours(-2),
+                ClienteId = quote.ClienteId,
+                NegocioId = quote.NegocioId,
+                UsuarioAsignadoId = advisorId
+            });
+        }
+        await db.SaveChangesAsync(cancellationToken);
+        return NoContent();
+    }
+
     private static ProductoFoto? ResolveQuotePhoto(Cotizacion quote)
     {
         static IEnumerable<ProductoFoto> OrderedPhotos(Producto? product) =>
@@ -537,7 +669,7 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
         }
     }
 
-    private static QuoteDto ToDto(Cotizacion x, string status = "Cotizada", string? advisorName = null)
+    private static QuoteDto ToDto(Cotizacion x)
     {
         var productName = x.Producto is null
             ? "Producto"
@@ -595,7 +727,7 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             x.Observaciones,
             QuoteItems(x).ToList(), x.EsPaquete,
             QuoteFinancingOptions.Read(x.AlternativasPlazoJson, x.TipoCredito, termMonths, x.CuotaMensualEstimada, totalPayment),
-            status, advisorName);
+            CreatorEmail: x.UsuarioCreacion);
     }
 
     private static IReadOnlyCollection<CreateQuoteItemDto> NormalizeQuoteItems(CreateQuoteDto dto)

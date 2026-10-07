@@ -40,6 +40,7 @@ import { api } from './api';
 import { quotePayments, isQuoteBundle, quoteTermLimit, quoteCustomerName, currencyInputValue, updateQuoteTerms } from './quotePayments';
 import { findDuplicateCreditPhones, duplicateCreditPhoneMessage, creditPhoneFieldError } from './creditPhones';
 import { QuotesTable } from './QuotesTable';
+import { QuoteFollowUpDialog, type QuoteFollowUp } from './QuoteFollowUpDialog';
 import { CustomersTable } from './CustomersTable';
 import { CompactRecordsTable } from './CompactRecordsTable';
 import { CreditFormDetailsFields, type CreditFormDetails } from './CreditFormDetailsFields';
@@ -381,7 +382,10 @@ function Layout() {
   const isDesktop = useMediaQuery(muiTheme.breakpoints.up('md'));
   const [mobileOpen, setMobileOpen] = useState(false);
   const canManageCredit = user?.roles.some((role) => role === 'Administrador' || role === 'Supervisor') ?? false;
-  const visibleNavGroups = useMemo(() => navGroups.map((group) => ({ ...group, items: group.items.filter((item) => !item.managerOnly || canManageCredit) })), [canManageCredit]);
+  const visibleNavGroups = useMemo(() => navGroups.map((group) => ({ ...group, items: group.items
+    .filter((item) => !item.managerOnly || canManageCredit)
+    .map((item) => item.to === '/' ? { ...item, label: canManageCredit ? 'Tablero del equipo' : 'Mi trabajo' } : item)
+  })), [canManageCredit]);
   const activeGroupKey = visibleNavGroups.find((group) => isNavGroupActive(group, location.pathname))?.key ?? 'comercial';
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => Object.fromEntries(visibleNavGroups.map((group) => [group.key, group.key === activeGroupKey])));
   useEffect(() => {
@@ -626,6 +630,7 @@ function LoginPage() {
 function DashboardPage() {
   const { data, loading, error, reload } = useResource<Dashboard>('/api/dashboard');
   const navigate = useNavigate();
+  const canManageTeam = useCanManage();
   const openPipeline = data?.openPipelineValue ?? 0;
   const weightedPipeline = data?.weightedPipelineValue ?? 0;
   const pendingActivities = data?.pendingActivities ?? 0;
@@ -637,8 +642,41 @@ function DashboardPage() {
   const followUpPressure = pendingActivities > 0 ? Math.min(100, Math.round((overdueActivities / pendingActivities) * 100)) : 0;
   const attentionTone = criticalAlerts || overdueActivities ? 'error' : alertCount ? 'warning' : 'success';
   return <Stack spacing={3}>
-    <Header title="Dashboard" onRefresh={reload} />
+    <Header title={canManageTeam ? 'Tablero del equipo' : 'Mi trabajo'} onRefresh={reload} />
     <StatusBar loading={loading} error={error} />
+    <Card><CardContent sx={{ p: { xs: 2, md: 2.5 } }}>
+      <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} gap={1.5}>
+        <Box>
+          <Typography variant="h6" fontWeight={900}>{canManageTeam ? 'Trabajo de la empresa' : 'Tus pendientes'}</Typography>
+          <Typography variant="body2" color="text.secondary">{canManageTeam ? 'Cotizaciones, alertas y actividades del equipo.' : 'Solo tus cotizaciones, alertas y actividades asignadas.'}</Typography>
+        </Box>
+        <Stack direction="row" flexWrap="wrap" gap={1}>
+          <Button variant="outlined" onClick={() => navigate('/cotizaciones')}>Cotizaciones</Button>
+          <Button variant="outlined" onClick={() => navigate('/actividades')}>Seguimientos ({pendingActivities})</Button>
+          <Button variant="outlined" onClick={() => navigate('/solicitudes-credito')}>Solicitudes</Button>
+        </Stack>
+      </Stack>
+    </CardContent></Card>
+    <Card><CardContent sx={{ p: { xs: 2, md: 2.5 } }}>
+      <Typography variant="h6" fontWeight={900}>Avance comercial</Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>Cotizaciones creadas en los últimos 30 días y cómo han avanzado.</Typography>
+      <Stack direction={{ xs: 'column', md: 'row' }} gap={1}>
+        {([
+          ['Cotizadas', data?.funnel?.quotes ?? 0, '/cotizaciones'],
+          ['Con seguimiento', data?.funnel?.followedUp ?? 0, '/actividades'],
+          ['Con solicitud', data?.funnel?.applications ?? 0, '/solicitudes-credito'],
+          ['Aprobadas', data?.funnel?.approved ?? 0, '/solicitudes-credito'],
+          ['Entregadas', data?.funnel?.delivered ?? 0, '/solicitudes-credito']
+        ] as [string, number, string][]).map(([label, value, url], index) => <Button key={label} variant="outlined" onClick={() => navigate(url)}
+          sx={{ flex: 1, minWidth: 0, display: 'block', textAlign: 'left', p: 1.5, borderColor: uiBorder,
+            borderTop: '4px solid', borderTopColor: index === 4 ? '#0f766e' : index === 3 ? '#3b8c82' : uiPrimary,
+            color: 'text.primary', textTransform: 'none' }}>
+          <Typography fontSize={12} color="text.secondary" fontWeight={800}>{label}</Typography>
+          <Typography fontSize={22} fontWeight={900}>{value}</Typography>
+          {index > 0 && <Typography variant="caption" color="text.secondary">{data?.funnel?.quotes ? `${Math.round(value / data.funnel.quotes * 100)}% de cotizaciones` : '—'}</Typography>}
+        </Button>)}
+      </Stack>
+    </CardContent></Card>
     <Grid container spacing={2}>
       <Grid item xs={12} lg={7}>
         <Card sx={{ height: '100%', background: 'linear-gradient(135deg, #0f172a 0%, #155e75 62%, #0f766e 100%)', color: '#fff' }}>
@@ -711,11 +749,12 @@ function DashboardPage() {
           {data?.alerts?.length ? data.alerts.map((alert) => <Stack key={`${alert.type}${alert.title}${alert.createdAt}`} direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" gap={1.5} sx={{ py: 1.25, borderBottom: '1px solid #edf1f5', '&:last-of-type': { borderBottom: 0 } }}>
             <Stack spacing={.5} sx={{ minWidth: 0 }}>
               <Stack direction="row" gap={1} alignItems="center" flexWrap="wrap">
+                <StatusChip label={alert.severity === 'error' ? 'Prioridad alta' : alert.severity === 'warning' ? 'Prioridad media' : 'Informativa'} tone={alertSeverityTone(alert.severity)} />
                 <StatusChip label={alert.type} tone={alertSeverityTone(alert.severity)} />
                 <Typography fontWeight={900}>{alert.title}</Typography>
               </Stack>
               <Typography color="text.secondary">{alert.description}</Typography>
-              <Typography variant="caption" color="text.secondary">{new Date(alert.createdAt).toLocaleString()}</Typography>
+              <Typography variant="caption" color="text.secondary">{alert.ownerName && canManageTeam ? `${alert.ownerName} · ` : ''}{new Date(alert.createdAt).toLocaleString()}</Typography>
             </Stack>
             {alert.actionUrl && <Button variant="outlined" sx={{ alignSelf: { xs: 'stretch', md: 'center' } }} onClick={() => navigate(alert.actionUrl!)}>Abrir</Button>}
           </Stack>) : <EmptyState text="Sin notificaciones internas" />}
@@ -1446,6 +1485,7 @@ function QuotesPage() {
   const [analysis, setAnalysis] = useState<CustomerAiAnalysis>();
   const [analysisPhone, setAnalysisPhone] = useState<string>();
   const [previewQuote, setPreviewQuote] = useState<Quote>();
+  const [followUpQuote, setFollowUpQuote] = useState<Quote>();
   const [notice, setNotice] = useState<Notice>();
 
   const downloadPdf = async (quote: Quote) => {
@@ -1561,13 +1601,25 @@ function QuotesPage() {
     }
   };
 
+  const saveQuoteFollowUp = async (quote: Quote, payload: QuoteFollowUp) => {
+    try {
+      await api.post(`/api/quotes/${quote.id}/follow-up`, payload);
+      await reload();
+      setNotice({ type: 'success', text: 'Seguimiento registrado.' });
+    } catch (reason) {
+      throw new Error(apiError(reason));
+    }
+  };
+
   return <Stack spacing={3}>
     <Header title="Cotizaciones" action="Nueva cotizacion" onAction={() => setForm({ open: true })} onRefresh={reload} />
     <StatusBar loading={loading} error={error} />
-    <QuotesTable rows={rows} onPreview={setPreviewQuote}
+    <QuotesTable rows={rows} onPreview={setPreviewQuote} onFollowUp={setFollowUpQuote}
+      currentUserEmail={currentUser?.email} showTeam={currentUser?.roles.some(role => role === 'Administrador' || role === 'Supervisor') ?? false}
       onAnalyze={quote => analyzeCustomer(quote.customerId, customers.find(customer => customer.id === quote.customerId)?.phone)} />
     <QuoteDialog form={form} products={products.filter((x) => x.active)} productCategories={productCategories.filter((x) => x.active)} quoteChargeConcepts={quoteChargeConcepts.filter((x) => x.active)} salesPoints={quoteSalesPoints} canChooseSalesPoint={currentUser?.roles.some((role) => role === 'Administrador' || role === 'Supervisor') ?? false} onClose={() => setForm({ open: false })} onSave={save} />
     <QuotePdfPreviewDialog quote={previewQuote} onClose={() => setPreviewQuote(undefined)} onDownload={downloadPdf} />
+    <QuoteFollowUpDialog quote={followUpQuote} onClose={() => setFollowUpQuote(undefined)} onSave={saveQuoteFollowUp} />
     <AiAnalysisDialog analysis={analysis} phone={analysisPhone} onClose={() => { setAnalysis(undefined); setAnalysisPhone(undefined); }} />
     <Notice notice={notice} onClose={() => setNotice(undefined)} />
   </Stack>;

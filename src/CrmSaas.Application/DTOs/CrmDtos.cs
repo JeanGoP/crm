@@ -370,7 +370,12 @@ public sealed record QuoteDto(
     bool IsBundle = false,
     IReadOnlyCollection<QuoteFinancingOptionDto>? FinancingOptions = null,
     string Status = "Cotizada",
-    string? AdvisorName = null);
+    string? AdvisorName = null,
+    string? NextAction = null,
+    DateTime? NextActionAt = null,
+    string? NextActionUrl = null,
+    string? CreatorEmail = null);
+public sealed record QuoteFollowUpDto(string Outcome, string? Notes, DateTime? NextContactAt);
 public sealed record CreateQuoteDto(
     TipoIdentificacionColombia IdentificationType,
     string? IdentificationNumber,
@@ -809,9 +814,11 @@ public sealed record DashboardDto(
     int OverdueActivities,
     int TodayActivities,
     IReadOnlyCollection<RecentActivityDto> RecentActivities,
-    IReadOnlyCollection<CommercialAlertDto> Alerts);
+    IReadOnlyCollection<CommercialAlertDto> Alerts,
+    DashboardFunnelDto Funnel);
+public sealed record DashboardFunnelDto(int Quotes, int FollowedUp, int Applications, int Approved, int Delivered);
 public sealed record RecentActivityDto(string Title, DateTime ScheduledAt, EstadoActividad Status);
-public sealed record CommercialAlertDto(string Type, string Severity, string Title, string Description, DateTime CreatedAt, string? ActionUrl);
+public sealed record CommercialAlertDto(string Type, string Severity, string Title, string Description, DateTime CreatedAt, string? ActionUrl, string? OwnerName = null);
 
 public sealed record CommercialReportsDto(
     CommercialReportSummaryDto Summary,

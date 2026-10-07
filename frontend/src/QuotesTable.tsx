@@ -1,10 +1,12 @@
 import { Fragment, useMemo, useState } from 'react';
-import { Box, Chip, Collapse, IconButton, InputAdornment, Paper, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TablePagination, TableRow, TextField, Tooltip, Typography } from '@mui/material';
+import { Box, Button, Chip, Collapse, IconButton, InputAdornment, Paper, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TablePagination, TableRow, TextField, Tooltip, Typography } from '@mui/material';
 import Search from '@mui/icons-material/Search';
+import Phone from '@mui/icons-material/Phone';
 import Visibility from '@mui/icons-material/Visibility';
 import AutoAwesome from '@mui/icons-material/AutoAwesome';
 import ChevronRight from '@mui/icons-material/ChevronRight';
 import type { Quote } from './types';
+import { useNavigate } from 'react-router-dom';
 
 const money = (amount: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(amount);
 const date = (value: string) => {
@@ -27,26 +29,36 @@ function CellText({ value }: { value: string }) {
   return <Tooltip title={value}><Box component="span" sx={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value || '-'}</Box></Tooltip>;
 }
 
-export function QuotesTable({ rows, onPreview, onAnalyze }: {
+type QuickFilter = 'all' | 'mine' | 'pending' | 'credit' | 'finished';
+
+export function QuotesTable({ rows, onPreview, onAnalyze, onFollowUp, currentUserEmail, showTeam }: {
   rows: Quote[]; onPreview: (quote: Quote) => void; onAnalyze: (quote: Quote) => void;
+  onFollowUp: (quote: Quote) => void; currentUserEmail?: string; showTeam: boolean;
 }) {
+  const navigate = useNavigate();
   const [search, setSearch] = useState('');
+  const [quickFilter, setQuickFilter] = useState<QuickFilter>('all');
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
   const [expanded, setExpanded] = useState<string>();
   const filtered = useMemo(() => {
     const terms = normalize(search).trim().split(/\s+/).filter(Boolean);
     return rows.filter(q => {
+      const finished = ['Entregada', 'Rechazada', 'Desistida'].includes(q.status || '');
+      if (quickFilter === 'mine' && q.creatorEmail?.toLowerCase() !== currentUserEmail?.toLowerCase()) return false;
+      if (quickFilter === 'pending' && (!q.nextAction || finished)) return false;
+      if (quickFilter === 'credit' && !['Solicitud creada', 'Documentos pendientes', 'Documentos recibidos', 'En estudio', 'Aprobada'].includes(q.status || '')) return false;
+      if (quickFilter === 'finished' && !finished) return false;
       const text = normalize([q.number, customerName(q), q.identificationNumber, q.salesPointName, q.status, q.advisorName,
         q.productName, q.salesPointRateName, q.promotionName, ...(q.items ?? []).map(i => i.productName)].join(' '));
       return terms.every(term => text.includes(term));
     });
-  }, [rows, search]);
+  }, [rows, search, quickFilter, currentUserEmail]);
   const safePage = Math.min(page, Math.max(0, Math.ceil(filtered.length / pageSize) - 1));
   const visible = filtered.slice(safePage * pageSize, (safePage + 1) * pageSize);
   const headers = [
-    ['Acciones', 112], ['Cliente', 245], ['Identificación', 135], ['Modalidad', 105], ['Estado', 175],
-    ['Número', 175], ['Fecha', 105], ['Asesor', 190], ['Sede', 175],
+    ['Acciones', 145], ['Cliente', 245], ['Identificación', 135], ['Modalidad', 105], ['Estado', 155],
+    ['Próxima acción', 235], ['Número', 175], ['Fecha', 105], ...(showTeam ? [['Asesor', 190] as const] : []), ['Sede', 175],
   ] as const;
   return <Paper variant="outlined" sx={{ overflow: 'hidden', borderColor: border, borderRadius: 1, boxShadow: 'none' }}>
     <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" gap={1} sx={{ p: 1.25 }}>
@@ -56,8 +68,13 @@ export function QuotesTable({ rows, onPreview, onAnalyze }: {
         sx={{ width: { xs: '100%', sm: 420 } }} />
       <Typography variant="caption" color="text.secondary" sx={{ alignSelf: { sm: 'center' } }}>La flecha muestra productos, valores y plazos.</Typography>
     </Stack>
+    <Stack direction="row" flexWrap="wrap" gap={.75} sx={{ px: 1.25, pb: 1 }}>
+      {([['all', 'Todas'], ...(showTeam ? [['mine', 'Mías']] : []), ['pending', 'Requieren acción'], ['credit', 'En crédito'], ['finished', 'Finalizadas']] as [QuickFilter, string][])
+        .map(([value, label]) => <Button key={value} size="small" variant={quickFilter === value ? 'contained' : 'outlined'}
+          onClick={() => { setQuickFilter(value); setPage(0); setExpanded(undefined); }}>{label}</Button>)}
+    </Stack>
     <TableContainer sx={{ overflowX: 'auto', maxHeight: '65vh' }} tabIndex={0} aria-label="Tabla de cotizaciones; desplace horizontalmente para ver todas las columnas">
-      <Table size="small" stickyHeader aria-label="Cotizaciones" sx={{ tableLayout: 'fixed', minWidth: 1417,
+      <Table size="small" stickyHeader aria-label="Cotizaciones" sx={{ tableLayout: 'fixed', minWidth: showTeam ? 1665 : 1475,
         '& th, & td': { borderRight: `1px solid ${border}`, borderBottom: `1px solid ${border}`, px: 1, py: .8, fontSize: 12, lineHeight: 1.4, verticalAlign: 'middle' },
         '& th': { bgcolor: '#eef6f8', color: 'primary.main', fontWeight: 700, whiteSpace: 'nowrap' },
         '& .quote-row:nth-of-type(4n + 1)': { bgcolor: '#fbfdff' },
@@ -79,6 +96,7 @@ export function QuotesTable({ rows, onPreview, onAnalyze }: {
                 <TableCell><Stack direction="row" spacing={.5}>
                   <Tooltip title={open ? 'Ocultar detalle' : 'Ver detalle'}><IconButton size="small" aria-label={`${open ? 'Ocultar' : 'Ver'} detalle ${q.number}`} aria-expanded={open} aria-controls={`quote-detail-${q.id}`} onClick={() => setExpanded(open ? undefined : q.id)}><ChevronRight sx={{ transform: open ? 'rotate(90deg)' : undefined }} /></IconButton></Tooltip>
                   <Tooltip title="Ver / descargar PDF"><IconButton size="small" aria-label={`Ver PDF ${q.number}`} onClick={() => onPreview(q)}><Visibility /></IconButton></Tooltip>
+                  {q.nextActionUrl === '/actividades' && <Tooltip title="Registrar seguimiento"><IconButton size="small" aria-label={`Registrar seguimiento ${q.number}`} onClick={() => onFollowUp(q)}><Phone /></IconButton></Tooltip>}
                   <Tooltip title="Análisis del cliente"><IconButton size="small" aria-label={`Analizar cliente de ${q.number}`} onClick={() => onAnalyze(q)}><AutoAwesome /></IconButton></Tooltip>
                 </Stack></TableCell>
                 <TableCell><CellText value={customerName(q)} /></TableCell>
@@ -88,9 +106,16 @@ export function QuotesTable({ rows, onPreview, onAnalyze }: {
                 <TableCell><Chip size="small" label={q.status || 'Cotizada'} sx={{ height: 22, borderRadius: .5, fontSize: 11, fontWeight: 700,
                   bgcolor: statusTone(q.status || 'Cotizada').background, color: statusTone(q.status || 'Cotizada').color,
                   borderLeft: '4px solid', borderLeftColor: statusTone(q.status || 'Cotizada').color }} /></TableCell>
+                <TableCell><Button size="small" sx={{ p: 0, textTransform: 'none', justifyContent: 'flex-start', textAlign: 'left', lineHeight: 1.25 }}
+                  disabled={!q.nextActionUrl} onClick={() => {
+                    if (q.nextActionUrl === '/actividades') onFollowUp(q);
+                    else if (q.nextActionUrl) navigate(q.nextActionUrl);
+                  }}>
+                  <CellText value={`${q.nextAction || 'Sin tareas pendientes'}${q.nextActionAt ? ` · ${date(q.nextActionAt)}` : ''}`} />
+                </Button></TableCell>
                 <TableCell><CellText value={q.number} /></TableCell>
                 <TableCell sx={{ whiteSpace: 'nowrap' }}>{date(q.quoteDate)}</TableCell>
-                <TableCell><CellText value={q.advisorName || '-'} /></TableCell>
+                {showTeam && <TableCell><CellText value={q.advisorName || '-'} /></TableCell>}
                 <TableCell><CellText value={q.salesPointName || '-'} /></TableCell>
               </TableRow>
               <TableRow><TableCell colSpan={headers.length} sx={{ p: '0 !important', borderBottom: open ? undefined : '0 !important' }}>
@@ -118,7 +143,7 @@ export function QuotesTable({ rows, onPreview, onAnalyze }: {
               </TableCell></TableRow>
             </Fragment>;
           })}
-          {!visible.length && <TableRow><TableCell colSpan={headers.length} align="center" sx={{ py: '28px !important', color: 'text.secondary' }}>{search ? 'No se encontraron cotizaciones para esta búsqueda.' : 'No hay cotizaciones registradas.'}</TableCell></TableRow>}
+          {!visible.length && <TableRow><TableCell colSpan={headers.length} align="center" sx={{ py: '28px !important', color: 'text.secondary' }}>{search || quickFilter !== 'all' ? 'No hay cotizaciones que coincidan con el filtro.' : 'No hay cotizaciones registradas.'}</TableCell></TableRow>}
         </TableBody>
       </Table>
     </TableContainer>

@@ -38,15 +38,15 @@ public interface IPipelineService
 
 public interface IActivityService
 {
-    Task<IReadOnlyCollection<ActivityDto>> GetAsync(CancellationToken cancellationToken);
+    Task<IReadOnlyCollection<ActivityDto>> GetAsync(Guid? userId, string userEmail, bool canSeeAll, CancellationToken cancellationToken);
     Task<ActivityDto> CreateAsync(UpsertActivityDto dto, CancellationToken cancellationToken);
-    Task<ActivityDto> UpdateAsync(Guid id, UpsertActivityDto dto, CancellationToken cancellationToken);
+    Task<ActivityDto> UpdateAsync(Guid id, UpsertActivityDto dto, Guid? userId, string userEmail, bool canSeeAll, CancellationToken cancellationToken);
     Task DeleteAsync(Guid id, CancellationToken cancellationToken);
 }
 
 public interface IDashboardService
 {
-    Task<DashboardDto> GetAsync(CancellationToken cancellationToken);
+    Task<DashboardDto> GetAsync(Guid? userId, string userEmail, bool canSeeAll, CancellationToken cancellationToken);
 }
 
 public interface ICommercialReportService
@@ -216,9 +216,14 @@ public sealed class PipelineService(ICrmDbContext db, IMapper mapper) : IPipelin
 
 public sealed class ActivityService(ICrmDbContext db, IMapper mapper) : IActivityService
 {
-    public async Task<IReadOnlyCollection<ActivityDto>> GetAsync(CancellationToken cancellationToken) =>
-        await ProjectActivities(db.Actividades.OrderBy(x => x.FechaProgramada))
+    public async Task<IReadOnlyCollection<ActivityDto>> GetAsync(Guid? userId, string userEmail, bool canSeeAll, CancellationToken cancellationToken) =>
+        await ProjectActivities(VisibleActivities(userId, userEmail, canSeeAll).OrderBy(x => x.FechaProgramada))
             .ToListAsync(cancellationToken);
+
+    private IQueryable<Actividad> VisibleActivities(Guid? userId, string userEmail, bool canSeeAll) => canSeeAll
+        ? db.Actividades
+        : db.Actividades.Where(x => userId.HasValue && x.UsuarioAsignadoId == userId.Value
+            || x.UsuarioAsignadoId == null && x.UsuarioCreacion == userEmail);
 
     public async Task<ActivityDto> CreateAsync(UpsertActivityDto dto, CancellationToken cancellationToken)
     {
@@ -229,10 +234,12 @@ public sealed class ActivityService(ICrmDbContext db, IMapper mapper) : IActivit
             .FirstAsync(cancellationToken);
     }
 
-    public async Task<ActivityDto> UpdateAsync(Guid id, UpsertActivityDto dto, CancellationToken cancellationToken)
+    public async Task<ActivityDto> UpdateAsync(Guid id, UpsertActivityDto dto, Guid? userId, string userEmail, bool canSeeAll, CancellationToken cancellationToken)
     {
-        var entity = await db.Actividades.FindAsync([id], cancellationToken) ?? throw new KeyNotFoundException("Actividad no encontrada.");
+        var entity = await VisibleActivities(userId, userEmail, canSeeAll).FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
+            ?? throw new KeyNotFoundException("Actividad no encontrada.");
         mapper.Map(dto, entity);
+        if (!canSeeAll) entity.UsuarioAsignadoId = userId;
         await db.SaveChangesAsync(cancellationToken);
         return await ProjectActivities(db.Actividades.Where(x => x.Id == entity.Id))
             .FirstAsync(cancellationToken);
@@ -298,40 +305,61 @@ file static class CrmDtoMapper
 
 public sealed class DashboardService(ICrmDbContext db) : IDashboardService
 {
-    public async Task<DashboardDto> GetAsync(CancellationToken cancellationToken)
+    public async Task<DashboardDto> GetAsync(Guid? userId, string userEmail, bool canSeeAll, CancellationToken cancellationToken)
     {
-        var openDeals = db.Negocios.Where(x => x.Estado == EstadoNegocio.Abierto);
-        var recent = await db.Actividades
+        var deals = db.Negocios.Where(x => canSeeAll || x.UsuarioCreacion == userEmail);
+        var activities = db.Actividades.Where(x => canSeeAll
+            || userId.HasValue && x.UsuarioAsignadoId == userId.Value
+            || x.UsuarioAsignadoId == null && x.UsuarioCreacion == userEmail);
+        var quotes = db.Cotizaciones.Where(x => canSeeAll || x.UsuarioCreacion == userEmail);
+        var applications = db.SolicitudesCredito.Where(x => canSeeAll || x.UsuarioCreacion == userEmail
+            || x.Cotizacion != null && x.Cotizacion.UsuarioCreacion == userEmail);
+        var customers = db.Clientes.Where(x => canSeeAll || x.UsuarioCreacion == userEmail);
+        var leads = db.Prospectos.Where(x => canSeeAll || x.UsuarioCreacion == userEmail);
+        var procedures = db.Tramites.Where(x => canSeeAll || x.UsuarioCreacion == userEmail);
+        var openDeals = deals.Where(x => x.Estado == EstadoNegocio.Abierto);
+        var recent = await activities
             .OrderByDescending(x => x.FechaCreacion)
             .Take(8)
             .Select(x => new RecentActivityDto(x.Titulo, x.FechaProgramada, x.Estado))
             .ToListAsync(cancellationToken);
         var today = ColombiaTime.Today;
         var tomorrow = today.AddDays(1);
-        var overdueActivities = await db.Actividades
+        var overdueActivities = await activities
             .CountAsync(x => (x.Estado == EstadoActividad.Pendiente || x.Estado == EstadoActividad.EnProceso) && x.FechaProgramada < today, cancellationToken);
-        var todayActivities = await db.Actividades
+        var todayActivities = await activities
             .CountAsync(x => (x.Estado == EstadoActividad.Pendiente || x.Estado == EstadoActividad.EnProceso) && x.FechaProgramada >= today && x.FechaProgramada < tomorrow, cancellationToken);
-        var alerts = await BuildAlertsAsync(today, tomorrow, cancellationToken);
+        var alerts = await BuildAlertsAsync(today, tomorrow, activities, applications, quotes, customers, deals, procedures, cancellationToken);
+        var periodQuotes = quotes.Where(x => x.FechaCotizacion >= today.AddDays(-30));
+        var funnel = new DashboardFunnelDto(
+            await periodQuotes.CountAsync(cancellationToken),
+            await periodQuotes.CountAsync(x => db.SolicitudesCredito.Any(s => s.CotizacionId == x.Id)
+                || x.NegocioId.HasValue && db.Actividades.Any(a => a.NegocioId == x.NegocioId && a.Estado == EstadoActividad.Completada), cancellationToken),
+            await periodQuotes.CountAsync(x => db.SolicitudesCredito.Any(s => s.CotizacionId == x.Id), cancellationToken),
+            await periodQuotes.CountAsync(x => db.SolicitudesCredito.Any(s => s.CotizacionId == x.Id && (s.Estado == EstadoSolicitudCredito.Aprobada || s.Estado == EstadoSolicitudCredito.Desembolsada)), cancellationToken),
+            await periodQuotes.CountAsync(x => db.SolicitudesCredito.Any(s => s.CotizacionId == x.Id && s.Estado == EstadoSolicitudCredito.Desembolsada), cancellationToken));
 
         return new DashboardDto(
             await openDeals.SumAsync(x => x.Valor, cancellationToken),
             await openDeals.SumAsync(x => x.Valor * (x.ProbabilidadCierre / 100), cancellationToken),
-            await db.Clientes.CountAsync(x => x.Estado == EstadoCliente.Activo, cancellationToken),
-            await db.Prospectos.CountAsync(x => !x.Convertido, cancellationToken),
-            await db.Actividades.CountAsync(x => x.Estado == EstadoActividad.Pendiente || x.Estado == EstadoActividad.EnProceso, cancellationToken),
+            await customers.CountAsync(x => x.Estado == EstadoCliente.Activo, cancellationToken),
+            await leads.CountAsync(x => !x.Convertido, cancellationToken),
+            await activities.CountAsync(x => x.Estado == EstadoActividad.Pendiente || x.Estado == EstadoActividad.EnProceso, cancellationToken),
             overdueActivities,
             todayActivities,
             recent,
-            alerts);
+            alerts,
+            funnel);
     }
 
-    private async Task<IReadOnlyCollection<CommercialAlertDto>> BuildAlertsAsync(DateTime today, DateTime tomorrow, CancellationToken cancellationToken)
+    private async Task<IReadOnlyCollection<CommercialAlertDto>> BuildAlertsAsync(DateTime today, DateTime tomorrow,
+        IQueryable<Actividad> activities, IQueryable<SolicitudCredito> applications, IQueryable<Cotizacion> quotes,
+        IQueryable<Cliente> customers, IQueryable<Negocio> deals, IQueryable<Tramite> procedures, CancellationToken cancellationToken)
     {
         var alerts = new List<CommercialAlertDto>();
         const string automaticQuoteFollowUpTitle = "Llamar al cliente mañana";
 
-        alerts.AddRange(await db.Actividades
+        alerts.AddRange(await activities
             .Where(x => x.Titulo == automaticQuoteFollowUpTitle
                 && (x.Estado == EstadoActividad.Pendiente || x.Estado == EstadoActividad.EnProceso)
                 && x.FechaProgramada < today)
@@ -340,13 +368,16 @@ public sealed class DashboardService(ICrmDbContext db) : IDashboardService
             .Select(x => new CommercialAlertDto(
                 "Cotizacion",
                 "error",
-                "Seguimiento de cotizacion vencido",
-                x.Titulo + " esta vencida. Actualice la actividad o registre el avance comercial.",
+                x.FechaProgramada < today.AddDays(-2) ? "Seguimiento escalado" : "Seguimiento de cotizacion vencido",
+                x.Titulo + (x.FechaProgramada < today.AddDays(-2)
+                    ? " lleva más de dos días vencida y requiere revisión del supervisor."
+                    : " esta vencida. Actualice la actividad o registre el avance comercial."),
                 x.FechaProgramada,
-                x.ClienteId == null ? "/actividades" : "/clientes/" + x.ClienteId))
+                x.ClienteId == null ? "/actividades" : "/clientes/" + x.ClienteId,
+                db.Usuarios.Where(u => u.Id == x.UsuarioAsignadoId).Select(u => u.NombreCompleto).FirstOrDefault() ?? x.UsuarioCreacion))
             .ToListAsync(cancellationToken));
 
-        alerts.AddRange(await db.Actividades
+        alerts.AddRange(await activities
             .Where(x => x.Titulo != automaticQuoteFollowUpTitle
                 && (x.Estado == EstadoActividad.Pendiente || x.Estado == EstadoActividad.EnProceso)
                 && x.FechaProgramada < today)
@@ -355,13 +386,16 @@ public sealed class DashboardService(ICrmDbContext db) : IDashboardService
             .Select(x => new CommercialAlertDto(
                 "Actividad",
                 "error",
-                "Actividad vencida",
-                x.Titulo + " esta vencida y requiere seguimiento interno.",
+                x.FechaProgramada < today.AddDays(-2) ? "Actividad escalada" : "Actividad vencida",
+                x.Titulo + (x.FechaProgramada < today.AddDays(-2)
+                    ? " lleva más de dos días vencida y requiere revisión del supervisor."
+                    : " esta vencida y requiere seguimiento interno."),
                 x.FechaProgramada,
-                x.ClienteId == null ? "/actividades" : "/clientes/" + x.ClienteId))
+                x.ClienteId == null ? "/actividades" : "/clientes/" + x.ClienteId,
+                db.Usuarios.Where(u => u.Id == x.UsuarioAsignadoId).Select(u => u.NombreCompleto).FirstOrDefault() ?? x.UsuarioCreacion))
             .ToListAsync(cancellationToken));
 
-        alerts.AddRange(await db.Actividades
+        alerts.AddRange(await activities
             .Where(x => (x.Estado == EstadoActividad.Pendiente || x.Estado == EstadoActividad.EnProceso) && x.FechaProgramada >= today && x.FechaProgramada < tomorrow)
             .OrderBy(x => x.FechaProgramada)
             .Take(5)
@@ -371,10 +405,11 @@ public sealed class DashboardService(ICrmDbContext db) : IDashboardService
                 "Seguimiento para hoy",
                 x.Titulo,
                 x.FechaProgramada,
-                x.ClienteId == null ? "/actividades" : "/clientes/" + x.ClienteId))
+                x.ClienteId == null ? "/actividades" : "/clientes/" + x.ClienteId,
+                db.Usuarios.Where(u => u.Id == x.UsuarioAsignadoId).Select(u => u.NombreCompleto).FirstOrDefault() ?? x.UsuarioCreacion))
             .ToListAsync(cancellationToken));
 
-        var pendingDocumentRequests = await db.SolicitudesCredito
+        var pendingDocumentRequests = await applications
             .Where(x => !x.DocumentacionCompleta && x.Estado != EstadoSolicitudCredito.Rechazada && x.Estado != EstadoSolicitudCredito.Desistida && x.Estado != EstadoSolicitudCredito.Desembolsada)
             .OrderBy(x => x.FechaCreacion)
             .Take(5)
@@ -400,7 +435,7 @@ public sealed class DashboardService(ICrmDbContext db) : IDashboardService
                 "/solicitudes-credito");
         }));
 
-        var completeChecklistRequests = await db.SolicitudesCredito
+        var completeChecklistRequests = await applications
             .Where(x => x.DocumentacionCompleta
                 && x.Estado == EstadoSolicitudCredito.DocumentosRecibidos)
             .OrderBy(x => x.FechaActualizacion ?? x.FechaCreacion)
@@ -423,7 +458,7 @@ public sealed class DashboardService(ICrmDbContext db) : IDashboardService
             "/solicitudes-credito")));
 
         var studyLimit = today.AddDays(-2);
-        var creditApplicationsInStudy = await db.SolicitudesCredito
+        var creditApplicationsInStudy = await applications
             .Where(x => x.Estado == EstadoSolicitudCredito.EnEstudio && (x.FechaInicioEstudio ?? x.FechaActualizacion ?? x.FechaCreacion) <= studyLimit)
             .OrderBy(x => x.FechaInicioEstudio ?? x.FechaActualizacion ?? x.FechaCreacion)
             .Take(5)
@@ -450,8 +485,9 @@ public sealed class DashboardService(ICrmDbContext db) : IDashboardService
         }));
 
         var quoteLimit = today.AddDays(-3);
-        alerts.AddRange(await db.Cotizaciones
-            .Where(x => x.FechaCotizacion <= quoteLimit && !db.Actividades.Any(a => a.ClienteId == x.ClienteId && a.FechaProgramada >= x.FechaCotizacion))
+        alerts.AddRange(await quotes
+            .Where(x => x.FechaCotizacion <= quoteLimit && (x.Negocio == null || x.Negocio.Estado != EstadoNegocio.Perdido)
+                && !activities.Any(a => a.ClienteId == x.ClienteId && a.FechaProgramada >= x.FechaCotizacion))
             .OrderByDescending(x => x.FechaCotizacion)
             .Take(5)
             .Select(x => new CommercialAlertDto(
@@ -460,15 +496,16 @@ public sealed class DashboardService(ICrmDbContext db) : IDashboardService
                 "Cotizacion sin seguimiento",
                 x.Numero + " no tiene actividad posterior registrada.",
                 x.FechaCotizacion,
-                "/clientes/" + x.ClienteId))
+                "/clientes/" + x.ClienteId,
+                x.UsuarioCreacion))
             .ToListAsync(cancellationToken));
 
         var staleDealLimit = today.AddDays(-7);
         var customerFollowUpLimit = today.AddDays(-7);
-        var customersWithoutFollowUp = await db.Clientes
+        var customersWithoutFollowUp = await customers
             .Where(x => x.Estado == EstadoCliente.Activo
                 && x.FechaCreacion <= customerFollowUpLimit
-                && !db.Actividades.Any(a => a.ClienteId == x.Id && a.Estado != EstadoActividad.Cancelada && a.FechaProgramada >= customerFollowUpLimit))
+                && !activities.Any(a => a.ClienteId == x.Id && a.Estado != EstadoActividad.Cancelada && a.FechaProgramada >= customerFollowUpLimit))
             .OrderBy(x => x.FechaCreacion)
             .Take(5)
             .Select(x => new
@@ -498,8 +535,8 @@ public sealed class DashboardService(ICrmDbContext db) : IDashboardService
                 "/clientes/" + x.Id);
         }));
 
-        alerts.AddRange(await db.Negocios
-            .Where(x => x.Estado == EstadoNegocio.Abierto && x.FechaCreacion <= staleDealLimit && !db.Actividades.Any(a => a.NegocioId == x.Id && a.FechaProgramada >= staleDealLimit))
+        alerts.AddRange(await deals
+            .Where(x => x.Estado == EstadoNegocio.Abierto && x.FechaCreacion <= staleDealLimit && !activities.Any(a => a.NegocioId == x.Id && a.FechaProgramada >= staleDealLimit))
             .OrderByDescending(x => x.Valor)
             .Take(5)
             .Select(x => new CommercialAlertDto(
@@ -508,10 +545,11 @@ public sealed class DashboardService(ICrmDbContext db) : IDashboardService
                 "Negocio sin actividad reciente",
                 x.Titulo + " requiere seguimiento comercial.",
                 x.FechaCreacion,
-                x.ClienteId == null ? "/pipeline" : "/clientes/" + x.ClienteId))
+                x.ClienteId == null ? "/pipeline" : "/clientes/" + x.ClienteId,
+                x.UsuarioCreacion))
             .ToListAsync(cancellationToken));
 
-        var overdueProcedures = await db.Tramites
+        var overdueProcedures = await procedures
             .Where(x => x.Estado == EstadoTramite.Atrasado || (x.Estado != EstadoTramite.Completado && x.Estado != EstadoTramite.Cancelado && x.FechaEstimada < today))
             .OrderBy(x => x.FechaEstimada)
             .Take(5)
@@ -527,6 +565,7 @@ public sealed class DashboardService(ICrmDbContext db) : IDashboardService
                 "/tramites")));
 
         return alerts
+            .DistinctBy(x => new { x.Type, x.Title, x.Description, x.ActionUrl })
             .OrderBy(x => x.Severity == "error" ? 0 : x.Severity == "warning" ? 1 : 2)
             .ThenBy(x => x.CreatedAt)
             .Take(12)

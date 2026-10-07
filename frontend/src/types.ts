@@ -368,6 +368,10 @@ export interface QuoteItem {
 export interface Quote {
   status?: string;
   advisorName?: string;
+  creatorEmail?: string;
+  nextAction?: string;
+  nextActionAt?: string;
+  nextActionUrl?: string;
   financingOptions?: QuoteFinancingOption[];
   isBundle?: boolean;
   id: string;
@@ -688,6 +692,7 @@ export interface Dashboard {
   todayActivities: number;
   recentActivities: { title: string; scheduledAt: string; status: number }[];
   alerts: CommercialAlert[];
+  funnel: { quotes: number; followedUp: number; applications: number; approved: number; delivered: number };
 }
 
 export interface CommercialAlert {
@@ -697,6 +702,7 @@ export interface CommercialAlert {
   description: string;
   createdAt: string;
   actionUrl?: string;
+  ownerName?: string;
 }
 
 export interface CommercialReports {
