@@ -368,7 +368,9 @@ public sealed record QuoteDto(
     string? Notes,
     IReadOnlyCollection<QuoteItemDto> Items,
     bool IsBundle = false,
-    IReadOnlyCollection<QuoteFinancingOptionDto>? FinancingOptions = null);
+    IReadOnlyCollection<QuoteFinancingOptionDto>? FinancingOptions = null,
+    string Status = "Cotizada",
+    string? AdvisorName = null);
 public sealed record CreateQuoteDto(
     TipoIdentificacionColombia IdentificationType,
     string? IdentificationNumber,

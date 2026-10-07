@@ -24,16 +24,48 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
     [HttpGet]
     public async Task<ActionResult<IReadOnlyCollection<QuoteDto>>> Get(CancellationToken cancellationToken)
     {
-        var quotes = await db.Cotizaciones
+        var canSeeAll = User.IsInRole("Administrador") || User.IsInRole("Supervisor")
+            || string.Equals(User.FindFirstValue("global_admin"), "true", StringComparison.OrdinalIgnoreCase);
+        var query = db.Cotizaciones.AsQueryable();
+        if (!canSeeAll) query = query.Where(x => x.UsuarioCreacion == tenantContext.UsuarioActual);
+
+        var quotes = await query
             .Include(x => x.Producto)
             .Include(x => x.PerfilRequisito)
             .Include(x => x.Items)
             .ThenInclude(x => x.Producto)
             .OrderByDescending(x => x.FechaCotizacion)
-            .Select(x => ToDto(x))
             .ToListAsync(cancellationToken);
-        return Ok(quotes);
+        var quoteIds = quotes.Select(x => x.Id).ToArray();
+        var applications = await db.SolicitudesCredito
+            .Where(x => x.CotizacionId.HasValue && quoteIds.Contains(x.CotizacionId.Value))
+            .Select(x => new { x.CotizacionId, x.Estado, x.FechaCreacion, x.FechaActualizacion })
+            .ToListAsync(cancellationToken);
+        var latestStatus = applications
+            .GroupBy(x => x.CotizacionId!.Value)
+            .ToDictionary(group => group.Key, group => QuoteStatus(group
+                .OrderByDescending(x => x.FechaActualizacion ?? x.FechaCreacion).First().Estado));
+        var advisorEmails = quotes.Select(x => x.UsuarioCreacion).Distinct().ToArray();
+        var advisors = await db.Usuarios.Where(x => advisorEmails.Contains(x.Email))
+            .Select(x => new { x.Email, x.NombreCompleto }).ToListAsync(cancellationToken);
+        var advisorNames = advisors.ToDictionary(x => x.Email, x => x.NombreCompleto, StringComparer.OrdinalIgnoreCase);
+        return Ok(quotes.Select(x => ToDto(x,
+            latestStatus.GetValueOrDefault(x.Id, "Cotizada"),
+            advisorNames.GetValueOrDefault(x.UsuarioCreacion, x.UsuarioCreacion))).ToList());
     }
+
+    private static string QuoteStatus(EstadoSolicitudCredito status) => status switch
+    {
+        EstadoSolicitudCredito.DocumentosPendientes => "Documentos pendientes",
+        EstadoSolicitudCredito.DocumentosRecibidos => "Documentos recibidos",
+        EstadoSolicitudCredito.EnEstudio => "En estudio",
+        EstadoSolicitudCredito.Aprobada => "Aprobada",
+        EstadoSolicitudCredito.Rechazada => "Rechazada",
+        EstadoSolicitudCredito.Desembolsada => "Entregada",
+        EstadoSolicitudCredito.Interesado => "Interesado",
+        EstadoSolicitudCredito.Desistida => "Desistida",
+        _ => "Solicitud creada"
+    };
 
     [HttpGet("rates")]
     public async Task<ActionResult<IReadOnlyCollection<SalesPointRateDto>>> GetRates([FromQuery] Guid? salesPointId, CancellationToken cancellationToken)
@@ -432,6 +464,10 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             .ThenInclude(x => x!.Fotos)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
             ?? throw new KeyNotFoundException("Cotizacion no encontrada.");
+        if (!User.IsInRole("Administrador") && !User.IsInRole("Supervisor")
+            && !string.Equals(User.FindFirstValue("global_admin"), "true", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(quote.UsuarioCreacion, tenantContext.UsuarioActual, StringComparison.OrdinalIgnoreCase))
+            return Forbid();
         var company = await db.Empresas.IgnoreQueryFilters().FirstOrDefaultAsync(x => x.Id == tenantContext.EmpresaId, cancellationToken);
         var dto = ToDto(quote);
         var companyLogo = ToPdfImage(company?.LogoDataUrl, "logo-empresa.png");
@@ -501,7 +537,7 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
         }
     }
 
-    private static QuoteDto ToDto(Cotizacion x)
+    private static QuoteDto ToDto(Cotizacion x, string status = "Cotizada", string? advisorName = null)
     {
         var productName = x.Producto is null
             ? "Producto"
@@ -558,7 +594,8 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             x.ValidaHasta,
             x.Observaciones,
             QuoteItems(x).ToList(), x.EsPaquete,
-            QuoteFinancingOptions.Read(x.AlternativasPlazoJson, x.TipoCredito, termMonths, x.CuotaMensualEstimada, totalPayment));
+            QuoteFinancingOptions.Read(x.AlternativasPlazoJson, x.TipoCredito, termMonths, x.CuotaMensualEstimada, totalPayment),
+            status, advisorName);
     }
 
     private static IReadOnlyCollection<CreateQuoteItemDto> NormalizeQuoteItems(CreateQuoteDto dto)

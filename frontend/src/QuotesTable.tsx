@@ -15,6 +15,13 @@ const customerName = (q: Quote) => [q.customerFirstName ? [q.customerFirstName, 
   q.customerLastName ? [q.customerLastName, q.customerSecondLastName].filter(Boolean).join(' ') : q.customerLastNames].filter(Boolean).join(' ');
 const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 const border = '#d9e2ec';
+const statusTone = (status: string) => {
+  if (status === 'Aprobada' || status === 'Entregada') return { background: '#e6f3ee', color: '#0f766e' };
+  if (status === 'Rechazada' || status === 'Desistida') return { background: '#fdecec', color: '#b42318' };
+  if (status === 'En estudio' || status === 'Documentos recibidos') return { background: '#e8f4f8', color: '#17647b' };
+  if (status === 'Documentos pendientes') return { background: '#fff3e5', color: '#9a5700' };
+  return { background: '#eef6f8', color: '#17647b' };
+};
 
 function CellText({ value }: { value: string }) {
   return <Tooltip title={value}><Box component="span" sx={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value || '-'}</Box></Tooltip>;
@@ -30,7 +37,7 @@ export function QuotesTable({ rows, onPreview, onAnalyze }: {
   const filtered = useMemo(() => {
     const terms = normalize(search).trim().split(/\s+/).filter(Boolean);
     return rows.filter(q => {
-      const text = normalize([q.number, customerName(q), q.identificationNumber, q.salesPointName,
+      const text = normalize([q.number, customerName(q), q.identificationNumber, q.salesPointName, q.status, q.advisorName,
         q.productName, q.salesPointRateName, q.promotionName, ...(q.items ?? []).map(i => i.productName)].join(' '));
       return terms.every(term => text.includes(term));
     });
@@ -38,8 +45,8 @@ export function QuotesTable({ rows, onPreview, onAnalyze }: {
   const safePage = Math.min(page, Math.max(0, Math.ceil(filtered.length / pageSize) - 1));
   const visible = filtered.slice(safePage * pageSize, (safePage + 1) * pageSize);
   const headers = [
-    ['Acciones', 112], ['Modalidad', 105], ['Número', 175], ['Fecha', 105], ['Identificación', 130],
-    ['Cliente', 245], ['Sede', 190], ['Productos', 220], ['Valor contado / financiado', 185], ['Plazos', 145], ['Válida hasta', 110],
+    ['Acciones', 112], ['Cliente', 245], ['Identificación', 135], ['Modalidad', 105], ['Estado', 175],
+    ['Número', 175], ['Fecha', 105], ['Asesor', 190], ['Sede', 175],
   ] as const;
   return <Paper variant="outlined" sx={{ overflow: 'hidden', borderColor: border, borderRadius: 1, boxShadow: 'none' }}>
     <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" gap={1} sx={{ p: 1.25 }}>
@@ -47,10 +54,10 @@ export function QuotesTable({ rows, onPreview, onAnalyze }: {
         onChange={event => { setSearch(event.target.value); setPage(0); setExpanded(undefined); }}
         InputProps={{ startAdornment: <InputAdornment position="start"><Search fontSize="small" /></InputAdornment> }}
         sx={{ width: { xs: '100%', sm: 420 } }} />
-      <Typography variant="caption" color="text.secondary" sx={{ alignSelf: { sm: 'center' } }}>Abra la flecha para ver productos, cuotas y promociones.</Typography>
+      <Typography variant="caption" color="text.secondary" sx={{ alignSelf: { sm: 'center' } }}>La flecha muestra productos, valores y plazos.</Typography>
     </Stack>
     <TableContainer sx={{ overflowX: 'auto', maxHeight: '65vh' }} tabIndex={0} aria-label="Tabla de cotizaciones; desplace horizontalmente para ver todas las columnas">
-      <Table size="small" stickyHeader aria-label="Cotizaciones" sx={{ tableLayout: 'fixed', minWidth: 1722,
+      <Table size="small" stickyHeader aria-label="Cotizaciones" sx={{ tableLayout: 'fixed', minWidth: 1417,
         '& th, & td': { borderRight: `1px solid ${border}`, borderBottom: `1px solid ${border}`, px: 1, py: .8, fontSize: 12, lineHeight: 1.4, verticalAlign: 'middle' },
         '& th': { bgcolor: '#eef6f8', color: 'primary.main', fontWeight: 700, whiteSpace: 'nowrap' },
         '& .quote-row:nth-of-type(4n + 1)': { bgcolor: '#fbfdff' },
@@ -58,7 +65,7 @@ export function QuotesTable({ rows, onPreview, onAnalyze }: {
         '& .MuiIconButton-root': { border: `1px solid ${border}`, borderRadius: .5, p: .35, bgcolor: '#fff', color: 'primary.main' },
         '& .MuiSvgIcon-root': { fontSize: 17 },
       }}>
-        <TableHead><TableRow>{headers.map(([label, width]) => <TableCell key={label} sx={{ width, textAlign: label === 'Valor contado / financiado' ? 'right' : 'left' }}>{label}</TableCell>)}</TableRow></TableHead>
+        <TableHead><TableRow>{headers.map(([label, width]) => <TableCell key={label} sx={{ width }}>{label}</TableCell>)}</TableRow></TableHead>
         <TableBody>
           {visible.map(q => {
             const cash = q.creditType === 'Contado';
@@ -74,23 +81,24 @@ export function QuotesTable({ rows, onPreview, onAnalyze }: {
                   <Tooltip title="Ver / descargar PDF"><IconButton size="small" aria-label={`Ver PDF ${q.number}`} onClick={() => onPreview(q)}><Visibility /></IconButton></Tooltip>
                   <Tooltip title="Análisis del cliente"><IconButton size="small" aria-label={`Analizar cliente de ${q.number}`} onClick={() => onAnalyze(q)}><AutoAwesome /></IconButton></Tooltip>
                 </Stack></TableCell>
+                <TableCell><CellText value={customerName(q)} /></TableCell>
+                <TableCell><CellText value={q.identificationNumber || '-'} /></TableCell>
                 <TableCell><Chip size="small" label={cash ? 'Contado' : 'Crédito'} sx={{ height: 22, borderRadius: .5, fontSize: 11, fontWeight: 700,
                   bgcolor: cash ? '#e6f3ee' : '#eef6f8', color: cash ? '#0f766e' : 'primary.main', borderLeft: '4px solid', borderLeftColor: cash ? '#0f766e' : 'primary.main' }} /></TableCell>
+                <TableCell><Chip size="small" label={q.status || 'Cotizada'} sx={{ height: 22, borderRadius: .5, fontSize: 11, fontWeight: 700,
+                  bgcolor: statusTone(q.status || 'Cotizada').background, color: statusTone(q.status || 'Cotizada').color,
+                  borderLeft: '4px solid', borderLeftColor: statusTone(q.status || 'Cotizada').color }} /></TableCell>
                 <TableCell><CellText value={q.number} /></TableCell>
                 <TableCell sx={{ whiteSpace: 'nowrap' }}>{date(q.quoteDate)}</TableCell>
-                <TableCell><CellText value={q.identificationNumber || '-'} /></TableCell>
-                <TableCell><CellText value={customerName(q)} /></TableCell>
+                <TableCell><CellText value={q.advisorName || '-'} /></TableCell>
                 <TableCell><CellText value={q.salesPointName || '-'} /></TableCell>
-                <TableCell><CellText value={(q.items?.length ?? 0) > 1 ? `${q.items.length} artículos · ${q.isBundle ? 'Financiación conjunta' : 'Comparativo'}` : q.productName} /></TableCell>
-                <TableCell align="right" sx={{ whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{money(cash ? q.estimatedTotalPayment : q.financedAmount)}</TableCell>
-                <TableCell><CellText value={cash ? 'No aplica' : terms.length ? `${terms.join(' / ')} cuotas` : 'Sin simulación'} /></TableCell>
-                <TableCell sx={{ whiteSpace: 'nowrap' }}>{date(q.validUntil)}</TableCell>
               </TableRow>
               <TableRow><TableCell colSpan={headers.length} sx={{ p: '0 !important', borderBottom: open ? undefined : '0 !important' }}>
                 <Collapse in={open} timeout="auto" unmountOnExit>
                   <Box id={`quote-detail-${q.id}`} sx={{ p: 2, bgcolor: '#f4f7fb' }}>
                     <Typography fontWeight={700} fontSize={13}>{q.number} · {customerName(q)}</Typography>
                     <Typography variant="body2" sx={{ mt: .5, mb: 1 }}>{q.salesPointName || 'Sin sede'} · {cash ? 'Contado' : `Tasa: ${q.salesPointRateName || 'Tasa general'}`}</Typography>
+                    <Typography variant="body2" sx={{ mb: 1 }}>Valor: {money(cash ? q.estimatedTotalPayment : q.financedAmount)} · Plazos: {cash ? 'No aplica' : terms.length ? `${terms.join(' / ')} cuotas` : 'Sin simulación'} · Válida hasta: {date(q.validUntil)}</Typography>
                     <Stack direction="row" flexWrap="wrap" gap={1.5}>
                       {(!q.isBundle && q.items?.length > 1 ? q.items : [q]).map((item, index) => <Box key={index} sx={{ p: 1.5, minWidth: 250, maxWidth: 480, bgcolor: '#fff', border: `1px solid ${border}`, borderRadius: 1 }}>
                         <Typography fontSize={13} fontWeight={700}>{q.isBundle ? 'Condiciones de todos los artículos' : item.productName}</Typography>

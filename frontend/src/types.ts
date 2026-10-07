@@ -366,6 +366,8 @@ export interface QuoteItem {
 }
 
 export interface Quote {
+  status?: string;
+  advisorName?: string;
   financingOptions?: QuoteFinancingOption[];
   isBundle?: boolean;
   id: string;
