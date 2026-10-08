@@ -1081,6 +1081,10 @@ namespace CrmSaas.Infrastructure.Persistence.Migrations
                         .HasMaxLength(300000)
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("LogoElectrodomesticosDataUrl")
+                        .HasMaxLength(300000)
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("Nombre")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");

@@ -35,7 +35,12 @@ static class CreditSignaturePdfChecks
             CoDebtors = [debtor, debtor with { Id = Guid.NewGuid(), Name = "MARIO EJEMPLO LÓPEZ", Identification = "1000000003", Mobile = "3005550107",
                 Reference1Name = "ROSA EJEMPLO", Reference1Mobile = "3005550108", Reference2Name = "JORGE EJEMPLO", Reference2Mobile = "3005550109" }]
         };
-        var bytes = SimplePdfGenerator.CreditApplication(sample, "EMPRESA DE DEMOSTRACIÓN", "solicitud-credito");
+        var logoDataUrl = args.Length > 1 ? "data:image/png;base64," + Convert.ToBase64String(File.ReadAllBytes(args[1])) : null;
+        var logoCompany = new CrmSaas.Domain.Entities.Empresa { LogoDataUrl = logoDataUrl };
+        var bytes = SimplePdfGenerator.CreditApplication(sample, "EMPRESA DE DEMOSTRACIÓN", "solicitud-credito",
+            CompanyDocumentLogos.ForCreditApplication(logoCompany, false));
+        if (logoDataUrl is not null && !Encoding.ASCII.GetString(bytes).Contains("/Logo Do"))
+            throw new Exception("La solicitud de moto debe dibujar el logo seleccionado.");
         var text = Decode(bytes);
         foreach (var expected in new[] { sample.CustomerName, debtor.Name, "MARIO EJEMPLO LÓPEZ", "24/10/2026", "CHASIS-DEMO-0001", "AUTORIZACIÓN DE TRATAMIENTO", "FIRMAS Y HUELLAS", "codeudor@example.com", "Calle 12 # 30-40" })
             if (!text.Contains(expected)) throw new Exception("Credit signature PDF missing: " + expected);

@@ -521,11 +521,15 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             return Forbid();
         var company = await db.Empresas.IgnoreQueryFilters().FirstOrDefaultAsync(x => x.Id == tenantContext.EmpresaId, cancellationToken);
         var dto = ToDto(quote);
-        var companyLogo = ToPdfImage(company?.LogoDataUrl, "logo-empresa.png");
+        var categories = await db.CategoriasProducto.AsNoTracking().ToListAsync(cancellationToken);
+        var (primaryLogo, secondaryLogo) = CompanyDocumentLogos.ForQuote(company,
+            quote.Items.Count > 0 ? quote.Items.Select(x => x.Producto?.Categoria) : [quote.Producto?.Categoria],
+            categories, quote.EsPaquete);
         var bytes = SimplePdfGenerator.Quote(
             dto,
             company?.Nombre ?? "Empresa",
-            companyLogo: companyLogo,
+            companyLogo: ToPdfImage(primaryLogo, "logo-empresa.png"),
+            secondaryCompanyLogo: ToPdfImage(secondaryLogo, "logo-electrodomesticos.png"),
             customerPhone: quote.Cliente?.Telefono,
             customerAddress: quote.Cliente?.Direccion,
             advisor: quote.UsuarioCreacion);

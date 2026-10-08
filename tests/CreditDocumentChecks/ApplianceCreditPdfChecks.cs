@@ -55,7 +55,12 @@ static class ApplianceCreditPdfChecks
             ProductName = product.Nombre, TermMonths = 18, FormDetails = details,
             CoDebtors = [person with { FormDetails = person.FormDetails! with { BirthDate = new(1988, 2, 10) } }] };
         Check(CreditFormDetails.Read(CreditFormDetails.Save(details)) == details, "Appliance fields round-trip without a database migration.");
-        var bytes = SimplePdfGenerator.CreditApplication(sample, "EMPRESA DE DEMOSTRACIÓN", "solicitud-credito", printContext: context);
+        var logoDataUrl = args.Length > 1 ? "data:image/png;base64," + Convert.ToBase64String(File.ReadAllBytes(args[1])) : null;
+        var logoCompany = new Empresa { LogoDataUrl = null, LogoElectrodomesticosDataUrl = logoDataUrl };
+        var bytes = SimplePdfGenerator.CreditApplication(sample, "EMPRESA DE DEMOSTRACIÓN", "solicitud-credito",
+            CompanyDocumentLogos.ForCreditApplication(logoCompany, true), context);
+        if (logoDataUrl is not null && !Encoding.ASCII.GetString(bytes).Contains("/Logo Do"))
+            throw new Exception("La solicitud de electrodomésticos debe dibujar el segundo logo.");
         var text = Decode(bytes);
         Check(text.Contains("ANTICIPO\n$ 500.000"), "Anticipo comes from the application initial payment, not legacy details or quote advances.");
         var editedInitial = Decode(SimplePdfGenerator.CreditApplication(sample with { DownPayment = 750000 }, "Empresa", "solicitud-credito", printContext: context));

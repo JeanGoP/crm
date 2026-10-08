@@ -6,7 +6,7 @@ namespace CrmSaas.Api.Services;
 public static partial class SimplePdfGenerator
 {
     // Layout only: amounts and financing alternatives come from the persisted quotation.
-    private sealed class QuoteLayout(QuoteDto quote, string company, PdfImageData? logo,
+    private sealed class QuoteLayout(QuoteDto quote, string company, PdfImageData? logo, PdfImageData? secondLogo,
         string? phone, string? address, string? advisor)
     {
         private const double Left = 32, Width = 531, Bottom = 52;
@@ -128,13 +128,18 @@ public static partial class SimplePdfGenerator
             page = new StringBuilder(); pages.Add(page);
             if (logo is not null)
             {
-                var scale = Math.Min(155d / logo.Width, 58d / logo.Height);
+                var scale = Math.Min((secondLogo is null ? 155d : 140d) / logo.Width, 58d / logo.Height);
                 page.AppendLine(FormattableString.Invariant($"q {logo.Width * scale:0.###} 0 0 {logo.Height * scale:0.###} 32 751 cm /Logo Do Q"));
             }
             else
             {
                 var companyLines = Wrap(Value(company), 270, 14, true);
                 for (var i = 0; i < Math.Min(3, companyLines.Count); i++) Text(32, 799 - i * 17, companyLines[i], 14, true);
+            }
+            if (secondLogo is not null)
+            {
+                var scale = Math.Min(140d / secondLogo.Width, 58d / secondLogo.Height);
+                page.AppendLine(FormattableString.Invariant($"q {secondLogo.Width * scale:0.###} 0 0 {secondLogo.Height * scale:0.###} 190 751 cm /Logo2 Do Q"));
             }
             Text(365, 793, "COTIZACIÓN", 23, true);
             Text(350, 773, quote.Number, Fit(quote.Number, 210, 10), true);

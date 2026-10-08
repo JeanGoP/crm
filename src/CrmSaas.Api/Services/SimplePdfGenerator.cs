@@ -13,9 +13,9 @@ public static partial class SimplePdfGenerator
 {
     private static readonly CultureInfo ColombianCulture = CultureInfo.GetCultureInfo("es-CO");
 
-    public static byte[] Quote(QuoteDto quote, string companyName, QuotePdfImage? productImage = null, QuotePdfImage? companyLogo = null, QuotePdfImage? brandLogo = null, string? customerPhone = null, string? customerAddress = null, string? advisor = null)
+    public static byte[] Quote(QuoteDto quote, string companyName, QuotePdfImage? productImage = null, QuotePdfImage? companyLogo = null, QuotePdfImage? brandLogo = null, string? customerPhone = null, string? customerAddress = null, string? advisor = null, QuotePdfImage? secondaryCompanyLogo = null)
     {
-        return CreateQuotePdf(quote, companyName, productImage, companyLogo, brandLogo, customerPhone, customerAddress, advisor);
+        return CreateQuotePdf(quote, companyName, productImage, companyLogo, brandLogo, customerPhone, customerAddress, advisor, secondaryCompanyLogo);
     }
 
     public static byte[] CreditApplication(CreditApplicationDto application, string companyName, string template, string? companyLogoDataUrl = null, CreditPrintContext? printContext = null)
@@ -352,9 +352,10 @@ public static partial class SimplePdfGenerator
         .Where(c => c < 128)
         .Aggregate(new StringBuilder(), (sb, c) => sb.Append(c), sb => sb.ToString());
 
-    private static byte[] CreateQuotePdf(QuoteDto quote, string companyName, QuotePdfImage? productImage, QuotePdfImage? companyLogo, QuotePdfImage? brandLogo, string? customerPhone, string? customerAddress, string? advisor)
+    private static byte[] CreateQuotePdf(QuoteDto quote, string companyName, QuotePdfImage? productImage, QuotePdfImage? companyLogo, QuotePdfImage? brandLogo, string? customerPhone, string? customerAddress, string? advisor, QuotePdfImage? secondaryCompanyLogo)
     {
         var logoImage = TryCreatePdfImage(companyLogo);
+        var secondLogoImage = TryCreatePdfImage(secondaryCompanyLogo);
         var objects = new List<PdfObject>
         {
             new("<< /Type /Catalog /Pages 2 0 R >>"),
@@ -365,10 +366,11 @@ public static partial class SimplePdfGenerator
 
         var xObjects = new List<string>();
         AddImageObject(objects, xObjects, "Logo", logoImage);
+        AddImageObject(objects, xObjects, "Logo2", secondLogoImage);
 
         var xObjectResources = xObjects.Count > 0 ? $" /XObject << {string.Join(" ", xObjects)} >>" : string.Empty;
         var resources = $"<< /Font << /F1 3 0 R /F2 4 0 R >>{xObjectResources} >>";
-        var pages = new QuoteLayout(quote, companyName, logoImage, customerPhone, customerAddress, advisor).Render();
+        var pages = new QuoteLayout(quote, companyName, logoImage, secondLogoImage, customerPhone, customerAddress, advisor).Render();
         var pageRefs = new List<string>();
         foreach (var pageContent in pages)
         {
