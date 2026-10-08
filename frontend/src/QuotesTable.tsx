@@ -75,7 +75,7 @@ export function QuotesTable({ rows, onPreview, onAnalyze, onFollowUp, currentUse
     </Stack>
     <TableContainer sx={{ overflowX: 'auto', maxHeight: '65vh' }} tabIndex={0} aria-label="Tabla de cotizaciones; desplace horizontalmente para ver todas las columnas">
       <Table size="small" stickyHeader aria-label="Cotizaciones" sx={{ tableLayout: 'fixed', minWidth: showTeam ? 1665 : 1475,
-        '& th, & td': { borderRight: `1px solid ${border}`, borderBottom: `1px solid ${border}`, px: 1, py: .8, fontSize: 12, lineHeight: 1.4, verticalAlign: 'middle' },
+        '& th, & td': { borderRight: `1px solid ${border}`, borderBottom: `1px solid ${border}`, px: 1, py: .55, fontSize: 12, lineHeight: 1.4, verticalAlign: 'middle' },
         '& th': { bgcolor: '#eef6f8', color: 'primary.main', fontWeight: 700, whiteSpace: 'nowrap' },
         '& .quote-row:nth-of-type(4n + 1)': { bgcolor: '#fbfdff' },
         '& .quote-row:hover': { bgcolor: '#eef9fb' },
@@ -111,11 +111,17 @@ export function QuotesTable({ rows, onPreview, onAnalyze, onFollowUp, currentUse
                   bgcolor: statusTone(q.status || 'Cotizada').background, color: statusTone(q.status || 'Cotizada').color,
                   borderLeft: '4px solid', borderLeftColor: statusTone(q.status || 'Cotizada').color }} /></TableCell>
                 <TableCell>
-                  {!cash && (q.creditApplicationId || !finished) ? <Stack spacing={.25} alignItems="flex-start">
-                    <Button size="small" variant="outlined" sx={{ py: .2, textTransform: 'none', whiteSpace: 'nowrap' }} onClick={() => navigate(processUrl)}>
-                      {q.creditApplicationId ? finished ? 'Ver expediente' : 'Continuar trámite' : 'Iniciar solicitud'}
-                    </Button>
-                    <Typography variant="caption" color="text.secondary"><CellText value={`${q.nextAction || ''}${q.nextActionAt ? ` · ${date(q.nextActionAt)}` : ''}`} /></Typography>
+                  {!cash && (q.creditApplicationId || !finished) ? <Stack direction="row" spacing={.75} alignItems="center" sx={{ minWidth: 0 }}>
+                    <Tooltip title={`${q.nextAction || 'Abrir solicitud'}${q.nextActionAt ? ` · ${date(q.nextActionAt)}` : ''}`}>
+                      <Button size="small" variant="outlined" sx={{ minWidth: 0, height: 25, px: 1, py: 0, flexShrink: 0, borderRadius: 1.5,
+                        fontSize: 10.5, fontWeight: 800, lineHeight: 1, textTransform: 'none', whiteSpace: 'nowrap',
+                        bgcolor: '#f2f8fa', borderColor: '#b7d7e1', '&:hover': { bgcolor: '#e4f3f7', borderColor: 'primary.main' } }} onClick={() => navigate(processUrl)}>
+                        {q.creditApplicationId ? finished ? 'Ver expediente' : 'Continuar trámite' : 'Iniciar solicitud'}
+                      </Button>
+                    </Tooltip>
+                    <Typography variant="caption" color="text.secondary" sx={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 10.5 }}>
+                      {q.nextAction || ''}
+                    </Typography>
                   </Stack> : <Button size="small" sx={{ p: 0, textTransform: 'none', justifyContent: 'flex-start', textAlign: 'left', lineHeight: 1.25 }}
                     disabled={!q.nextActionUrl} onClick={() => {
                       if (q.nextActionUrl === '/actividades') onFollowUp(q);
