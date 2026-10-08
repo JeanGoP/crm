@@ -2022,7 +2022,7 @@ function CreditApplicationsPage() {
         cells: [
         <Stack direction="row" gap={.5} alignItems="center" flexWrap="nowrap">
           <Button size="small" variant="contained" onClick={() => setManagement(r)} sx={{ minHeight: 28, px: 1.25, fontSize: 11.5 }}>Gestionar</Button>
-          <Actions onAi={() => analyzeCustomer(r.customerId, r.mobile)} onEdit={() => setForm({ open: true, item: r })} />
+          <Actions onAi={() => analyzeCustomer(r.customerId, r.mobile)} onEdit={canManageCredit || ![4, 5, 6, 7].includes(r.status) ? () => setForm({ open: true, item: r }) : undefined} />
         </Stack>,
         r.number,
         <StatusChip label={creditStatus(r.status)} tone={creditTone(r.status)} />,
@@ -2150,21 +2150,22 @@ function CreditApplicationManagementDialog({
           </Stack>
           <DocumentSummary application={application} onComplete={(completed) => onWorkflowMilestone(application, "documentation", completed)} onUpdate={onUpdateDocument} onUpload={onUploadDocument} onDownload={onDownloadDocument} onDelete={onDeleteDocument} />
         </Stack>}
-        {tab === 1 && <CreditStudySummary application={application} onStep0={onStep0} onRecalculate={onRecalculate} onDecision={onDecision} />}
+        {tab === 1 && <CreditStudySummary application={application} canManage={showWorkflow} onStep0={onStep0} onRecalculate={onRecalculate} onDecision={onDecision} />}
         {tab === 2 && <Stack spacing={2}>
           <Typography variant="subtitle2" fontWeight={900}>Descargar documentos</Typography>
           <CreditTemplateDownloads application={application} onDownload={onDownloadTemplate} />
         </Stack>}
         {tab === 3 && <Stack spacing={2}>
           <FieldGrid>
-            <TextField select size="small" label="Estado" value={application.status} onChange={(e) => onChangeStatus(application, Number(e.target.value))}>
-              {creditStatusOptions.map((x) => <MenuItem key={x} value={x}>{creditStatus(x)}</MenuItem>)}
+            <TextField select size="small" label="Estado" value={application.status} disabled={!showWorkflow && [4, 5, 6, 7].includes(application.status)} onChange={(e) => onChangeStatus(application, Number(e.target.value))}>
+              {creditStatusOptions.map((x) => <MenuItem key={x} value={x} disabled={x === 5 || x === 6 || (!showWorkflow && (x === 4 || x === 7))}>{creditStatus(x)}</MenuItem>)}
             </TextField>
+            <Typography variant="caption" color="text.secondary">La aprobación y la negación se registran en Estudio por un administrador o supervisor.</Typography>
             <Box>
               <Typography variant="subtitle2" fontWeight={900} sx={{ mb: .75 }}>Acciones rapidas</Typography>
               <Stack direction="row" gap={1} flexWrap="wrap" useFlexGap>
                 <Button variant="outlined" startIcon={<AutoAwesome />} onClick={() => onAnalyze(application)}>Analizar IA</Button>
-                <Button variant="outlined" startIcon={<Edit />} onClick={() => onEdit(application)}>Editar solicitud</Button>
+                <Button variant="outlined" startIcon={<Edit />} disabled={!showWorkflow && [4, 5, 6, 7].includes(application.status)} onClick={() => onEdit(application)}>Editar solicitud</Button>
               </Stack>
             </Box>
           </FieldGrid>
@@ -2314,8 +2315,9 @@ function CreditWorkflowControls({ application, onCreditBureau, onMilestone }: {
   </>;
 }
 
-function CreditStudySummary({ application, onStep0, onRecalculate, onDecision }: {
+function CreditStudySummary({ application, canManage, onStep0, onRecalculate, onDecision }: {
   application: CreditApplication;
+  canManage: boolean;
   onStep0: (application: CreditApplication, patch?: Partial<CreditApplication>) => Promise<void>;
   onRecalculate: (application: CreditApplication, patch: Partial<CreditApplication>) => Promise<void>;
   onDecision: (application: CreditApplication, status: number, notes?: string, study?: Partial<CreditApplication> & { result?: string }) => Promise<void>;
@@ -2417,13 +2419,13 @@ function CreditStudySummary({ application, onStep0, onRecalculate, onDecision }:
     </Typography>
     {approvedPayment > 0 && <Typography variant="caption" color="text.secondary">Cuota analista: {money(approvedPayment)}</Typography>}
     {application.decisionNotes && <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.25 }}>{application.decisionNotes}</Typography>}
-    <Stack direction="row" gap={.5} flexWrap="wrap">
+    {canManage ? <Stack direction="row" gap={.5} flexWrap="wrap">
       <Button size="small" variant="outlined" onClick={() => void openExternalLookup(runtUrl, application.identificationNumber)}>RUNT</Button>
       <Button size="small" variant="outlined" onClick={() => void openExternalLookup(simitUrl, application.identificationNumber)}>SIMIT</Button>
       <Button size="small" variant="outlined" onClick={openInitialValidation}>Validacion inicial</Button>
       <Button size="small" variant="outlined" onClick={recalculate}>Recalcular</Button>
-    </Stack>
-    <Stack direction="row" gap={.5} flexWrap="wrap">
+    </Stack> : <Alert severity="info">Un administrador o supervisor registra las verificaciones y decide el crédito.</Alert>}
+    {canManage && <Stack direction="row" gap={.5} flexWrap="wrap">
       {actions.length ? actions.map((action) => <Button key={action.status} size="small" variant="outlined" onClick={() => onDecision(application, action.status)}>{action.label}</Button>) : <Chip size="small" label="Sin acciones" variant="outlined" />}
       {application.status === 4 && <>
         <Button size="small" variant="contained" onClick={() => approve(false, false)}>Aprobar</Button>
@@ -2431,7 +2433,7 @@ function CreditStudySummary({ application, onStep0, onRecalculate, onDecision }:
         <Button size="small" variant="outlined" onClick={() => approve(true, false)}>Con codeudor</Button>
         <Button size="small" color="error" variant="outlined" onClick={reject}>Negar</Button>
       </>}
-    </Stack>
+    </Stack>}
   </Stack>
   <Dialog open={initialValidationOpen} onClose={() => setInitialValidationOpen(false)} fullWidth maxWidth="sm">
     <DialogTitle>Validacion inicial</DialogTitle>
@@ -5378,7 +5380,6 @@ function CreditApplicationDialog({ form, customers, products, productCategories,
           <Stack spacing={2}>
             <Typography variant="subtitle1" fontWeight={900}>Gestion</Typography>
             <FieldGrid>
-              <TextField select label="Estado" value={v.status} onChange={(e) => set({ status: Number(e.target.value) })}>{creditStatusOptions.map((x) => <MenuItem key={x} value={x}>{creditStatus(x)}</MenuItem>)}</TextField>
               <TextField label="Observaciones" value={v.notes} onChange={(e) => set({ notes: e.target.value })} multiline minRows={2} />
             </FieldGrid>
           </Stack>

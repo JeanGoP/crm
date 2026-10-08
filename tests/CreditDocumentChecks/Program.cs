@@ -8,6 +8,7 @@ using CrmSaas.Api.Services;
 using CrmSaas.Domain.Entities;
 using CrmSaas.Domain.Enums;
 using FluentValidation;
+using Microsoft.AspNetCore.Authorization;
 
 static void Check(bool condition, string message)
 {
@@ -15,6 +16,36 @@ static void Check(bool condition, string message)
 }
 static void Invoke(string name, params object?[] args) => typeof(CreditApplicationsController)
     .GetMethod(name, BindingFlags.NonPublic | BindingFlags.Static)!.Invoke(null, args);
+static void MustReject(string method, params object?[] args)
+{
+    try
+    {
+        Invoke(method, args);
+        throw new Exception($"{method} debió rechazar el cambio de estado.");
+    }
+    catch (TargetInvocationException e) when (e.InnerException is ValidationException) { }
+}
+
+Invoke("ValidateEditableStatus", EstadoSolicitudCredito.Borrador, null);
+Invoke("ValidateEditableStatus", EstadoSolicitudCredito.Aprobada, EstadoSolicitudCredito.Aprobada);
+MustReject("ValidateEditableStatus", EstadoSolicitudCredito.Aprobada, null);
+MustReject("ValidateEditableStatus", EstadoSolicitudCredito.Aprobada, EstadoSolicitudCredito.Borrador);
+MustReject("ValidateEditableStatus", EstadoSolicitudCredito.EnEstudio, EstadoSolicitudCredito.Borrador);
+MustReject("ValidateStatusEndpoint", EstadoSolicitudCredito.Aprobada);
+MustReject("ValidateStatusEndpoint", EstadoSolicitudCredito.Rechazada);
+Invoke("ValidateStatusEndpoint", EstadoSolicitudCredito.EnEstudio);
+Invoke("ValidateFormalDecision", EstadoSolicitudCredito.Aprobada);
+Invoke("ValidateFormalDecision", EstadoSolicitudCredito.Rechazada);
+MustReject("ValidateFormalDecision", EstadoSolicitudCredito.EnEstudio);
+var controlledStatus = typeof(CreditApplicationsController).GetMethod("IsStudyControlledStatus", BindingFlags.NonPublic | BindingFlags.Static)!;
+Check((bool)controlledStatus.Invoke(null, [EstadoSolicitudCredito.Aprobada])! &&
+    (bool)controlledStatus.Invoke(null, [EstadoSolicitudCredito.EnEstudio])! &&
+    !(bool)controlledStatus.Invoke(null, [EstadoSolicitudCredito.DocumentosPendientes])!,
+    "Las solicitudes en estudio o decididas requieren un responsable autorizado para editarse.");
+var decisionRoles = typeof(CreditApplicationsController).GetMethod("Decide")!
+    .GetCustomAttribute<AuthorizeAttribute>()?.Roles;
+Check(decisionRoles == "Administrador,Supervisor", "Solo administrador y supervisor pueden registrar una decisión formal.");
+Console.WriteLine("OK: alta/edición no cambian estados; aprobación y negación solo por decisión formal con roles.");
 
 var application = new SolicitudCredito
 {

@@ -62,6 +62,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
     public async Task<ActionResult<CreditApplicationDto>> Create(UpsertCreditApplicationDto dto, CancellationToken cancellationToken)
     {
         Validate(dto);
+        ValidateEditableStatus(dto.Status, null);
         var customer = await db.Clientes.FirstOrDefaultAsync(x => x.Id == dto.CustomerId, cancellationToken)
             ?? throw new KeyNotFoundException("Cliente no encontrado.");
         var product = await db.Productos.FirstOrDefaultAsync(x => x.Id == dto.ProductId, cancellationToken)
@@ -107,7 +108,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             CodeudorReferencia2Nombre = Normalize(dto.CoDebtorReference2Name),
             CodeudorReferencia2Celular = Normalize(dto.CoDebtorReference2Mobile),
             CodeudorReferencia2Relacion = Normalize(dto.CoDebtorReference2Relationship),
-            Estado = dto.Status,
+            Estado = EstadoSolicitudCredito.Borrador,
             Observaciones = dto.Notes,
             FormDetailsJson = CreditFormDetails.Save(dto.FormDetails)
         };
@@ -144,6 +145,8 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             .Include(x => x.Documentos).Include(x => x.Codeudores)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
             ?? throw new KeyNotFoundException("Solicitud de credito no encontrada.");
+        if (IsStudyControlledStatus(entity.Estado) && !CanValidateDocuments()) return Forbid();
+        ValidateEditableStatus(dto.Status, entity.Estado);
 
         if (!await db.Clientes.AnyAsync(x => x.Id == dto.CustomerId, cancellationToken)) throw new KeyNotFoundException("Cliente no encontrado.");
         var product = await db.Productos.FirstOrDefaultAsync(x => x.Id == dto.ProductId, cancellationToken)
@@ -189,7 +192,6 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         entity.CodeudorReferencia2Nombre = Normalize(dto.CoDebtorReference2Name);
         entity.CodeudorReferencia2Celular = Normalize(dto.CoDebtorReference2Mobile);
         entity.CodeudorReferencia2Relacion = Normalize(dto.CoDebtorReference2Relationship);
-        entity.Estado = dto.Status;
         entity.Observaciones = dto.Notes;
         entity.FormDetailsJson = CreditFormDetails.Save(dto.FormDetails, entity.FormDetailsJson);
         AddMissingChecklistDocuments(entity, null);
@@ -205,6 +207,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
     [HttpPost("{id:guid}/status")]
     public async Task<ActionResult<CreditApplicationDto>> ChangeStatus(Guid id, ChangeCreditApplicationStatusDto dto, CancellationToken cancellationToken)
     {
+        ValidateStatusEndpoint(dto.Status);
         var entity = await VisibleApplications()
             .Include(x => x.Cliente)
             .Include(x => x.Producto)
@@ -212,6 +215,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             .Include(x => x.Documentos).Include(x => x.Codeudores)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
             ?? throw new KeyNotFoundException("Solicitud de credito no encontrada.");
+        if (IsStudyControlledStatus(entity.Estado) && !CanValidateDocuments()) return Forbid();
 
         if (dto.Status is EstadoSolicitudCredito.EnEstudio or EstadoSolicitudCredito.Aprobada or EstadoSolicitudCredito.Rechazada or EstadoSolicitudCredito.Desembolsada && !CanValidateDocuments())
         {
@@ -230,6 +234,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
     [Authorize(Roles = "Administrador,Supervisor")]
     public async Task<ActionResult<CreditApplicationDto>> Decide(Guid id, CreditApplicationDecisionDto dto, CancellationToken cancellationToken)
     {
+        ValidateFormalDecision(dto.Status);
         var entity = await db.SolicitudesCredito
             .Include(x => x.Cliente)
             .Include(x => x.Producto)
@@ -597,6 +602,30 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             if (string.IsNullOrWhiteSpace(dto.CoDebtorReference2Mobile)) throw new ValidationException("El celular de la referencia 2 del codeudor es obligatorio.");
             if (string.IsNullOrWhiteSpace(dto.CoDebtorReference2Relationship)) throw new ValidationException("La relacion de la referencia 2 del codeudor es obligatoria.");
         }
+    }
+
+    private static void ValidateEditableStatus(EstadoSolicitudCredito requested, EstadoSolicitudCredito? current)
+    {
+        if (current is null && requested != EstadoSolicitudCredito.Borrador)
+            throw new ValidationException("La solicitud nueva debe iniciar en borrador. Cambie el estado desde Gestionar solicitud.");
+        if (current.HasValue && requested != current.Value)
+            throw new ValidationException("El estado no se puede cambiar al editar la solicitud. Use las acciones del proceso.");
+    }
+
+    private static bool IsStudyControlledStatus(EstadoSolicitudCredito status) =>
+        status is EstadoSolicitudCredito.EnEstudio or EstadoSolicitudCredito.Aprobada or
+            EstadoSolicitudCredito.Rechazada or EstadoSolicitudCredito.Desembolsada;
+
+    private static void ValidateStatusEndpoint(EstadoSolicitudCredito status)
+    {
+        if (status is EstadoSolicitudCredito.Aprobada or EstadoSolicitudCredito.Rechazada)
+            throw new ValidationException("La aprobación o negación debe registrarse desde la decisión del estudio.");
+    }
+
+    private static void ValidateFormalDecision(EstadoSolicitudCredito status)
+    {
+        if (status is not (EstadoSolicitudCredito.Aprobada or EstadoSolicitudCredito.Rechazada))
+            throw new ValidationException("La decisión del estudio solo permite aprobar o negar la solicitud.");
     }
 
     private bool CanSeeAll =>
