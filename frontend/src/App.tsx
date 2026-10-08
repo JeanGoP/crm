@@ -200,7 +200,6 @@ const navGroups: NavGroup[] = [
       { to: '/clientes', label: 'Clientes', icon: <Groups /> },
       { to: '/prospectos', label: 'Prospectos', icon: <Handshake /> },
       { to: '/cotizaciones', label: 'Cotizaciones', icon: <ReceiptLong /> },
-      { to: '/pipeline', label: 'Pipeline', icon: <ViewKanban /> },
       { to: '/actividades', label: 'Actividades', icon: <EventNote /> }
     ]
   },
