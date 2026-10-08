@@ -349,7 +349,6 @@ const emptyProcedure = {
   customerNotifiedAt: '',
   notes: ''
 };
-const creditStatusOptions = [1, 8, 2, 4, 5, 6, 7, 9];
 
 function fullFirstNames(firstName?: string, middleName?: string, fallback?: string) {
   const value = [firstName, middleName].filter(Boolean).join(' ').trim();
@@ -1627,9 +1626,9 @@ function QuotesPage() {
 type CreditWorkflowColumnId = 'initial' | 'bureau' | 'created' | 'documents' | 'approval' | 'signatures' | 'final-review' | 'welcome' | 'closed';
 
 const creditWorkflowColumns: Array<{ id: CreditWorkflowColumnId; step: string; title: string; color: string; description: string }> = [
-  { id: 'initial', step: '1', title: 'SIMIT y RUNT', color: '#0369a1', description: 'Consultas e identidad' },
-  { id: 'bureau', step: '2', title: 'Datacredito', color: '#7c3aed', description: 'Cliente y codeudor' },
-  { id: 'created', step: '3', title: 'Solicitud creada', color: '#0f766e', description: 'Lista para soportes' },
+  { id: 'created', step: '1', title: 'Solicitud creada', color: '#0f766e', description: 'Pendiente de verificaciones' },
+  { id: 'initial', step: '2', title: 'SIMIT y RUNT', color: '#0369a1', description: 'Consultas e identidad' },
+  { id: 'bureau', step: '3', title: 'Datacrédito', color: '#7c3aed', description: 'Cliente y codeudor' },
   { id: 'documents', step: '4', title: 'Soportes', color: '#b45309', description: 'Carga y correcciones' },
   { id: 'approval', step: '5', title: 'Aprobaciones', color: '#c2410c', description: 'Estudio y decisión' },
   { id: 'signatures', step: '6', title: 'Firmas', color: '#2563eb', description: 'Documentos del negocio' },
@@ -1647,7 +1646,7 @@ function creditWorkflowColumn(application: CreditApplication): CreditWorkflowCol
   }
   if (application.status === 4) return 'approval';
   const initialReady = application.runtChecked && application.simitChecked && application.identityValidated;
-  if (!initialReady) return 'initial';
+  if (!initialReady) return application.step0ReviewedAt ? 'initial' : 'created';
   const bureauReady = application.creditBureauClientChecked && (!application.coDebtorName || application.creditBureauCoDebtorChecked);
   if (!bureauReady) return 'bureau';
   const documentsStarted = application.status >= 2 || application.documents.some((document) => document.hasFile || document.status > 1);
@@ -1659,13 +1658,29 @@ function creditWorkflowColumn(application: CreditApplication): CreditWorkflowCol
 
 function creditWorkflowStageDate(application: CreditApplication, column: CreditWorkflowColumnId) {
   const value = column === 'bureau' ? application.step0ReviewedAt
-    : column === 'created' || column === 'documents' ? application.creditBureauReviewedAt
+    : column === 'documents' ? application.creditBureauReviewedAt
       : column === 'approval' ? application.submittedAt
         : column === 'signatures' ? application.approvedAt
           : column === 'final-review' ? application.signaturesCompletedAt
             : column === 'welcome' ? application.finalReviewAt
               : application.createdAt;
   return value || application.createdAt;
+}
+
+function creditManagerTask(application: CreditApplication): { label: string; tab: 'estudio' | 'proceso' } | null {
+  if ([6, 9].includes(application.status) || application.welcomeCompleted) return null;
+  if (application.status === 4) return { label: 'Decidir crédito', tab: 'estudio' };
+  if ([5, 7].includes(application.status)) {
+    if (application.signaturesCompleted && !application.finalReviewApproved) return { label: 'Hacer revisión final', tab: 'proceso' };
+    if (application.finalReviewApproved && !application.welcomeCompleted) return { label: 'Registrar bienvenida', tab: 'proceso' };
+    return null;
+  }
+  if (!application.runtChecked || !application.simitChecked || !application.identityValidated)
+    return { label: 'Verificar identidad, RUNT y SIMIT', tab: 'estudio' };
+  if (!application.creditBureauClientChecked || (application.coDebtorName && !application.creditBureauCoDebtorChecked))
+    return { label: 'Registrar Datacrédito', tab: 'proceso' };
+  if (application.documentationCompleted) return { label: 'Enviar a estudio', tab: 'estudio' };
+  return null;
 }
 
 function CreditWorkflowBoardPage() {
@@ -1682,6 +1697,8 @@ function CreditWorkflowBoardPage() {
   const active = applications.filter((application) => ![6, 9].includes(application.status) && !application.welcomeCompleted).length;
   const finished = applications.filter((application) => application.welcomeCompleted).length;
   const attention = applications.filter((application) => application.documents.some((document) => document.status === 4 || document.isExpired)).length;
+  const reviewQueue = applications.map((application) => ({ application, task: creditManagerTask(application) }))
+    .filter((entry): entry is { application: CreditApplication; task: { label: string; tab: 'estudio' | 'proceso' } } => entry.task !== null);
 
   return <Stack spacing={2.5}>
     <Header title="Tablero de solicitudes de credito" onRefresh={reload} />
@@ -1692,6 +1709,24 @@ function CreditWorkflowBoardPage() {
       <Grid item xs={12} sm={6} lg={3}><Metric label="Requieren atencion" value={attention} /></Grid>
       <Grid item xs={12} sm={6} lg={3}><Metric label="Bienvenida completada" value={finished} /></Grid>
     </Grid>
+    <Paper variant="outlined" sx={{ p: 2, borderColor: uiBorder }}>
+      <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }} gap={1} sx={{ mb: 1.5 }}>
+        <Box>
+          <Typography fontWeight={900}>Por revisar ({reviewQueue.length})</Typography>
+          <Typography color="text.secondary" fontSize={12}>Las solicitudes que requieren una acción del administrador o supervisor.</Typography>
+        </Box>
+      </Stack>
+      {reviewQueue.length ? <Stack spacing={1}>
+        {reviewQueue.slice(0, 6).map(({ application, task }) => <Stack key={application.id} direction={{ xs: 'column', sm: 'row' }} alignItems={{ xs: 'flex-start', sm: 'center' }} justifyContent="space-between" gap={1} sx={{ p: 1, border: `1px solid ${uiBorder}`, borderRadius: 1 }}>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography fontSize={13} fontWeight={800}>{application.customerName} · {application.number}</Typography>
+            <Typography color="text.secondary" fontSize={12}>{task.label}</Typography>
+          </Box>
+          <Button size="small" variant="outlined" onClick={() => navigate(`/solicitudes-credito?solicitud=${application.id}&tab=${task.tab}`)}>Revisar</Button>
+        </Stack>)}
+        {reviewQueue.length > 6 && <Typography color="text.secondary" fontSize={12}>Hay {reviewQueue.length - 6} solicitudes más en las columnas de abajo.</Typography>}
+      </Stack> : <Typography color="text.secondary" fontSize={13}>No hay decisiones ni verificaciones pendientes.</Typography>}
+    </Paper>
     <Stack direction={{ xs: 'column', sm: 'row' }} alignItems={{ xs: 'stretch', sm: 'center' }} justifyContent="space-between" gap={1}>
       <TextField
         size="small"
@@ -1774,6 +1809,7 @@ function CreditApplicationsPage() {
   const [notice, setNotice] = useState<Notice>();
   const [searchParams, setSearchParams] = useSearchParams();
   const managementApplication = management ? rows.find((x) => x.id === management.id) ?? management : undefined;
+  const requestedQuoteId = searchParams.get('cotizacion');
 
   useEffect(() => {
     const requestedId = searchParams.get('solicitud');
@@ -1781,6 +1817,20 @@ function CreditApplicationsPage() {
     const requested = rows.find((application) => application.id === requestedId);
     if (requested) setManagement(requested);
   }, [rows, searchParams]);
+
+  useEffect(() => {
+    if (requestedQuoteId && quotes.some((quote) => quote.id === requestedQuoteId && customers.some((customer) => customer.id === quote.customerId)))
+      setForm((current) => current.open ? current : { open: true });
+  }, [requestedQuoteId, quotes, customers]);
+
+  const closeForm = () => {
+    setForm({ open: false });
+    if (requestedQuoteId) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('cotizacion');
+      setSearchParams(next, { replace: true });
+    }
+  };
 
   const closeManagement = () => {
     setManagement(undefined);
@@ -1841,6 +1891,10 @@ function CreditApplicationsPage() {
     setData(form.item ? rows.map((x) => x.id === data.id ? data : x) : [data, ...rows]);
     setNotice({ type: 'success', text: form.item ? 'Solicitud actualizada.' : 'Solicitud de credito creada.' });
     setForm({ open: false });
+    if (!form.item) {
+      setManagement(data);
+      setSearchParams({ solicitud: data.id, tab: 'pendiente' }, { replace: true });
+    }
   };
 
   const changeStatus = async (application: CreditApplication, status: number) => {
@@ -2036,10 +2090,10 @@ function CreditApplicationsPage() {
         <CreditApplicationPendingSummary application={r} compact />
       ] }))}
     />
-    <CreditApplicationDialog form={form} customers={customers} products={products.filter((x) => x.active)} productCategories={productCategories} quotes={quotes} onClose={() => setForm({ open: false })} onSave={save} />
+    <CreditApplicationDialog form={form} startingQuoteId={requestedQuoteId} customers={customers} products={products.filter((x) => x.active)} productCategories={productCategories} quotes={quotes} onClose={closeForm} onSave={save} />
     <CreditApplicationManagementDialog
       application={managementApplication}
-      initialTab={searchParams.get('tab') === 'proceso' ? 4 : 0}
+      initialTab={searchParams.get('tab') === 'proceso' ? 4 : searchParams.get('tab') === 'estudio' ? 1 : searchParams.get('tab') === 'pendiente' && managementApplication && canManageCredit && managementApplication.documentationCompleted ? managementApplication.status >= 5 ? 4 : 1 : 0}
       showWorkflow={canManageCredit}
       onClose={closeManagement}
       onUpdateDocument={updateDocument}
@@ -2124,6 +2178,9 @@ function CreditApplicationManagementDialog({
   useEffect(() => { if (application) setTab(initialTab ?? 0); }, [application?.id, initialTab]);
 
   if (!application) return null;
+  const readyForStudy = application.documentationCompleted && application.runtChecked && application.simitChecked &&
+    application.identityValidated && application.creditBureauClientChecked &&
+    (!application.coDebtorName || application.creditBureauCoDebtorChecked);
 
   return <Dialog open={!!application} onClose={onClose} fullWidth maxWidth="lg" fullScreen={fullScreen} scroll="paper" sx={{ '& .MuiDialog-paper': { m: { xs: 0, sm: 2 }, width: { xs: '100%', sm: 'calc(100% - 32px)' } } }}>
     <DialogTitle>
@@ -2148,6 +2205,8 @@ function CreditApplicationManagementDialog({
           <Stack direction="row" gap={.75} flexWrap="wrap" useFlexGap>
             <CreditApplicationPendingSummary application={application} />
           </Stack>
+          {!showWorkflow && application.documentationCompleted && [1, 2, 3, 4].includes(application.status) &&
+            <Alert severity="info">El expediente está listo para revisión. Un administrador o supervisor registra las verificaciones y decide el crédito.</Alert>}
           <DocumentSummary application={application} onComplete={(completed) => onWorkflowMilestone(application, "documentation", completed)} onUpdate={onUpdateDocument} onUpload={onUploadDocument} onDownload={onDownloadDocument} onDelete={onDeleteDocument} />
         </Stack>}
         {tab === 1 && <CreditStudySummary application={application} canManage={showWorkflow} onStep0={onStep0} onRecalculate={onRecalculate} onDecision={onDecision} />}
@@ -2156,19 +2215,19 @@ function CreditApplicationManagementDialog({
           <CreditTemplateDownloads application={application} onDownload={onDownloadTemplate} />
         </Stack>}
         {tab === 3 && <Stack spacing={2}>
-          <FieldGrid>
-            <TextField select size="small" label="Estado" value={application.status} disabled={!showWorkflow && [4, 5, 6, 7].includes(application.status)} onChange={(e) => onChangeStatus(application, Number(e.target.value))}>
-              {creditStatusOptions.map((x) => <MenuItem key={x} value={x} disabled={x === 5 || x === 6 || (!showWorkflow && (x === 4 || x === 7))}>{creditStatus(x)}</MenuItem>)}
-            </TextField>
-            <Typography variant="caption" color="text.secondary">La aprobación y la negación se registran en Estudio por un administrador o supervisor.</Typography>
-            <Box>
-              <Typography variant="subtitle2" fontWeight={900} sx={{ mb: .75 }}>Acciones rapidas</Typography>
-              <Stack direction="row" gap={1} flexWrap="wrap" useFlexGap>
-                <Button variant="outlined" startIcon={<AutoAwesome />} onClick={() => onAnalyze(application)}>Analizar IA</Button>
-                <Button variant="outlined" startIcon={<Edit />} disabled={!showWorkflow && [4, 5, 6, 7].includes(application.status)} onClick={() => onEdit(application)}>Editar solicitud</Button>
-              </Stack>
-            </Box>
-          </FieldGrid>
+          <Typography variant="subtitle2" fontWeight={900}>Qué hacer ahora</Typography>
+          <Stack direction="row" gap={1} flexWrap="wrap" useFlexGap>
+            {application.status === 1 && <Button variant="outlined" onClick={() => onChangeStatus(application, 8)}>Cliente interesado</Button>}
+            {[1, 8].includes(application.status) && <Button variant="outlined" onClick={() => onChangeStatus(application, 2)}>Solicitar documentos</Button>}
+            {showWorkflow && [2, 3].includes(application.status) && <Button variant="outlined" disabled={!readyForStudy} onClick={() => onChangeStatus(application, 4)}>Enviar a estudio</Button>}
+            {showWorkflow && application.status === 5 && application.finalReviewApproved && <Button variant="outlined" onClick={() => onChangeStatus(application, 7)}>Autorizar entrega</Button>}
+            {![6, 7, 9].includes(application.status) && (showWorkflow || ![4, 5].includes(application.status)) && <Button color="error" variant="outlined" onClick={() => {
+              if (window.confirm('¿Confirmar que el cliente desistió de esta solicitud?')) onChangeStatus(application, 9);
+            }}>Registrar desistimiento</Button>}
+            <Button variant="outlined" startIcon={<AutoAwesome />} onClick={() => onAnalyze(application)}>Analizar IA</Button>
+            <Button variant="outlined" startIcon={<Edit />} disabled={!showWorkflow && [4, 5, 6, 7].includes(application.status)} onClick={() => onEdit(application)}>Editar solicitud</Button>
+          </Stack>
+          <Typography variant="caption" color="text.secondary">La aprobación y la negación se registran en Estudio por un administrador o supervisor. Los demás estados se actualizan al completar cada paso.</Typography>
           <Paper variant="outlined" sx={{ p: 1.5 }}>
             <Typography variant="subtitle2" fontWeight={900}>Resumen</Typography>
             <InfoLine label="Ingresos" value={money(application.monthlyIncome)} />
@@ -2204,9 +2263,9 @@ function CreditWorkflowControls({ application, onCreditBureau, onMilestone }: {
   const [form, setForm] = useState({ completed: false, clientChecked: false, clientScore: '', coDebtorChecked: false, coDebtorScore: '', notes: '' });
 
   const stages = [
-    { number: 1, title: 'Verificacion SIMIT y RUNT', complete: initialReady, detail: initialReady ? `Completada por ${application.step0User || 'el equipo'}` : 'Pendiente en la pestaña Estudio' },
-    { number: 2, title: 'Verificacion Datacredito', complete: bureauReady, detail: bureauReady ? `Cliente${application.creditBureauClientScore != null ? `: ${application.creditBureauClientScore}` : ''}${application.coDebtorName ? ` · Codeudor${application.creditBureauCoDebtorScore != null ? `: ${application.creditBureauCoDebtorScore}` : ''}` : ''}` : 'Falta registrar la consulta', action: 'bureau' as CreditWorkflowEditor },
-    { number: 3, title: 'Creacion de la solicitud', complete: true, detail: `Creada el ${new Date(application.createdAt).toLocaleDateString()}` },
+    { number: 1, title: 'Creación de la solicitud', complete: true, detail: `Creada el ${new Date(application.createdAt).toLocaleDateString()}` },
+    { number: 2, title: 'Verificación SIMIT y RUNT', complete: initialReady, detail: initialReady ? `Completada por ${application.step0User || 'el equipo'}` : 'Pendiente en la pestaña Estudio' },
+    { number: 3, title: 'Verificación Datacrédito', complete: bureauReady, detail: bureauReady ? `Cliente${application.creditBureauClientScore != null ? `: ${application.creditBureauClientScore}` : ''}${application.coDebtorName ? ` · Codeudor${application.creditBureauCoDebtorScore != null ? `: ${application.creditBureauCoDebtorScore}` : ''}` : ''}` : 'Falta registrar la consulta', action: 'bureau' as CreditWorkflowEditor },
     { number: 4, title: "Ingreso de soportes", complete: documentsReady, detail: documentsReady ? "Documentación confirmada por el responsable" : "Confirme que recibió los documentos necesarios para este caso" },
     { number: 5, title: 'Aprobaciones', complete: approved, detail: application.studyResult || (application.status === 4 ? 'Credito en estudio' : 'Pendiente de estudio') },
     { number: 6, title: 'Firmas del negocio', complete: application.signaturesCompleted, detail: application.signaturesCompleted ? `Registradas por ${application.signaturesUser || 'el equipo'}` : 'Pendientes después de la aprobación', action: 'signatures' as CreditWorkflowEditor, disabled: !approved },
@@ -2331,6 +2390,8 @@ function CreditStudySummary({ application, canManage, onStep0, onRecalculate, on
   ].filter((x) => x.show);
   const lastDate = application.disbursedAt ?? application.approvedAt ?? application.rejectedAt ?? application.reviewStartedAt ?? application.submittedAt;
   const step0Ready = application.runtChecked && application.simitChecked && application.identityValidated;
+  const bureauReady = application.creditBureauClientChecked && (!application.coDebtorName || application.creditBureauCoDebtorChecked);
+  const documentsReady = application.documentationCompleted;
   const approvedAmount = application.analystApprovedAmount ?? application.motorcycleValue;
   const approvedDownPayment = application.approvedDownPayment ?? application.downPayment;
   const approvedTerm = application.approvedTermMonths ?? application.termMonths;
@@ -2426,7 +2487,7 @@ function CreditStudySummary({ application, canManage, onStep0, onRecalculate, on
       <Button size="small" variant="outlined" onClick={recalculate}>Recalcular</Button>
     </Stack> : <Alert severity="info">Un administrador o supervisor registra las verificaciones y decide el crédito.</Alert>}
     {canManage && <Stack direction="row" gap={.5} flexWrap="wrap">
-      {actions.length ? actions.map((action) => <Button key={action.status} size="small" variant="outlined" onClick={() => onDecision(application, action.status)}>{action.label}</Button>) : <Chip size="small" label="Sin acciones" variant="outlined" />}
+      {actions.length ? actions.map((action) => <Button key={action.status} size="small" variant="outlined" disabled={action.status === 4 && !(step0Ready && bureauReady && documentsReady)} onClick={() => onDecision(application, action.status)}>{action.label}</Button>) : <Chip size="small" label="Sin acciones" variant="outlined" />}
       {application.status === 4 && <>
         <Button size="small" variant="contained" onClick={() => approve(false, false)}>Aprobar</Button>
         <Button size="small" variant="outlined" onClick={() => approve(false, true)}>Con ajuste</Button>
@@ -5134,12 +5195,13 @@ function QuotePdfPreviewDialog({ quote, onClose, onDownload }: { quote?: Quote; 
   </Dialog>;
 }
 
-function CreditApplicationDialog({ form, customers, products, productCategories, quotes, onClose, onSave }: DialogProps<CreditApplication, typeof emptyCreditApplication> & { customers: Customer[]; products: Product[]; productCategories: ProductCategory[]; quotes: Quote[]; }) {
+function CreditApplicationDialog({ form, startingQuoteId, customers, products, productCategories, quotes, onClose, onSave }: DialogProps<CreditApplication, typeof emptyCreditApplication> & { startingQuoteId?: string | null; customers: Customer[]; products: Product[]; productCategories: ProductCategory[]; quotes: Quote[]; }) {
   const [referenceDialog, setReferenceDialog] = useState<'client' | number>();
   useEffect(() => {
     if (!form.open) setReferenceDialog(undefined);
   }, [form.open]);
-  const quote = quotes.find((x) => x.id === (form.item?.quoteId ?? ''));
+  const quote = quotes.find((x) => x.id === (form.item?.quoteId ?? startingQuoteId ?? ''));
+  const quoteCustomer = customers.find((customer) => customer.id === quote?.customerId);
   const initial = form.item ? {
     firstDueDate: form.item.firstDueDate?.slice(0, 10) ?? '',
     formDetails: form.item.formDetails ?? {},
@@ -5178,7 +5240,18 @@ function CreditApplicationDialog({ form, customers, products, productCategories,
     coDebtorReference2Relationship: form.item.coDebtorReference2Relationship ?? '',
     status: form.item.status,
     notes: form.item.notes ?? ''
-  } : { ...emptyCreditApplication, customerId: customers[0]?.id ?? '', productId: products[0]?.id ?? '', motorcycleValue: products[0]?.price ?? 0 };
+  } : { ...emptyCreditApplication,
+    customerId: quote?.customerId ?? customers[0]?.id ?? '',
+    quoteId: quote?.id ?? '',
+    productId: quote?.productId ?? products[0]?.id ?? '',
+    identificationType: quote?.identificationType ?? quoteCustomer?.identificationType ?? 1,
+    identificationNumber: quote?.identificationNumber ?? quoteCustomer?.identificationNumber ?? '',
+    mobile: quoteCustomer?.phone ?? '',
+    address: quoteCustomer?.address ?? '',
+    city: quoteCustomer?.city ?? '',
+    motorcycleValue: quote?.productPrice ?? products[0]?.price ?? 0,
+    downPayment: quote?.downPayment ?? 0,
+    termMonths: quote?.termMonths ?? 24 };
   return <FormDialog title={form.item ? 'Editar solicitud de credito' : 'Nueva solicitud de credito'} open={form.open} initial={initial} onClose={onClose} onSave={onSave} maxWidth="lg">
     {(v, set) => {
       const selectedQuote = quotes.find((x) => x.id === v.quoteId);
@@ -5230,12 +5303,16 @@ function CreditApplicationDialog({ form, customers, products, productCategories,
                 </li>}
                 renderInput={(params) => <TextField {...params} label="Buscar cotización" placeholder="Nombre, cédula o número" helperText="Escriba para buscar. Puede continuar sin cotización." />}
                 onChange={(_, selected) => {
+                const customer = customers.find((candidate) => candidate.id === selected?.customerId);
                 set({
                   quoteId: selected?.id ?? '',
                   customerId: selected?.customerId ?? v.customerId,
                   productId: selected?.productId ?? v.productId,
                   identificationType: selected?.identificationType ?? v.identificationType,
                   identificationNumber: selected?.identificationNumber ?? v.identificationNumber,
+                  mobile: customer?.phone ?? v.mobile,
+                  address: customer?.address ?? v.address,
+                  city: customer?.city ?? v.city,
                   motorcycleValue: selected?.productPrice ?? v.motorcycleValue,
                   downPayment: selected?.downPayment ?? v.downPayment,
                   termMonths: selected?.termMonths ?? v.termMonths

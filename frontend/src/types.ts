@@ -368,6 +368,7 @@ export interface QuoteItem {
 
 export interface Quote {
   status?: string;
+  creditApplicationId?: string;
   advisorName?: string;
   creatorEmail?: string;
   nextAction?: string;

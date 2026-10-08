@@ -86,6 +86,10 @@ export function QuotesTable({ rows, onPreview, onAnalyze, onFollowUp, currentUse
         <TableBody>
           {visible.map(q => {
             const cash = q.creditType === 'Contado';
+            const finished = ['Entregada', 'Rechazada', 'Desistida'].includes(q.status || '');
+            const processUrl = q.creditApplicationId
+              ? `/solicitudes-credito?solicitud=${q.creditApplicationId}&tab=pendiente`
+              : `/solicitudes-credito?cotizacion=${q.id}`;
             const open = expanded === q.id;
             const options = q.financingOptions ?? [];
             const terms = Array.from(new Set((!q.isBundle && (q.items?.length ?? 0) > 1
@@ -106,13 +110,20 @@ export function QuotesTable({ rows, onPreview, onAnalyze, onFollowUp, currentUse
                 <TableCell><Chip size="small" label={q.status || 'Cotizada'} sx={{ height: 22, borderRadius: .5, fontSize: 11, fontWeight: 700,
                   bgcolor: statusTone(q.status || 'Cotizada').background, color: statusTone(q.status || 'Cotizada').color,
                   borderLeft: '4px solid', borderLeftColor: statusTone(q.status || 'Cotizada').color }} /></TableCell>
-                <TableCell><Button size="small" sx={{ p: 0, textTransform: 'none', justifyContent: 'flex-start', textAlign: 'left', lineHeight: 1.25 }}
-                  disabled={!q.nextActionUrl} onClick={() => {
-                    if (q.nextActionUrl === '/actividades') onFollowUp(q);
-                    else if (q.nextActionUrl) navigate(q.nextActionUrl);
-                  }}>
-                  <CellText value={`${q.nextAction || 'Sin tareas pendientes'}${q.nextActionAt ? ` · ${date(q.nextActionAt)}` : ''}`} />
-                </Button></TableCell>
+                <TableCell>
+                  {!cash && (q.creditApplicationId || !finished) ? <Stack spacing={.25} alignItems="flex-start">
+                    <Button size="small" variant="outlined" sx={{ py: .2, textTransform: 'none', whiteSpace: 'nowrap' }} onClick={() => navigate(processUrl)}>
+                      {q.creditApplicationId ? finished ? 'Ver expediente' : 'Continuar trámite' : 'Iniciar solicitud'}
+                    </Button>
+                    <Typography variant="caption" color="text.secondary"><CellText value={`${q.nextAction || ''}${q.nextActionAt ? ` · ${date(q.nextActionAt)}` : ''}`} /></Typography>
+                  </Stack> : <Button size="small" sx={{ p: 0, textTransform: 'none', justifyContent: 'flex-start', textAlign: 'left', lineHeight: 1.25 }}
+                    disabled={!q.nextActionUrl} onClick={() => {
+                      if (q.nextActionUrl === '/actividades') onFollowUp(q);
+                      else if (q.nextActionUrl) navigate(q.nextActionUrl);
+                    }}>
+                    <CellText value={`${q.nextAction || 'Sin tareas pendientes'}${q.nextActionAt ? ` · ${date(q.nextActionAt)}` : ''}`} />
+                  </Button>}
+                </TableCell>
                 <TableCell><CellText value={q.number} /></TableCell>
                 <TableCell sx={{ whiteSpace: 'nowrap' }}>{date(q.quoteDate)}</TableCell>
                 {showTeam && <TableCell><CellText value={q.advisorName || '-'} /></TableCell>}

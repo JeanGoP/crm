@@ -374,7 +374,8 @@ public sealed record QuoteDto(
     string? NextAction = null,
     DateTime? NextActionAt = null,
     string? NextActionUrl = null,
-    string? CreatorEmail = null);
+    string? CreatorEmail = null,
+    Guid? CreditApplicationId = null);
 public sealed record QuoteFollowUpDto(string Outcome, string? Notes, DateTime? NextContactAt);
 public sealed record CreateQuoteDto(
     TipoIdentificacionColombia IdentificationType,

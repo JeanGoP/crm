@@ -39,7 +39,7 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
         var quoteIds = quotes.Select(x => x.Id).ToArray();
         var applications = await db.SolicitudesCredito
             .Where(x => x.CotizacionId.HasValue && quoteIds.Contains(x.CotizacionId.Value))
-            .Select(x => new { x.CotizacionId, x.Estado, x.DocumentacionCompleta, x.FechaCreacion, x.FechaActualizacion })
+            .Select(x => new { x.Id, x.CotizacionId, x.Estado, x.DocumentacionCompleta, x.FechaCreacion, x.FechaActualizacion })
             .ToListAsync(cancellationToken);
         var latestApplications = applications
             .GroupBy(x => x.CotizacionId!.Value)
@@ -83,6 +83,7 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             {
                 Status = quoteStatus,
                 AdvisorName = advisorNames.GetValueOrDefault(x.UsuarioCreacion, x.UsuarioCreacion),
+                CreditApplicationId = application?.Id,
                 NextAction = next.Action,
                 NextActionAt = next.At,
                 NextActionUrl = next.Url
