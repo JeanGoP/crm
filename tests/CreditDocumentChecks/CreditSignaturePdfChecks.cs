@@ -50,6 +50,7 @@ static class CreditSignaturePdfChecks
         if (manyText.Contains("RETIRADO-NO-IMPRIMIR") || !manyText.Contains("CODEUDOR PRUEBA 8") || !manyText.Contains("CODEUDOR 8 / DEUDOR SOLIDARIO"))
             throw new Exception("All active co-debtors must have identity and signature sections.");
         var empty = SimplePdfGenerator.CreditApplication(sample with { FormDetails = null, CoDebtors = [], Notes = null }, "Empresa", "solicitud-credito");
+        PdfMonochromeChecks.AssertBlackAndWhite(empty, "Solicitud de motos");
         if (empty.Length < 1000) throw new Exception("Optional missing details must still print.");
         if (args.Length > 0)
         {

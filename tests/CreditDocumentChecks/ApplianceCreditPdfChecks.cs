@@ -64,6 +64,7 @@ static class ApplianceCreditPdfChecks
         var text = Decode(bytes);
         Check(text.Contains("ANTICIPO\n$ 500.000"), "Anticipo comes from the application initial payment, not legacy details or quote advances.");
         var editedInitial = Decode(SimplePdfGenerator.CreditApplication(sample with { DownPayment = 750000 }, "Empresa", "solicitud-credito", printContext: context));
+        PdfMonochromeChecks.AssertBlackAndWhite(SimplePdfGenerator.CreditApplication(sample, "Empresa", "solicitud-credito", printContext: context), "Solicitud de electrodomésticos");
         Check(editedInitial.Contains("ANTICIPO\n$ 750.000"), "Editing initial payment updates the printed advance.");
         var zeroInitial = Decode(SimplePdfGenerator.CreditApplication(sample with { DownPayment = 0 }, "Empresa", "solicitud-credito", printContext: context));
         Check(zeroInitial.Contains("ANTICIPO\n$ 0"), "A zero initial payment must not fall back to an old advance.");

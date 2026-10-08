@@ -10,7 +10,7 @@ public static partial class SimplePdfGenerator
         string? phone, string? address, string? advisor)
     {
         private const double Left = 32, Width = 531, Bottom = 52;
-        private const string Ink = "0.09 0.17 0.21", Teal = "0 0.50 0.45", Pale = "0.93 0.96 0.95";
+        private const string Ink = "0 0 0", White = "1 1 1";
         private readonly List<StringBuilder> pages = [];
         private StringBuilder page = new();
         private double y;
@@ -144,7 +144,7 @@ public static partial class SimplePdfGenerator
             Text(365, 793, "COTIZACIÓN", 23, true);
             Text(350, 773, quote.Number, Fit(quote.Number, 210, 10), true);
             Text(350, 753, "Fecha: " + quote.QuoteDate.ToString("dd/MM/yyyy"), 9, false);
-            page.AppendLine($"{Teal} RG 1.5 w 32 735 m 563 735 l S");
+            page.AppendLine($"{Ink} RG 1.5 w 32 735 m 563 735 l S");
             y = 720;
         }
         private void Ensure(double height) { if (y - height < Bottom) NewPage(); }
@@ -164,11 +164,11 @@ public static partial class SimplePdfGenerator
                 ParagraphText("ASESOR: " + Value(advisor) + ". Sede: " + Value(quote.SalesPointName), 8.5);
                 return;
             }
-            Rect(Left, y - height, Width, height, Pale);
-            Text(44, y - 16, "CLIENTE", 8, true);
-            Text(310, y - 16, "ASESOR / SEDE", 8, true);
-            for (var i = 0; i < left.Count; i++) Text(44, y - 32 - i * 12, left[i], 8.5, i == 0);
-            for (var i = 0; i < right.Count; i++) Text(310, y - 32 - i * 12, right[i], 8.5, i == 0);
+            Rect(Left, y - height, Width, height, Ink);
+            Text(44, y - 16, "CLIENTE", 8, true, White);
+            Text(310, y - 16, "ASESOR / SEDE", 8, true, White);
+            for (var i = 0; i < left.Count; i++) Text(44, y - 32 - i * 12, left[i], 8.5, i == 0, White);
+            for (var i = 0; i < right.Count; i++) Text(310, y - 32 - i * 12, right[i], 8.5, i == 0, White);
             y -= height + 14;
         }
 
@@ -178,13 +178,13 @@ public static partial class SimplePdfGenerator
             void Header()
             {
                 if (title is not null) { Text(Left, y - 12, title, 11, true); y -= 25; }
-                Rect(Left, y - headerHeight, Width, headerHeight, Teal);
+                Rect(Left, y - headerHeight, Width, headerHeight, Ink);
                 var x = Left;
                 for (var i = 0; i < headers.Length; i++)
                 {
                     var headerSize = Fit(headers[i], widths[i] - 14, 8, true);
                     var headerX = i == 0 ? x + 7 : x + (widths[i] - Measure(headers[i], headerSize, true)) / 2;
-                    Text(headerX, y - 17, headers[i], headerSize, true, "1 1 1");
+                    Text(headerX, y - 17, headers[i], headerSize, true, White);
                     x += widths[i];
                 }
                 y -= headerHeight;
@@ -204,7 +204,6 @@ public static partial class SimplePdfGenerator
                     var count = Math.Min(totalLines - offset, 35);
                     var height = Math.Max(26, count * 11 + 12);
                     if (y - height < Bottom) { NewPage(); Header(); }
-                    if (r % 2 == 1) Rect(Left, y - height, Width, height, Pale);
                     var x = Left;
                     for (var i = 0; i < row.Length; i++)
                     {
@@ -218,7 +217,7 @@ public static partial class SimplePdfGenerator
                         x += widths[i];
                     }
                     y -= height;
-                    page.AppendLine(FormattableString.Invariant($"0.86 0.90 0.91 RG 0.4 w 32 {y:0.###} m 563 {y:0.###} l S"));
+                    page.AppendLine(FormattableString.Invariant($"{Ink} RG 0.4 w 32 {y:0.###} m 563 {y:0.###} l S"));
                     offset += count;
                 }
             }
@@ -230,11 +229,11 @@ public static partial class SimplePdfGenerator
             var lines = Wrap(text, Width - (shaded ? 20 : 0), size, bold);
             var height = lines.Count * 11 + (shaded ? 20 : 7);
             if (height < 660) Ensure(height);
-            if (shaded) Rect(Left, y - height, Width, height, Pale);
+            if (shaded) Rect(Left, y - height, Width, height, Ink);
             foreach (var value in lines)
             {
                 Ensure(18);
-                Text(Left + (shaded ? 10 : 0), y - 11, value, size, bold);
+                Text(Left + (shaded ? 10 : 0), y - 11, value, size, bold, shaded ? White : Ink);
                 y -= 11;
             }
             y -= shaded ? 20 : 7;

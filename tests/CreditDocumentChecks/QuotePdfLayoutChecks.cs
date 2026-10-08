@@ -29,6 +29,7 @@ internal static class QuotePdfLayoutChecks
         byte[] Generate(QuoteDto q) => SimplePdfGenerator.Quote(q, "Moteros de la Sabana", companyLogo: logo,
             brandLogo: logo, productImage: logo, customerPhone: "300 000 0000", advisor: "Asesor comercial");
         var pdf = Generate(single);
+        PdfMonochromeChecks.AssertBlackAndWhite(SimplePdfGenerator.Quote(single, "Empresa de prueba"), "Cotización");
         var text = Read(pdf);
         Check(text.Contains("MARÍA JOSÉ MUÑOZ PÉREZ") && text.Contains("COTIZACIÓN"), "Acentos preservados en PDF.");
         Check(text.Contains("$ 1.000.000") && text.Contains("$ 500.000") && text.Contains("$ 1.500.000") && text.Contains("$ 5.000.000"), "Inicial, extra, inicial completa y financiado sin recalcular.");

@@ -46,7 +46,7 @@ public static partial class SimplePdfGenerator
         private bool Appliance => context?.IsAppliance == true;
         private double Font => Appliance ? 8 : 7;
         private double Line => Appliance ? 10 : 8;
-        private const string Teal = "0.02 0.40 0.43";
+        private const string Black = "0 0 0", White = "1 1 1";
         private readonly List<string> pages = [];
         private StringBuilder page = new();
         private double y;
@@ -168,7 +168,7 @@ public static partial class SimplePdfGenerator
             page = new();
             section = "";
             if (Appliance) { ApplianceHeader(); return; }
-            Text("SOLICITUD DE CRÉDITO", Left, 29, 13, true, Teal);
+            Text("SOLICITUD DE CRÉDITO", Left, 29, 13, true);
             var names = QuoteLayout.Wrap(company, 380, 9, true);
             var top = 44d;
             foreach (var name in names) { Text(name, Left, top, 9, true); top += 11; }
@@ -201,8 +201,8 @@ public static partial class SimplePdfGenerator
             if (y + 37 > Bottom) NewPage();
             section = title.Replace(" (continuación)", "");
             y += 2;
-            Box(Left, y, Width, 14, Teal);
-            Text(title, Left + 5, y + 10, 7.8, true, "1 1 1");
+            Box(Left, y, Width, 14, Black);
+            Text(title, Left + 5, y + 10, 7.8, true, White);
             y += 14;
         }
 
@@ -223,7 +223,6 @@ public static partial class SimplePdfGenerator
                 for (var i = 0; i < cells.Length; i++)
                 {
                     var x = Left + i * width;
-                    Box(x, y, labelWidth, height, "0.94 0.97 0.97");
                     Border(x, y, width, height);
                     for (var line = 0; line < take; line++)
                     {
@@ -252,10 +251,10 @@ public static partial class SimplePdfGenerator
         private void Signature(double x, double width, (string Role, string Name, string Id) signer, double height)
         {
             Border(x, y + 8, width, height);
-            Text(signer.Role, x + 8, y + 22, 8, true, Teal);
+            Text(signer.Role, x + 8, y + 22, 8, true);
             Border(x + width - 60, y + 33, 48, 58);
             Text("Huella", x + width - 48, y + 102, 7);
-            page.AppendLine(FormattableString.Invariant($"0.3 0.3 0.3 RG .5 w {x + 8:0.###} {841.89 - y - 86:0.###} m {x + width - 70:0.###} {841.89 - y - 86:0.###} l S"));
+            page.AppendLine(FormattableString.Invariant($"{Black} RG .5 w {x + 8:0.###} {841.89 - y - 86:0.###} m {x + width - 70:0.###} {841.89 - y - 86:0.###} l S"));
             Text("Firma", x + 8, y + 98, 7);
             var names = QuoteLayout.Wrap(signer.Name, width - 16, 7.2, true);
             for (var i = 0; i < names.Count; i++) Text(names[i], x + 8, y + 111 + i * 9, 7.2, true);
@@ -263,7 +262,7 @@ public static partial class SimplePdfGenerator
             for (var i = 0; i < ids.Count; i++) Text(ids[i], x + 8, y + height - (ids.Count - 1 - i) * 9, 7);
         }
 
-        private void Text(string value, double x, double top, double size, bool bold = false, string color = "0.08 0.13 0.15")
+        private void Text(string value, double x, double top, double size, bool bold = false, string color = Black)
         {
             var bytes = Encoding.Latin1.GetBytes(value.Replace('\u2013', '-').Replace('\u2014', '-').Replace('\u2019', '\''));
             page.AppendLine(FormattableString.Invariant($"{color} rg BT /{(bold ? "F2" : "F1")} {size:0.###} Tf {x:0.###} {841.89 - top:0.###} Td <{Convert.ToHexString(bytes)}> Tj ET"));
@@ -271,6 +270,6 @@ public static partial class SimplePdfGenerator
         private void Box(double x, double top, double width, double height, string color) =>
             page.AppendLine(FormattableString.Invariant($"{color} rg {x:0.###} {841.89 - top - height:0.###} {width:0.###} {height:0.###} re f"));
         private void Border(double x, double top, double width, double height) =>
-            page.AppendLine(FormattableString.Invariant($"0.48 0.57 0.58 RG .35 w {x:0.###} {841.89 - top - height:0.###} {width:0.###} {height:0.###} re S"));
+            page.AppendLine(FormattableString.Invariant($"{Black} RG .35 w {x:0.###} {841.89 - top - height:0.###} {width:0.###} {height:0.###} re S"));
     }
 }

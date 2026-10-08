@@ -12,7 +12,7 @@ public static partial class SimplePdfGenerator
             var top = 28d;
             foreach (var line in QuoteLayout.Wrap(company.ToUpperInvariant(), 390, 13, true))
             {
-                Text(line, Left, top, 13, true, Teal);
+                Text(line, Left, top, 13, true);
                 top += 15;
             }
             Text("VENTA DE ELECTRODOMÉSTICOS", Left, top, 9, true);
@@ -95,7 +95,6 @@ public static partial class SimplePdfGenerator
             {
                 var valueLines = QuoteLayout.Wrap(value, 97, 8);
                 var height = Math.Max(24, valueLines.Count * 10 + 6);
-                Box(Left + 335, summaryY, 95, height, "0.94 0.97 0.97");
                 Border(Left + 335, summaryY, 200, height);
                 Text(label, Left + 340, summaryY + 15, 8, true);
                 for (var i = 0; i < valueLines.Count; i++) Text(string.IsNullOrEmpty(value) ? "" : valueLines[i], Left + 434, summaryY + 15 + i * 10, 8);
@@ -114,11 +113,11 @@ public static partial class SimplePdfGenerator
 
         private void PurchaseHeader()
         {
-            Box(Left, y, 335, 20, Teal);
+            Box(Left, y, 335, 20, Black);
             var widths = new[] { 36d, 161, 54, 84 };
             var headers = new[] { "CANT.", "PRODUCTO", "CÓD.", "VALOR" };
             var x = Left;
-            for (var i = 0; i < widths.Length; i++) { Text(headers[i], x + 4, y + 13, 8, true, "1 1 1"); x += widths[i]; }
+            for (var i = 0; i < widths.Length; i++) { Text(headers[i], x + 4, y + 13, 8, true, White); x += widths[i]; }
             y += 20;
         }
 
