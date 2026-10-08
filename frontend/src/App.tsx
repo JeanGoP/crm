@@ -2090,7 +2090,7 @@ function CreditApplicationsPage() {
         <CreditApplicationPendingSummary application={r} compact />
       ] }))}
     />
-    <CreditApplicationDialog form={form} startingQuoteId={requestedQuoteId} customers={customers} products={products.filter((x) => x.active)} productCategories={productCategories} quotes={quotes} onClose={closeForm} onSave={save} />
+    <CreditApplicationDialog form={form} startingQuoteId={requestedQuoteId} customers={customers} products={products} productCategories={productCategories} quotes={quotes} onClose={closeForm} onSave={save} />
     <CreditApplicationManagementDialog
       application={managementApplication}
       initialTab={searchParams.get('tab') === 'proceso' ? 4 : searchParams.get('tab') === 'estudio' ? 1 : searchParams.get('tab') === 'pendiente' && managementApplication && canManageCredit && managementApplication.documentationCompleted ? managementApplication.status >= 5 ? 4 : 1 : 0}
@@ -5202,6 +5202,7 @@ function CreditApplicationDialog({ form, startingQuoteId, customers, products, p
   }, [form.open]);
   const quote = quotes.find((x) => x.id === (form.item?.quoteId ?? startingQuoteId ?? ''));
   const quoteCustomer = customers.find((customer) => customer.id === quote?.customerId);
+  const initialQuoteItem = quote?.items?.[0];
   const initial = form.item ? {
     firstDueDate: form.item.firstDueDate?.slice(0, 10) ?? '',
     formDetails: form.item.formDetails ?? {},
@@ -5243,18 +5244,28 @@ function CreditApplicationDialog({ form, startingQuoteId, customers, products, p
   } : { ...emptyCreditApplication,
     customerId: quote?.customerId ?? customers[0]?.id ?? '',
     quoteId: quote?.id ?? '',
-    productId: quote?.productId ?? products[0]?.id ?? '',
+    productId: initialQuoteItem?.productId ?? quote?.productId ?? products.find((product) => product.active)?.id ?? '',
     identificationType: quote?.identificationType ?? quoteCustomer?.identificationType ?? 1,
     identificationNumber: quote?.identificationNumber ?? quoteCustomer?.identificationNumber ?? '',
     mobile: quoteCustomer?.phone ?? '',
     address: quoteCustomer?.address ?? '',
     city: quoteCustomer?.city ?? '',
-    motorcycleValue: quote?.productPrice ?? products[0]?.price ?? 0,
-    downPayment: quote?.downPayment ?? 0,
-    termMonths: quote?.termMonths ?? 24 };
+    motorcycleValue: quote?.isBundle ? quote.productPrice : initialQuoteItem?.productPrice ?? quote?.productPrice ?? products.find((product) => product.active)?.price ?? 0,
+    downPayment: quote?.isBundle ? quote.downPayment : initialQuoteItem?.downPayment ?? quote?.downPayment ?? 0,
+    termMonths: quote?.isBundle ? quote.termMonths : initialQuoteItem?.termMonths ?? quote?.termMonths ?? 24 };
   return <FormDialog title={form.item ? 'Editar solicitud de credito' : 'Nueva solicitud de credito'} open={form.open} initial={initial} onClose={onClose} onSave={onSave} maxWidth="lg">
     {(v, set) => {
       const selectedQuote = quotes.find((x) => x.id === v.quoteId);
+      const quotedItems = selectedQuote?.items?.length ? selectedQuote.items : selectedQuote ? [{
+        productId: selectedQuote.productId,
+        productName: selectedQuote.productName,
+        productPrice: selectedQuote.productPrice,
+        downPayment: selectedQuote.downPayment,
+        termMonths: selectedQuote.termMonths
+      }] : [];
+      const availableProducts = selectedQuote
+        ? products.filter((product) => quotedItems.some((item) => item.productId === product.id))
+        : products.filter((product) => product.active || product.id === v.productId);
       const selectedProduct = products.find((x) => x.id === v.productId);
       const selectedCustomer = customers.find((x) => x.id === v.customerId);
       const clientReferencesComplete = [v.reference1Name, v.reference1Mobile, v.reference1Relationship, v.reference2Name, v.reference2Mobile, v.reference2Relationship].every((value) => value.trim());
@@ -5304,18 +5315,19 @@ function CreditApplicationDialog({ form, startingQuoteId, customers, products, p
                 renderInput={(params) => <TextField {...params} label="Buscar cotización" placeholder="Nombre, cédula o número" helperText="Escriba para buscar. Puede continuar sin cotización." />}
                 onChange={(_, selected) => {
                 const customer = customers.find((candidate) => candidate.id === selected?.customerId);
+                const firstItem = selected?.items?.[0];
                 set({
                   quoteId: selected?.id ?? '',
                   customerId: selected?.customerId ?? v.customerId,
-                  productId: selected?.productId ?? v.productId,
+                  productId: firstItem?.productId ?? selected?.productId ?? v.productId,
                   identificationType: selected?.identificationType ?? v.identificationType,
                   identificationNumber: selected?.identificationNumber ?? v.identificationNumber,
                   mobile: customer?.phone ?? v.mobile,
                   address: customer?.address ?? v.address,
                   city: customer?.city ?? v.city,
-                  motorcycleValue: selected?.productPrice ?? v.motorcycleValue,
-                  downPayment: selected?.downPayment ?? v.downPayment,
-                  termMonths: selected?.termMonths ?? v.termMonths
+                  motorcycleValue: selected ? selected.isBundle ? selected.productPrice : firstItem?.productPrice ?? selected.productPrice : v.motorcycleValue,
+                  downPayment: selected ? selected.isBundle ? selected.downPayment : firstItem?.downPayment ?? selected.downPayment : v.downPayment,
+                  termMonths: selected ? selected.isBundle ? selected.termMonths : firstItem?.termMonths ?? selected.termMonths : v.termMonths
                 });
               }} />
               <TextField required select disabled={!!selectedQuote} label="Cliente" value={v.customerId} onChange={(e) => set({ customerId: e.target.value })} helperText={selectedQuote ? 'Cliente asociado a la cotización seleccionada.' : undefined}>{customers.map((x) => <MenuItem key={x.id} value={x.id}>{x.firstNames || x.name} {x.lastNames}</MenuItem>)}</TextField>
@@ -5345,15 +5357,33 @@ function CreditApplicationDialog({ form, startingQuoteId, customers, products, p
         <Paper variant="outlined" sx={{ p: 2, bgcolor: '#f8fafc' }}>
           <Stack spacing={2}>
             <Typography variant="subtitle1" fontWeight={900}>Producto y credito</Typography>
+            {selectedQuote && <Paper variant="outlined" sx={{ p: 1.5, bgcolor: 'white' }}>
+              <Typography fontWeight={800} sx={{ mb: 0.75 }}>Artículos de la cotización {selectedQuote.number}</Typography>
+              {quotedItems.map((item, index) => <Stack key={`${item.productId}-${index}`} direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" gap={0.5} sx={{ py: 0.5 }}>
+                <Typography variant="body2">{index + 1}. {item.productName || products.find((product) => product.id === item.productId)?.name || 'Artículo'}</Typography>
+                <Typography variant="body2" fontWeight={700}>{money(item.productPrice)}</Typography>
+              </Stack>)}
+              <Typography variant="caption" color="text.secondary">
+                {selectedQuote.isBundle
+                  ? 'Todos los artículos comparten el valor y la cuota inicial de esta solicitud.'
+                  : quotedItems.length > 1
+                    ? 'Esta cotización compara artículos. Seleccione abajo cuál llevará a la solicitud; su precio, cuota inicial y plazo se cargarán automáticamente.'
+                    : 'Los valores del artículo cotizado se cargaron en la solicitud.'}
+              </Typography>
+            </Paper>}
             <Box sx={{
               display: 'grid',
               gridTemplateColumns: { xs: '1fr', md: 'minmax(280px, 1.6fr) repeat(4, minmax(130px, 1fr))' },
               gap: 1.5
             }}>
-              <TextField required select label="Producto principal" value={v.productId} onChange={(e) => {
+              <TextField required select disabled={!!selectedQuote?.isBundle} label={selectedQuote?.isBundle ? 'Artículo principal' : 'Producto principal'} value={v.productId} onChange={(e) => {
                 const product = products.find((x) => x.id === e.target.value);
-                set({ productId: e.target.value, motorcycleValue: product?.price ?? v.motorcycleValue });
-              }}>{products.map((x) => <MenuItem key={x.id} value={x.id}>{productName(x)} ({x.category}) - {money(x.price)}</MenuItem>)}</TextField>
+                const quotedItem = quotedItems.find((item) => item.productId === e.target.value);
+                set({ productId: e.target.value,
+                  motorcycleValue: quotedItem?.productPrice ?? product?.price ?? v.motorcycleValue,
+                  downPayment: quotedItem?.downPayment ?? v.downPayment,
+                  termMonths: quotedItem?.termMonths ?? v.termMonths });
+              }}>{availableProducts.map((x) => <MenuItem key={x.id} value={x.id}>{productName(x)} ({x.category}) - {money(quotedItems.find((item) => item.productId === x.id)?.productPrice ?? x.price)}</MenuItem>)}</TextField>
               <CurrencyField fullWidth label="Ingresos" value={v.monthlyIncome} onChange={amount => set({ monthlyIncome: amount })} />
               <CurrencyField fullWidth label="Cuota inicial" value={v.downPayment} onChange={amount => set({ downPayment: amount })} />
               <TextField fullWidth label="Plazo meses" type="number" value={v.termMonths} onChange={(e) => set({ termMonths: Number(e.target.value) })} />
