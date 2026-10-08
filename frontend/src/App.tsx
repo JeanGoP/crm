@@ -5263,9 +5263,7 @@ function CreditApplicationDialog({ form, startingQuoteId, customers, products, p
         downPayment: selectedQuote.downPayment,
         termMonths: selectedQuote.termMonths
       }] : [];
-      const availableProducts = selectedQuote
-        ? products.filter((product) => quotedItems.some((item) => item.productId === product.id))
-        : products.filter((product) => product.active || product.id === v.productId);
+      const availableProducts = products.filter((product) => product.active || product.id === v.productId);
       const selectedProduct = products.find((x) => x.id === v.productId);
       const selectedCustomer = customers.find((x) => x.id === v.customerId);
       const clientReferencesComplete = [v.reference1Name, v.reference1Mobile, v.reference1Relationship, v.reference2Name, v.reference2Mobile, v.reference2Relationship].every((value) => value.trim());
@@ -5357,7 +5355,7 @@ function CreditApplicationDialog({ form, startingQuoteId, customers, products, p
         <Paper variant="outlined" sx={{ p: 2, bgcolor: '#f8fafc' }}>
           <Stack spacing={2}>
             <Typography variant="subtitle1" fontWeight={900}>Producto y credito</Typography>
-            {selectedQuote && <Paper variant="outlined" sx={{ p: 1.5, bgcolor: 'white' }}>
+            {selectedQuote && quotedItems.length > 1 && <Paper variant="outlined" sx={{ p: 1.5, bgcolor: 'white' }}>
               <Typography fontWeight={800} sx={{ mb: 0.75 }}>Artículos de la cotización {selectedQuote.number}</Typography>
               {quotedItems.map((item, index) => <Stack key={`${item.productId}-${index}`} direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" gap={0.5} sx={{ py: 0.5 }}>
                 <Typography variant="body2">{index + 1}. {item.productName || products.find((product) => product.id === item.productId)?.name || 'Artículo'}</Typography>
@@ -5383,7 +5381,12 @@ function CreditApplicationDialog({ form, startingQuoteId, customers, products, p
                   motorcycleValue: quotedItem?.productPrice ?? product?.price ?? v.motorcycleValue,
                   downPayment: quotedItem?.downPayment ?? v.downPayment,
                   termMonths: quotedItem?.termMonths ?? v.termMonths });
-              }}>{availableProducts.map((x) => <MenuItem key={x.id} value={x.id}>{productName(x)} ({x.category}) - {money(quotedItems.find((item) => item.productId === x.id)?.productPrice ?? x.price)}</MenuItem>)}</TextField>
+              }}>{selectedQuote
+                ? quotedItems.filter((item, index, all) => all.findIndex((candidate) => candidate.productId === item.productId) === index)
+                  .map((item) => <MenuItem key={item.productId} value={item.productId}>
+                    {item.productName || products.find((product) => product.id === item.productId)?.name || 'Artículo cotizado'} - {money(item.productPrice)}
+                  </MenuItem>)
+                : availableProducts.map((product) => <MenuItem key={product.id} value={product.id}>{productName(product)} ({product.category}) - {money(product.price)}</MenuItem>)}</TextField>
               <CurrencyField fullWidth label="Ingresos" value={v.monthlyIncome} onChange={amount => set({ monthlyIncome: amount })} />
               <CurrencyField fullWidth label="Cuota inicial" value={v.downPayment} onChange={amount => set({ downPayment: amount })} />
               <TextField fullWidth label="Plazo meses" type="number" value={v.termMonths} onChange={(e) => set({ termMonths: Number(e.target.value) })} />
