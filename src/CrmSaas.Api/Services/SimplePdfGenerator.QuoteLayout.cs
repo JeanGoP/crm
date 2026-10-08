@@ -6,7 +6,7 @@ namespace CrmSaas.Api.Services;
 public static partial class SimplePdfGenerator
 {
     // Layout only: amounts and financing alternatives come from the persisted quotation.
-    private sealed class QuoteLayout(QuoteDto quote, string company, PdfImageData? logo, PdfImageData? secondLogo,
+    private sealed partial class QuoteLayout(QuoteDto quote, string company, PdfImageData? logo, PdfImageData? secondLogo, PdfImageData? productPhoto,
         string? phone, string? address, string? advisor)
     {
         private const double Left = 32, Width = 531, Bottom = 52;
@@ -24,10 +24,15 @@ public static partial class SimplePdfGenerator
             var customer = string.Join(" ", new[] { quote.CustomerFirstName, quote.CustomerMiddleName,
                 quote.CustomerLastName, quote.CustomerSecondLastName }.Where(x => !string.IsNullOrWhiteSpace(x)));
             if (string.IsNullOrWhiteSpace(customer)) customer = $"{quote.CustomerFirstNames} {quote.CustomerLastNames}".Trim();
+            var items = quote.Items.OrderBy(x => x.Order).ToArray();
+            if (items.Length <= 1 || quote.IsBundle)
+            {
+                RenderFeatured(customer, items);
+                return FinishPages();
+            }
             CustomerCard(customer);
             if (!string.IsNullOrWhiteSpace(address)) ParagraphText("Dirección: " + address, 8);
 
-            var items = quote.Items.OrderBy(x => x.Order).ToArray();
             var priceRows = items.Length > 0
                 ? items.Select(x => new[] { x.ProductName, Money(x.ProductPrice), Money(x.PromotionDiscount),
                     Money(Cash ? 0 : x.Insurance + x.AdministrativeFees),
@@ -88,6 +93,11 @@ public static partial class SimplePdfGenerator
             if (!string.IsNullOrWhiteSpace(quote.Notes)) ParagraphText("Observaciones: " + quote.Notes, 8.5);
             if (!string.IsNullOrWhiteSpace(quote.SalesPointCommercialTerms)) ParagraphText("Condiciones comerciales: " + quote.SalesPointCommercialTerms, 8.5);
             Requirements();
+            return FinishPages();
+        }
+
+        private List<string> FinishPages()
+        {
             for (var i = 0; i < pages.Count; i++)
             {
                 page = pages[i];
@@ -128,8 +138,8 @@ public static partial class SimplePdfGenerator
             page = new StringBuilder(); pages.Add(page);
             if (logo is not null)
             {
-                var scale = Math.Min((secondLogo is null ? 155d : 140d) / logo.Width, 58d / logo.Height);
-                page.AppendLine(FormattableString.Invariant($"q {logo.Width * scale:0.###} 0 0 {logo.Height * scale:0.###} 32 751 cm /Logo Do Q"));
+                var scale = Math.Min((secondLogo is null ? 135d : 125d) / logo.Width, 48d / logo.Height);
+                page.AppendLine(FormattableString.Invariant($"q {logo.Width * scale:0.###} 0 0 {logo.Height * scale:0.###} 32 758 cm /Logo Do Q"));
             }
             else
             {
@@ -138,12 +148,14 @@ public static partial class SimplePdfGenerator
             }
             if (secondLogo is not null)
             {
-                var scale = Math.Min(140d / secondLogo.Width, 58d / secondLogo.Height);
-                page.AppendLine(FormattableString.Invariant($"q {secondLogo.Width * scale:0.###} 0 0 {secondLogo.Height * scale:0.###} 190 751 cm /Logo2 Do Q"));
+                var scale = Math.Min(125d / secondLogo.Width, 48d / secondLogo.Height);
+                page.AppendLine(FormattableString.Invariant($"q {secondLogo.Width * scale:0.###} 0 0 {secondLogo.Height * scale:0.###} 170 758 cm /Logo2 Do Q"));
             }
-            Text(365, 793, "COTIZACIÓN", 23, true);
-            Text(350, 773, quote.Number, Fit(quote.Number, 210, 10), true);
-            Text(350, 753, "Fecha: " + quote.QuoteDate.ToString("dd/MM/yyyy"), 9, false);
+            if (logo is not null && secondLogo is null)
+                Text(180, 797, Value(company), Fit(Value(company), 174, 10), true);
+            Text(395, 797, "COTIZACIÓN", 19, true);
+            Text(395, 778, quote.Number, Fit(quote.Number, 165, 9), true);
+            Text(395, 760, quote.QuoteDate.ToString("dd/MM/yyyy"), 8, false);
             page.AppendLine($"{Ink} RG 1.5 w 32 735 m 563 735 l S");
             y = 720;
         }
@@ -164,11 +176,11 @@ public static partial class SimplePdfGenerator
                 ParagraphText("ASESOR: " + Value(advisor) + ". Sede: " + Value(quote.SalesPointName), 8.5);
                 return;
             }
-            Rect(Left, y - height, Width, height, Ink);
-            Text(44, y - 16, "CLIENTE", 8, true, White);
-            Text(310, y - 16, "ASESOR / SEDE", 8, true, White);
-            for (var i = 0; i < left.Count; i++) Text(44, y - 32 - i * 12, left[i], 8.5, i == 0, White);
-            for (var i = 0; i < right.Count; i++) Text(310, y - 32 - i * 12, right[i], 8.5, i == 0, White);
+            Outline(Left, y - height, Width, height);
+            Text(44, y - 16, "CLIENTE", 8, true);
+            Text(310, y - 16, "ASESOR / SEDE", 8, true);
+            for (var i = 0; i < left.Count; i++) Text(44, y - 32 - i * 12, left[i], 8.5, i == 0);
+            for (var i = 0; i < right.Count; i++) Text(310, y - 32 - i * 12, right[i], 8.5, i == 0);
             y -= height + 14;
         }
 
@@ -240,6 +252,9 @@ public static partial class SimplePdfGenerator
         }
         private void Rect(double x, double bottom, double width, double height, string color) =>
             page.AppendLine(FormattableString.Invariant($"{color} rg {x:0.###} {bottom:0.###} {width:0.###} {height:0.###} re f"));
+
+        private void Outline(double x, double bottom, double width, double height) =>
+            page.AppendLine(FormattableString.Invariant($"{Ink} RG 0.8 w {x:0.###} {bottom:0.###} {width:0.###} {height:0.###} re S"));
 
         private void Text(double x, double bottom, string value, double size, bool bold, string color = Ink)
         {

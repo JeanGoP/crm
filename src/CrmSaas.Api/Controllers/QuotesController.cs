@@ -528,6 +528,9 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
         var bytes = SimplePdfGenerator.Quote(
             dto,
             company?.Nombre ?? "Empresa",
+            productImage: quote.Items.Count <= 1 && ResolveQuotePhoto(quote) is { } photo
+                ? new QuotePdfImage(photo.Datos, photo.ContentType, photo.NombreArchivo)
+                : null,
             companyLogo: ToPdfImage(primaryLogo, "logo-empresa.png"),
             secondaryCompanyLogo: ToPdfImage(secondaryLogo, "logo-electrodomesticos.png"),
             customerPhone: quote.Cliente?.Telefono,

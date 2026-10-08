@@ -29,15 +29,23 @@ internal static class QuotePdfLayoutChecks
         byte[] Generate(QuoteDto q) => SimplePdfGenerator.Quote(q, "Moteros de la Sabana", companyLogo: logo,
             brandLogo: logo, productImage: logo, customerPhone: "300 000 0000", advisor: "Asesor comercial");
         var pdf = Generate(single);
+        if (args.Length > 0) File.WriteAllBytes(Path.Combine(args[0], "layout-single.pdf"), pdf);
         PdfMonochromeChecks.AssertBlackAndWhite(SimplePdfGenerator.Quote(single, "Empresa de prueba"), "Cotización");
         var text = Read(pdf);
         Check(text.Contains("MARÍA JOSÉ MUÑOZ PÉREZ") && text.Contains("COTIZACIÓN"), "Acentos preservados en PDF.");
         Check(text.Contains("$ 1.000.000") && text.Contains("$ 500.000") && text.Contains("$ 1.500.000") && text.Contains("$ 5.000.000"), "Inicial, extra, inicial completa y financiado sin recalcular.");
         Check(terms.All(t => text.Contains(t.TermMonths + " cuotas")), "Todas las alternativas aparecen.");
         Check(text.Contains("PROPIEDAD RAÍZ") && text.Contains("COMERCIANTE") && text.Contains("EMPLEADO") && text.Contains("DÍA EN QUE SE"), "Requisitos y vigencia diaria.");
-        Check(!Encoding.ASCII.GetString(pdf).Contains("/BrandLogo") && !Encoding.ASCII.GetString(pdf).Contains("/Product"), "Solo logo de empresa.");
+        Check(!Encoding.ASCII.GetString(pdf).Contains("/BrandLogo"), "Solo los logos de la empresa se añaden en color.");
+        if (logo is not null)
+            Check(Encoding.ASCII.GetString(pdf).Contains("/ProductPhoto Do") &&
+                Encoding.ASCII.GetString(pdf).Contains("/ColorSpace /DeviceGray"), "La foto del artículo se imprime en escala de grises.");
         Check(!text.Contains("SIGUENOS") && !text.Contains("ENCUESTA") && !text.Contains("cada una"), "Sin QR ficticios ni textos eliminados.");
         Check(PageCount(pdf) == 1, "Cotización habitual cabe en una página.");
+        var longName = string.Join(" ", Enumerable.Repeat("REFRIGERADOR DE ALTA CAPACIDAD", 8)) + " MODELO FINAL 98765";
+        var longItem = item with { ProductName = longName };
+        Check(Read(Generate(single with { ProductName = longName, Items = [longItem] })).Contains("MODELO FINAL 98765"),
+            "Los nombres largos de artículos se conservan completos.");
         var cash = single with { CreditType = "Contado", IsBundle = true, Items = [item] };
         var cashPdf = Generate(cash);
         Check(!Read(cashPdf).Contains("Financiado") && !Read(cashPdf).Contains("cuotas") && !Read(cashPdf).Contains("REQUISITOS"), "Contado sin condiciones de crédito.");
@@ -51,6 +59,7 @@ internal static class QuotePdfLayoutChecks
             DownPayment = 0, InitialPaymentPaidToday = 0, InitialPaymentSchedule = [], FinancingOptions = [] }).ToArray() };
         var bundlePdf = Generate(bundle);
         Check(Read(bundlePdf).Contains("Todos los artículos") && !Read(bundlePdf).Contains("paquete"), "Financiación global sin palabra paquete.");
+        Check(PageCount(bundlePdf) == 1, "Cotización global habitual cabe en una página.");
         Check(Regex.Matches(Read(bundlePdf), "15/10/2026").Count == 2, "Un solo plan global y su fecha de inicio.");
         var many = single with { FinancingOptions = Enumerable.Range(1, 40).Select(t => new QuoteFinancingOptionDto(t, 5000000m/t, 6500000)).ToArray(),
             Notes = string.Join(" ", Enumerable.Repeat("Observación extensa para comprobar saltos de página.", 100)),
@@ -71,7 +80,7 @@ internal static class QuotePdfLayoutChecks
         var headerYs = new[] { 6, 12, 18, 24 }.Select(term =>
             Regex.Match(rawFour, @"([0-9.]+) ([0-9.]+) Td <" + Convert.ToHexString(Encoding.Latin1.GetBytes(term + " cuotas")) + "> Tj").Groups[2].Value).ToArray();
         Check(headerYs.All(y => y.Length > 0) && headerYs.Distinct().Count() == 1, "6, 12, 18 y 24 cuotas comparten una sola fila.");
-        Check(Regex.Matches(Read(fourPdf), "02  Opciones de financiación").Count == 1, "Sin bloque adicional innecesario para 24 cuotas.");
+        Check(Regex.Matches(Read(fourPdf), "02  CONDICIONES DE PAGO").Count == 1, "Un solo bloque de condiciones para las cuatro alternativas.");
         Check(PageCount(fourPdf) == 1, "Cuatro alternativas y requisitos caben en una página.");
         if (args.Length > 0)
         {

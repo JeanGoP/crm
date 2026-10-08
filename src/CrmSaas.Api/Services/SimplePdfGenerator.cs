@@ -4,6 +4,7 @@ using System.Text;
 using CrmSaas.Domain.Common;
 using CrmSaas.Application.DTOs;
 using CrmSaas.Domain.Enums;
+using StbImageSharp;
 
 namespace CrmSaas.Api.Services;
 
@@ -356,6 +357,7 @@ public static partial class SimplePdfGenerator
     {
         var logoImage = TryCreatePdfImage(companyLogo);
         var secondLogoImage = TryCreatePdfImage(secondaryCompanyLogo);
+        var productPhoto = TryCreateMonochromePdfImage(productImage);
         var objects = new List<PdfObject>
         {
             new("<< /Type /Catalog /Pages 2 0 R >>"),
@@ -367,10 +369,11 @@ public static partial class SimplePdfGenerator
         var xObjects = new List<string>();
         AddImageObject(objects, xObjects, "Logo", logoImage);
         AddImageObject(objects, xObjects, "Logo2", secondLogoImage);
+        AddImageObject(objects, xObjects, "ProductPhoto", productPhoto);
 
         var xObjectResources = xObjects.Count > 0 ? $" /XObject << {string.Join(" ", xObjects)} >>" : string.Empty;
         var resources = $"<< /Font << /F1 3 0 R /F2 4 0 R >>{xObjectResources} >>";
-        var pages = new QuoteLayout(quote, companyName, logoImage, secondLogoImage, customerPhone, customerAddress, advisor).Render();
+        var pages = new QuoteLayout(quote, companyName, logoImage, secondLogoImage, productPhoto, customerPhone, customerAddress, advisor).Render();
         var pageRefs = new List<string>();
         foreach (var pageContent in pages)
         {
@@ -415,6 +418,47 @@ public static partial class SimplePdfGenerator
         data[7] == 10;
 
     private sealed record PdfImageData(byte[] Data, int Width, int Height, string ColorSpace, string Filter, string? DecodeParms);
+
+    private static PdfImageData? TryCreateMonochromePdfImage(QuotePdfImage? photo)
+    {
+        if (photo is null || photo.Data.Length is 0 or > 5_000_000) return null;
+        var dimensions = HasJpegSignature(photo.Data) ? TryReadJpegSize(photo.Data) :
+            HasPngSignature(photo.Data) && photo.Data.Length >= 24
+                ? (ReadBigEndianInt(photo.Data, 16), ReadBigEndianInt(photo.Data, 20)) : null;
+        if (dimensions is not { Width: > 0 and <= 4096, Height: > 0 and <= 4096 } size ||
+            (long)size.Width * size.Height > 4_000_000) return null;
+
+        try
+        {
+            var decoded = ImageResult.FromMemory(photo.Data, ColorComponents.RedGreenBlueAlpha);
+            if (decoded.Width != size.Width || decoded.Height != size.Height) return null;
+            using var raw = new MemoryStream();
+            for (var row = 0; row < decoded.Height; row++)
+            {
+                raw.WriteByte(0);
+                for (var col = 0; col < decoded.Width; col++)
+                {
+                    var pixel = (row * decoded.Width + col) * 4;
+                    var gray = (decoded.Data[pixel] * 299 + decoded.Data[pixel + 1] * 587 + decoded.Data[pixel + 2] * 114 + 500) / 1000;
+                    var alpha = decoded.Data[pixel + 3];
+                    raw.WriteByte((byte)((gray * alpha + 255 * (255 - alpha)) / 255));
+                }
+            }
+            using var encoded = new MemoryStream();
+            using (var compressor = new ZLibStream(encoded, CompressionLevel.SmallestSize, leaveOpen: true))
+            {
+                raw.Position = 0;
+                raw.CopyTo(compressor);
+            }
+            return new PdfImageData(encoded.ToArray(), decoded.Width, decoded.Height, "DeviceGray", "FlateDecode",
+                $"<< /Predictor 15 /Colors 1 /BitsPerComponent 8 /Columns {decoded.Width} >>");
+        }
+        catch (Exception)
+        {
+            // A corrupt optional image must not prevent a quotation from being printed.
+            return null;
+        }
+    }
 
     private static PdfImageData? TryCreatePdfImage(QuotePdfImage? image)
     {
