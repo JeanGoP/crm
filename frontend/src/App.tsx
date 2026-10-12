@@ -2267,7 +2267,7 @@ function CreditWorkflowControls({ application, onCreditBureau, onMilestone }: {
     { number: 2, title: 'Verificación SIMIT y RUNT', complete: initialReady, detail: initialReady ? `Completada por ${application.step0User || 'el equipo'}` : 'Pendiente en la pestaña Estudio' },
     { number: 3, title: 'Verificación Datacrédito', complete: bureauReady, detail: bureauReady ? `Cliente${application.creditBureauClientScore != null ? `: ${application.creditBureauClientScore}` : ''}${application.coDebtorName ? ` · Codeudor${application.creditBureauCoDebtorScore != null ? `: ${application.creditBureauCoDebtorScore}` : ''}` : ''}` : 'Falta registrar la consulta', action: 'bureau' as CreditWorkflowEditor },
     { number: 4, title: "Ingreso de soportes", complete: documentsReady, detail: documentsReady ? "Documentación confirmada por el responsable" : "Confirme que recibió los documentos necesarios para este caso" },
-    { number: 5, title: 'Aprobaciones', complete: approved, detail: application.studyResult || (application.status === 4 ? 'Credito en estudio' : 'Pendiente de estudio') },
+    { number: 5, title: 'Aprobaciones', complete: approved, detail: application.studyResult || (application.status === 4 ? 'Credito en estudio' : application.status === 3 ? 'Listo para enviar a estudio' : 'Pendiente de estudio') },
     { number: 6, title: 'Firmas del negocio', complete: application.signaturesCompleted, detail: application.signaturesCompleted ? `Registradas por ${application.signaturesUser || 'el equipo'}` : 'Pendientes después de la aprobación', action: 'signatures' as CreditWorkflowEditor, disabled: !approved },
     { number: 7, title: 'Revision final de aprobaciones', complete: application.finalReviewApproved, detail: application.finalReviewApproved ? `Autorizada por ${application.finalReviewUser || 'el equipo'}` : 'Pendiente después de las firmas', action: 'final-review' as CreditWorkflowEditor, disabled: !application.signaturesCompleted },
     { number: 8, title: 'Bienvenida y cierre', complete: application.welcomeCompleted, detail: application.welcomeCompleted ? `Completada por ${application.welcomeUser || 'el equipo'}` : 'Pendiente después de la revisión final', action: 'welcome' as CreditWorkflowEditor, disabled: !application.finalReviewApproved }
@@ -2384,7 +2384,7 @@ function CreditStudySummary({ application, canManage, onStep0, onRecalculate, on
   const actions = [
     { status: 8, label: 'Interesado', show: application.status === 1 },
     { status: 2, label: 'Documentos', show: application.status === 1 || application.status === 8 },
-    { status: 4, label: 'Estudio', show: application.status === 2 || application.status === 3 },
+    { status: 4, label: 'Enviar a estudio', show: application.status === 2 || application.status === 3 },
     { status: 7, label: 'Entregar', show: application.status === 5 && application.finalReviewApproved },
     { status: 9, label: 'Desistir', show: ![6, 7, 9].includes(application.status) }
   ].filter((x) => x.show);
@@ -2468,6 +2468,9 @@ function CreditStudySummary({ application, canManage, onStep0, onRecalculate, on
 
   return <>
   <Stack spacing={.75} sx={{ minWidth: 0 }}>
+    {canManage && application.status === 3 && <Alert severity="info" sx={{ py: 0 }}>
+      La documentación está lista. Pulse «Enviar a estudio»; después aparecerán las opciones para aprobar o negar el crédito.
+    </Alert>}
     <Stack direction="row" gap={.5} flexWrap="wrap">
       <Chip size="small" label={step0Ready ? 'Validacion inicial lista' : 'Validacion inicial pendiente'} color={step0Ready ? 'success' : 'warning'} variant={step0Ready ? 'filled' : 'outlined'} />
       {application.studyResult && <Chip size="small" label={application.studyResult} color={application.status === 6 ? 'error' : application.status === 5 ? 'success' : 'default'} variant="outlined" />}
@@ -6585,7 +6588,7 @@ function creditStatus(value: number) {
   return ({
     1: 'Cotizado',
     2: 'Documentos pendientes',
-    3: 'Credito en estudio',
+    3: 'Documentación lista',
     4: 'Credito en estudio',
     5: 'Aprobado',
     6: 'Rechazado',
