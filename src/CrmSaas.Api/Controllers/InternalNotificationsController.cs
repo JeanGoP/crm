@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Text.Json;
 using CrmSaas.Api.Services;
 using CrmSaas.Domain.Common;
 using CrmSaas.Infrastructure.Persistence;
@@ -69,10 +70,13 @@ public sealed class InternalNotificationsController(CrmDbContext db, Notificatio
             {
                 using var heartbeat = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                 heartbeat.CancelAfter(TimeSpan.FromSeconds(20));
-                bool updated;
-                try { updated = await reader.ReadAsync(heartbeat.Token); }
-                catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) { updated = false; }
-                await Response.WriteAsync(updated ? "event: refresh\ndata: {}\n\n" : ": heartbeat\n\n", cancellationToken);
+                Guid? changedApplicationId;
+                try { changedApplicationId = await reader.ReadAsync(heartbeat.Token); }
+                catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) { changedApplicationId = null; }
+                var message = changedApplicationId.HasValue
+                    ? $"event: refresh\ndata: {JsonSerializer.Serialize(new { applicationId = changedApplicationId.Value })}\n\n"
+                    : ": heartbeat\n\n";
+                await Response.WriteAsync(message, cancellationToken);
                 await Response.Body.FlushAsync(cancellationToken);
             }
         }

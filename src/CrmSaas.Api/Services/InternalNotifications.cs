@@ -9,12 +9,12 @@ namespace CrmSaas.Api.Services;
 
 public sealed class NotificationBroadcaster
 {
-    private readonly ConcurrentDictionary<Guid, ConcurrentDictionary<Guid, Channel<bool>>> subscribers = new();
+    private readonly ConcurrentDictionary<Guid, ConcurrentDictionary<Guid, Channel<Guid>>> subscribers = new();
 
-    public (Guid SubscriptionId, ChannelReader<bool> Reader) Subscribe(Guid userId)
+    public (Guid SubscriptionId, ChannelReader<Guid> Reader) Subscribe(Guid userId)
     {
         var id = Guid.NewGuid();
-        var channel = Channel.CreateUnbounded<bool>(new UnboundedChannelOptions { SingleReader = true, SingleWriter = false });
+        var channel = Channel.CreateUnbounded<Guid>(new UnboundedChannelOptions { SingleReader = true, SingleWriter = false });
         subscribers.GetOrAdd(userId, _ => new()).TryAdd(id, channel);
         return (id, channel.Reader);
     }
@@ -25,11 +25,11 @@ public sealed class NotificationBroadcaster
         if (listeners.TryRemove(subscriptionId, out var channel)) channel.Writer.TryComplete();
     }
 
-    public void Notify(IEnumerable<Guid> userIds)
+    public void Notify(IEnumerable<Guid> userIds, Guid applicationId)
     {
         foreach (var userId in userIds.Distinct())
             if (subscribers.TryGetValue(userId, out var listeners))
-                foreach (var channel in listeners.Values) channel.Writer.TryWrite(true);
+                foreach (var channel in listeners.Values) channel.Writer.TryWrite(applicationId);
     }
 }
 
@@ -41,7 +41,7 @@ public sealed class InternalNotificationService(CrmDbContext db, ITenantContext 
             .Where(user => user.Activo && (user.Email == application.UsuarioCreacion || user.UsuarioRoles.Any(role =>
                 role.Rol != null && (role.Rol.Nombre == "Administrador" || role.Rol.Nombre == "Supervisor"))))
             .Select(user => user.Id).ToListAsync(cancellationToken);
-        broadcaster.Notify(recipients);
+        broadcaster.Notify(recipients, application.Id);
     }
 
     public async Task<IReadOnlyList<Guid>> QueueForManagersAsync(SolicitudCredito application, string type,

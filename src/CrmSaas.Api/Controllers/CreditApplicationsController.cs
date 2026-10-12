@@ -58,6 +58,13 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         return Ok(rows.Select(ToDto).ToList());
     }
 
+    [HttpGet("{id:guid}")]
+    public async Task<ActionResult<CreditApplicationDto>> GetById(Guid id, CancellationToken cancellationToken)
+    {
+        var entity = await LoadApplicationAsync(id, cancellationToken);
+        return Ok(ToDto(entity));
+    }
+
     [HttpPost]
     public async Task<ActionResult<CreditApplicationDto>> Create(UpsertCreditApplicationDto dto, CancellationToken cancellationToken)
     {

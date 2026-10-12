@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+﻿import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react';
 import { Navigate, NavLink, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   Alert, AppBar, Autocomplete, Box, Button, Card, CardContent, Checkbox, Chip, CssBaseline, Dialog, DialogActions,
@@ -1686,12 +1686,9 @@ function creditManagerTask(application: CreditApplication): { label: string; tab
 }
 
 function CreditWorkflowBoardPage() {
-  const { data: applications = [], loading, error, reload } = useResource<CreditApplication[]>('/api/credit-applications/board', []);
+  const { data: applications = [], loading, error, reload, setData } = useResource<CreditApplication[]>('/api/credit-applications/board', []);
   const flashingStatuses = useRecentlyChangedCreditStatuses(applications, loading);
-  useEffect(() => {
-    window.addEventListener('credit-applications-updated', reload);
-    return () => window.removeEventListener('credit-applications-updated', reload);
-  }, [reload]);
+  useLiveCreditApplications(setData);
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const normalizedSearch = normalizeSearch(search);
@@ -1807,10 +1804,7 @@ function CreditApplicationsPage() {
   const { data: productCategories = [] } = useResource<ProductCategory[]>('/api/product-categories', []);
   const { data: rows = [], loading, error, reload, setData } = useResource<CreditApplication[]>('/api/credit-applications', []);
   const flashingStatuses = useRecentlyChangedCreditStatuses(rows, loading);
-  useEffect(() => {
-    window.addEventListener('credit-applications-updated', reload);
-    return () => window.removeEventListener('credit-applications-updated', reload);
-  }, [reload]);
+  useLiveCreditApplications(setData);
   const { data: customers = [] } = useResource<Customer[]>('/api/customers', []);
   const { data: products = [] } = useResource<Product[]>('/api/products', []);
   const { data: quotes = [] } = useResource<Quote[]>('/api/quotes', []);
@@ -6239,6 +6233,26 @@ function useResource<T>(url: string, fallback?: T) {
   }, [url]);
   useEffect(() => { reload(); }, [reload]);
   return { data, setData, loading, error, reload };
+}
+
+function useLiveCreditApplications(setRows: Dispatch<SetStateAction<CreditApplication[] | undefined>>) {
+  useEffect(() => {
+    const update = async (event: Event) => {
+      const id = (event as CustomEvent<string>).detail;
+      if (!id) return;
+      try {
+        const { data } = await api.get<CreditApplication>(`/api/credit-applications/${id}`);
+        setRows((current) => {
+          const rows = current ?? [];
+          return rows.some((row) => row.id === data.id)
+            ? rows.map((row) => row.id === data.id ? data : row)
+            : [data, ...rows];
+        });
+      } catch { /* Los datos actuales siguen visibles si se pierde la conexión. */ }
+    };
+    window.addEventListener('credit-application-changed', update);
+    return () => window.removeEventListener('credit-application-changed', update);
+  }, [setRows]);
 }
 
 function useCanManage() {

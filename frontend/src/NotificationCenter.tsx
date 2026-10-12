@@ -95,20 +95,25 @@ export function NotificationCenter() {
           pending = (pending + decoder.decode(value, { stream: true })).replace(/\r\n/g, '\n');
           const chunks = pending.split('\n\n');
           pending = chunks.pop() ?? '';
-          if (chunks.some((chunk) => chunk.includes('event: refresh'))) {
+          for (const chunk of chunks) {
+            if (!chunk.includes('event: refresh')) continue;
+            const dataLine = chunk.split('\n').find((line) => line.startsWith('data: '));
+            if (dataLine) {
+              try {
+                const { applicationId } = JSON.parse(dataLine.slice(6)) as { applicationId?: string };
+                if (applicationId) window.dispatchEvent(new CustomEvent('credit-application-changed', { detail: applicationId }));
+              } catch { /* Se ignora un evento incompleto. */ }
+            }
             void refresh();
-            window.dispatchEvent(new Event('credit-applications-updated'));
           }
         }
       } catch { /* Se reintenta automáticamente. */ }
-      if (active) retryTimer = window.setTimeout(() => { void refresh(); window.dispatchEvent(new Event('credit-applications-updated')); void connect(); }, 3000);
+      if (active) retryTimer = window.setTimeout(() => { void connect(); }, 3000);
     };
     void connect();
-    const fallback = window.setInterval(() => { void refresh(); window.dispatchEvent(new Event('credit-applications-updated')); }, 30000);
     return () => {
       active = false;
       controller.abort();
-      window.clearInterval(fallback);
       if (retryTimer) window.clearTimeout(retryTimer);
     };
   }, [token, activeCompanyId, email, userId, refresh]);
