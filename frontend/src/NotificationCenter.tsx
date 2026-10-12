@@ -12,6 +12,7 @@ type InternalNotification = {
   message: string;
   creditApplicationId: string;
   createdAt: string;
+  updatedAt?: string | null;
   readAt?: string | null;
 };
 
@@ -41,7 +42,7 @@ export function NotificationCenter() {
   const activeCompanyId = useAuthStore((state) => state.activeCompanyId);
   const email = useAuthStore((state) => state.user?.email);
   const userId = useAuthStore((state) => state.user?.id);
-  const canManage = useAuthStore((state) => state.user?.roles.some((role) => role === 'Administrador' || role === 'Supervisor' || role === 'Aprobador de créditos') ?? false);
+  const canManage = useAuthStore((state) => Boolean(state.user?.id));
   const [rows, setRows] = useState<InternalNotification[]>([]);
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const [toast, setToast] = useState<InternalNotification | null>(null);
@@ -58,13 +59,13 @@ export function NotificationCenter() {
     try {
       const { data } = await api.get<InternalNotification[]>('/api/notifications');
       if (loaded.current) {
-        const latest = data.find((row) => !knownIds.current.has(row.id));
+        const latest = data.find((row) => !row.readAt && !knownIds.current.has(`${row.id}:${row.updatedAt ?? row.createdAt}`));
         if (latest) {
           setToast(latest);
           if (soundRef.current) playChime();
         }
       }
-      data.forEach((row) => knownIds.current.add(row.id));
+      data.forEach((row) => knownIds.current.add(`${row.id}:${row.updatedAt ?? row.createdAt}`));
       loaded.current = true;
       setRows(data);
     } catch { /* La bandeja se recuperará en el siguiente intento. */ }
@@ -126,7 +127,8 @@ export function NotificationCenter() {
     setAnchor(null);
     const tab = row.type === 'ListaParaDecision' ? 'estudio'
       : row.type === 'ListaParaFirmas' || row.type === 'ListaParaRevisionFinal' ? 'proceso'
-        : row.type === 'ListaParaEntrega' ? 'acciones' : 'pendiente';
+        : row.type === 'ListaParaEntrega' ? 'acciones'
+          : row.type === 'SolicitudDevuelta' || row.type === 'DocumentoDevuelto' ? 'documentos' : 'pendiente';
     navigate(`/solicitudes-credito?solicitud=${row.creditApplicationId}&tab=${tab}`);
   };
 

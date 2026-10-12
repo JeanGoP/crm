@@ -158,6 +158,8 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             ?? throw new KeyNotFoundException("Solicitud de credito no encontrada.");
         if (IsStudyControlledStatus(entity.Estado) &&
             !(entity.Estado == EstadoSolicitudCredito.EnEstudio ? CanValidateDocuments() : CanManageAfterApproval())) return Forbid();
+        if (entity.Estado == EstadoSolicitudCredito.EnEstudio)
+            throw new ValidationException("Devuelva la solicitud al vendedor antes de editar sus datos durante el estudio.");
         ValidateEditableStatus(dto.Status, entity.Estado);
 
         if (!await db.Clientes.AnyAsync(x => x.Id == dto.CustomerId, cancellationToken)) throw new KeyNotFoundException("Cliente no encontrado.");
@@ -236,13 +238,29 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         {
             return Forbid();
         }
+        if (entity.Estado == EstadoSolicitudCredito.EnEstudio && dto.Status == EstadoSolicitudCredito.DocumentosPendientes)
+            throw new ValidationException("Para devolver una solicitud en estudio, registre el motivo en Devolver al vendedor.");
 
         ValidateDecision(entity, dto.Status);
         if (dto.Status == EstadoSolicitudCredito.EnEstudio && entity.Estado != EstadoSolicitudCredito.EnEstudio)
-            await notifications.QueueForManagersAsync(entity, "ListaParaDecision", "Crédito listo para decidir",
+            await notifications.QueueForCreditReviewAsync(entity, "ListaParaDecision", "Crédito listo para decidir",
                 $"{entity.Numero} · {entity.Cliente?.Nombres} {entity.Cliente?.Apellidos} · Revise el estudio y registre la decisión.", cancellationToken);
         entity.Estado = dto.Status;
         ApplyDecision(entity, dto.Status, null);
+        await SyncPipelineAsync(entity, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+        await notifications.PublishApplicationChangedAsync(entity, cancellationToken);
+        return Ok(ToDto(entity));
+    }
+
+    [HttpPost("{id:guid}/return-for-correction")]
+    [Authorize(Roles = CreditRoles.Managers)]
+    public async Task<ActionResult<CreditApplicationDto>> ReturnForCorrection(Guid id, ReturnCreditApplicationDto dto, CancellationToken cancellationToken)
+    {
+        var entity = await LoadApplicationAsync(id, cancellationToken);
+        ReturnForCorrection(entity, dto.Reason, tenantContext.UsuarioActual);
+        await notifications.QueueForCreatorAsync(entity, "SolicitudDevuelta", "Solicitud devuelta para corrección",
+            $"{entity.Numero} · {dto.Reason.Trim()}", cancellationToken);
         await SyncPipelineAsync(entity, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         await notifications.PublishApplicationChangedAsync(entity, cancellationToken);
@@ -345,20 +363,24 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         var document = entity.Documentos.FirstOrDefault(x => x.Id == documentId)
             ?? throw new KeyNotFoundException("Documento no encontrado.");
 
+        EnsureDocumentsEditable(entity);
+        if (entity.Estado == EstadoSolicitudCredito.EnEstudio && dto.Status is not (EstadoDocumentoCredito.Validado or EstadoDocumentoCredito.Rechazado))
+            throw new ValidationException("Durante el estudio solo puede validar o devolver un documento. Para otros cambios, devuelva primero la solicitud al vendedor.");
+        if (document.Estado == EstadoDocumentoCredito.Rechazado && dto.Status != EstadoDocumentoCredito.Rechazado && !CanValidateDocuments())
+            throw new ValidationException("Para corregir un documento rechazado, cargue un archivo nuevo.");
+        if (dto.Status is EstadoDocumentoCredito.Validado or EstadoDocumentoCredito.Rechazado && !CanValidateDocuments())
+            return Forbid();
+        if (dto.Status == EstadoDocumentoCredito.Rechazado && string.IsNullOrWhiteSpace(dto.RejectionReason))
+            throw new ValidationException("Debe registrar el motivo de rechazo del documento.");
+        if (dto.Status == EstadoDocumentoCredito.Rechazado && dto.RejectionReason!.Trim().Length > 500)
+            throw new ValidationException("El motivo de rechazo no puede superar 500 caracteres.");
+
         document.Tipo = dto.Type;
         document.Nombre = string.IsNullOrWhiteSpace(dto.Name) ? document.Nombre : dto.Name.Trim();
         document.ClienteId = document.CodeudorId.HasValue ? null : entity.ClienteId;
         document.FechaVencimiento = null;
-        if (dto.Status is EstadoDocumentoCredito.Validado or EstadoDocumentoCredito.Rechazado && !CanValidateDocuments())
-        {
-            return Forbid();
-        }
-
-        if (dto.Status == EstadoDocumentoCredito.Rechazado && string.IsNullOrWhiteSpace(dto.RejectionReason))
-        {
-            throw new ValidationException("Debe registrar el motivo de rechazo del documento.");
-        }
-
+        var newRejection = dto.Status == EstadoDocumentoCredito.Rechazado &&
+            (document.Estado != EstadoDocumentoCredito.Rechazado || !string.Equals(document.MotivoRechazo, dto.RejectionReason?.Trim(), StringComparison.Ordinal));
         document.Estado = dto.Status;
         document.FechaRecepcion = dto.Status is EstadoDocumentoCredito.Recibido or EstadoDocumentoCredito.Validado
             ? dto.ReceivedAt ?? ColombiaTime.Now
@@ -366,7 +388,19 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         document.Observaciones = dto.Notes;
         ApplyDocumentAudit(document, dto.Status, dto.RejectionReason);
 
-        ClearDocumentationConfirmation(entity);
+        if (dto.Status == EstadoDocumentoCredito.Rechazado)
+        {
+            var owner = document.CodeudorId.HasValue
+                ? entity.Codeudores.FirstOrDefault(person => person.Id == document.CodeudorId)?.Nombre ?? "Codeudor"
+                : "Cliente";
+            var reason = $"{owner} · {document.Nombre}: {dto.RejectionReason!.Trim()}";
+            ReturnForCorrection(entity, reason, tenantContext.UsuarioActual);
+            if (newRejection)
+                await notifications.QueueForCreatorAsync(entity, "DocumentoDevuelto", "Documento devuelto para corrección",
+                    $"{entity.Numero} · {reason}", cancellationToken);
+        }
+        else if (entity.Estado != EstadoSolicitudCredito.EnEstudio)
+            ClearDocumentationConfirmation(entity);
 
         await SyncPipelineAsync(entity, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
@@ -397,6 +431,9 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         var document = entity.Documentos.FirstOrDefault(x => x.Id == documentId)
             ?? throw new KeyNotFoundException("Documento no encontrado.");
 
+        EnsureDocumentsEditable(entity);
+        if (entity.Estado == EstadoSolicitudCredito.EnEstudio)
+            throw new ValidationException("Devuelva la solicitud al vendedor antes de reemplazar un archivo durante el estudio.");
         var originalName = Path.GetFileName(file.FileName);
         var folder = Path.Combine(StorageRoot, "credit-documents", entity.EmpresaId.ToString("N"), entity.Id.ToString("N"));
         Directory.CreateDirectory(folder);
@@ -461,6 +498,11 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             ?? throw new KeyNotFoundException("Solicitud de credito no encontrada.");
         var document = entity.Documentos.FirstOrDefault(x => x.Id == documentId)
             ?? throw new KeyNotFoundException("Documento no encontrado.");
+        EnsureDocumentsEditable(entity);
+        if (entity.Estado == EstadoSolicitudCredito.EnEstudio)
+            throw new ValidationException("Devuelva la solicitud al vendedor antes de retirar un archivo durante el estudio.");
+        if (document.Estado == EstadoDocumentoCredito.Rechazado && !CanValidateDocuments())
+            throw new ValidationException("Para corregir un documento rechazado, cargue un archivo nuevo. Solo el equipo de crédito puede descartarlo.");
         if (string.IsNullOrWhiteSpace(document.RutaArchivo))
         {
             throw new ValidationException("El documento no tiene un archivo cargado.");
@@ -674,6 +716,8 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
     {
         if (status is EstadoSolicitudCredito.Aprobada or EstadoSolicitudCredito.Rechazada)
             throw new ValidationException("La aprobación o negación debe registrarse desde la decisión del estudio.");
+        if (status == EstadoSolicitudCredito.DocumentosRecibidos)
+            throw new ValidationException("Para marcar la documentación lista, use Documentación completa.");
     }
 
     private static void ValidateFormalDecision(EstadoSolicitudCredito status)
@@ -784,6 +828,28 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             entity.Estado = EstadoSolicitudCredito.DocumentosPendientes;
     }
 
+    private static void EnsureDocumentsEditable(SolicitudCredito entity)
+    {
+        if (entity.Estado is EstadoSolicitudCredito.Aprobada or EstadoSolicitudCredito.Rechazada or
+            EstadoSolicitudCredito.Desembolsada or EstadoSolicitudCredito.Desistida)
+            throw new ValidationException("Los documentos de una solicitud decidida o cerrada no pueden modificarse.");
+    }
+
+    private static void ReturnForCorrection(SolicitudCredito entity, string? reason, string returnedBy)
+    {
+        EnsureDocumentsEditable(entity);
+        if (string.IsNullOrWhiteSpace(reason))
+            throw new ValidationException("Indique qué debe corregir el vendedor antes de devolver la solicitud.");
+        if (reason.Trim().Length > 1000)
+            throw new ValidationException("El motivo de devolución no puede superar 1000 caracteres.");
+
+        ClearDocumentationConfirmation(entity);
+        entity.Estado = EstadoSolicitudCredito.DocumentosPendientes;
+        entity.MotivoDevolucion = reason.Trim();
+        entity.FechaDevolucion = ColombiaTime.Now;
+        entity.UsuarioDevolucion = returnedBy;
+    }
+
     [HttpPost("{id:guid}/workflow/documentation")]
     public async Task<ActionResult<CreditApplicationDto>> ConfirmDocumentation(Guid id, CreditWorkflowMilestoneDto dto, CancellationToken cancellationToken)
     {
@@ -791,6 +857,11 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             .Include(x => x.PerfilRequisito).Include(x => x.Documentos).Include(x => x.Codeudores)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
             ?? throw new KeyNotFoundException("Solicitud no encontrada.");
+        EnsureDocumentsEditable(entity);
+        if (entity.Estado == EstadoSolicitudCredito.EnEstudio)
+            throw new ValidationException("Durante el estudio, use Devolver al vendedor para solicitar correcciones.");
+        if (dto.Completed && entity.Documentos.Any(document => document.Estado == EstadoDocumentoCredito.Rechazado))
+            throw new ValidationException("Corrija o descarte los documentos rechazados antes de confirmar la documentación.");
         var wasComplete = entity.DocumentacionCompleta;
         ClearDocumentationConfirmation(entity);
         if (dto.Completed)
@@ -801,7 +872,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             if (entity.Estado is EstadoSolicitudCredito.Borrador or EstadoSolicitudCredito.Cotizado or EstadoSolicitudCredito.Interesado or EstadoSolicitudCredito.DocumentosPendientes)
                 entity.Estado = EstadoSolicitudCredito.DocumentosRecibidos;
             if (!wasComplete)
-                await notifications.QueueForManagersAsync(entity, "DocumentacionLista", "Documentación lista",
+                await notifications.QueueForCreditReviewAsync(entity, "DocumentacionLista", "Documentación lista",
                     $"{entity.Numero} · {entity.Cliente?.Nombres} {entity.Cliente?.Apellidos} · El expediente ya puede revisarse.", cancellationToken);
         }
         await SyncPipelineAsync(entity, cancellationToken);
@@ -849,6 +920,9 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
 
     private static void ValidateDecision(SolicitudCredito entity, EstadoSolicitudCredito status)
     {
+        if (status is EstadoSolicitudCredito.EnEstudio or EstadoSolicitudCredito.Aprobada &&
+            entity.Documentos.Any(document => document.Estado == EstadoDocumentoCredito.Rechazado))
+            throw new ValidationException("Corrija o descarte los documentos rechazados antes de continuar el estudio.");
         if (status == EstadoSolicitudCredito.EnEstudio && !entity.DocumentacionCompleta)
         {
             throw new ValidationException("Antes de enviar a estudio confirme que la documentación necesaria está completa.");
@@ -1141,7 +1215,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             x.UsuarioBienvenida,
             x.ObservacionBienvenida,
             x.Documentos.OrderBy(d => Array.IndexOf(CreditDocumentCatalog.Names, d.Nombre) is var index && index >= 0 ? index : 999).ThenBy(d => d.Nombre).Select(ToDocumentDto).ToList(),
-            x.DocumentacionCompleta, x.FechaDocumentacionCompleta, x.UsuarioDocumentacionCompleta, x.FechaPrimerVencimiento, x.Codeudores.OrderBy(c => c.Orden).Select(CreditCoDebtorService.ToDto).ToList(), CreditFormDetails.Read(x.FormDetailsJson));
+            x.DocumentacionCompleta, x.FechaDocumentacionCompleta, x.UsuarioDocumentacionCompleta, x.FechaPrimerVencimiento, x.Codeudores.OrderBy(c => c.Orden).Select(CreditCoDebtorService.ToDto).ToList(), CreditFormDetails.Read(x.FormDetailsJson), x.MotivoDevolucion, x.FechaDevolucion, x.UsuarioDevolucion);
     }
 
     private static CreditDocumentDto ToDocumentDto(DocumentoSolicitudCredito d) =>

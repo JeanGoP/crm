@@ -447,6 +447,9 @@ public sealed class SolicitudCredito : AuditableTenantEntity
     public DateTime? FechaDesembolso { get; set; }
     public string? UsuarioDecision { get; set; }
     public string? ObservacionDecision { get; set; }
+    public string? MotivoDevolucion { get; set; }
+    public DateTime? FechaDevolucion { get; set; }
+    public string? UsuarioDevolucion { get; set; }
     public bool FirmasCompletas { get; set; }
     public DateTime? FechaFirmasCompletas { get; set; }
     public string? UsuarioFirmas { get; set; }

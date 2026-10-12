@@ -2481,6 +2481,9 @@ namespace CrmSaas.Infrastructure.Persistence.Migrations
                     b.Property<DateTime?>("FechaDesembolso")
                         .HasColumnType("datetime2");
 
+                    b.Property<DateTime?>("FechaDevolucion")
+                        .HasColumnType("datetime2");
+
                     b.Property<DateTime?>("FechaDocumentacionCompleta")
                         .HasColumnType("datetime2");
 
@@ -2523,6 +2526,9 @@ namespace CrmSaas.Infrastructure.Persistence.Migrations
                     b.Property<decimal>("IngresosMensuales")
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("MotivoDevolucion")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<Guid?>("NegocioId")
                         .HasColumnType("uniqueidentifier");
@@ -2632,6 +2638,9 @@ namespace CrmSaas.Infrastructure.Persistence.Migrations
                     b.Property<string>("UsuarioDecision")
                         .HasMaxLength(180)
                         .HasColumnType("nvarchar(180)");
+
+                    b.Property<string>("UsuarioDevolucion")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("UsuarioDocumentacionCompleta")
                         .HasColumnType("nvarchar(max)");

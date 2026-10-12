@@ -1,7 +1,6 @@
 using System.Security.Claims;
 using System.Text.Json;
 using CrmSaas.Api.Services;
-using CrmSaas.Api.Authorization;
 using CrmSaas.Domain.Common;
 using CrmSaas.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
@@ -19,22 +18,20 @@ public sealed class InternalNotificationsController(CrmDbContext db, Notificatio
         ? id : throw new UnauthorizedAccessException("Usuario no identificado.");
 
     [HttpGet]
-    [Authorize(Roles = CreditRoles.Managers)]
     public async Task<IActionResult> Get(CancellationToken cancellationToken)
     {
         var userId = CurrentUserId;
         var rows = await db.AlertasInternas.AsNoTracking()
             .Where(alert => alert.UsuarioId == userId)
-            .OrderByDescending(alert => alert.FechaCreacion)
+            .OrderByDescending(alert => alert.FechaActualizacion ?? alert.FechaCreacion)
             .Take(80)
             .Select(alert => new NotificationDto(alert.Id, alert.Tipo, alert.Titulo, alert.Mensaje,
-                alert.SolicitudCreditoId, alert.FechaCreacion, alert.FechaLectura))
+                alert.SolicitudCreditoId, alert.FechaCreacion, alert.FechaActualizacion, alert.FechaLectura))
             .ToListAsync(cancellationToken);
         return Ok(rows);
     }
 
     [HttpPut("{id:guid}/read")]
-    [Authorize(Roles = CreditRoles.Managers)]
     public async Task<IActionResult> MarkRead(Guid id, CancellationToken cancellationToken)
     {
         var alert = await db.AlertasInternas.FirstOrDefaultAsync(x => x.Id == id && x.UsuarioId == CurrentUserId, cancellationToken);
@@ -45,7 +42,6 @@ public sealed class InternalNotificationsController(CrmDbContext db, Notificatio
     }
 
     [HttpPut("read-all")]
-    [Authorize(Roles = CreditRoles.Managers)]
     public async Task<IActionResult> MarkAllRead(CancellationToken cancellationToken)
     {
         var rows = await db.AlertasInternas.Where(x => x.UsuarioId == CurrentUserId && x.FechaLectura == null)
@@ -86,5 +82,5 @@ public sealed class InternalNotificationsController(CrmDbContext db, Notificatio
     }
 
     public sealed record NotificationDto(Guid Id, string Type, string Title, string Message,
-        Guid CreditApplicationId, DateTime CreatedAt, DateTime? ReadAt);
+        Guid CreditApplicationId, DateTime CreatedAt, DateTime? UpdatedAt, DateTime? ReadAt);
 }

@@ -578,6 +578,9 @@ export interface CreditApplication {
   documentationCompleted: boolean;
   documentationCompletedAt?: string;
   documentationCompletedBy?: string;
+  returnReason?: string;
+  returnedAt?: string;
+  returnedBy?: string;
 }
 
 export interface MotorcycleDelivery {

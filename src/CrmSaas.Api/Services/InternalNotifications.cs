@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Threading.Channels;
 using CrmSaas.Api.Authorization;
 using CrmSaas.Application.Abstractions;
+using CrmSaas.Domain.Common;
 using CrmSaas.Domain.Entities;
 using CrmSaas.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -53,22 +54,50 @@ public sealed class InternalNotificationService(CrmDbContext db, ITenantContext 
         string title, string message, CancellationToken cancellationToken) =>
         QueueAsync(application, type, title, message, includeApprovers: false, deduplicate: false, cancellationToken: cancellationToken);
 
+    public Task<IReadOnlyList<Guid>> QueueForCreditReviewAsync(SolicitudCredito application, string type,
+        string title, string message, CancellationToken cancellationToken) =>
+        QueueAsync(application, type, title, message, includeApprovers: true, deduplicate: false, cancellationToken: cancellationToken);
+
+    public async Task<IReadOnlyList<Guid>> QueueForCreatorAsync(SolicitudCredito application, string type,
+        string title, string message, CancellationToken cancellationToken)
+    {
+        var recipients = await db.Usuarios
+            .Where(user => user.Activo && user.Email == application.UsuarioCreacion)
+            .Select(user => user.Id).ToListAsync(cancellationToken);
+        return await QueueForRecipientsAsync(application, recipients, type, title, message, deduplicate: false, cancellationToken);
+    }
+
     private async Task<IReadOnlyList<Guid>> QueueAsync(SolicitudCredito application, string type,
         string title, string message, bool includeApprovers, bool deduplicate, CancellationToken cancellationToken)
     {
-        var companyId = tenantContext.EmpresaId ?? throw new InvalidOperationException("No se resolvió la empresa de la notificación.");
         var recipients = await db.Usuarios
             .Where(user => user.Activo && user.UsuarioRoles.Any(role => role.Rol != null &&
                 (role.Rol.Nombre == "Administrador" || role.Rol.Nombre == "Supervisor" || (includeApprovers && role.Rol.Nombre == CreditRoles.Approver))))
             .Select(user => user.Id).ToListAsync(cancellationToken);
-        if (recipients.Count == 0) return recipients;
+        return await QueueForRecipientsAsync(application, recipients, type, title, message, deduplicate, cancellationToken);
+    }
 
-        var existing = deduplicate
-            ? await db.AlertasInternas
-                .Where(alert => alert.SolicitudCreditoId == application.Id && alert.Tipo == type && recipients.Contains(alert.UsuarioId))
-                .Select(alert => alert.UsuarioId).ToListAsync(cancellationToken)
-            : [];
-        var newRecipients = recipients.Except(existing).ToList();
+    private async Task<IReadOnlyList<Guid>> QueueForRecipientsAsync(SolicitudCredito application, IReadOnlyList<Guid> recipients,
+        string type, string title, string message, bool deduplicate, CancellationToken cancellationToken)
+    {
+        if (recipients.Count == 0) return recipients;
+        if (message.Length > 500) message = message[..497] + "...";
+        var companyId = tenantContext.EmpresaId ?? throw new InvalidOperationException("No se resolvió la empresa de la notificación.");
+        if (application.EmpresaId != companyId) throw new InvalidOperationException("La solicitud no pertenece a la empresa activa.");
+
+        var existing = await db.AlertasInternas
+            .Where(alert => alert.SolicitudCreditoId == application.Id && alert.Tipo == type && recipients.Contains(alert.UsuarioId))
+            .ToListAsync(cancellationToken);
+        var existingByUser = existing.ToDictionary(alert => alert.UsuarioId);
+        var newRecipients = recipients.Where(userId => !existingByUser.ContainsKey(userId)).Distinct().ToList();
+        if (!deduplicate)
+            foreach (var alert in existing)
+            {
+                alert.Titulo = title;
+                alert.Mensaje = message;
+                alert.FechaLectura = null;
+                alert.FechaActualizacion = ColombiaTime.Now;
+            }
         foreach (var userId in newRecipients)
             db.AlertasInternas.Add(new AlertaInterna
             {
@@ -79,7 +108,7 @@ public sealed class InternalNotificationService(CrmDbContext db, ITenantContext 
                 Titulo = title,
                 Mensaje = message
             });
-        return newRecipients;
+        return deduplicate ? newRecipients : recipients;
     }
 
 }

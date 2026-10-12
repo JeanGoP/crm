@@ -35,6 +35,7 @@ MustReject("ValidateEditableStatus", EstadoSolicitudCredito.Aprobada, EstadoSoli
 MustReject("ValidateEditableStatus", EstadoSolicitudCredito.EnEstudio, EstadoSolicitudCredito.Borrador);
 MustReject("ValidateStatusEndpoint", EstadoSolicitudCredito.Aprobada);
 MustReject("ValidateStatusEndpoint", EstadoSolicitudCredito.Rechazada);
+MustReject("ValidateStatusEndpoint", EstadoSolicitudCredito.DocumentosRecibidos);
 Invoke("ValidateStatusEndpoint", EstadoSolicitudCredito.EnEstudio);
 Invoke("ValidateFormalDecision", EstadoSolicitudCredito.Aprobada);
 Invoke("ValidateFormalDecision", EstadoSolicitudCredito.Rechazada);
@@ -71,6 +72,17 @@ Check(application.Documentos.Count == 15, "Debe usar el catálogo de 15 document
 Check(application.Documentos.Select(d => d.Nombre).Distinct().Count() == 15, "Sin duplicados.");
 Check(application.Documentos.All(d => d.ClienteId == application.ClienteId && d.FechaVencimiento == null), "Sin vencimientos y asociados al cliente.");
 Check(!application.Documentos.Any(d => d.Tipo == TipoDocumentoCredito.Referencias), "Referencias no se solicita como documento.");
+var returnedApplication = new SolicitudCredito { Estado = EstadoSolicitudCredito.EnEstudio, DocumentacionCompleta = true };
+Invoke("ReturnForCorrection", returnedApplication, "Recibo ilegible", "aprobador");
+Check(returnedApplication.Estado == EstadoSolicitudCredito.DocumentosPendientes && !returnedApplication.DocumentacionCompleta &&
+    returnedApplication.MotivoDevolucion == "Recibo ilegible" && returnedApplication.UsuarioDevolucion == "aprobador" && returnedApplication.FechaDevolucion.HasValue,
+    "La devolución debe reabrir la solicitud y conservar motivo, fecha y responsable.");
+MustReject("ReturnForCorrection", new SolicitudCredito { Estado = EstadoSolicitudCredito.EnEstudio }, " ", "aprobador");
+MustReject("ReturnForCorrection", new SolicitudCredito { Estado = EstadoSolicitudCredito.Aprobada }, "Falta documento", "aprobador");
+var rejectedApplication = new SolicitudCredito { DocumentacionCompleta = true };
+rejectedApplication.Documentos.Add(new DocumentoSolicitudCredito { Estado = EstadoDocumentoCredito.Rechazado });
+MustReject("ValidateDecision", rejectedApplication, EstadoSolicitudCredito.EnEstudio);
+Console.WriteLine("OK: devolución con motivo, solicitud reabierta, estados cerrados protegidos y rechazo bloqueante.");
 try
 {
     Invoke("ValidateDecision", application, EstadoSolicitudCredito.EnEstudio);

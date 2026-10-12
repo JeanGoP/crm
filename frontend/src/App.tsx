@@ -1921,6 +1921,18 @@ function CreditApplicationsPage() {
     }
   };
 
+  const returnForCorrection = async (application: CreditApplication, reason: string) => {
+    try {
+      const { data } = await api.post<CreditApplication>(`/api/credit-applications/${application.id}/return-for-correction`, { reason });
+      setData((current) => (current ?? []).map((item) => item.id === data.id ? data : item));
+      setNotice({ type: 'success', text: 'Solicitud devuelta al vendedor con el motivo registrado.' });
+      return true;
+    } catch (err) {
+      setNotice({ type: 'error', text: apiError(err) });
+      return false;
+    }
+  };
+
   const decide = async (application: CreditApplication, status: number, notes?: string, study?: Partial<CreditApplication> & { result?: string }) => {
     try {
       const { data } = await api.post<CreditApplication>(`/api/credit-applications/${application.id}/decision`, {
@@ -2086,11 +2098,11 @@ function CreditApplicationsPage() {
       headers={[['Acciones', 165], ['Solicitud', 190], ['Estado', 165], ['Cliente', 250], ['Identificación', 145], ['Teléfono', 140], ['Producto', 260], ['Valor', 150, 'right'], ['Cuota inicial', 150, 'right'], ['Referencias', 100], ['Pendientes', 420]]}
       empty="No hay solicitudes de credito"
       rows={rows.map((r) => ({ id: r.id,
-        searchText: [r.number, r.customerName, r.identificationNumber, r.mobile, r.productName, creditStatus(r.status), r.studyResult].join(' '),
+        searchText: [r.number, r.customerName, r.identificationNumber, r.mobile, r.productName, creditStatus(r.status), r.studyResult, r.returnReason].join(' '),
         cells: [
         <Stack direction="row" gap={.5} alignItems="center" flexWrap="nowrap">
           <Button size="small" variant="contained" onClick={() => setManagement(r)} sx={{ minHeight: 28, px: 1.25, fontSize: 11.5 }}>Gestionar</Button>
-          <Actions onAi={() => analyzeCustomer(r.customerId, r.mobile)} onEdit={(canManagePostApproval || (canManageCredit && r.status === 4) || ![4, 5, 6, 7].includes(r.status)) ? () => setForm({ open: true, item: r }) : undefined} />
+          <Actions onAi={() => analyzeCustomer(r.customerId, r.mobile)} onEdit={(r.status !== 4 && (canManagePostApproval || ![5, 6, 7].includes(r.status))) ? () => setForm({ open: true, item: r }) : undefined} />
         </Stack>,
         r.number,
         <StatusChip label={creditStatus(r.status)} tone={creditTone(r.status)} flash={flashingStatuses.has(r.id)} />,
@@ -2124,6 +2136,7 @@ function CreditApplicationsPage() {
       onAnalyze={(application) => analyzeCustomer(application.customerId, application.mobile)}
       onEdit={(application) => setForm({ open: true, item: application })}
       onChangeStatus={(application, status) => changeStatus(application, status)}
+      onReturnForCorrection={returnForCorrection}
     />
     <AiAnalysisDialog analysis={analysis} phone={analysisPhone} onClose={() => { setAnalysis(undefined); setAnalysisPhone(undefined); }} />
     <Notice notice={notice} onClose={() => setNotice(undefined)} />
@@ -2133,6 +2146,9 @@ function CreditApplicationsPage() {
 function CreditApplicationPendingSummary({ application, compact = false }: { application: CreditApplication; compact?: boolean }) {
 
   const pendingDocuments = application.documentationCompleted ? 0 : 1;
+  const rejectedDocuments = application.documents.filter((document) => document.status === 4).length;
+  const returned = application.status === 2 && Boolean(application.returnedAt) &&
+    (!application.documentationCompletedAt || new Date(application.returnedAt!).getTime() > new Date(application.documentationCompletedAt).getTime());
   const step0Ready = application.runtChecked && application.simitChecked && application.identityValidated;
   const items = [
     pendingDocuments > 0 ? `${pendingDocuments} doc. pendientes` : 'Docs ok',
@@ -2143,6 +2159,8 @@ function CreditApplicationPendingSummary({ application, compact = false }: { app
   ].filter(Boolean);
 
   return <Stack direction="row" gap={.5} flexWrap="wrap" useFlexGap>
+    {returned && <Chip size="small" color="error" label="Devuelta al vendedor" />}
+    {rejectedDocuments > 0 && <Chip size="small" color="error" variant="outlined" label={`${rejectedDocuments} documento${rejectedDocuments === 1 ? '' : 's'} por corregir`} />}
     <Chip size="small" color={application.documentationCompleted ? "success" : "warning"} label={application.documentationCompleted ? "Documentación completa" : "Documentación por confirmar"} />
     <Chip size="small" color={step0Ready ? 'success' : 'warning'} variant={step0Ready ? 'filled' : 'outlined'} label={compact ? (step0Ready ? 'Inicial ok' : 'Inicial') : (step0Ready ? 'Validacion inicial lista' : 'Validacion inicial pendiente')} />
     {application.studyResult && <Chip size="small" label={application.studyResult} variant="outlined" color={application.status === 6 ? 'error' : application.status === 5 ? 'success' : 'default'} />}
@@ -2168,7 +2186,8 @@ function CreditApplicationManagementDialog({
   onDownloadTemplate,
   onAnalyze,
   onEdit,
-  onChangeStatus
+  onChangeStatus,
+  onReturnForCorrection
 }: {
   application?: CreditApplication;
   initialTab?: number;
@@ -2188,16 +2207,32 @@ function CreditApplicationManagementDialog({
   onAnalyze: (application: CreditApplication) => void;
   onEdit: (application: CreditApplication) => void;
   onChangeStatus: (application: CreditApplication, status: number) => void;
+  onReturnForCorrection: (application: CreditApplication, reason: string) => Promise<boolean>;
 }) {
   const muiTheme = useTheme();
   const fullScreen = useMediaQuery(muiTheme.breakpoints.down('sm'));
   const [tab, setTab] = useState(0);
+  const [returnOpen, setReturnOpen] = useState(false);
+  const [returnReason, setReturnReason] = useState('');
+  const [returnSaving, setReturnSaving] = useState(false);
   useEffect(() => { if (application) setTab(initialTab ?? 0); }, [application?.id, initialTab]);
 
   if (!application) return null;
   const readyForStudy = application.documentationCompleted && application.runtChecked && application.simitChecked &&
     application.identityValidated && application.creditBureauClientChecked &&
-    (!application.coDebtorName || application.creditBureauCoDebtorChecked);
+    (!application.coDebtorName || application.creditBureauCoDebtorChecked) &&
+    !application.documents.some((document) => document.status === 4);
+  const returned = application.status === 2 && Boolean(application.returnedAt) &&
+    (!application.documentationCompletedAt || new Date(application.returnedAt!).getTime() > new Date(application.documentationCompletedAt).getTime());
+  const rejectedDocuments = application.documents.filter((document) => document.status === 4);
+  const openReturn = () => { setReturnReason(''); setReturnOpen(true); };
+  const saveReturn = async () => {
+    if (!returnReason.trim()) return;
+    setReturnSaving(true);
+    try {
+      if (await onReturnForCorrection(application, returnReason.trim())) setReturnOpen(false);
+    } finally { setReturnSaving(false); }
+  };
 
   return <Dialog open={!!application} onClose={onClose} fullWidth maxWidth="lg" fullScreen={fullScreen} scroll="paper" sx={{ '& .MuiDialog-paper': { m: { xs: 0, sm: 2 }, width: { xs: '100%', sm: 'calc(100% - 32px)' } } }}>
     <DialogTitle>
@@ -2218,12 +2253,24 @@ function CreditApplicationManagementDialog({
         {showWorkflow && <Tab label="Proceso" />}
       </Tabs>
       <Box sx={{ p: { xs: 1.5, sm: 2.5 } }}>
+        {returned && <Alert severity="warning" sx={{ mb: 2 }}>
+          <Typography fontWeight={800}>Solicitud devuelta para corrección</Typography>
+          <Typography>{application.returnReason}</Typography>
+          {application.returnedAt && <Typography variant="caption">{application.returnedBy || 'Equipo de crédito'} · {new Date(application.returnedAt).toLocaleString()}</Typography>}
+        </Alert>}
+        {rejectedDocuments.length > 0 && <Alert severity="error" sx={{ mb: 2 }}>
+          <Typography fontWeight={800}>Documentos por corregir</Typography>
+          {rejectedDocuments.map((document) => <Typography key={document.id} variant="body2">
+            {document.coDebtorId ? application.coDebtors?.find((person) => person.id === document.coDebtorId)?.name ?? 'Codeudor' : 'Cliente'} · {document.name}: {document.rejectionReason}
+          </Typography>)}
+        </Alert>}
         {tab === 0 && <Stack spacing={2}>
           <Stack direction="row" gap={.75} flexWrap="wrap" useFlexGap>
             <CreditApplicationPendingSummary application={application} />
           </Stack>
           {!showWorkflow && application.documentationCompleted && [1, 2, 3, 4].includes(application.status) &&
             <Alert severity="info">El expediente está listo para revisión. Un aprobador de créditos, supervisor o administrador registra las verificaciones y decide el crédito.</Alert>}
+          {showWorkflow && [2, 3, 4].includes(application.status) && <Button color="warning" variant="outlined" sx={{ alignSelf: 'flex-start' }} onClick={openReturn}>Devolver al vendedor</Button>}
           <DocumentSummary application={application} onComplete={(completed) => onWorkflowMilestone(application, "documentation", completed)} onUpdate={onUpdateDocument} onUpload={onUploadDocument} onDownload={onDownloadDocument} onDelete={onDeleteDocument} />
         </Stack>}
         {tab === 1 && <CreditStudySummary application={application} canManage={showWorkflow} canManagePostApproval={canManagePostApproval} onStep0={onStep0} onRecalculate={onRecalculate} onDecision={onDecision} onChangeStatus={onChangeStatus} />}
@@ -2237,12 +2284,13 @@ function CreditApplicationManagementDialog({
             {application.status === 1 && <Button variant="outlined" onClick={() => onChangeStatus(application, 8)}>Cliente interesado</Button>}
             {[1, 8].includes(application.status) && <Button variant="outlined" onClick={() => onChangeStatus(application, 2)}>Solicitar documentos</Button>}
             {showWorkflow && [2, 3].includes(application.status) && <Button variant="outlined" disabled={!readyForStudy} onClick={() => onChangeStatus(application, 4)}>Enviar a estudio</Button>}
+            {showWorkflow && [2, 3, 4].includes(application.status) && <Button color="warning" variant="outlined" onClick={openReturn}>Devolver al vendedor</Button>}
             {canManagePostApproval && application.status === 5 && application.finalReviewApproved && <Button variant="outlined" onClick={() => onChangeStatus(application, 7)}>Autorizar entrega</Button>}
             {![6, 7, 9].includes(application.status) && (showWorkflow || ![4, 5].includes(application.status)) && <Button color="error" variant="outlined" onClick={() => {
               if (window.confirm('¿Confirmar que el cliente desistió de esta solicitud?')) onChangeStatus(application, 9);
             }}>Registrar desistimiento</Button>}
             <Button variant="outlined" startIcon={<AutoAwesome />} onClick={() => onAnalyze(application)}>Analizar IA</Button>
-            <Button variant="outlined" startIcon={<Edit />} disabled={!canManagePostApproval && [5, 6, 7].includes(application.status) || !showWorkflow && application.status === 4} onClick={() => onEdit(application)}>Editar solicitud</Button>
+            <Button variant="outlined" startIcon={<Edit />} disabled={application.status === 4 || (!canManagePostApproval && [5, 6, 7].includes(application.status))} onClick={() => onEdit(application)}>Editar solicitud</Button>
           </Stack>
           <Typography variant="caption" color="text.secondary">La aprobación y la negación se registran en Estudio por un aprobador de créditos, supervisor o administrador. Los demás estados se actualizan al completar cada paso.</Typography>
           <Paper variant="outlined" sx={{ p: 1.5 }}>
@@ -2261,6 +2309,19 @@ function CreditApplicationManagementDialog({
     <DialogActions sx={{ px: { xs: 2, sm: 3 }, py: 1.5, '& .MuiButton-root': { width: { xs: '100%', sm: 'auto' } } }}>
       <Button onClick={onClose}>Cerrar</Button>
     </DialogActions>
+    <Dialog open={returnOpen} onClose={() => !returnSaving && setReturnOpen(false)} fullWidth maxWidth="sm">
+      <DialogTitle>Devolver solicitud al vendedor</DialogTitle>
+      <DialogContent dividers>
+        <Stack spacing={2}>
+          <Alert severity="info">Explique concretamente qué falta o qué debe corregirse. La solicitud volverá a «Documentos pendientes» y el vendedor recibirá un aviso.</Alert>
+          <TextField autoFocus required multiline minRows={4} fullWidth label="Motivo de devolución" value={returnReason} onChange={(event) => setReturnReason(event.target.value)} inputProps={{ maxLength: 1000 }} helperText={`${returnReason.length}/1000 · Ejemplo: falta la cédula del segundo codeudor o el recibo está ilegible.`} />
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button disabled={returnSaving} onClick={() => setReturnOpen(false)}>Cancelar</Button>
+        <Button disabled={returnSaving || !returnReason.trim()} variant="contained" onClick={() => void saveReturn()}>{returnSaving ? 'Enviando...' : 'Devolver y avisar'}</Button>
+      </DialogActions>
+    </Dialog>
   </Dialog>;
 }
 
@@ -5585,14 +5646,20 @@ function DocumentSummary({ application, onUpdate, onUpload, onDownload, onDelete
   onDownload: (application: CreditApplication, document: CreditDocument) => Promise<void>;
   onDelete: (application: CreditApplication, document: CreditDocument) => Promise<void>;
 }) {
-  const canValidate = useCanManage();
+  const canValidate = useCanManageCredit();
   const statusOptions = canValidate ? [1, 2, 3, 4] : [1, 2];
+  const documentsEditable = ![5, 6, 7, 9].includes(application.status);
+  const canChangeFiles = documentsEditable && application.status !== 4;
+  const hasRejectedDocuments = application.documents.some((document) => document.status === 4);
   const [owner, setOwner] = useState('client');
   useEffect(() => setOwner('client'), [application.id]);
   const ownerDocuments = application.documents.filter((document) => owner === 'client' ? !document.coDebtorId : document.coDebtorId === owner);
   const [confirmComplete, setConfirmComplete] = useState(false);
   const [saving, setSaving] = useState(false);
   const [completionError, setCompletionError] = useState('');
+  const [rejectionTarget, setRejectionTarget] = useState<CreditDocument>();
+  const [rejectionCategory, setRejectionCategory] = useState('Ilegible');
+  const [rejectionDetail, setRejectionDetail] = useState('');
   const groups = [
     { title: 'Identificación y domicilio', names: creditDocumentNames.slice(0, 2) },
     { title: 'Soportes laborales y financieros', names: [creditDocumentNames[2], creditDocumentNames[3], creditDocumentNames[8], creditDocumentNames[9]] },
@@ -5603,9 +5670,9 @@ function DocumentSummary({ application, onUpdate, onUpload, onDownload, onDelete
 
   const handleStatus = (document: CreditDocument, status: number) => {
     if (status === 4) {
-      const reason = window.prompt('Motivo de rechazo del documento');
-      if (!reason?.trim()) return;
-      onUpdate(application, document, status, { rejectionReason: reason.trim() });
+      setRejectionTarget(document);
+      setRejectionCategory('Ilegible');
+      setRejectionDetail('');
       return;
     }
 
@@ -5619,8 +5686,9 @@ function DocumentSummary({ application, onUpdate, onUpload, onDownload, onDelete
     </Alert>
     <Stack direction={{ xs: 'column', sm: 'row' }} gap={1} alignItems={{ sm: 'center' }} justifyContent="space-between">
       <Typography variant="body2">{application.documents.filter((d) => d.hasFile).length} archivos cargados · Sin fechas de vencimiento</Typography>
-      <Button variant={application.documentationCompleted ? 'outlined' : 'contained'} disabled={saving} onClick={() => setConfirmComplete(true)}>{application.documentationCompleted ? 'Reabrir documentación' : 'Documentación completa'}</Button>
+      <Button variant={application.documentationCompleted ? 'outlined' : 'contained'} disabled={saving || !canChangeFiles || hasRejectedDocuments} onClick={() => setConfirmComplete(true)}>{application.documentationCompleted ? 'Reabrir documentación' : 'Documentación completa'}</Button>
     </Stack>
+    {hasRejectedDocuments && <Typography variant="caption" color="error">Corrija los documentos rechazados antes de confirmar que la documentación está completa.</Typography>}
     {completionError && <Alert severity="error">{completionError}</Alert>}
     <ConfirmDialog open={confirmComplete} title={application.documentationCompleted ? 'Reabrir documentación' : 'Confirmar documentación completa'} text={application.documentationCompleted ? 'La documentación volverá a quedar pendiente de confirmación. No se borrará ningún archivo.' : 'Confirmo que recibí todos los documentos necesarios para esta solicitud. No es necesario cargar todas las opciones del listado.'} confirmLabel="Confirmar" onClose={() => setConfirmComplete(false)} onConfirm={async () => {
       setSaving(true);
@@ -5638,7 +5706,8 @@ function DocumentSummary({ application, onUpdate, onUpload, onDownload, onDelete
       <Typography variant="subtitle1" fontWeight={800} sx={{ mb: 1 }}>{group.title}</Typography>
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' }, gap: 1.25 }}>
     {ownerDocuments.filter((document) => group.names.includes(document.name)).map((document) => {
-      const documentStatusOptions = statusOptions.includes(document.status) ? statusOptions : [...statusOptions, document.status];
+      const availableStatuses = application.status === 4 && canValidate ? [3, 4] : statusOptions;
+      const documentStatusOptions = availableStatuses.includes(document.status) ? availableStatuses : [document.status, ...availableStatuses];
       return <Stack key={document.id} spacing={.75} sx={{ p: 1, border: '1px solid #e2e8f0', borderRadius: 1, bgcolor: '#fff' }}>
       <Stack spacing={1}>
         <Stack spacing={.4} sx={{ minWidth: 0 }}>
@@ -5652,7 +5721,7 @@ function DocumentSummary({ application, onUpdate, onUpload, onDownload, onDelete
         </Stack>
         <Stack direction="row" alignItems="center" gap={.5} sx={{ flexShrink: 0 }}>
           <Tooltip title="Subir documento">
-            <IconButton component="label" size="small" color={document.hasFile ? 'success' : 'primary'}>
+            <IconButton component="label" size="small" disabled={!canChangeFiles} color={document.hasFile ? 'success' : 'primary'}>
               <UploadFile fontSize="small" />
               <input hidden type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,image/*" onChange={(e) => {
                 const file = e.target.files?.[0];
@@ -5667,11 +5736,11 @@ function DocumentSummary({ application, onUpdate, onUpload, onDownload, onDelete
             </IconButton>
           </Tooltip>}
           {document.hasFile && <Tooltip title="Eliminar archivo">
-            <IconButton size="small" color="error" onClick={() => onDelete(application, document)}>
+            <IconButton size="small" color="error" disabled={!canChangeFiles || (document.status === 4 && !canValidate)} onClick={() => onDelete(application, document)}>
               <Delete fontSize="small" />
             </IconButton>
           </Tooltip>}
-          <TextField select size="small" value={document.status} onChange={(e) => handleStatus(document, Number(e.target.value))} sx={{ width: 126 }} helperText={!canValidate ? 'Sin validar' : undefined}>
+          <TextField select size="small" value={document.status} disabled={!documentsEditable || (!canValidate && (document.status === 4 || application.status === 4))} onChange={(e) => handleStatus(document, Number(e.target.value))} sx={{ width: 126 }} helperText={document.status === 4 && !canValidate ? 'Cargue un archivo nuevo' : !canValidate ? 'Sin validar' : undefined}>
             {documentStatusOptions.map((status) => <MenuItem key={status} value={status}>{documentStatus(status)}</MenuItem>)}
           </TextField>
         </Stack>
@@ -5680,6 +5749,28 @@ function DocumentSummary({ application, onUpdate, onUpload, onDownload, onDelete
     })}
       </Box>
     </Box>)}
+    <Dialog open={Boolean(rejectionTarget)} onClose={() => setRejectionTarget(undefined)} fullWidth maxWidth="sm">
+      <DialogTitle>Devolver documento al vendedor</DialogTitle>
+      <DialogContent dividers>
+        <Stack spacing={2}>
+          <Typography variant="body2">{rejectionTarget?.name}</Typography>
+          <TextField select fullWidth label="Motivo" value={rejectionCategory} onChange={(event) => setRejectionCategory(event.target.value)}>
+            {['Ilegible', 'Documento incorrecto', 'Incompleto', 'Faltante', 'Datos no coinciden', 'Otro'].map((reason) => <MenuItem key={reason} value={reason}>{reason}</MenuItem>)}
+          </TextField>
+          <TextField fullWidth multiline minRows={3} label="Detalle de la corrección" value={rejectionDetail} onChange={(event) => setRejectionDetail(event.target.value)} inputProps={{ maxLength: 450 }} helperText="Indique qué debe enviar o corregir el vendedor." />
+          <Alert severity="info">La solicitud volverá a Documentos pendientes y se avisará al vendedor responsable.</Alert>
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={() => setRejectionTarget(undefined)}>Cancelar</Button>
+        <Button variant="contained" disabled={!rejectionTarget || (rejectionCategory === 'Otro' && !rejectionDetail.trim())} onClick={() => {
+          if (!rejectionTarget) return;
+          const reason = `${rejectionCategory}${rejectionDetail.trim() ? `: ${rejectionDetail.trim()}` : ''}`;
+          void onUpdate(application, rejectionTarget, 4, { rejectionReason: reason });
+          setRejectionTarget(undefined);
+        }}>Devolver y avisar</Button>
+      </DialogActions>
+    </Dialog>
   </Stack>;
 }
 
