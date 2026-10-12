@@ -45,19 +45,29 @@ public sealed class InternalNotificationService(CrmDbContext db, ITenantContext 
         broadcaster.Notify(recipients, application.Id);
     }
 
-    public async Task<IReadOnlyList<Guid>> QueueForManagersAsync(SolicitudCredito application, string type,
-        string title, string message, CancellationToken cancellationToken)
+    public Task<IReadOnlyList<Guid>> QueueForManagersAsync(SolicitudCredito application, string type,
+        string title, string message, CancellationToken cancellationToken) =>
+        QueueAsync(application, type, title, message, includeApprovers: true, deduplicate: true, cancellationToken: cancellationToken);
+
+    public Task<IReadOnlyList<Guid>> QueueForPostApprovalManagersAsync(SolicitudCredito application, string type,
+        string title, string message, CancellationToken cancellationToken) =>
+        QueueAsync(application, type, title, message, includeApprovers: false, deduplicate: false, cancellationToken: cancellationToken);
+
+    private async Task<IReadOnlyList<Guid>> QueueAsync(SolicitudCredito application, string type,
+        string title, string message, bool includeApprovers, bool deduplicate, CancellationToken cancellationToken)
     {
         var companyId = tenantContext.EmpresaId ?? throw new InvalidOperationException("No se resolvió la empresa de la notificación.");
         var recipients = await db.Usuarios
             .Where(user => user.Activo && user.UsuarioRoles.Any(role => role.Rol != null &&
-                (role.Rol.Nombre == "Administrador" || role.Rol.Nombre == "Supervisor" || role.Rol.Nombre == CreditRoles.Approver)))
+                (role.Rol.Nombre == "Administrador" || role.Rol.Nombre == "Supervisor" || (includeApprovers && role.Rol.Nombre == CreditRoles.Approver))))
             .Select(user => user.Id).ToListAsync(cancellationToken);
         if (recipients.Count == 0) return recipients;
 
-        var existing = await db.AlertasInternas
-            .Where(alert => alert.SolicitudCreditoId == application.Id && alert.Tipo == type && recipients.Contains(alert.UsuarioId))
-            .Select(alert => alert.UsuarioId).ToListAsync(cancellationToken);
+        var existing = deduplicate
+            ? await db.AlertasInternas
+                .Where(alert => alert.SolicitudCreditoId == application.Id && alert.Tipo == type && recipients.Contains(alert.UsuarioId))
+                .Select(alert => alert.UsuarioId).ToListAsync(cancellationToken)
+            : [];
         var newRecipients = recipients.Except(existing).ToList();
         foreach (var userId in newRecipients)
             db.AlertasInternas.Add(new AlertaInterna

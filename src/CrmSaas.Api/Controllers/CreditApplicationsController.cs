@@ -266,6 +266,9 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         ApplyFormalStudy(entity, dto);
         entity.Estado = dto.Status;
         ApplyDecision(entity, dto.Status, dto.Notes);
+        if (dto.Status == EstadoSolicitudCredito.Aprobada)
+            await notifications.QueueForPostApprovalManagersAsync(entity, "ListaParaFirmas", "Crédito listo para firmas",
+                $"{entity.Numero} · {entity.Cliente?.Nombres} {entity.Cliente?.Apellidos} · El crédito fue aprobado. Gestione las firmas del negocio.", cancellationToken);
         await SyncPipelineAsync(entity, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         await notifications.PublishApplicationChangedAsync(entity, cancellationToken);
@@ -521,11 +524,16 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             throw new ValidationException("Las firmas solo pueden completarse después de aprobar el crédito.");
         }
 
+        var signaturesJustCompleted = dto.Completed && !entity.FirmasCompletas;
         entity.FirmasCompletas = dto.Completed;
         entity.FechaFirmasCompletas = dto.Completed ? ColombiaTime.Now : null;
         entity.UsuarioFirmas = tenantContext.UsuarioActual;
         entity.ObservacionFirmas = Normalize(dto.Notes);
         if (!dto.Completed) ClearFinalWorkflow(entity);
+
+        if (signaturesJustCompleted && entity.Estado == EstadoSolicitudCredito.Aprobada)
+            await notifications.QueueForPostApprovalManagersAsync(entity, "ListaParaRevisionFinal", "Crédito listo para revisión final",
+                $"{entity.Numero} · {entity.Cliente?.Nombres} {entity.Cliente?.Apellidos} · Las firmas están completas. Revise las aprobaciones finales.", cancellationToken);
 
         await db.SaveChangesAsync(cancellationToken);
         await notifications.PublishApplicationChangedAsync(entity, cancellationToken);
@@ -542,11 +550,16 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             throw new ValidationException("Debe completar las firmas antes de aprobar la revisión final.");
         }
 
+        var reviewJustCompleted = dto.Completed && !entity.RevisionFinalAprobada;
         entity.RevisionFinalAprobada = dto.Completed;
         entity.FechaRevisionFinal = dto.Completed ? ColombiaTime.Now : null;
         entity.UsuarioRevisionFinal = tenantContext.UsuarioActual;
         entity.ObservacionRevisionFinal = Normalize(dto.Notes);
         if (!dto.Completed) ClearWelcome(entity);
+
+        if (reviewJustCompleted && entity.Estado == EstadoSolicitudCredito.Aprobada)
+            await notifications.QueueForPostApprovalManagersAsync(entity, "ListaParaEntrega", "Crédito listo para entrega",
+                $"{entity.Numero} · {entity.Cliente?.Nombres} {entity.Cliente?.Apellidos} · La revisión final está aprobada. Autorice la entrega.", cancellationToken);
 
         await db.SaveChangesAsync(cancellationToken);
         await notifications.PublishApplicationChangedAsync(entity, cancellationToken);
@@ -558,6 +571,10 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
     public async Task<ActionResult<CreditApplicationDto>> SaveWelcome(Guid id, CreditWorkflowMilestoneDto dto, CancellationToken cancellationToken)
     {
         var entity = await LoadApplicationAsync(id, cancellationToken);
+        if (dto.Completed && entity.Estado != EstadoSolicitudCredito.Desembolsada)
+        {
+            throw new ValidationException("Debe autorizar la entrega antes de completar la bienvenida.");
+        }
         if (dto.Completed && !entity.RevisionFinalAprobada)
         {
             throw new ValidationException("Debe aprobar la revisión final antes de completar la bienvenida.");

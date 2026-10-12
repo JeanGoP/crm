@@ -1646,6 +1646,7 @@ function creditWorkflowColumn(application: CreditApplication): CreditWorkflowCol
   if (application.status === 5 || application.status === 7) {
     if (!application.signaturesCompleted) return 'signatures';
     if (!application.finalReviewApproved) return 'final-review';
+    if (application.status === 5) return 'final-review';
     return 'welcome';
   }
   if (application.status === 4) return 'approval';
@@ -1665,19 +1666,20 @@ function creditWorkflowStageDate(application: CreditApplication, column: CreditW
     : column === 'documents' ? application.creditBureauReviewedAt
       : column === 'approval' ? application.submittedAt
         : column === 'signatures' ? application.approvedAt
-          : column === 'final-review' ? application.signaturesCompletedAt
+          : column === 'final-review' ? application.finalReviewAt ?? application.signaturesCompletedAt
             : column === 'welcome' ? application.finalReviewAt
               : application.createdAt;
   return value || application.createdAt;
 }
 
-function creditManagerTask(application: CreditApplication): { label: string; tab: 'estudio' | 'proceso' } | null {
-  if ([6, 9].includes(application.status) || application.welcomeCompleted) return null;
+function creditManagerTask(application: CreditApplication): { label: string; tab: 'estudio' | 'proceso' | 'acciones' } | null {
+  if ([6, 9].includes(application.status) || (application.status === 7 && application.welcomeCompleted)) return null;
   if (application.status === 4) return { label: 'Decidir crédito', tab: 'estudio' };
   if ([5, 7].includes(application.status)) {
-    if (application.signaturesCompleted && !application.finalReviewApproved) return { label: 'Hacer revisión final', tab: 'proceso' };
-    if (application.finalReviewApproved && !application.welcomeCompleted) return { label: 'Registrar bienvenida', tab: 'proceso' };
-    return null;
+    if (!application.signaturesCompleted) return { label: 'Gestionar firmas', tab: 'proceso' };
+    if (!application.finalReviewApproved) return { label: 'Hacer revisión final', tab: 'proceso' };
+    if (application.status === 5) return { label: 'Autorizar entrega', tab: 'acciones' };
+    return application.welcomeCompleted ? null : { label: 'Registrar bienvenida', tab: 'proceso' };
   }
   if (!application.runtChecked || !application.simitChecked || !application.identityValidated)
     return { label: 'Verificar identidad, RUNT y SIMIT', tab: 'estudio' };
@@ -1706,7 +1708,7 @@ function CreditWorkflowBoardPage() {
   const finished = applications.filter((application) => application.welcomeCompleted).length;
   const attention = applications.filter((application) => application.documents.some((document) => document.status === 4 || document.isExpired)).length;
   const reviewQueue = applications.map((application) => ({ application, task: creditManagerTask(application) }))
-    .filter((entry): entry is { application: CreditApplication; task: { label: string; tab: 'estudio' | 'proceso' } } => entry.task !== null && (canManagePostApproval || ![5, 7].includes(entry.application.status)));
+    .filter((entry): entry is { application: CreditApplication; task: { label: string; tab: 'estudio' | 'proceso' | 'acciones' } } => entry.task !== null && (canManagePostApproval || ![5, 7].includes(entry.application.status)));
 
   return <Stack spacing={2.5}>
     <Header title="Tablero de solicitudes de credito" onRefresh={reload} />
@@ -2105,7 +2107,7 @@ function CreditApplicationsPage() {
     <CreditApplicationDialog form={form} startingQuoteId={requestedQuoteId} customers={customers} products={products} productCategories={productCategories} quotes={quotes} onClose={closeForm} onSave={save} />
     <CreditApplicationManagementDialog
       application={managementApplication}
-      initialTab={searchParams.get('tab') === 'proceso' ? 4 : searchParams.get('tab') === 'estudio' ? 1 : searchParams.get('tab') === 'pendiente' && managementApplication && canManageCredit && managementApplication.documentationCompleted ? managementApplication.status >= 5 ? 4 : 1 : 0}
+      initialTab={searchParams.get('tab') === 'proceso' ? 4 : searchParams.get('tab') === 'acciones' ? 3 : searchParams.get('tab') === 'estudio' ? 1 : searchParams.get('tab') === 'pendiente' && managementApplication && canManageCredit && managementApplication.documentationCompleted ? managementApplication.status >= 5 ? 4 : 1 : 0}
       showWorkflow={canManageCredit}
       canManagePostApproval={canManagePostApproval}
       onClose={closeManagement}
@@ -2286,7 +2288,7 @@ function CreditWorkflowControls({ application, canManagePostApproval, onCreditBu
     { number: 5, title: 'Aprobaciones', complete: approved, detail: application.studyResult || (application.status === 4 ? 'Credito en estudio' : application.status === 3 ? 'Listo para enviar a estudio' : 'Pendiente de estudio') },
     { number: 6, title: 'Firmas del negocio', complete: application.signaturesCompleted, detail: application.signaturesCompleted ? `Registradas por ${application.signaturesUser || 'el equipo'}` : 'Pendientes después de la aprobación', action: 'signatures' as CreditWorkflowEditor, disabled: !approved },
     { number: 7, title: 'Revision final de aprobaciones', complete: application.finalReviewApproved, detail: application.finalReviewApproved ? `Autorizada por ${application.finalReviewUser || 'el equipo'}` : 'Pendiente después de las firmas', action: 'final-review' as CreditWorkflowEditor, disabled: !application.signaturesCompleted },
-    { number: 8, title: 'Bienvenida y cierre', complete: application.welcomeCompleted, detail: application.welcomeCompleted ? `Completada por ${application.welcomeUser || 'el equipo'}` : 'Pendiente después de la revisión final', action: 'welcome' as CreditWorkflowEditor, disabled: !application.finalReviewApproved }
+    { number: 8, title: 'Bienvenida y cierre', complete: application.welcomeCompleted, detail: application.welcomeCompleted ? `Completada por ${application.welcomeUser || 'el equipo'}` : 'Pendiente después de la entrega', action: 'welcome' as CreditWorkflowEditor, disabled: application.status !== 7 || !application.finalReviewApproved }
   ];
   const completedCount = stages.filter((stage) => stage.complete).length;
 

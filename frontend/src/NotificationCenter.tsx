@@ -124,7 +124,10 @@ export function NotificationCenter() {
       setRows((current) => current.map((item) => item.id === row.id ? { ...item, readAt: new Date().toISOString() } : item));
     }
     setAnchor(null);
-    navigate(`/solicitudes-credito?solicitud=${row.creditApplicationId}&tab=${row.type === 'ListaParaDecision' ? 'estudio' : 'pendiente'}`);
+    const tab = row.type === 'ListaParaDecision' ? 'estudio'
+      : row.type === 'ListaParaFirmas' || row.type === 'ListaParaRevisionFinal' ? 'proceso'
+        : row.type === 'ListaParaEntrega' ? 'acciones' : 'pendiente';
+    navigate(`/solicitudes-credito?solicitud=${row.creditApplicationId}&tab=${tab}`);
   };
 
   const markAllRead = async () => {
