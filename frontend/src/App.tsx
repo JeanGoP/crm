@@ -5207,6 +5207,7 @@ function quoteSaleDetails(quote: Quote | undefined, productId: string, products:
   const initialBalance = quote.isBundle ? quote.initialPaymentBalance : item?.initialPaymentBalance ?? quote.initialPaymentBalance;
   const initialSchedule = quote.isBundle ? quote.initialPaymentSchedule : item?.initialPaymentSchedule ?? quote.initialPaymentSchedule;
   return {
+    zone: quote.salesPointName || undefined,
     advisor: quote.advisorName || quote.creatorEmail || undefined,
     salesPoint: quote.salesPointName || undefined,
     businessType: quote.creditType || undefined,
