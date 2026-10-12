@@ -120,7 +120,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         SyncCoDebtors(entity, dto.CoDebtors);
         CreditPhoneValidation.Validate(entity);
         await SyncPipelineAsync(entity, cancellationToken);
-        var recipientIds = await notifications.QueueForManagersAsync(entity, "NuevaSolicitud", "Nueva solicitud de crédito",
+        await notifications.QueueForManagersAsync(entity, "NuevaSolicitud", "Nueva solicitud de crédito",
             $"{customer.Nombres} {customer.Apellidos} · {entity.Numero} · Sede: {quote?.NombreSede ?? "Sin sede"} · Vendedor: {tenantContext.UsuarioActual}", cancellationToken);
         if (dealId.HasValue)
         {
@@ -131,7 +131,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             foreach (var followUp in quoteFollowUps) followUp.Estado = EstadoActividad.Cancelada;
         }
         await db.SaveChangesAsync(cancellationToken);
-        notifications.Publish(recipientIds);
+        await notifications.PublishApplicationChangedAsync(entity, cancellationToken);
         entity.Cliente = customer;
         entity.Producto = product;
         return Ok(ToDto(entity));
@@ -203,6 +203,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         CreditPhoneValidation.Validate(entity);
         await SyncPipelineAsync(entity, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
+        await notifications.PublishApplicationChangedAsync(entity, cancellationToken);
         entity.Producto = product;
         return Ok(ToDto(entity));
     }
@@ -226,15 +227,14 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         }
 
         ValidateDecision(entity, dto.Status);
-        IReadOnlyList<Guid> decisionRecipients = [];
         if (dto.Status == EstadoSolicitudCredito.EnEstudio && entity.Estado != EstadoSolicitudCredito.EnEstudio)
-            decisionRecipients = await notifications.QueueForManagersAsync(entity, "ListaParaDecision", "Crédito listo para decidir",
+            await notifications.QueueForManagersAsync(entity, "ListaParaDecision", "Crédito listo para decidir",
                 $"{entity.Numero} · {entity.Cliente?.Nombres} {entity.Cliente?.Apellidos} · Revise el estudio y registre la decisión.", cancellationToken);
         entity.Estado = dto.Status;
         ApplyDecision(entity, dto.Status, null);
         await SyncPipelineAsync(entity, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
-        notifications.Publish(decisionRecipients);
+        await notifications.PublishApplicationChangedAsync(entity, cancellationToken);
         return Ok(ToDto(entity));
     }
 
@@ -257,6 +257,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         ApplyDecision(entity, dto.Status, dto.Notes);
         await SyncPipelineAsync(entity, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
+        await notifications.PublishApplicationChangedAsync(entity, cancellationToken);
         return Ok(ToDto(entity));
     }
 
@@ -280,6 +281,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         entity.FechaRevisionPaso0 = ColombiaTime.Now;
 
         await db.SaveChangesAsync(cancellationToken);
+        await notifications.PublishApplicationChangedAsync(entity, cancellationToken);
         return Ok(ToDto(entity));
     }
 
@@ -308,6 +310,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         entity.UsuarioDecision = tenantContext.UsuarioActual;
 
         await db.SaveChangesAsync(cancellationToken);
+        await notifications.PublishApplicationChangedAsync(entity, cancellationToken);
         return Ok(ToDto(entity));
     }
 
@@ -349,6 +352,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
 
         await SyncPipelineAsync(entity, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
+        await notifications.PublishApplicationChangedAsync(entity, cancellationToken);
         return Ok(ToDto(entity));
     }
 
@@ -402,6 +406,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         ClearDocumentationConfirmation(entity);
         await SyncPipelineAsync(entity, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
+        await notifications.PublishApplicationChangedAsync(entity, cancellationToken);
         return Ok(ToDto(entity));
     }
 
@@ -460,6 +465,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
 
         await SyncPipelineAsync(entity, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
+        await notifications.PublishApplicationChangedAsync(entity, cancellationToken);
         return Ok(ToDto(entity));
     }
 
@@ -485,6 +491,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         entity.ObservacionDataCredito = Normalize(dto.Notes);
 
         await db.SaveChangesAsync(cancellationToken);
+        await notifications.PublishApplicationChangedAsync(entity, cancellationToken);
         return Ok(ToDto(entity));
     }
 
@@ -505,6 +512,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         if (!dto.Completed) ClearFinalWorkflow(entity);
 
         await db.SaveChangesAsync(cancellationToken);
+        await notifications.PublishApplicationChangedAsync(entity, cancellationToken);
         return Ok(ToDto(entity));
     }
 
@@ -525,6 +533,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         if (!dto.Completed) ClearWelcome(entity);
 
         await db.SaveChangesAsync(cancellationToken);
+        await notifications.PublishApplicationChangedAsync(entity, cancellationToken);
         return Ok(ToDto(entity));
     }
 
@@ -544,6 +553,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         entity.ObservacionBienvenida = Normalize(dto.Notes);
 
         await db.SaveChangesAsync(cancellationToken);
+        await notifications.PublishApplicationChangedAsync(entity, cancellationToken);
         return Ok(ToDto(entity));
     }
 
@@ -745,6 +755,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             .Include(x => x.PerfilRequisito).Include(x => x.Documentos).Include(x => x.Codeudores)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
             ?? throw new KeyNotFoundException("Solicitud no encontrada.");
+        var wasComplete = entity.DocumentacionCompleta;
         ClearDocumentationConfirmation(entity);
         if (dto.Completed)
         {
@@ -753,9 +764,13 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             entity.UsuarioDocumentacionCompleta = tenantContext.UsuarioActual;
             if (entity.Estado is EstadoSolicitudCredito.Borrador or EstadoSolicitudCredito.Cotizado or EstadoSolicitudCredito.Interesado or EstadoSolicitudCredito.DocumentosPendientes)
                 entity.Estado = EstadoSolicitudCredito.DocumentosRecibidos;
+            if (!wasComplete)
+                await notifications.QueueForManagersAsync(entity, "DocumentacionLista", "Documentación lista",
+                    $"{entity.Numero} · {entity.Cliente?.Nombres} {entity.Cliente?.Apellidos} · El expediente ya puede revisarse.", cancellationToken);
         }
         await SyncPipelineAsync(entity, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
+        await notifications.PublishApplicationChangedAsync(entity, cancellationToken);
         return Ok(ToDto(entity));
     }
 

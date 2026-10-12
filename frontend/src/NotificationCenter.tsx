@@ -41,6 +41,7 @@ export function NotificationCenter() {
   const activeCompanyId = useAuthStore((state) => state.activeCompanyId);
   const email = useAuthStore((state) => state.user?.email);
   const userId = useAuthStore((state) => state.user?.id);
+  const canManage = useAuthStore((state) => state.user?.roles.some((role) => role === 'Administrador' || role === 'Supervisor') ?? false);
   const [rows, setRows] = useState<InternalNotification[]>([]);
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const [toast, setToast] = useState<InternalNotification | null>(null);
@@ -53,6 +54,7 @@ export function NotificationCenter() {
   useEffect(() => { soundRef.current = sound; localStorage.setItem(soundKey, String(sound)); }, [sound]);
 
   const refresh = useCallback(async () => {
+    if (!canManage) return;
     try {
       const { data } = await api.get<InternalNotification[]>('/api/notifications');
       if (loaded.current) {
@@ -60,14 +62,13 @@ export function NotificationCenter() {
         if (latest) {
           setToast(latest);
           if (soundRef.current) playChime();
-          window.dispatchEvent(new Event('credit-applications-updated'));
         }
       }
       data.forEach((row) => knownIds.current.add(row.id));
       loaded.current = true;
       setRows(data);
     } catch { /* La bandeja se recuperará en el siguiente intento. */ }
-  }, []);
+  }, [canManage]);
 
   useEffect(() => {
     knownIds.current.clear();
@@ -91,16 +92,19 @@ export function NotificationCenter() {
         while (active) {
           const { value, done } = await reader.read();
           if (done) break;
-          pending += decoder.decode(value, { stream: true });
+          pending = (pending + decoder.decode(value, { stream: true })).replace(/\r\n/g, '\n');
           const chunks = pending.split('\n\n');
           pending = chunks.pop() ?? '';
-          if (chunks.some((chunk) => chunk.includes('event: refresh'))) void refresh();
+          if (chunks.some((chunk) => chunk.includes('event: refresh'))) {
+            void refresh();
+            window.dispatchEvent(new Event('credit-applications-updated'));
+          }
         }
       } catch { /* Se reintenta automáticamente. */ }
-      if (active) retryTimer = window.setTimeout(() => { void refresh(); void connect(); }, 3000);
+      if (active) retryTimer = window.setTimeout(() => { void refresh(); window.dispatchEvent(new Event('credit-applications-updated')); void connect(); }, 3000);
     };
     void connect();
-    const fallback = window.setInterval(() => { void refresh(); }, 30000);
+    const fallback = window.setInterval(() => { void refresh(); window.dispatchEvent(new Event('credit-applications-updated')); }, 30000);
     return () => {
       active = false;
       controller.abort();
@@ -123,7 +127,7 @@ export function NotificationCenter() {
     setRows((current) => current.map((row) => ({ ...row, readAt: row.readAt ?? new Date().toISOString() })));
   };
 
-  return <>
+  return canManage ? <>
     <Tooltip title="Avisos de solicitudes">
       <IconButton aria-label={`Avisos de solicitudes: ${unreadCount} sin leer`} onClick={(event) => setAnchor(event.currentTarget)}
         sx={{ border: '1px solid #d9e2ec', bgcolor: '#fff' }}>
@@ -160,5 +164,5 @@ export function NotificationCenter() {
         <strong>{toast?.title}</strong><br />{toast?.message}
       </Alert>
     </Snackbar>
-  </>;
+  </> : null;
 }

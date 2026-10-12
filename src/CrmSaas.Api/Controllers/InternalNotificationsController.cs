@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 namespace CrmSaas.Api.Controllers;
 
 [ApiController]
-[Authorize(Roles = "Administrador,Supervisor")]
+[Authorize]
 [Route("api/notifications")]
 public sealed class InternalNotificationsController(CrmDbContext db, NotificationBroadcaster broadcaster) : ControllerBase
 {
@@ -17,6 +17,7 @@ public sealed class InternalNotificationsController(CrmDbContext db, Notificatio
         ? id : throw new UnauthorizedAccessException("Usuario no identificado.");
 
     [HttpGet]
+    [Authorize(Roles = "Administrador,Supervisor")]
     public async Task<IActionResult> Get(CancellationToken cancellationToken)
     {
         var userId = CurrentUserId;
@@ -31,6 +32,7 @@ public sealed class InternalNotificationsController(CrmDbContext db, Notificatio
     }
 
     [HttpPut("{id:guid}/read")]
+    [Authorize(Roles = "Administrador,Supervisor")]
     public async Task<IActionResult> MarkRead(Guid id, CancellationToken cancellationToken)
     {
         var alert = await db.AlertasInternas.FirstOrDefaultAsync(x => x.Id == id && x.UsuarioId == CurrentUserId, cancellationToken);
@@ -41,6 +43,7 @@ public sealed class InternalNotificationsController(CrmDbContext db, Notificatio
     }
 
     [HttpPut("read-all")]
+    [Authorize(Roles = "Administrador,Supervisor")]
     public async Task<IActionResult> MarkAllRead(CancellationToken cancellationToken)
     {
         var rows = await db.AlertasInternas.Where(x => x.UsuarioId == CurrentUserId && x.FechaLectura == null)

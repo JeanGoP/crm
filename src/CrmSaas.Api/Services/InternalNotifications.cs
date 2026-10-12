@@ -35,6 +35,15 @@ public sealed class NotificationBroadcaster
 
 public sealed class InternalNotificationService(CrmDbContext db, ITenantContext tenantContext, NotificationBroadcaster broadcaster)
 {
+    public async Task PublishApplicationChangedAsync(SolicitudCredito application, CancellationToken cancellationToken)
+    {
+        var recipients = await db.Usuarios
+            .Where(user => user.Activo && (user.Email == application.UsuarioCreacion || user.UsuarioRoles.Any(role =>
+                role.Rol != null && (role.Rol.Nombre == "Administrador" || role.Rol.Nombre == "Supervisor"))))
+            .Select(user => user.Id).ToListAsync(cancellationToken);
+        broadcaster.Notify(recipients);
+    }
+
     public async Task<IReadOnlyList<Guid>> QueueForManagersAsync(SolicitudCredito application, string type,
         string title, string message, CancellationToken cancellationToken)
     {
@@ -62,5 +71,4 @@ public sealed class InternalNotificationService(CrmDbContext db, ITenantContext 
         return newRecipients;
     }
 
-    public void Publish(IEnumerable<Guid> userIds) => broadcaster.Notify(userIds);
 }

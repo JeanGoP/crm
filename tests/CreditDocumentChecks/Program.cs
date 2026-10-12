@@ -119,6 +119,16 @@ using var db = new CrmDbContext(new DbContextOptionsBuilder<CrmDbContext>()
     .UseSqlServer("Server=(local);Database=ModelChecks;Integrated Security=True;TrustServerCertificate=True").Options, tenant);
 Check(db.Model.FindEntityType(typeof(AlertaInterna))!.GetQueryFilter() != null, "Los avisos deben estar aislados por empresa.");
 Check(db.AlertasInternas.Where(x => x.UsuarioId == Guid.NewGuid()).ToQueryString().Contains("EmpresaId"), "La bandeja filtra por empresa y usuario.");
+var liveUser = Guid.NewGuid();
+var anotherUser = Guid.NewGuid();
+var broadcaster = new NotificationBroadcaster();
+var (liveSubscription, liveReader) = broadcaster.Subscribe(liveUser);
+var (otherSubscription, otherReader) = broadcaster.Subscribe(anotherUser);
+broadcaster.Notify([liveUser]);
+Check(liveReader.TryRead(out var changed) && changed, "El cambio llega al usuario conectado.");
+Check(!otherReader.TryRead(out _), "El cambio no llega a otro usuario.");
+broadcaster.Unsubscribe(liveUser, liveSubscription);
+broadcaster.Unsubscribe(anotherUser, otherSubscription);
 var tracked = new SolicitudCredito { EmpresaId = tenant.EmpresaId!.Value, ClienteId = Guid.NewGuid() };
 Invoke("AddChecklistDocuments", tracked, null);
 db.Attach(tracked);

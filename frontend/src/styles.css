@@ -190,3 +190,14 @@ a {
     grid-template-columns: 1fr;
   }
 }
+
+@keyframes creditStatusBlink {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(21, 94, 117, 0); }
+  50% { opacity: .35; box-shadow: 0 0 0 4px rgba(21, 94, 117, .2); }
+}
+
+.creditStatusFlash { animation: creditStatusBlink .6s ease-in-out 5; }
+
+@media (prefers-reduced-motion: reduce) {
+  .creditStatusFlash { animation: none; outline: 2px solid #155e75; }
+}

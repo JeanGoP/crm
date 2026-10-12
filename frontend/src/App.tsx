@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+﻿import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Navigate, NavLink, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   Alert, AppBar, Autocomplete, Box, Button, Card, CardContent, Checkbox, Chip, CssBaseline, Dialog, DialogActions,
@@ -514,7 +514,7 @@ function Layout() {
               </Box>
             </Stack>
             <Stack direction="row" alignItems="center" gap={1}>
-              {canManageCredit && <NotificationCenter />}
+              <NotificationCenter />
               <Box sx={{ display: { xs: 'none', sm: 'flex' }, alignItems: 'center', gap: 1, px: 1.5, py: .75, border: `1px solid ${uiBorder}`, borderRadius: 999, bgcolor: '#fff', boxShadow: '0 8px 22px rgba(15, 23, 42, .04)' }}>
                 <Search fontSize="small" sx={{ color: uiMuted }} />
                 <Typography variant="body2" color="text.secondary">CRM comercial</Typography>
@@ -1687,6 +1687,7 @@ function creditManagerTask(application: CreditApplication): { label: string; tab
 
 function CreditWorkflowBoardPage() {
   const { data: applications = [], loading, error, reload } = useResource<CreditApplication[]>('/api/credit-applications/board', []);
+  const flashingStatuses = useRecentlyChangedCreditStatuses(applications, loading);
   useEffect(() => {
     window.addEventListener('credit-applications-updated', reload);
     return () => window.removeEventListener('credit-applications-updated', reload);
@@ -1784,7 +1785,7 @@ function CreditWorkflowBoardPage() {
                         <Typography color="text.secondary" fontSize={11.5} sx={{ mt: .25 }}>{application.productName}</Typography>
                       </Box>
                       <Stack direction="row" gap={.5} flexWrap="wrap" useFlexGap>
-                        <StatusChip label={creditStatus(application.status)} tone={creditTone(application.status)} />
+                        <StatusChip label={creditStatus(application.status)} tone={creditTone(application.status)} flash={flashingStatuses.has(application.id)} />
                         {pending > 0 && <Chip size="small" color="warning" variant="outlined" label="Documentación por confirmar" />}
                         {column.id === 'welcome' && application.welcomeCompleted && <Chip size="small" color="success" label="Finalizado" />}
                       </Stack>
@@ -1805,6 +1806,7 @@ function CreditApplicationsPage() {
   const canManageCredit = useCanManage();
   const { data: productCategories = [] } = useResource<ProductCategory[]>('/api/product-categories', []);
   const { data: rows = [], loading, error, reload, setData } = useResource<CreditApplication[]>('/api/credit-applications', []);
+  const flashingStatuses = useRecentlyChangedCreditStatuses(rows, loading);
   useEffect(() => {
     window.addEventListener('credit-applications-updated', reload);
     return () => window.removeEventListener('credit-applications-updated', reload);
@@ -2089,7 +2091,7 @@ function CreditApplicationsPage() {
           <Actions onAi={() => analyzeCustomer(r.customerId, r.mobile)} onEdit={canManageCredit || ![4, 5, 6, 7].includes(r.status) ? () => setForm({ open: true, item: r }) : undefined} />
         </Stack>,
         r.number,
-        <StatusChip label={creditStatus(r.status)} tone={creditTone(r.status)} />,
+        <StatusChip label={creditStatus(r.status)} tone={creditTone(r.status)} flash={flashingStatuses.has(r.id)} />,
         r.customerName,
         r.identificationNumber,
         r.mobile,
@@ -6177,14 +6179,42 @@ function StatusBar({ loading, error }: { loading?: boolean; error?: string }) {
   return <>{loading && <LinearProgress sx={{ borderRadius: 999 }} />}{error && <Alert severity="error">{error}</Alert>}</>;
 }
 
-function StatusChip({ label, tone }: { label: string; tone: 'success' | 'warning' | 'error' | 'default' }) {
+function StatusChip({ label, tone, flash = false }: { label: string; tone: 'success' | 'warning' | 'error' | 'default'; flash?: boolean }) {
   const colors = {
     success: { bg: '#dcfce7', fg: '#166534', border: '#86efac' },
     warning: { bg: '#fef3c7', fg: '#92400e', border: '#fcd34d' },
     error: { bg: '#fee2e2', fg: '#991b1b', border: '#fca5a5' },
     default: { bg: '#f1f5f9', fg: '#475569', border: '#cbd5e1' }
   }[tone];
-  return <Chip size="small" label={label} variant="outlined" sx={{ bgcolor: colors.bg, color: colors.fg, borderColor: colors.border, fontWeight: 900, '& .MuiChip-label': { px: 1 } }} />;
+  return <Chip size="small" label={label} variant="outlined" className={flash ? 'creditStatusFlash' : undefined} sx={{ bgcolor: colors.bg, color: colors.fg, borderColor: colors.border, fontWeight: 900, '& .MuiChip-label': { px: 1 } }} />;
+}
+
+function useRecentlyChangedCreditStatuses(applications: CreditApplication[], loading: boolean) {
+  const previous = useRef(new Map<string, string>());
+  const initialized = useRef(false);
+  const timers = useRef(new Map<string, number>());
+  const [flashing, setFlashing] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (loading) return;
+    const current = new Map(applications.map((application) => [application.id, `${application.status}:${application.documentationCompleted}`]));
+    if (initialized.current) {
+      for (const [id, value] of current) {
+        if (previous.current.get(id) === value) continue;
+        setFlashing((old) => new Set(old).add(id));
+        window.clearTimeout(timers.current.get(id));
+        timers.current.set(id, window.setTimeout(() => {
+          setFlashing((old) => { const next = new Set(old); next.delete(id); return next; });
+          timers.current.delete(id);
+        }, 3600));
+      }
+    }
+    previous.current = current;
+    initialized.current = true;
+  }, [applications, loading]);
+
+  useEffect(() => () => { for (const timer of timers.current.values()) window.clearTimeout(timer); }, []);
+  return flashing;
 }
 
 function Notice({ notice, onClose }: { notice?: Notice; onClose: () => void }) {
