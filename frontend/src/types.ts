@@ -335,6 +335,15 @@ export interface QuoteInitialPayment {
 
 export interface QuoteItem {
   financingOptions?: QuoteFinancingOption[];
+  productCategory?: string;
+  productBrand?: string;
+  productModel?: string;
+  productLine?: string;
+  productVersion?: string;
+  productColor?: string;
+  productEngineCc?: number;
+  productYear?: number;
+  productRegistrationFee?: number;
   id: string;
   productId: string;
   productName: string;

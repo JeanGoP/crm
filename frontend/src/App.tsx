@@ -5195,6 +5195,43 @@ function QuotePdfPreviewDialog({ quote, onClose, onDownload }: { quote?: Quote; 
   </Dialog>;
 }
 
+function quoteSaleDetails(quote: Quote | undefined, productId: string, products: Product[], termMonths?: number): CreditFormDetails {
+  if (!quote) return {};
+  const item = quote.items?.find((candidate) => candidate.productId === productId) ?? quote.items?.[0];
+  const product = products.find((candidate) => candidate.id === (item?.productId ?? productId));
+  const financing = quote.isBundle || !item ? quote : item;
+  const selectedTerm = termMonths ?? financing.termMonths;
+  const registration = item?.productRegistrationFee ?? product?.registrationFee;
+  const monthlyPayment = financing.financingOptions?.find((option) => option.termMonths === selectedTerm)?.monthlyPayment
+    ?? (selectedTerm === financing.termMonths ? financing.estimatedMonthlyPayment : undefined);
+  const initialBalance = quote.isBundle ? quote.initialPaymentBalance : item?.initialPaymentBalance ?? quote.initialPaymentBalance;
+  const initialSchedule = quote.isBundle ? quote.initialPaymentSchedule : item?.initialPaymentSchedule ?? quote.initialPaymentSchedule;
+  return {
+    advisor: quote.advisorName || quote.creatorEmail || undefined,
+    salesPoint: quote.salesPointName || undefined,
+    businessType: quote.creditType || undefined,
+    extraPayment: initialBalance > 0 ? initialBalance : undefined,
+    extraPaymentCount: initialSchedule?.length ? initialSchedule.length : undefined,
+    monthlyPayment: monthlyPayment && monthlyPayment > 0 ? monthlyPayment : undefined,
+    soat: financing.insurance > 0 ? financing.insurance : undefined,
+    registration: registration && registration > 0 ? registration : undefined,
+    totalCredit: financing.financedAmount > 0 ? financing.financedAmount : undefined,
+    vehicleType: item?.productCategory || product?.category || undefined,
+    vehicleLine: item?.productLine || product?.line || undefined,
+    vehicleVariant: item?.productVersion || product?.version || undefined,
+    vehicleModel: item?.productModel || product?.model || (item?.productYear || product?.year ? String(item?.productYear ?? product?.year) : undefined),
+    vehicleColor: item?.productColor || product?.color || undefined,
+    vehicleEngineCc: item?.productEngineCc || product?.engineCc ? String(item?.productEngineCc ?? product?.engineCc) : undefined,
+    vehicleChassis: item?.inventoryChassisNumber || undefined,
+    vehicleBrand: item?.productBrand || product?.brand || undefined,
+    vehicleEngine: item?.inventoryEngineNumber || undefined
+  };
+}
+
+function mergeMissingCreditDetails(saved: CreditFormDetails | null | undefined, suggested: CreditFormDetails): CreditFormDetails {
+  return { ...suggested, ...Object.fromEntries(Object.entries(saved ?? {}).filter(([, value]) => value !== null && value !== '')) };
+}
+
 function CreditApplicationDialog({ form, startingQuoteId, customers, products, productCategories, quotes, onClose, onSave }: DialogProps<CreditApplication, typeof emptyCreditApplication> & { startingQuoteId?: string | null; customers: Customer[]; products: Product[]; productCategories: ProductCategory[]; quotes: Quote[]; }) {
   const [referenceDialog, setReferenceDialog] = useState<'client' | number>();
   useEffect(() => {
@@ -5203,9 +5240,12 @@ function CreditApplicationDialog({ form, startingQuoteId, customers, products, p
   const quote = quotes.find((x) => x.id === (form.item?.quoteId ?? startingQuoteId ?? ''));
   const quoteCustomer = customers.find((customer) => customer.id === quote?.customerId);
   const initialQuoteItem = quote?.items?.[0];
+  const initialProductId = form.item?.productId ?? initialQuoteItem?.productId ?? quote?.productId ?? '';
+  const initialTermMonths = form.item?.termMonths ?? (quote?.isBundle ? quote.termMonths : initialQuoteItem?.termMonths ?? quote?.termMonths);
+  const initialSaleDetails = quoteSaleDetails(quote, initialProductId, products, initialTermMonths);
   const initial = form.item ? {
     firstDueDate: form.item.firstDueDate?.slice(0, 10) ?? '',
-    formDetails: form.item.formDetails ?? {},
+    formDetails: mergeMissingCreditDetails(form.item.formDetails, initialSaleDetails),
     coDebtors: (form.item.coDebtors ?? []).filter((person) => person.active).map((person) => ({ ...emptyCoDebtor, ...person })),
     customerId: form.item.customerId,
     productId: form.item.productId,
@@ -5242,6 +5282,7 @@ function CreditApplicationDialog({ form, startingQuoteId, customers, products, p
     status: form.item.status,
     notes: form.item.notes ?? ''
   } : { ...emptyCreditApplication,
+    formDetails: initialSaleDetails,
     customerId: quote?.customerId ?? customers[0]?.id ?? '',
     quoteId: quote?.id ?? '',
     productId: initialQuoteItem?.productId ?? quote?.productId ?? products.find((product) => product.active)?.id ?? '',
@@ -5314,10 +5355,11 @@ function CreditApplicationDialog({ form, startingQuoteId, customers, products, p
                 onChange={(_, selected) => {
                 const customer = customers.find((candidate) => candidate.id === selected?.customerId);
                 const firstItem = selected?.items?.[0];
+                const selectedProductId = firstItem?.productId ?? selected?.productId ?? v.productId;
                 set({
                   quoteId: selected?.id ?? '',
                   customerId: selected?.customerId ?? v.customerId,
-                  productId: firstItem?.productId ?? selected?.productId ?? v.productId,
+                  productId: selectedProductId,
                   identificationType: selected?.identificationType ?? v.identificationType,
                   identificationNumber: selected?.identificationNumber ?? v.identificationNumber,
                   mobile: customer?.phone ?? v.mobile,
@@ -5325,7 +5367,8 @@ function CreditApplicationDialog({ form, startingQuoteId, customers, products, p
                   city: customer?.city ?? v.city,
                   motorcycleValue: selected ? selected.isBundle ? selected.productPrice : firstItem?.productPrice ?? selected.productPrice : v.motorcycleValue,
                   downPayment: selected ? selected.isBundle ? selected.downPayment : firstItem?.downPayment ?? selected.downPayment : v.downPayment,
-                  termMonths: selected ? selected.isBundle ? selected.termMonths : firstItem?.termMonths ?? selected.termMonths : v.termMonths
+                  termMonths: selected ? selected.isBundle ? selected.termMonths : firstItem?.termMonths ?? selected.termMonths : v.termMonths,
+                  formDetails: selected ? { ...v.formDetails, ...quoteSaleDetails(selected, selectedProductId, products) } : v.formDetails
                 });
               }} />
               <TextField required select disabled={!!selectedQuote} label="Cliente" value={v.customerId} onChange={(e) => set({ customerId: e.target.value })} helperText={selectedQuote ? 'Cliente asociado a la cotización seleccionada.' : undefined}>{customers.map((x) => <MenuItem key={x.id} value={x.id}>{x.firstNames || x.name} {x.lastNames}</MenuItem>)}</TextField>
@@ -5380,7 +5423,8 @@ function CreditApplicationDialog({ form, startingQuoteId, customers, products, p
                 set({ productId: e.target.value,
                   motorcycleValue: quotedItem?.productPrice ?? product?.price ?? v.motorcycleValue,
                   downPayment: quotedItem?.downPayment ?? v.downPayment,
-                  termMonths: quotedItem?.termMonths ?? v.termMonths });
+                  termMonths: quotedItem?.termMonths ?? v.termMonths,
+                  formDetails: selectedQuote ? { ...v.formDetails, ...quoteSaleDetails(selectedQuote, e.target.value, products, quotedItem?.termMonths) } : v.formDetails });
               }}>{selectedQuote
                 ? quotedItems.filter((item, index, all) => all.findIndex((candidate) => candidate.productId === item.productId) === index)
                   .map((item) => <MenuItem key={item.productId} value={item.productId}>
@@ -5389,10 +5433,15 @@ function CreditApplicationDialog({ form, startingQuoteId, customers, products, p
                 : availableProducts.map((product) => <MenuItem key={product.id} value={product.id}>{productName(product)} ({product.category}) - {money(product.price)}</MenuItem>)}</TextField>
               <CurrencyField fullWidth label="Ingresos" value={v.monthlyIncome} onChange={amount => set({ monthlyIncome: amount })} />
               <CurrencyField fullWidth label="Cuota inicial" value={v.downPayment} onChange={amount => set({ downPayment: amount })} />
-              <TextField fullWidth label="Plazo meses" type="number" value={v.termMonths} onChange={(e) => set({ termMonths: Number(e.target.value) })} />
+              <TextField fullWidth label="Plazo meses" type="number" value={v.termMonths} onChange={(e) => {
+                const termMonths = Number(e.target.value);
+                const monthlyPayment = selectedQuote ? quoteSaleDetails(selectedQuote, v.productId, products, termMonths).monthlyPayment : undefined;
+                set({ termMonths, formDetails: selectedQuote ? { ...v.formDetails, monthlyPayment: monthlyPayment ?? null } : v.formDetails });
+              }} />
               <CurrencyField label="Valor producto" value={v.motorcycleValue} onChange={motorcycleValue => set({ motorcycleValue })} />
             </Box>
             <TextField label="Fecha del primer vencimiento" type="date" value={v.firstDueDate} onChange={(e) => set({ firstDueDate: e.target.value })} InputLabelProps={{ shrink: true }} helperText="Fecha de la primera cuota acordada con el cliente." />
+            {selectedQuote && <Typography variant="caption" color="text.secondary">Datos de la cotización precargados abajo. Revise y complete los campos que no estaban disponibles.</Typography>}
             <CreditFormDetailsFields value={v.formDetails} onChange={formDetails => set({ formDetails })} group="sale" appliance={productCategories.some(category => category.quoteAsBundle && category.name.trim().toLowerCase() === selectedProduct?.category?.trim().toLowerCase())} />
           </Stack>
         </Paper>

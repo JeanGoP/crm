@@ -300,7 +300,16 @@ public sealed record QuoteItemDto(
     string? InventorySerialNumber = null,
     string? InventoryEngineNumber = null,
     string? InventoryChassisNumber = null,
-    IReadOnlyCollection<QuoteFinancingOptionDto>? FinancingOptions = null);
+    IReadOnlyCollection<QuoteFinancingOptionDto>? FinancingOptions = null,
+    string? ProductCategory = null,
+    string? ProductBrand = null,
+    string? ProductModel = null,
+    string? ProductLine = null,
+    string? ProductVersion = null,
+    string? ProductColor = null,
+    int? ProductEngineCc = null,
+    int? ProductYear = null,
+    decimal? ProductRegistrationFee = null);
 
 public sealed record CreateQuoteItemDto(
     Guid ProductId,

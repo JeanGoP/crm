@@ -253,7 +253,16 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
                 quote.TotalPagarEstimado,
                 quote.TipoCredito,
                 quote.UsoConfiguracionFinancieraEmpresa,
-                1)
+                1,
+                ProductCategory: quote.Producto?.Categoria,
+                ProductBrand: quote.Producto?.Marca,
+                ProductModel: quote.Producto?.Modelo,
+                ProductLine: quote.Producto?.Linea,
+                ProductVersion: quote.Producto?.Version,
+                ProductColor: quote.Producto?.Color,
+                ProductEngineCc: quote.Producto?.Cilindraje,
+                ProductYear: quote.Producto?.Anio,
+                ProductRegistrationFee: quote.Producto?.Matricula)
         ];
     }
 
@@ -293,7 +302,16 @@ public sealed class CustomersController(ICustomerService service, IValidator<Ups
             item.NumeroSerieInventario,
             item.NumeroMotorInventario,
             item.NumeroChasisInventario,
-            QuoteFinancingOptions.Read(item.AlternativasPlazoJson, item.TipoCredito, item.PlazoMeses <= 0 ? 24 : item.PlazoMeses, item.CuotaMensualEstimada, totalPayment));
+            QuoteFinancingOptions.Read(item.AlternativasPlazoJson, item.TipoCredito, item.PlazoMeses <= 0 ? 24 : item.PlazoMeses, item.CuotaMensualEstimada, totalPayment),
+            item.Producto?.Categoria,
+            item.Producto?.Marca,
+            item.Producto?.Modelo,
+            item.Producto?.Linea,
+            item.Producto?.Version,
+            item.Producto?.Color,
+            item.Producto?.Cilindraje,
+            item.Producto?.Anio,
+            item.Producto?.Matricula);
     }
 
     private static CreditApplicationDto ToCreditApplicationDto(SolicitudCredito x)
