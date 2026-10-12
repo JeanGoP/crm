@@ -2209,7 +2209,7 @@ function CreditApplicationManagementDialog({
             <Alert severity="info">El expediente está listo para revisión. Un administrador o supervisor registra las verificaciones y decide el crédito.</Alert>}
           <DocumentSummary application={application} onComplete={(completed) => onWorkflowMilestone(application, "documentation", completed)} onUpdate={onUpdateDocument} onUpload={onUploadDocument} onDownload={onDownloadDocument} onDelete={onDeleteDocument} />
         </Stack>}
-        {tab === 1 && <CreditStudySummary application={application} canManage={showWorkflow} onStep0={onStep0} onRecalculate={onRecalculate} onDecision={onDecision} />}
+        {tab === 1 && <CreditStudySummary application={application} canManage={showWorkflow} onStep0={onStep0} onRecalculate={onRecalculate} onDecision={onDecision} onChangeStatus={onChangeStatus} />}
         {tab === 2 && <Stack spacing={2}>
           <Typography variant="subtitle2" fontWeight={900}>Descargar documentos</Typography>
           <CreditTemplateDownloads application={application} onDownload={onDownloadTemplate} />
@@ -2374,12 +2374,13 @@ function CreditWorkflowControls({ application, onCreditBureau, onMilestone }: {
   </>;
 }
 
-function CreditStudySummary({ application, canManage, onStep0, onRecalculate, onDecision }: {
+function CreditStudySummary({ application, canManage, onStep0, onRecalculate, onDecision, onChangeStatus }: {
   application: CreditApplication;
   canManage: boolean;
   onStep0: (application: CreditApplication, patch?: Partial<CreditApplication>) => Promise<void>;
   onRecalculate: (application: CreditApplication, patch: Partial<CreditApplication>) => Promise<void>;
   onDecision: (application: CreditApplication, status: number, notes?: string, study?: Partial<CreditApplication> & { result?: string }) => Promise<void>;
+  onChangeStatus: (application: CreditApplication, status: number) => void;
 }) {
   const actions = [
     { status: 8, label: 'Interesado', show: application.status === 1 },
@@ -2490,7 +2491,7 @@ function CreditStudySummary({ application, canManage, onStep0, onRecalculate, on
       <Button size="small" variant="outlined" onClick={recalculate}>Recalcular</Button>
     </Stack> : <Alert severity="info">Un administrador o supervisor registra las verificaciones y decide el crédito.</Alert>}
     {canManage && <Stack direction="row" gap={.5} flexWrap="wrap">
-      {actions.length ? actions.map((action) => <Button key={action.status} size="small" variant="outlined" disabled={action.status === 4 && !(step0Ready && bureauReady && documentsReady)} onClick={() => onDecision(application, action.status)}>{action.label}</Button>) : <Chip size="small" label="Sin acciones" variant="outlined" />}
+      {actions.length ? actions.map((action) => <Button key={action.status} size="small" variant="outlined" disabled={action.status === 4 && !(step0Ready && bureauReady && documentsReady)} onClick={() => onChangeStatus(application, action.status)}>{action.label}</Button>) : <Chip size="small" label="Sin acciones" variant="outlined" />}
       {application.status === 4 && <>
         <Button size="small" variant="contained" onClick={() => approve(false, false)}>Aprobar</Button>
         <Button size="small" variant="outlined" onClick={() => approve(false, true)}>Con ajuste</Button>
