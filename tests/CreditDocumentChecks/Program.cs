@@ -9,6 +9,8 @@ using CrmSaas.Domain.Entities;
 using CrmSaas.Domain.Enums;
 using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
+using CrmSaas.Api.Authorization;
+using System.Security.Claims;
 
 static void Check(bool condition, string message)
 {
@@ -44,8 +46,18 @@ Check((bool)controlledStatus.Invoke(null, [EstadoSolicitudCredito.Aprobada])! &&
     "Las solicitudes en estudio o decididas requieren un responsable autorizado para editarse.");
 var decisionRoles = typeof(CreditApplicationsController).GetMethod("Decide")!
     .GetCustomAttribute<AuthorizeAttribute>()?.Roles;
-Check(decisionRoles == "Administrador,Supervisor", "Solo administrador y supervisor pueden registrar una decisión formal.");
-Console.WriteLine("OK: alta/edición no cambian estados; aprobación y negación solo por decisión formal con roles.");
+Check(decisionRoles == CreditRoles.Managers, "El aprobador, supervisor y administrador pueden registrar una decisión formal.");
+foreach (var role in new[] { "Administrador", "Supervisor", CreditRoles.Approver })
+{
+    var user = new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.Role, role)], "test"));
+    Check(CreditRoles.CanManage(user), $"El rol {role} debe poder gestionar créditos.");
+}
+Check(!CreditRoles.CanManage(new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.Role, "Vendedor")], "test"))),
+    "El vendedor no debe poder decidir créditos.");
+foreach (var method in new[] { "SaveSignatures", "SaveFinalReview", "SaveWelcome" })
+    Check(typeof(CreditApplicationsController).GetMethod(method)!.GetCustomAttribute<AuthorizeAttribute>()?.Roles == "Administrador,Supervisor",
+        $"{method} debe permanecer reservado al supervisor o administrador.");
+Console.WriteLine("OK: alta/edición no cambian estados; el aprobador decide, pero no gestiona la entrega.");
 
 var application = new SolicitudCredito
 {

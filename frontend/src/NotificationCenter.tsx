@@ -41,7 +41,7 @@ export function NotificationCenter() {
   const activeCompanyId = useAuthStore((state) => state.activeCompanyId);
   const email = useAuthStore((state) => state.user?.email);
   const userId = useAuthStore((state) => state.user?.id);
-  const canManage = useAuthStore((state) => state.user?.roles.some((role) => role === 'Administrador' || role === 'Supervisor') ?? false);
+  const canManage = useAuthStore((state) => state.user?.roles.some((role) => role === 'Administrador' || role === 'Supervisor' || role === 'Aprobador de créditos') ?? false);
   const [rows, setRows] = useState<InternalNotification[]>([]);
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const [toast, setToast] = useState<InternalNotification | null>(null);

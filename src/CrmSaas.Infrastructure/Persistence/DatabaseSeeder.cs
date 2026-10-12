@@ -7,7 +7,7 @@ namespace CrmSaas.Infrastructure.Persistence;
 
 public static class DatabaseSeeder
 {
-    private static readonly string[] RoleNames = ["Administrador", "Vendedor", "Supervisor"];
+    private static readonly string[] RoleNames = ["Administrador", "Vendedor", "Supervisor", "Aprobador de créditos"];
 
     public static async Task SeedDemoAsync(CrmDbContext db, IPasswordHasher passwordHasher, string adminPassword, CancellationToken cancellationToken = default)
     {

@@ -1,6 +1,7 @@
 using CrmSaas.Application.DTOs;
 using CrmSaas.Application.Abstractions;
 using CrmSaas.Api.Services;
+using CrmSaas.Api.Authorization;
 using CrmSaas.Domain.Common;
 using CrmSaas.Domain.Entities;
 using CrmSaas.Domain.Enums;
@@ -44,7 +45,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
     }
 
     [HttpGet("board")]
-    [Authorize(Roles = "Administrador,Supervisor")]
+    [Authorize(Roles = CreditRoles.Managers)]
     public async Task<ActionResult<IReadOnlyCollection<CreditApplicationDto>>> GetBoard(CancellationToken cancellationToken)
     {
         var rows = await db.SolicitudesCredito
@@ -155,7 +156,8 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             .Include(x => x.Documentos).Include(x => x.Codeudores)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
             ?? throw new KeyNotFoundException("Solicitud de credito no encontrada.");
-        if (IsStudyControlledStatus(entity.Estado) && !CanValidateDocuments()) return Forbid();
+        if (IsStudyControlledStatus(entity.Estado) &&
+            !(entity.Estado == EstadoSolicitudCredito.EnEstudio ? CanValidateDocuments() : CanManageAfterApproval())) return Forbid();
         ValidateEditableStatus(dto.Status, entity.Estado);
 
         if (!await db.Clientes.AnyAsync(x => x.Id == dto.CustomerId, cancellationToken)) throw new KeyNotFoundException("Cliente no encontrado.");
@@ -226,9 +228,11 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             .Include(x => x.Documentos).Include(x => x.Codeudores)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
             ?? throw new KeyNotFoundException("Solicitud de credito no encontrada.");
-        if (IsStudyControlledStatus(entity.Estado) && !CanValidateDocuments()) return Forbid();
+        if (IsStudyControlledStatus(entity.Estado) &&
+            !(entity.Estado == EstadoSolicitudCredito.EnEstudio ? CanValidateDocuments() : CanManageAfterApproval())) return Forbid();
 
-        if (dto.Status is EstadoSolicitudCredito.EnEstudio or EstadoSolicitudCredito.Aprobada or EstadoSolicitudCredito.Rechazada or EstadoSolicitudCredito.Desembolsada && !CanValidateDocuments())
+        if (dto.Status == EstadoSolicitudCredito.EnEstudio && !CanValidateDocuments()) return Forbid();
+        if (dto.Status == EstadoSolicitudCredito.Desembolsada && !CanManageAfterApproval())
         {
             return Forbid();
         }
@@ -246,7 +250,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
     }
 
     [HttpPost("{id:guid}/decision")]
-    [Authorize(Roles = "Administrador,Supervisor")]
+    [Authorize(Roles = CreditRoles.Managers)]
     public async Task<ActionResult<CreditApplicationDto>> Decide(Guid id, CreditApplicationDecisionDto dto, CancellationToken cancellationToken)
     {
         ValidateFormalDecision(dto.Status);
@@ -269,7 +273,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
     }
 
     [HttpPost("{id:guid}/study/step0")]
-    [Authorize(Roles = "Administrador,Supervisor")]
+    [Authorize(Roles = CreditRoles.Managers)]
     public async Task<ActionResult<CreditApplicationDto>> SaveStep0(Guid id, CreditStudyStep0Dto dto, CancellationToken cancellationToken)
     {
         var entity = await db.SolicitudesCredito
@@ -279,6 +283,8 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             .Include(x => x.Documentos).Include(x => x.Codeudores)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
             ?? throw new KeyNotFoundException("Solicitud de credito no encontrada.");
+
+        if (IsPostApprovalStatus(entity.Estado) && !CanManageAfterApproval()) return Forbid();
 
         entity.RuntConsultado = dto.RuntChecked;
         entity.SimitConsultado = dto.SimitChecked;
@@ -293,7 +299,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
     }
 
     [HttpPost("{id:guid}/study/recalculation")]
-    [Authorize(Roles = "Administrador,Supervisor")]
+    [Authorize(Roles = CreditRoles.Managers)]
     public async Task<ActionResult<CreditApplicationDto>> SaveRecalculation(Guid id, CreditStudyRecalculationDto dto, CancellationToken cancellationToken)
     {
         if (dto.ApprovedAmount <= 0) throw new ValidationException("El valor aprobado debe ser mayor a cero.");
@@ -308,6 +314,8 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             .Include(x => x.Documentos).Include(x => x.Codeudores)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
             ?? throw new KeyNotFoundException("Solicitud de credito no encontrada.");
+
+        if (IsPostApprovalStatus(entity.Estado) && !CanManageAfterApproval()) return Forbid();
 
         entity.ValorAprobadoAnalista = dto.ApprovedAmount;
         entity.CuotaInicialAprobada = dto.ApprovedDownPayment;
@@ -477,13 +485,14 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
     }
 
     [HttpPost("{id:guid}/study/credit-bureau")]
-    [Authorize(Roles = "Administrador,Supervisor")]
+    [Authorize(Roles = CreditRoles.Managers)]
     public async Task<ActionResult<CreditApplicationDto>> SaveCreditBureau(Guid id, CreditBureauCheckDto dto, CancellationToken cancellationToken)
     {
         if (dto.ClientScore is < 0 or > 1000) throw new ValidationException("El puntaje del cliente debe estar entre 0 y 1000.");
         if (dto.CoDebtorScore is < 0 or > 1000) throw new ValidationException("El puntaje del codeudor debe estar entre 0 y 1000.");
 
         var entity = await LoadApplicationAsync(id, cancellationToken);
+        if (IsPostApprovalStatus(entity.Estado) && !CanManageAfterApproval()) return Forbid();
         if (dto.CoDebtorChecked && string.IsNullOrWhiteSpace(entity.CodeudorNombre))
         {
             throw new ValidationException("La solicitud no tiene un codeudor registrado.");
@@ -641,6 +650,9 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         status is EstadoSolicitudCredito.EnEstudio or EstadoSolicitudCredito.Aprobada or
             EstadoSolicitudCredito.Rechazada or EstadoSolicitudCredito.Desembolsada;
 
+    private static bool IsPostApprovalStatus(EstadoSolicitudCredito status) =>
+        status is EstadoSolicitudCredito.Aprobada or EstadoSolicitudCredito.Rechazada or EstadoSolicitudCredito.Desembolsada;
+
     private static void ValidateStatusEndpoint(EstadoSolicitudCredito status)
     {
         if (status is EstadoSolicitudCredito.Aprobada or EstadoSolicitudCredito.Rechazada)
@@ -654,7 +666,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
     }
 
     private bool CanSeeAll =>
-        User.IsInRole("Administrador") || User.IsInRole("Supervisor")
+        CreditRoles.CanManage(User)
         || string.Equals(User.FindFirstValue("global_admin"), "true", StringComparison.OrdinalIgnoreCase);
 
     private IQueryable<SolicitudCredito> VisibleApplications() => CanSeeAll
@@ -781,8 +793,9 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         return Ok(ToDto(entity));
     }
 
-    private bool CanValidateDocuments() =>
-        User.IsInRole("Administrador") || User.IsInRole("Supervisor");
+    private bool CanValidateDocuments() => CreditRoles.CanManage(User);
+
+    private bool CanManageAfterApproval() => User.IsInRole("Administrador") || User.IsInRole("Supervisor");
 
     private void ApplyDocumentAudit(DocumentoSolicitudCredito document, EstadoDocumentoCredito status, string? rejectionReason)
     {

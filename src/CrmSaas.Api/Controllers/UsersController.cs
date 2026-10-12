@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using CrmSaas.Application.Abstractions;
+using CrmSaas.Api.Authorization;
 using CrmSaas.Application.DTOs;
 using CrmSaas.Domain.Common;
 using CrmSaas.Domain.Entities;
@@ -86,6 +87,7 @@ public sealed class UsersController(CrmDbContext db, IPasswordHasher passwordHas
 
         var isAdministrator = roles.Any(x => x.Nombre == "Administrador");
         var isSupervisor = roles.Any(x => x.Nombre == "Supervisor");
+        var isCreditApprover = roles.Any(x => x.Nombre == CreditRoles.Approver);
         Guid? salesPointId = null;
         var supervisedSalesPointIds = Array.Empty<Guid>();
         if (isSupervisor)
@@ -106,7 +108,7 @@ public sealed class UsersController(CrmDbContext db, IPasswordHasher passwordHas
                 return BadRequest(new { detail = "Una de las sedes supervisadas no existe o esta inactiva para la empresa seleccionada." });
             }
         }
-        else if (!isAdministrator)
+        else if (!isAdministrator && !isCreditApprover)
         {
             if (!dto.SalesPointId.HasValue)
             {
@@ -217,6 +219,7 @@ public sealed class UsersController(CrmDbContext db, IPasswordHasher passwordHas
 
             var isAdministrator = roles.Any(x => x.Nombre == "Administrador");
             var isSupervisor = roles.Any(x => x.Nombre == "Supervisor");
+            var isCreditApprover = roles.Any(x => x.Nombre == CreditRoles.Approver);
             Guid? salesPointId = null;
             var supervisedSalesPointIds = Array.Empty<Guid>();
             if (isSupervisor)
@@ -237,7 +240,7 @@ public sealed class UsersController(CrmDbContext db, IPasswordHasher passwordHas
                     return BadRequest(new { detail = "Una de las sedes supervisadas no existe o esta inactiva para la empresa seleccionada." });
                 }
             }
-            else if (!isAdministrator)
+            else if (!isAdministrator && !isCreditApprover)
             {
                 if (!dto.SalesPointId.HasValue)
                 {

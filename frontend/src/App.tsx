@@ -380,11 +380,13 @@ function Layout() {
   const muiTheme = useTheme();
   const isDesktop = useMediaQuery(muiTheme.breakpoints.up('md'));
   const [mobileOpen, setMobileOpen] = useState(false);
-  const canManageCredit = user?.roles.some((role) => role === 'Administrador' || role === 'Supervisor') ?? false;
-  const visibleNavGroups = useMemo(() => navGroups.map((group) => ({ ...group, items: group.items
+  const canManageCredit = user?.roles.some((role) => role === 'Administrador' || role === 'Supervisor' || role === 'Aprobador de créditos') ?? false;
+  const isCreditApproverOnly = user?.roles.includes('Aprobador de créditos') && !user.roles.some((role) => role === 'Administrador' || role === 'Supervisor' || role === 'Vendedor');
+  const visibleNavGroups = useMemo(() => (isCreditApproverOnly ? navGroups.filter((group) => group.key === 'credito') : navGroups).map((group) => ({ ...group, items: group.items
     .filter((item) => !item.managerOnly || canManageCredit)
+    .filter((item) => !isCreditApproverOnly || item.to === '/tablero-creditos' || item.to === '/solicitudes-credito')
     .map((item) => item.to === '/' ? { ...item, label: canManageCredit ? 'Tablero del equipo' : 'Mi trabajo' } : item)
-  })), [canManageCredit]);
+  })), [canManageCredit, isCreditApproverOnly]);
   const activeGroupKey = visibleNavGroups.find((group) => isNavGroupActive(group, location.pathname))?.key ?? 'comercial';
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => Object.fromEntries(visibleNavGroups.map((group) => [group.key, group.key === activeGroupKey])));
   useEffect(() => {
@@ -527,7 +529,7 @@ function Layout() {
         </AppBar>
         <Box component="main" sx={{ p: { xs: 1, sm: 2, md: 3 }, width: '100%', maxWidth: 1760, mx: 'auto', boxSizing: 'border-box' }}>
           <Routes>
-            <Route path="/" element={<DashboardPage />} />
+            <Route path="/" element={isCreditApproverOnly ? <Navigate to="/tablero-creditos" replace /> : <DashboardPage />} />
             <Route path="/clientes" element={<CustomersPage />} />
             <Route path="/clientes/:id" element={<Customer360Page />} />
             <Route path="/productos" element={<ProductsPage />} />
@@ -1686,6 +1688,8 @@ function creditManagerTask(application: CreditApplication): { label: string; tab
 }
 
 function CreditWorkflowBoardPage() {
+  const roles = useAuthStore((state) => state.user?.roles ?? []);
+  const canManagePostApproval = roles.includes('Administrador') || roles.includes('Supervisor');
   const { data: applications = [], loading, error, reload, setData } = useResource<CreditApplication[]>('/api/credit-applications/board', []);
   const flashingStatuses = useRecentlyChangedCreditStatuses(applications, loading);
   useLiveCreditApplications(setData);
@@ -1702,7 +1706,7 @@ function CreditWorkflowBoardPage() {
   const finished = applications.filter((application) => application.welcomeCompleted).length;
   const attention = applications.filter((application) => application.documents.some((document) => document.status === 4 || document.isExpired)).length;
   const reviewQueue = applications.map((application) => ({ application, task: creditManagerTask(application) }))
-    .filter((entry): entry is { application: CreditApplication; task: { label: string; tab: 'estudio' | 'proceso' } } => entry.task !== null);
+    .filter((entry): entry is { application: CreditApplication; task: { label: string; tab: 'estudio' | 'proceso' } } => entry.task !== null && (canManagePostApproval || ![5, 7].includes(entry.application.status)));
 
   return <Stack spacing={2.5}>
     <Header title="Tablero de solicitudes de credito" onRefresh={reload} />
@@ -1717,7 +1721,7 @@ function CreditWorkflowBoardPage() {
       <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }} gap={1} sx={{ mb: 1.5 }}>
         <Box>
           <Typography fontWeight={900}>Por revisar ({reviewQueue.length})</Typography>
-          <Typography color="text.secondary" fontSize={12}>Las solicitudes que requieren una acción del administrador o supervisor.</Typography>
+          <Typography color="text.secondary" fontSize={12}>Las solicitudes que requieren una acción {canManagePostApproval ? 'del supervisor o administrador' : 'del aprobador de créditos'}.</Typography>
         </Box>
       </Stack>
       {reviewQueue.length ? <Stack spacing={1}>
@@ -1800,7 +1804,9 @@ function CreditWorkflowBoardPage() {
 }
 
 function CreditApplicationsPage() {
-  const canManageCredit = useCanManage();
+  const canManageCredit = useCanManageCredit();
+  const roles = useAuthStore((state) => state.user?.roles ?? []);
+  const canManagePostApproval = roles.includes('Administrador') || roles.includes('Supervisor');
   const { data: productCategories = [] } = useResource<ProductCategory[]>('/api/product-categories', []);
   const { data: rows = [], loading, error, reload, setData } = useResource<CreditApplication[]>('/api/credit-applications', []);
   const flashingStatuses = useRecentlyChangedCreditStatuses(rows, loading);
@@ -2082,7 +2088,7 @@ function CreditApplicationsPage() {
         cells: [
         <Stack direction="row" gap={.5} alignItems="center" flexWrap="nowrap">
           <Button size="small" variant="contained" onClick={() => setManagement(r)} sx={{ minHeight: 28, px: 1.25, fontSize: 11.5 }}>Gestionar</Button>
-          <Actions onAi={() => analyzeCustomer(r.customerId, r.mobile)} onEdit={canManageCredit || ![4, 5, 6, 7].includes(r.status) ? () => setForm({ open: true, item: r }) : undefined} />
+          <Actions onAi={() => analyzeCustomer(r.customerId, r.mobile)} onEdit={(canManagePostApproval || (canManageCredit && r.status === 4) || ![4, 5, 6, 7].includes(r.status)) ? () => setForm({ open: true, item: r }) : undefined} />
         </Stack>,
         r.number,
         <StatusChip label={creditStatus(r.status)} tone={creditTone(r.status)} flash={flashingStatuses.has(r.id)} />,
@@ -2101,6 +2107,7 @@ function CreditApplicationsPage() {
       application={managementApplication}
       initialTab={searchParams.get('tab') === 'proceso' ? 4 : searchParams.get('tab') === 'estudio' ? 1 : searchParams.get('tab') === 'pendiente' && managementApplication && canManageCredit && managementApplication.documentationCompleted ? managementApplication.status >= 5 ? 4 : 1 : 0}
       showWorkflow={canManageCredit}
+      canManagePostApproval={canManagePostApproval}
       onClose={closeManagement}
       onUpdateDocument={updateDocument}
       onUploadDocument={uploadDocument}
@@ -2145,6 +2152,7 @@ function CreditApplicationManagementDialog({
   application,
   initialTab,
   showWorkflow,
+  canManagePostApproval,
   onClose,
   onUpdateDocument,
   onUploadDocument,
@@ -2163,6 +2171,7 @@ function CreditApplicationManagementDialog({
   application?: CreditApplication;
   initialTab?: number;
   showWorkflow: boolean;
+  canManagePostApproval: boolean;
   onClose: () => void;
   onUpdateDocument: (application: CreditApplication, document: CreditDocument, status: number, patch?: Partial<Pick<CreditDocument, 'expiresAt' | 'notes' | 'rejectionReason'>>) => Promise<void>;
   onUploadDocument: (application: CreditApplication, document: CreditDocument, file: File) => Promise<void>;
@@ -2212,10 +2221,10 @@ function CreditApplicationManagementDialog({
             <CreditApplicationPendingSummary application={application} />
           </Stack>
           {!showWorkflow && application.documentationCompleted && [1, 2, 3, 4].includes(application.status) &&
-            <Alert severity="info">El expediente está listo para revisión. Un administrador o supervisor registra las verificaciones y decide el crédito.</Alert>}
+            <Alert severity="info">El expediente está listo para revisión. Un aprobador de créditos, supervisor o administrador registra las verificaciones y decide el crédito.</Alert>}
           <DocumentSummary application={application} onComplete={(completed) => onWorkflowMilestone(application, "documentation", completed)} onUpdate={onUpdateDocument} onUpload={onUploadDocument} onDownload={onDownloadDocument} onDelete={onDeleteDocument} />
         </Stack>}
-        {tab === 1 && <CreditStudySummary application={application} canManage={showWorkflow} onStep0={onStep0} onRecalculate={onRecalculate} onDecision={onDecision} onChangeStatus={onChangeStatus} />}
+        {tab === 1 && <CreditStudySummary application={application} canManage={showWorkflow} canManagePostApproval={canManagePostApproval} onStep0={onStep0} onRecalculate={onRecalculate} onDecision={onDecision} onChangeStatus={onChangeStatus} />}
         {tab === 2 && <Stack spacing={2}>
           <Typography variant="subtitle2" fontWeight={900}>Descargar documentos</Typography>
           <CreditTemplateDownloads application={application} onDownload={onDownloadTemplate} />
@@ -2226,14 +2235,14 @@ function CreditApplicationManagementDialog({
             {application.status === 1 && <Button variant="outlined" onClick={() => onChangeStatus(application, 8)}>Cliente interesado</Button>}
             {[1, 8].includes(application.status) && <Button variant="outlined" onClick={() => onChangeStatus(application, 2)}>Solicitar documentos</Button>}
             {showWorkflow && [2, 3].includes(application.status) && <Button variant="outlined" disabled={!readyForStudy} onClick={() => onChangeStatus(application, 4)}>Enviar a estudio</Button>}
-            {showWorkflow && application.status === 5 && application.finalReviewApproved && <Button variant="outlined" onClick={() => onChangeStatus(application, 7)}>Autorizar entrega</Button>}
+            {canManagePostApproval && application.status === 5 && application.finalReviewApproved && <Button variant="outlined" onClick={() => onChangeStatus(application, 7)}>Autorizar entrega</Button>}
             {![6, 7, 9].includes(application.status) && (showWorkflow || ![4, 5].includes(application.status)) && <Button color="error" variant="outlined" onClick={() => {
               if (window.confirm('¿Confirmar que el cliente desistió de esta solicitud?')) onChangeStatus(application, 9);
             }}>Registrar desistimiento</Button>}
             <Button variant="outlined" startIcon={<AutoAwesome />} onClick={() => onAnalyze(application)}>Analizar IA</Button>
-            <Button variant="outlined" startIcon={<Edit />} disabled={!showWorkflow && [4, 5, 6, 7].includes(application.status)} onClick={() => onEdit(application)}>Editar solicitud</Button>
+            <Button variant="outlined" startIcon={<Edit />} disabled={!canManagePostApproval && [5, 6, 7].includes(application.status) || !showWorkflow && application.status === 4} onClick={() => onEdit(application)}>Editar solicitud</Button>
           </Stack>
-          <Typography variant="caption" color="text.secondary">La aprobación y la negación se registran en Estudio por un administrador o supervisor. Los demás estados se actualizan al completar cada paso.</Typography>
+          <Typography variant="caption" color="text.secondary">La aprobación y la negación se registran en Estudio por un aprobador de créditos, supervisor o administrador. Los demás estados se actualizan al completar cada paso.</Typography>
           <Paper variant="outlined" sx={{ p: 1.5 }}>
             <Typography variant="subtitle2" fontWeight={900}>Resumen</Typography>
             <InfoLine label="Ingresos" value={money(application.monthlyIncome)} />
@@ -2244,7 +2253,7 @@ function CreditApplicationManagementDialog({
           </Paper>
         </Stack>
         }
-        {showWorkflow && tab === 4 && <CreditWorkflowControls application={application} onCreditBureau={onCreditBureau} onMilestone={onWorkflowMilestone} />}
+        {showWorkflow && tab === 4 && <CreditWorkflowControls application={application} canManagePostApproval={canManagePostApproval} onCreditBureau={onCreditBureau} onMilestone={onWorkflowMilestone} />}
       </Box>
     </DialogContent>
     <DialogActions sx={{ px: { xs: 2, sm: 3 }, py: 1.5, '& .MuiButton-root': { width: { xs: '100%', sm: 'auto' } } }}>
@@ -2255,8 +2264,9 @@ function CreditApplicationManagementDialog({
 
 type CreditWorkflowEditor = 'bureau' | 'signatures' | 'final-review' | 'welcome';
 
-function CreditWorkflowControls({ application, onCreditBureau, onMilestone }: {
+function CreditWorkflowControls({ application, canManagePostApproval, onCreditBureau, onMilestone }: {
   application: CreditApplication;
+  canManagePostApproval: boolean;
   onCreditBureau: (application: CreditApplication, patch: Partial<CreditApplication>) => Promise<void>;
   onMilestone: (application: CreditApplication, milestone: 'signatures' | 'final-review' | 'welcome' | "documentation", completed: boolean, notes?: string) => Promise<void>;
 }) {
@@ -2345,7 +2355,7 @@ function CreditWorkflowControls({ application, onCreditBureau, onMilestone }: {
                 <Typography fontWeight={900} fontSize={13.5}>{stage.number}. {stage.title}</Typography>
                 <Typography color="text.secondary" fontSize={12} sx={{ mt: .25 }}>{stage.detail}</Typography>
               </Box>
-              {stage.action && <Button size="small" variant={stage.complete ? 'text' : 'outlined'} disabled={stage.disabled} onClick={() => openEditor(stage.action!)}>{stage.complete ? 'Editar' : 'Registrar'}</Button>}
+              {stage.action && (stage.number <= 5 || canManagePostApproval) && <Button size="small" variant={stage.complete ? 'text' : 'outlined'} disabled={stage.disabled} onClick={() => openEditor(stage.action!)}>{stage.complete ? 'Editar' : 'Registrar'}</Button>}
             </Stack>
           </Paper>
         </Grid>)}
@@ -2380,9 +2390,10 @@ function CreditWorkflowControls({ application, onCreditBureau, onMilestone }: {
   </>;
 }
 
-function CreditStudySummary({ application, canManage, onStep0, onRecalculate, onDecision, onChangeStatus }: {
+function CreditStudySummary({ application, canManage, canManagePostApproval, onStep0, onRecalculate, onDecision, onChangeStatus }: {
   application: CreditApplication;
   canManage: boolean;
+  canManagePostApproval: boolean;
   onStep0: (application: CreditApplication, patch?: Partial<CreditApplication>) => Promise<void>;
   onRecalculate: (application: CreditApplication, patch: Partial<CreditApplication>) => Promise<void>;
   onDecision: (application: CreditApplication, status: number, notes?: string, study?: Partial<CreditApplication> & { result?: string }) => Promise<void>;
@@ -2392,13 +2403,14 @@ function CreditStudySummary({ application, canManage, onStep0, onRecalculate, on
     { status: 8, label: 'Interesado', show: application.status === 1 },
     { status: 2, label: 'Documentos', show: application.status === 1 || application.status === 8 },
     { status: 4, label: 'Enviar a estudio', show: application.status === 2 || application.status === 3 },
-    { status: 7, label: 'Entregar', show: application.status === 5 && application.finalReviewApproved },
-    { status: 9, label: 'Desistir', show: ![6, 7, 9].includes(application.status) }
+    { status: 7, label: 'Entregar', show: canManagePostApproval && application.status === 5 && application.finalReviewApproved },
+    { status: 9, label: 'Desistir', show: ![6, 7, 9].includes(application.status) && (canManagePostApproval || application.status !== 5) }
   ].filter((x) => x.show);
   const lastDate = application.disbursedAt ?? application.approvedAt ?? application.rejectedAt ?? application.reviewStartedAt ?? application.submittedAt;
   const step0Ready = application.runtChecked && application.simitChecked && application.identityValidated;
   const bureauReady = application.creditBureauClientChecked && (!application.coDebtorName || application.creditBureauCoDebtorChecked);
   const documentsReady = application.documentationCompleted;
+  const canEditStudy = canManage && (canManagePostApproval || ![5, 6, 7].includes(application.status));
   const approvedAmount = application.analystApprovedAmount ?? application.motorcycleValue;
   const approvedDownPayment = application.approvedDownPayment ?? application.downPayment;
   const approvedTerm = application.approvedTermMonths ?? application.termMonths;
@@ -2490,13 +2502,13 @@ function CreditStudySummary({ application, canManage, onStep0, onRecalculate, on
     </Typography>
     {approvedPayment > 0 && <Typography variant="caption" color="text.secondary">Cuota analista: {money(approvedPayment)}</Typography>}
     {application.decisionNotes && <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.25 }}>{application.decisionNotes}</Typography>}
-    {canManage ? <Stack direction="row" gap={.5} flexWrap="wrap">
+    {canEditStudy ? <Stack direction="row" gap={.5} flexWrap="wrap">
       <Button size="small" variant="outlined" onClick={() => void openExternalLookup(runtUrl, application.identificationNumber)}>RUNT</Button>
       <Button size="small" variant="outlined" onClick={() => void openExternalLookup(simitUrl, application.identificationNumber)}>SIMIT</Button>
       <Button size="small" variant="outlined" onClick={openInitialValidation}>Validacion inicial</Button>
       <Button size="small" variant="outlined" onClick={recalculate}>Recalcular</Button>
-    </Stack> : <Alert severity="info">Un administrador o supervisor registra las verificaciones y decide el crédito.</Alert>}
-    {canManage && <Stack direction="row" gap={.5} flexWrap="wrap">
+    </Stack> : !canManage ? <Alert severity="info">Un aprobador de créditos, supervisor o administrador registra las verificaciones y decide el crédito.</Alert> : null}
+    {canEditStudy && <Stack direction="row" gap={.5} flexWrap="wrap">
       {actions.length ? actions.map((action) => <Button key={action.status} size="small" variant="outlined" disabled={action.status === 4 && !(step0Ready && bureauReady && documentsReady)} onClick={() => onChangeStatus(application, action.status)}>{action.label}</Button>) : <Chip size="small" label="Sin acciones" variant="outlined" />}
       {application.status === 4 && <>
         <Button size="small" variant="contained" onClick={() => approve(false, false)}>Aprobar</Button>
@@ -3528,11 +3540,12 @@ function SettingsPage() {
   const saveUser = async (payload: typeof emptyUser) => {
     const isAdministrator = payload.roles.includes('Administrador');
     const isSupervisor = payload.roles.includes('Supervisor');
+    const isCreditApprover = payload.roles.includes('Aprobador de créditos');
     const companyId = isGlobalAdmin ? payload.companyId : user?.companyId ?? payload.companyId;
     const body = {
       ...payload,
       companyId,
-      salesPointId: isAdministrator || isSupervisor ? null : payload.salesPointId || null,
+      salesPointId: isAdministrator || isSupervisor || isCreditApprover ? null : payload.salesPointId || null,
       supervisedSalesPointIds: isSupervisor ? payload.supervisedSalesPointIds : []
     };
     const { data } = userForm.item
@@ -4212,7 +4225,7 @@ function UserDialog({ form, companies, salesPoints, defaultCompanyId, onClose, o
         helperText={form.item?.email.trim().toLowerCase() === 'admin@demo.com'
           ? 'El superusuario conserva su contraseña actual.'
           : 'La contraseña está definida por el sistema y se mantiene al guardar.'} />
-      <TextField required select label="Empresa" value={v.companyId} onChange={(e) => set({ companyId: e.target.value, salesPointId: isAdministrator ? '' : defaultSalesPointId })}>{companies.map((c) => <MenuItem key={c.id} value={c.id}>{c.name} ({c.subdomain})</MenuItem>)}</TextField>
+      <TextField required select label="Empresa" value={v.companyId} onChange={(e) => set({ companyId: e.target.value, salesPointId: selectedRole === 'Vendedor' ? defaultSalesPointId : '' })}>{companies.map((c) => <MenuItem key={c.id} value={c.id}>{c.name} ({c.subdomain})</MenuItem>)}</TextField>
       <TextField select label="Rol" value={selectedRole} onChange={(e) => {
         const role = e.target.value;
         set({
@@ -4220,8 +4233,9 @@ function UserDialog({ form, companies, salesPoints, defaultCompanyId, onClose, o
           salesPointId: role === 'Vendedor' ? (v.salesPointId || defaultSalesPointId) : '',
           supervisedSalesPointIds: role === 'Supervisor' ? v.supervisedSalesPointIds : []
         });
-      }}>{['Administrador', 'Supervisor', 'Vendedor'].map((role) => <MenuItem key={role} value={role}>{role}</MenuItem>)}</TextField>
+      }}>{['Administrador', 'Supervisor', 'Aprobador de créditos', 'Vendedor'].map((role) => <MenuItem key={role} value={role}>{role}</MenuItem>)}</TextField>
       {isAdministrator && <Alert severity="info">Este usuario tiene acceso a todas las sedes de la empresa.</Alert>}
+      {selectedRole === 'Aprobador de créditos' && <Alert severity="info">Gestiona solicitudes de todas las sedes, realiza el estudio y aprueba o niega créditos. No administra la configuración ni la entrega.</Alert>}
       {selectedRole === 'Vendedor' && <TextField required select label="Sede principal" value={v.salesPointId} onChange={(e) => set({ salesPointId: e.target.value })} helperText="Se usara en cotizaciones, reportes y tramites por sede.">
         {currentSalesPoints.length === 0 && <MenuItem value="">Cree una sede antes de crear vendedores.</MenuItem>}
         {currentSalesPoints.map((point) => <MenuItem key={point.id} value={point.id}>{point.name} - {point.city}</MenuItem>)}
@@ -6258,6 +6272,11 @@ function useLiveCreditApplications(setRows: Dispatch<SetStateAction<CreditApplic
 function useCanManage() {
   const roles = useAuthStore((s) => s.user?.roles ?? []);
   return useMemo(() => roles.includes('Administrador') || roles.includes('Supervisor'), [roles]);
+}
+
+function useCanManageCredit() {
+  const roles = useAuthStore((s) => s.user?.roles ?? []);
+  return useMemo(() => roles.includes('Administrador') || roles.includes('Supervisor') || roles.includes('Aprobador de créditos'), [roles]);
 }
 
 function apiError(err: unknown) {

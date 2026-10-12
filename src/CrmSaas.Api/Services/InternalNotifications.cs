@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Threading.Channels;
+using CrmSaas.Api.Authorization;
 using CrmSaas.Application.Abstractions;
 using CrmSaas.Domain.Entities;
 using CrmSaas.Infrastructure.Persistence;
@@ -39,7 +40,7 @@ public sealed class InternalNotificationService(CrmDbContext db, ITenantContext 
     {
         var recipients = await db.Usuarios
             .Where(user => user.Activo && (user.Email == application.UsuarioCreacion || user.UsuarioRoles.Any(role =>
-                role.Rol != null && (role.Rol.Nombre == "Administrador" || role.Rol.Nombre == "Supervisor"))))
+                role.Rol != null && (role.Rol.Nombre == "Administrador" || role.Rol.Nombre == "Supervisor" || role.Rol.Nombre == CreditRoles.Approver))))
             .Select(user => user.Id).ToListAsync(cancellationToken);
         broadcaster.Notify(recipients, application.Id);
     }
@@ -50,7 +51,7 @@ public sealed class InternalNotificationService(CrmDbContext db, ITenantContext 
         var companyId = tenantContext.EmpresaId ?? throw new InvalidOperationException("No se resolvió la empresa de la notificación.");
         var recipients = await db.Usuarios
             .Where(user => user.Activo && user.UsuarioRoles.Any(role => role.Rol != null &&
-                (role.Rol.Nombre == "Administrador" || role.Rol.Nombre == "Supervisor")))
+                (role.Rol.Nombre == "Administrador" || role.Rol.Nombre == "Supervisor" || role.Rol.Nombre == CreditRoles.Approver)))
             .Select(user => user.Id).ToListAsync(cancellationToken);
         if (recipients.Count == 0) return recipients;
 
