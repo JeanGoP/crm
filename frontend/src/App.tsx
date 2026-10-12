@@ -44,6 +44,7 @@ import { QuoteFollowUpDialog, type QuoteFollowUp } from './QuoteFollowUpDialog';
 import { CustomersTable } from './CustomersTable';
 import { CompactRecordsTable } from './CompactRecordsTable';
 import { CreditFormDetailsFields, type CreditFormDetails } from './CreditFormDetailsFields';
+import { NotificationCenter } from './NotificationCenter';
 import { useAuthStore } from './store';
 import { Activity, ColombianIdentityLookup, CollectionOrder, CommercialInventory, CommercialInventorySummary, CommercialReports, Company, CreditApplication, CreditCoDebtor, CreditDocument, Customer, Customer360, CustomerAiAnalysis, CustomerTimelineItem, Dashboard, Deal, DealStage, ExternalInventoryItem, ExternalInventoryWarehouse, FinancialSettings, Lead, LoginAccessReport, MotorcycleDelivery, Procedure, Product, ProductCategory, ProductPhoto, Promotion, Quote, QuoteChargeConcept, QuoteSalesPoint, QuoteSimulationResult, SalesPoint, SalesPointRate, User } from './types';
 
@@ -513,6 +514,7 @@ function Layout() {
               </Box>
             </Stack>
             <Stack direction="row" alignItems="center" gap={1}>
+              {canManageCredit && <NotificationCenter />}
               <Box sx={{ display: { xs: 'none', sm: 'flex' }, alignItems: 'center', gap: 1, px: 1.5, py: .75, border: `1px solid ${uiBorder}`, borderRadius: 999, bgcolor: '#fff', boxShadow: '0 8px 22px rgba(15, 23, 42, .04)' }}>
                 <Search fontSize="small" sx={{ color: uiMuted }} />
                 <Typography variant="body2" color="text.secondary">CRM comercial</Typography>
@@ -1685,6 +1687,10 @@ function creditManagerTask(application: CreditApplication): { label: string; tab
 
 function CreditWorkflowBoardPage() {
   const { data: applications = [], loading, error, reload } = useResource<CreditApplication[]>('/api/credit-applications/board', []);
+  useEffect(() => {
+    window.addEventListener('credit-applications-updated', reload);
+    return () => window.removeEventListener('credit-applications-updated', reload);
+  }, [reload]);
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const normalizedSearch = normalizeSearch(search);
@@ -1799,6 +1805,10 @@ function CreditApplicationsPage() {
   const canManageCredit = useCanManage();
   const { data: productCategories = [] } = useResource<ProductCategory[]>('/api/product-categories', []);
   const { data: rows = [], loading, error, reload, setData } = useResource<CreditApplication[]>('/api/credit-applications', []);
+  useEffect(() => {
+    window.addEventListener('credit-applications-updated', reload);
+    return () => window.removeEventListener('credit-applications-updated', reload);
+  }, [reload]);
   const { data: customers = [] } = useResource<Customer[]>('/api/customers', []);
   const { data: products = [] } = useResource<Product[]>('/api/products', []);
   const { data: quotes = [] } = useResource<Quote[]>('/api/quotes', []);

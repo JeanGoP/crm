@@ -117,10 +117,12 @@ Console.WriteLine("OK: varios codeudores, edición, retiro, identidad estable, a
 var tenant = new TestTenant();
 using var db = new CrmDbContext(new DbContextOptionsBuilder<CrmDbContext>()
     .UseSqlServer("Server=(local);Database=ModelChecks;Integrated Security=True;TrustServerCertificate=True").Options, tenant);
+Check(db.Model.FindEntityType(typeof(AlertaInterna))!.GetQueryFilter() != null, "Los avisos deben estar aislados por empresa.");
+Check(db.AlertasInternas.Where(x => x.UsuarioId == Guid.NewGuid()).ToQueryString().Contains("EmpresaId"), "La bandeja filtra por empresa y usuario.");
 var tracked = new SolicitudCredito { EmpresaId = tenant.EmpresaId!.Value, ClienteId = Guid.NewGuid() };
 Invoke("AddChecklistDocuments", tracked, null);
 db.Attach(tracked);
-var controller = new CreditApplicationsController(db, null!, tenant);
+var controller = new CreditApplicationsController(db, null!, tenant, new InternalNotificationService(db, tenant, new NotificationBroadcaster()));
 var sync = typeof(CreditApplicationsController).GetMethod("SyncCoDebtors", BindingFlags.Instance | BindingFlags.NonPublic)!;
 sync.Invoke(controller, [tracked, new[] { Person("400"), Person("500") }]);
 db.ChangeTracker.DetectChanges();

@@ -14,6 +14,7 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
     public DbSet<UsuarioSedeSupervisada> UsuariosSedesSupervisadas => Set<UsuarioSedeSupervisada>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<IngresoPlataforma> IngresosPlataforma => Set<IngresoPlataforma>();
+    public DbSet<AlertaInterna> AlertasInternas => Set<AlertaInterna>();
     public DbSet<Cliente> Clientes => Set<Cliente>();
     public DbSet<Prospecto> Prospectos => Set<Prospecto>();
     public DbSet<Negocio> Negocios => Set<Negocio>();
@@ -53,6 +54,12 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
         modelBuilder.Entity<UsuarioSedeSupervisada>().ToTable("UsuariosSedesSupervisadas");
         modelBuilder.Entity<RefreshToken>().ToTable("RefreshTokens");
         modelBuilder.Entity<IngresoPlataforma>().ToTable("IngresosPlataforma");
+        modelBuilder.Entity<AlertaInterna>().ToTable("AlertasInternas");
+        modelBuilder.Entity<AlertaInterna>().Property(x => x.Tipo).HasMaxLength(60);
+        modelBuilder.Entity<AlertaInterna>().Property(x => x.Titulo).HasMaxLength(180);
+        modelBuilder.Entity<AlertaInterna>().Property(x => x.Mensaje).HasMaxLength(500);
+        modelBuilder.Entity<AlertaInterna>().HasIndex(x => new { x.EmpresaId, x.UsuarioId, x.FechaCreacion });
+        modelBuilder.Entity<AlertaInterna>().HasIndex(x => new { x.EmpresaId, x.UsuarioId, x.SolicitudCreditoId, x.Tipo }).IsUnique();
         modelBuilder.Entity<Cliente>().ToTable("Clientes");
         modelBuilder.Entity<Prospecto>().ToTable("Prospectos");
         modelBuilder.Entity<Negocio>().ToTable("Negocios");
@@ -332,6 +339,7 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
         modelBuilder.Entity<UsuarioSedeSupervisada>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<RefreshToken>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<IngresoPlataforma>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
+        modelBuilder.Entity<AlertaInterna>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<Cliente>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<Prospecto>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<Negocio>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);

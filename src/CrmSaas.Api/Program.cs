@@ -1,6 +1,7 @@
 using System.Text;
 using AutoMapper;
 using CrmSaas.Api.Middleware;
+using CrmSaas.Api.Services;
 using CrmSaas.Application.DTOs;
 using CrmSaas.Application.Mapping;
 using CrmSaas.Application.Services;
@@ -26,6 +27,8 @@ builder.Host.UseSerilog((context, services, configuration) => configuration
     .WriteTo.File("logs/crm-saas-.log", rollingInterval: RollingInterval.Day, retainedFileCountLimit: 30));
 
 builder.Services.AddControllers();
+builder.Services.AddSingleton<NotificationBroadcaster>();
+builder.Services.AddScoped<InternalNotificationService>();
 builder.Services.AddHttpClient();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddScoped<ICustomerService, CustomerService>();

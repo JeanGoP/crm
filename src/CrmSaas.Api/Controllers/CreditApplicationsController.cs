@@ -16,7 +16,7 @@ namespace CrmSaas.Api.Controllers;
 [ApiController]
 [Authorize]
 [Route("api/credit-applications")]
-public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnvironment env, ITenantContext tenantContext) : ControllerBase
+public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnvironment env, ITenantContext tenantContext, InternalNotificationService notifications) : ControllerBase
 {
     private static readonly HashSet<string> AllowedFileExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -120,6 +120,8 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         SyncCoDebtors(entity, dto.CoDebtors);
         CreditPhoneValidation.Validate(entity);
         await SyncPipelineAsync(entity, cancellationToken);
+        var recipientIds = await notifications.QueueForManagersAsync(entity, "NuevaSolicitud", "Nueva solicitud de crédito",
+            $"{customer.Nombres} {customer.Apellidos} · {entity.Numero} · Sede: {quote?.NombreSede ?? "Sin sede"} · Vendedor: {tenantContext.UsuarioActual}", cancellationToken);
         if (dealId.HasValue)
         {
             var quoteFollowUps = await db.Actividades
@@ -129,6 +131,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             foreach (var followUp in quoteFollowUps) followUp.Estado = EstadoActividad.Cancelada;
         }
         await db.SaveChangesAsync(cancellationToken);
+        notifications.Publish(recipientIds);
         entity.Cliente = customer;
         entity.Producto = product;
         return Ok(ToDto(entity));
@@ -223,10 +226,15 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         }
 
         ValidateDecision(entity, dto.Status);
+        IReadOnlyList<Guid> decisionRecipients = [];
+        if (dto.Status == EstadoSolicitudCredito.EnEstudio && entity.Estado != EstadoSolicitudCredito.EnEstudio)
+            decisionRecipients = await notifications.QueueForManagersAsync(entity, "ListaParaDecision", "Crédito listo para decidir",
+                $"{entity.Numero} · {entity.Cliente?.Nombres} {entity.Cliente?.Apellidos} · Revise el estudio y registre la decisión.", cancellationToken);
         entity.Estado = dto.Status;
         ApplyDecision(entity, dto.Status, null);
         await SyncPipelineAsync(entity, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
+        notifications.Publish(decisionRecipients);
         return Ok(ToDto(entity));
     }
 
