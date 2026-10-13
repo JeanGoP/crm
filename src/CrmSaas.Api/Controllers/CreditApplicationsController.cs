@@ -83,6 +83,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
 
         var entity = new SolicitudCredito
         {
+            EmpresaId = tenantContext.EmpresaId ?? throw new InvalidOperationException("No se resolvió la empresa activa."),
             Numero = $"SOL-{ColombiaTime.Now:yyyyMMddHHmmss}",
             ClienteId = customer.Id,
             ProductoId = product.Id,
