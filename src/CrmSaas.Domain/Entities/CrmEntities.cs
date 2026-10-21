@@ -450,6 +450,7 @@ public sealed class SolicitudCredito : AuditableTenantEntity
     public string? MotivoDevolucion { get; set; }
     public DateTime? FechaDevolucion { get; set; }
     public string? UsuarioDevolucion { get; set; }
+    public ICollection<DevolucionSolicitudCredito> Devoluciones { get; set; } = new List<DevolucionSolicitudCredito>();
     public bool FirmasCompletas { get; set; }
     public DateTime? FechaFirmasCompletas { get; set; }
     public string? UsuarioFirmas { get; set; }
@@ -468,6 +469,17 @@ public sealed class SolicitudCredito : AuditableTenantEntity
     public ICollection<CodeudorSolicitudCredito> Codeudores { get; set; } = new List<CodeudorSolicitudCredito>();
     public DateTime? FechaDocumentacionCompleta { get; set; }
     public string? UsuarioDocumentacionCompleta { get; set; }
+}
+
+public sealed class DevolucionSolicitudCredito : AuditableTenantEntity
+{
+    public Guid SolicitudCreditoId { get; set; }
+    public SolicitudCredito? SolicitudCredito { get; set; }
+    public string Motivo { get; set; } = string.Empty;
+    public DateTime FechaDevolucion { get; set; }
+    public string UsuarioDevolucion { get; set; } = string.Empty;
+    public DateTime? FechaReenvio { get; set; }
+    public string? UsuarioReenvio { get; set; }
 }
 
 public sealed class DocumentoSolicitudCredito : AuditableTenantEntity

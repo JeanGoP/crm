@@ -517,7 +517,13 @@ public sealed record CreditApplicationDto(
     CreditFormDetailsDto? FormDetails = null,
     string? ReturnReason = null,
     DateTime? ReturnedAt = null,
-    string? ReturnedBy = null);
+    string? ReturnedBy = null,
+    IReadOnlyCollection<CreditReturnDto>? ReturnHistory = null,
+    string? SellerName = null,
+    string? SalesPointName = null);
+
+public sealed record CreditReturnDto(Guid Id, string Reason, DateTime ReturnedAt, string ReturnedBy,
+    DateTime? ResubmittedAt, string? ResubmittedBy);
 
 public sealed record CreditCoDebtorDto(Guid? Id, string Name, string Identification, string Mobile,
     string? Relationship, decimal MonthlyIncome, string? Reference1Name, string? Reference1Mobile,
@@ -850,7 +856,9 @@ public sealed record CommercialReportSummaryDto(
     decimal CreditApprovalRate,
     decimal ApprovedCreditAmount);
 
-public sealed record SalesBySellerDto(string Seller, int Quotes, int ApprovedCredits, decimal ApprovedAmount);
+public sealed record SalesBySellerDto(string Seller, int Quotes, int ApprovedCredits, decimal ApprovedAmount,
+    int Applications = 0, int ConvertedQuotes = 0, int RejectedCredits = 0, int ReturnedCredits = 0,
+    decimal QuoteConversionRate = 0, decimal ApprovalRate = 0);
 public sealed record QuotesByStatusDto(string Status, int Count, decimal Amount);
 public sealed record CreditsByStatusDto(string Status, int Count, decimal Amount);
 public sealed record TopQuotedProductDto(Guid ProductId, string ProductName, string Brand, string Model, int QuoteCount, decimal QuotedAmount);

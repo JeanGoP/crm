@@ -51,7 +51,7 @@ public interface IDashboardService
 
 public interface ICommercialReportService
 {
-    Task<CommercialReportsDto> GetAsync(DateTime? from, DateTime? to, CancellationToken cancellationToken);
+    Task<CommercialReportsDto> GetAsync(DateTime? from, DateTime? to, string? sellerEmail, CancellationToken cancellationToken);
 }
 
 public sealed class CustomerService(ICrmDbContext db, IMapper mapper) : ICustomerService
@@ -575,7 +575,7 @@ public sealed class DashboardService(ICrmDbContext db) : IDashboardService
 
 public sealed class CommercialReportService(ICrmDbContext db) : ICommercialReportService
 {
-    public async Task<CommercialReportsDto> GetAsync(DateTime? from, DateTime? to, CancellationToken cancellationToken)
+    public async Task<CommercialReportsDto> GetAsync(DateTime? from, DateTime? to, string? sellerEmail, CancellationToken cancellationToken)
     {
         var today = ColombiaTime.Today;
         var fromDate = (from ?? new DateTime(today.Year, today.Month, 1)).Date;
@@ -588,6 +588,11 @@ public sealed class CommercialReportService(ICrmDbContext db) : ICommercialRepor
 
         var quotes = db.Cotizaciones.Where(x => x.FechaCotizacion >= fromDate && x.FechaCotizacion < toDateExclusive);
         var creditApplications = db.SolicitudesCredito.Where(x => x.FechaCreacion >= fromDate && x.FechaCreacion < toDateExclusive);
+        if (!string.IsNullOrWhiteSpace(sellerEmail))
+        {
+            quotes = quotes.Where(x => x.UsuarioCreacion == sellerEmail);
+            creditApplications = creditApplications.Where(x => x.UsuarioCreacion == sellerEmail);
+        }
 
         var totalQuotes = await quotes.CountAsync(cancellationToken);
         var quotesConvertedToCredit = await quotes.CountAsync(x => db.SolicitudesCredito.Any(s => s.CotizacionId == x.Id), cancellationToken);
@@ -599,31 +604,47 @@ public sealed class CommercialReportService(ICrmDbContext db) : ICommercialRepor
             .SumAsync(x => x.ValorMoto, cancellationToken);
 
         var salesRows = await creditApplications
-            .Where(x => x.Estado == EstadoSolicitudCredito.Aprobada || x.Estado == EstadoSolicitudCredito.Desembolsada)
             .GroupBy(x => x.UsuarioCreacion)
             .Select(x => new
             {
                 SellerEmail = x.Key,
-                ApprovedCredits = x.Count(),
-                ApprovedAmount = x.Sum(s => s.ValorMoto)
+                Applications = x.Count(),
+                ApprovedCredits = x.Count(s => s.Estado == EstadoSolicitudCredito.Aprobada || s.Estado == EstadoSolicitudCredito.Desembolsada),
+                RejectedCredits = x.Count(s => s.Estado == EstadoSolicitudCredito.Rechazada),
+                ReturnedCredits = x.Count(s => s.FechaDevolucion.HasValue),
+                ApprovedAmount = x.Sum(s => s.Estado == EstadoSolicitudCredito.Aprobada || s.Estado == EstadoSolicitudCredito.Desembolsada ? s.ValorMoto : 0)
             })
             .OrderByDescending(x => x.ApprovedAmount)
             .ToListAsync(cancellationToken);
-        var sellerEmails = salesRows.Select(x => x.SellerEmail).ToArray();
+        var quoteRowsBySeller = await quotes
+            .GroupBy(x => x.UsuarioCreacion)
+            .Select(x => new { SellerEmail = x.Key, Quotes = x.Count(),
+                Converted = x.Count(quote => db.SolicitudesCredito.Any(application => application.CotizacionId == quote.Id)) })
+            .ToListAsync(cancellationToken);
+        var sellerEmails = salesRows.Select(x => x.SellerEmail).Concat(quoteRowsBySeller.Select(x => x.SellerEmail)).Distinct().ToArray();
         var sellerNames = await db.Usuarios
             .Where(x => sellerEmails.Contains(x.Email))
             .Select(x => new { x.Email, x.NombreCompleto })
             .ToDictionaryAsync(x => x.Email, x => x.NombreCompleto, cancellationToken);
-        var quoteCountsBySeller = await quotes
-            .GroupBy(x => x.UsuarioCreacion)
-            .Select(x => new { SellerEmail = x.Key, Quotes = x.Count() })
-            .ToDictionaryAsync(x => x.SellerEmail, x => x.Quotes, cancellationToken);
-        var salesBySeller = salesRows
-            .Select(x => new SalesBySellerDto(
-                sellerNames.TryGetValue(x.SellerEmail, out var sellerName) ? sellerName : x.SellerEmail,
-                quoteCountsBySeller.TryGetValue(x.SellerEmail, out var sellerQuotes) ? sellerQuotes : 0,
-                x.ApprovedCredits,
-                x.ApprovedAmount))
+        var salesByEmail = salesRows.ToDictionary(x => x.SellerEmail);
+        var quotesByEmail = quoteRowsBySeller.ToDictionary(x => x.SellerEmail);
+        var salesBySeller = sellerEmails
+            .Select(email =>
+            {
+                salesByEmail.TryGetValue(email, out var applications);
+                quotesByEmail.TryGetValue(email, out var sellerQuotes);
+                var quoteCount = sellerQuotes?.Quotes ?? 0;
+                var converted = sellerQuotes?.Converted ?? 0;
+                var approved = applications?.ApprovedCredits ?? 0;
+                var rejected = applications?.RejectedCredits ?? 0;
+                return new SalesBySellerDto(
+                    sellerNames.TryGetValue(email, out var sellerName) ? sellerName : email,
+                    quoteCount, approved, applications?.ApprovedAmount ?? 0,
+                    applications?.Applications ?? 0, converted, rejected, applications?.ReturnedCredits ?? 0,
+                    quoteCount == 0 ? 0 : Math.Round((decimal)converted / quoteCount * 100, 2),
+                    approved + rejected == 0 ? 0 : Math.Round((decimal)approved / (approved + rejected) * 100, 2));
+            })
+            .OrderByDescending(x => x.ApprovedCredits).ThenByDescending(x => x.Quotes)
             .ToList();
 
         var convertedQuoteIds = await db.SolicitudesCredito

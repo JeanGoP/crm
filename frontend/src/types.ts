@@ -581,6 +581,18 @@ export interface CreditApplication {
   returnReason?: string;
   returnedAt?: string;
   returnedBy?: string;
+  returnHistory?: CreditReturn[];
+  sellerName?: string;
+  salesPointName?: string;
+}
+
+export interface CreditReturn {
+  id: string;
+  reason: string;
+  returnedAt: string;
+  returnedBy: string;
+  resubmittedAt?: string;
+  resubmittedBy?: string;
 }
 
 export interface MotorcycleDelivery {
@@ -742,6 +754,12 @@ export interface SalesBySeller {
   quotes: number;
   approvedCredits: number;
   approvedAmount: number;
+  applications: number;
+  convertedQuotes: number;
+  rejectedCredits: number;
+  returnedCredits: number;
+  quoteConversionRate: number;
+  approvalRate: number;
 }
 
 export interface QuotesByStatus {

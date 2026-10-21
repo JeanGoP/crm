@@ -958,6 +958,62 @@ namespace CrmSaas.Infrastructure.Persistence.Migrations
                     b.ToTable("DetallesOrdenRecaudo", (string)null);
                 });
 
+            modelBuilder.Entity("CrmSaas.Domain.Entities.DevolucionSolicitudCredito", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("EmpresaId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("FechaActualizacion")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("FechaCreacion")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("FechaDevolucion")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("FechaReenvio")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Motivo")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<Guid>("SolicitudCreditoId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("UsuarioActualizacion")
+                        .HasMaxLength(180)
+                        .HasColumnType("nvarchar(180)");
+
+                    b.Property<string>("UsuarioCreacion")
+                        .IsRequired()
+                        .HasMaxLength(180)
+                        .HasColumnType("nvarchar(180)");
+
+                    b.Property<string>("UsuarioDevolucion")
+                        .IsRequired()
+                        .HasMaxLength(180)
+                        .HasColumnType("nvarchar(180)");
+
+                    b.Property<string>("UsuarioReenvio")
+                        .HasMaxLength(180)
+                        .HasColumnType("nvarchar(180)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EmpresaId");
+
+                    b.HasIndex("SolicitudCreditoId");
+
+                    b.ToTable("DevolucionesSolicitudCredito", (string)null);
+                });
+
             modelBuilder.Entity("CrmSaas.Domain.Entities.DocumentoPerfilRequisito", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3106,6 +3162,17 @@ namespace CrmSaas.Infrastructure.Persistence.Migrations
                     b.Navigation("OrdenRecaudo");
                 });
 
+            modelBuilder.Entity("CrmSaas.Domain.Entities.DevolucionSolicitudCredito", b =>
+                {
+                    b.HasOne("CrmSaas.Domain.Entities.SolicitudCredito", "SolicitudCredito")
+                        .WithMany("Devoluciones")
+                        .HasForeignKey("SolicitudCreditoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("SolicitudCredito");
+                });
+
             modelBuilder.Entity("CrmSaas.Domain.Entities.DocumentoPerfilRequisito", b =>
                 {
                     b.HasOne("CrmSaas.Domain.Entities.PerfilRequisito", "PerfilRequisito")
@@ -3519,6 +3586,8 @@ namespace CrmSaas.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("CrmSaas.Domain.Entities.SolicitudCredito", b =>
                 {
                     b.Navigation("Codeudores");
+
+                    b.Navigation("Devoluciones");
 
                     b.Navigation("Documentos");
                 });

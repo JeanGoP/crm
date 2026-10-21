@@ -48,6 +48,9 @@ Check((bool)controlledStatus.Invoke(null, [EstadoSolicitudCredito.Aprobada])! &&
 var decisionRoles = typeof(CreditApplicationsController).GetMethod("Decide")!
     .GetCustomAttribute<AuthorizeAttribute>()?.Roles;
 Check(decisionRoles == CreditRoles.Managers, "El aprobador, supervisor y administrador pueden registrar una decisión formal.");
+Check(typeof(CreditApplicationsController).GetMethod("SaveStep0")!
+    .GetCustomAttribute<AuthorizeAttribute>()?.Roles == "Vendedor",
+    "RUNT, SIMIT e identidad corresponden al vendedor.");
 foreach (var role in new[] { "Administrador", "Supervisor", CreditRoles.Approver })
 {
     var user = new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.Role, role)], "test"));
@@ -77,6 +80,14 @@ Invoke("ReturnForCorrection", returnedApplication, "Recibo ilegible", "aprobador
 Check(returnedApplication.Estado == EstadoSolicitudCredito.DocumentosPendientes && !returnedApplication.DocumentacionCompleta &&
     returnedApplication.MotivoDevolucion == "Recibo ilegible" && returnedApplication.UsuarioDevolucion == "aprobador" && returnedApplication.FechaDevolucion.HasValue,
     "La devolución debe reabrir la solicitud y conservar motivo, fecha y responsable.");
+Check(returnedApplication.Devoluciones.Count == 1 && returnedApplication.Devoluciones.Single().Motivo == "Recibo ilegible",
+    "Cada devolución debe quedar registrada en el historial.");
+Invoke("ReturnForCorrection", returnedApplication, "Falta la firma", "supervisor");
+Check(returnedApplication.Devoluciones.Count == 2 && returnedApplication.Devoluciones.Any(x => x.Motivo == "Recibo ilegible") &&
+    returnedApplication.Devoluciones.Any(x => x.Motivo == "Falta la firma"), "Una nueva devolución no debe borrar la anterior.");
+Invoke("MarkReturnsResubmitted", returnedApplication, "vendedor");
+Check(returnedApplication.Devoluciones.All(x => x.FechaReenvio.HasValue && x.UsuarioReenvio == "vendedor"),
+    "El reenvío debe cerrar todas las devoluciones pendientes sin borrarlas.");
 MustReject("ReturnForCorrection", new SolicitudCredito { Estado = EstadoSolicitudCredito.EnEstudio }, " ", "aprobador");
 MustReject("ReturnForCorrection", new SolicitudCredito { Estado = EstadoSolicitudCredito.Aprobada }, "Falta documento", "aprobador");
 var rejectedApplication = new SolicitudCredito { DocumentacionCompleta = true };
@@ -143,6 +154,12 @@ using var db = new CrmDbContext(new DbContextOptionsBuilder<CrmDbContext>()
     .UseSqlServer("Server=(local);Database=ModelChecks;Integrated Security=True;TrustServerCertificate=True").Options, tenant);
 Check(db.Model.FindEntityType(typeof(AlertaInterna))!.GetQueryFilter() != null, "Los avisos deben estar aislados por empresa.");
 Check(db.AlertasInternas.Where(x => x.UsuarioId == Guid.NewGuid()).ToQueryString().Contains("EmpresaId"), "La bandeja filtra por empresa y usuario.");
+Check(db.Model.FindEntityType(typeof(DevolucionSolicitudCredito))!.GetQueryFilter() != null,
+    "El historial de devoluciones debe estar aislado por empresa.");
+Check(db.Cotizaciones.GroupBy(x => x.UsuarioCreacion)
+    .Select(group => new { Seller = group.Key,
+        Converted = group.Count(quote => db.SolicitudesCredito.Any(application => application.CotizacionId == quote.Id)) })
+    .ToQueryString().Contains("SolicitudesCredito"), "El informe de conversión por asesor debe traducirse a SQL.");
 var liveUser = Guid.NewGuid();
 var anotherUser = Guid.NewGuid();
 var broadcaster = new NotificationBroadcaster();

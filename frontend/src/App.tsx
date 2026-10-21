@@ -1682,7 +1682,7 @@ function creditManagerTask(application: CreditApplication): { label: string; tab
     return application.welcomeCompleted ? null : { label: 'Registrar bienvenida', tab: 'proceso' };
   }
   if (!application.runtChecked || !application.simitChecked || !application.identityValidated)
-    return { label: 'Verificar identidad, RUNT y SIMIT', tab: 'estudio' };
+    return { label: 'Esperar RUNT, SIMIT e identidad del vendedor', tab: 'estudio' };
   if (!application.creditBureauClientChecked || (application.coDebtorName && !application.creditBureauCoDebtorChecked))
     return { label: 'Registrar Datacrédito', tab: 'proceso' };
   if (application.documentationCompleted) return { label: 'Enviar a estudio', tab: 'estudio' };
@@ -1808,6 +1808,7 @@ function CreditWorkflowBoardPage() {
 function CreditApplicationsPage() {
   const canManageCredit = useCanManageCredit();
   const roles = useAuthStore((state) => state.user?.roles ?? []);
+  const canValidateInitial = roles.includes('Vendedor') && !canManageCredit;
   const canManagePostApproval = roles.includes('Administrador') || roles.includes('Supervisor');
   const { data: productCategories = [] } = useResource<ProductCategory[]>('/api/product-categories', []);
   const { data: rows = [], loading, error, reload, setData } = useResource<CreditApplication[]>('/api/credit-applications', []);
@@ -2095,7 +2096,7 @@ function CreditApplicationsPage() {
     <Header title="Solicitudes de credito" action="Nueva solicitud" onAction={() => setForm({ open: true })} onRefresh={reload} />
     <StatusBar loading={loading} error={error} />
     <CompactRecordsTable label="Solicitudes de crédito" searchLabel="Buscar solicitud" placeholder="Solicitud, cliente, cédula, teléfono o producto"
-      headers={[['Acciones', 165], ['Solicitud', 190], ['Estado', 165], ['Cliente', 250], ['Identificación', 145], ['Teléfono', 140], ['Producto', 260], ['Valor', 150, 'right'], ['Cuota inicial', 150, 'right'], ['Referencias', 100], ['Pendientes', 420]]}
+      headers={[['Acciones', 165], ['Solicitud', 190], ['Estado', 165], ['Cliente', 250], ['Vendedor', 190], ['Punto de venta', 180], ['Identificación', 145], ['Teléfono', 140], ['Producto', 260], ['Valor', 150, 'right'], ['Cuota inicial', 150, 'right'], ['Referencias', 100], ['Pendientes', 420]]}
       empty="No hay solicitudes de credito"
       rows={rows.map((r) => ({ id: r.id,
         searchText: [r.number, r.customerName, r.identificationNumber, r.mobile, r.productName, creditStatus(r.status), r.studyResult, r.returnReason].join(' '),
@@ -2107,6 +2108,8 @@ function CreditApplicationsPage() {
         r.number,
         <StatusChip label={creditStatus(r.status)} tone={creditTone(r.status)} flash={flashingStatuses.has(r.id)} />,
         r.customerName,
+        r.sellerName || r.formDetails?.advisor || '—',
+        r.salesPointName || r.formDetails?.salesPoint || '—',
         r.identificationNumber,
         r.mobile,
         r.productName,
@@ -2121,6 +2124,7 @@ function CreditApplicationsPage() {
       application={managementApplication}
       initialTab={searchParams.get('tab') === 'proceso' ? 4 : searchParams.get('tab') === 'acciones' ? 3 : searchParams.get('tab') === 'estudio' ? 1 : searchParams.get('tab') === 'pendiente' && managementApplication && canManageCredit && managementApplication.documentationCompleted ? managementApplication.status >= 5 ? 4 : 1 : 0}
       showWorkflow={canManageCredit}
+      canValidateInitial={canValidateInitial}
       canManagePostApproval={canManagePostApproval}
       onClose={closeManagement}
       onUpdateDocument={updateDocument}
@@ -2172,6 +2176,7 @@ function CreditApplicationManagementDialog({
   application,
   initialTab,
   showWorkflow,
+  canValidateInitial,
   canManagePostApproval,
   onClose,
   onUpdateDocument,
@@ -2192,6 +2197,7 @@ function CreditApplicationManagementDialog({
   application?: CreditApplication;
   initialTab?: number;
   showWorkflow: boolean;
+  canValidateInitial: boolean;
   canManagePostApproval: boolean;
   onClose: () => void;
   onUpdateDocument: (application: CreditApplication, document: CreditDocument, status: number, patch?: Partial<Pick<CreditDocument, 'expiresAt' | 'notes' | 'rejectionReason'>>) => Promise<void>;
@@ -2240,6 +2246,7 @@ function CreditApplicationManagementDialog({
         <Box>
           <Typography variant="h6" fontWeight={900}>Gestionar solicitud</Typography>
           <Typography variant="body2" color="text.secondary">{application.number} · {application.customerName} · {application.productName}</Typography>
+          <Typography variant="caption" color="text.secondary">Vendedor: {application.sellerName || application.formDetails?.advisor || 'Sin asignar'} · Punto de venta: {application.salesPointName || application.formDetails?.salesPoint || 'Sin asignar'}</Typography>
         </Box>
         <StatusChip label={creditStatus(application.status)} tone={creditTone(application.status)} />
       </Stack>
@@ -2264,16 +2271,23 @@ function CreditApplicationManagementDialog({
             {document.coDebtorId ? application.coDebtors?.find((person) => person.id === document.coDebtorId)?.name ?? 'Codeudor' : 'Cliente'} · {document.name}: {document.rejectionReason}
           </Typography>)}
         </Alert>}
+        {(application.returnHistory?.length ?? 0) > 0 && <Paper variant="outlined" sx={{ p: 1.5, mb: 2 }}>
+          <Typography fontWeight={800} fontSize={13} sx={{ mb: .75 }}>Historial de devoluciones</Typography>
+          {application.returnHistory!.map((entry) => <Box key={entry.id} sx={{ py: .7, borderTop: '1px solid #e2e8f0' }}>
+            <Typography variant="body2"><b>{new Date(entry.returnedAt).toLocaleString()}</b> · {entry.returnedBy}: {entry.reason}</Typography>
+            <Typography variant="caption" color="text.secondary">{entry.resubmittedAt ? `Corregida y reenviada el ${new Date(entry.resubmittedAt).toLocaleString()} por ${entry.resubmittedBy || 'el vendedor'}` : 'Pendiente de corrección y reenvío'}</Typography>
+          </Box>)}
+        </Paper>}
         {tab === 0 && <Stack spacing={2}>
           <Stack direction="row" gap={.75} flexWrap="wrap" useFlexGap>
             <CreditApplicationPendingSummary application={application} />
           </Stack>
           {!showWorkflow && application.documentationCompleted && [1, 2, 3, 4].includes(application.status) &&
-            <Alert severity="info">El expediente está listo para revisión. Un aprobador de créditos, supervisor o administrador registra las verificaciones y decide el crédito.</Alert>}
+            <Alert severity="info">Complete RUNT, SIMIT e identidad en «Estudio». Luego el aprobador de créditos, supervisor o administrador revisará el expediente y decidirá.</Alert>}
           {showWorkflow && [2, 3, 4].includes(application.status) && <Button color="warning" variant="outlined" sx={{ alignSelf: 'flex-start' }} onClick={openReturn}>Devolver al vendedor</Button>}
           <DocumentSummary application={application} onComplete={(completed) => onWorkflowMilestone(application, "documentation", completed)} onUpdate={onUpdateDocument} onUpload={onUploadDocument} onDownload={onDownloadDocument} onDelete={onDeleteDocument} />
         </Stack>}
-        {tab === 1 && <CreditStudySummary application={application} canManage={showWorkflow} canManagePostApproval={canManagePostApproval} onStep0={onStep0} onRecalculate={onRecalculate} onDecision={onDecision} onChangeStatus={onChangeStatus} />}
+        {tab === 1 && <CreditStudySummary application={application} canManage={showWorkflow} canValidateInitial={canValidateInitial} canManagePostApproval={canManagePostApproval} onStep0={onStep0} onRecalculate={onRecalculate} onDecision={onDecision} onChangeStatus={onChangeStatus} />}
         {tab === 2 && <Stack spacing={2}>
           <Typography variant="subtitle2" fontWeight={900}>Descargar documentos</Typography>
           <CreditTemplateDownloads application={application} onDownload={onDownloadTemplate} />
@@ -2343,8 +2357,8 @@ function CreditWorkflowControls({ application, canManagePostApproval, onCreditBu
 
   const stages = [
     { number: 1, title: 'Creación de la solicitud', complete: true, detail: `Creada el ${new Date(application.createdAt).toLocaleDateString()}` },
-    { number: 2, title: 'Verificación SIMIT y RUNT', complete: initialReady, detail: initialReady ? `Completada por ${application.step0User || 'el equipo'}` : 'Pendiente en la pestaña Estudio' },
-    { number: 3, title: 'Verificación Datacrédito', complete: bureauReady, detail: bureauReady ? `Cliente${application.creditBureauClientScore != null ? `: ${application.creditBureauClientScore}` : ''}${application.coDebtorName ? ` · Codeudor${application.creditBureauCoDebtorScore != null ? `: ${application.creditBureauCoDebtorScore}` : ''}` : ''}` : 'Falta registrar la consulta', action: 'bureau' as CreditWorkflowEditor },
+    { number: 2, title: 'Verificación SIMIT y RUNT', complete: initialReady, detail: initialReady ? `Completada por ${application.step0User || 'el vendedor'}` : 'Pendiente del vendedor en la pestaña Estudio' },
+    { number: 3, title: 'Verificación Datacrédito', complete: bureauReady, detail: bureauReady ? `Cliente${application.creditBureauClientScore != null ? `: ${application.creditBureauClientScore}` : ''}${application.coDebtorName ? ` · Codeudor${application.creditBureauCoDebtorScore != null ? `: ${application.creditBureauCoDebtorScore}` : ''}` : ''}` : 'Falta registrar la consulta', action: 'bureau' as CreditWorkflowEditor, disabled: !initialReady },
     { number: 4, title: "Ingreso de soportes", complete: documentsReady, detail: documentsReady ? "Documentación confirmada por el responsable" : "Confirme que recibió los documentos necesarios para este caso" },
     { number: 5, title: 'Aprobaciones', complete: approved, detail: application.studyResult || (application.status === 4 ? 'Credito en estudio' : application.status === 3 ? 'Listo para enviar a estudio' : 'Pendiente de estudio') },
     { number: 6, title: 'Firmas del negocio', complete: application.signaturesCompleted, detail: application.signaturesCompleted ? `Registradas por ${application.signaturesUser || 'el equipo'}` : 'Pendientes después de la aprobación', action: 'signatures' as CreditWorkflowEditor, disabled: !approved },
@@ -2453,9 +2467,10 @@ function CreditWorkflowControls({ application, canManagePostApproval, onCreditBu
   </>;
 }
 
-function CreditStudySummary({ application, canManage, canManagePostApproval, onStep0, onRecalculate, onDecision, onChangeStatus }: {
+function CreditStudySummary({ application, canManage, canValidateInitial, canManagePostApproval, onStep0, onRecalculate, onDecision, onChangeStatus }: {
   application: CreditApplication;
   canManage: boolean;
+  canValidateInitial: boolean;
   canManagePostApproval: boolean;
   onStep0: (application: CreditApplication, patch?: Partial<CreditApplication>) => Promise<void>;
   onRecalculate: (application: CreditApplication, patch: Partial<CreditApplication>) => Promise<void>;
@@ -2474,6 +2489,7 @@ function CreditStudySummary({ application, canManage, canManagePostApproval, onS
   const bureauReady = application.creditBureauClientChecked && (!application.coDebtorName || application.creditBureauCoDebtorChecked);
   const documentsReady = application.documentationCompleted;
   const canEditStudy = canManage && (canManagePostApproval || ![5, 6, 7].includes(application.status));
+  const canEditInitial = canValidateInitial && ![4, 5, 6, 7, 9].includes(application.status);
   const approvedAmount = application.analystApprovedAmount ?? application.motorcycleValue;
   const approvedDownPayment = application.approvedDownPayment ?? application.downPayment;
   const approvedTerm = application.approvedTermMonths ?? application.termMonths;
@@ -2565,12 +2581,15 @@ function CreditStudySummary({ application, canManage, canManagePostApproval, onS
     </Typography>
     {approvedPayment > 0 && <Typography variant="caption" color="text.secondary">Cuota analista: {money(approvedPayment)}</Typography>}
     {application.decisionNotes && <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.25 }}>{application.decisionNotes}</Typography>}
-    {canEditStudy ? <Stack direction="row" gap={.5} flexWrap="wrap">
+    {canEditInitial && <Alert severity="info">Como vendedor, complete aquí RUNT, SIMIT e identidad antes de enviar la solicitud a estudio.</Alert>}
+    {canEditInitial && <Stack direction="row" gap={.5} flexWrap="wrap">
       <Button size="small" variant="outlined" onClick={() => void openExternalLookup(runtUrl, application.identificationNumber)}>RUNT</Button>
       <Button size="small" variant="outlined" onClick={() => void openExternalLookup(simitUrl, application.identificationNumber)}>SIMIT</Button>
       <Button size="small" variant="outlined" onClick={openInitialValidation}>Validacion inicial</Button>
+    </Stack>}
+    {canEditStudy ? <Stack direction="row" gap={.5} flexWrap="wrap">
       <Button size="small" variant="outlined" onClick={recalculate}>Recalcular</Button>
-    </Stack> : !canManage ? <Alert severity="info">Un aprobador de créditos, supervisor o administrador registra las verificaciones y decide el crédito.</Alert> : null}
+    </Stack> : !canManage && !canEditInitial ? <Alert severity="info">El estudio y la decisión corresponden al aprobador de créditos, supervisor o administrador.</Alert> : null}
     {canEditStudy && <Stack direction="row" gap={.5} flexWrap="wrap">
       {actions.length ? actions.map((action) => <Button key={action.status} size="small" variant="outlined" disabled={action.status === 4 && !(step0Ready && bureauReady && documentsReady)} onClick={() => onChangeStatus(application, action.status)}>{action.label}</Button>) : <Chip size="small" label="Sin acciones" variant="outlined" />}
       {application.status === 4 && <>
@@ -3418,22 +3437,21 @@ function CommercialReportsPage() {
     </CardContent></Card>
     <StatusBar loading={loading} error={error} />
     <Grid container spacing={2}>{cards.map((card) => <Grid item xs={12} sm={6} md={card.label === 'Valor aprobado' ? 3 : 1.8} key={card.label}><Metric label={card.label} value={card.value} /></Grid>)}</Grid>
+    <Card><CardContent>
+      <Typography variant="h6" fontWeight={900} sx={{ mb: .5 }}>Efectividad por asesor</Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>Conversión: cotizaciones del período que llegaron a solicitud. Aprobación: créditos aprobados sobre los ya decididos. Las devoluciones cuentan solicitudes devueltas al menos una vez.</Typography>
+      <Box sx={{ overflowX: 'auto' }}>
+        <ReportTable
+          headers={['Asesor', 'Cotizaciones', 'A solicitud', 'Conversión', 'Solicitudes', 'Aprobados', 'Negados', 'Devueltos', 'Aprobación', 'Valor aprobado']}
+          empty="Sin actividad comercial en el período"
+          rows={(data?.salesBySeller ?? []).map((row) => [
+            row.seller, row.quotes, row.convertedQuotes, percent(row.quoteConversionRate), row.applications,
+            row.approvedCredits, row.rejectedCredits, row.returnedCredits, percent(row.approvalRate), money(row.approvedAmount)
+          ])}
+        />
+      </Box>
+    </CardContent></Card>
     <Grid container spacing={2}>
-      <Grid item xs={12} lg={6}>
-        <Card><CardContent>
-          <Typography variant="h6" fontWeight={900} sx={{ mb: 1 }}>Ventas por vendedor</Typography>
-          <ReportTable
-            headers={['Vendedor', 'Cotizaciones', 'Aprobados', 'Valor']}
-            empty="Sin ventas aprobadas en el periodo"
-            rows={(data?.salesBySeller ?? []).map((row) => [
-              row.seller,
-              row.quotes,
-              row.approvedCredits,
-              money(row.approvedAmount)
-            ])}
-          />
-        </CardContent></Card>
-      </Grid>
       <Grid item xs={12} lg={6}>
         <Card><CardContent>
           <Typography variant="h6" fontWeight={900} sx={{ mb: 1 }}>Cotizaciones por estado</Typography>
@@ -5321,6 +5339,7 @@ function mergeMissingCreditDetails(saved: CreditFormDetails | null | undefined, 
 }
 
 function CreditApplicationDialog({ form, startingQuoteId, customers, products, productCategories, quotes, onClose, onSave }: DialogProps<CreditApplication, typeof emptyCreditApplication> & { startingQuoteId?: string | null; customers: Customer[]; products: Product[]; productCategories: ProductCategory[]; quotes: Quote[]; }) {
+  const currentUser = useAuthStore((state) => state.user);
   const [referenceDialog, setReferenceDialog] = useState<'client' | number>();
   useEffect(() => {
     if (!form.open) setReferenceDialog(undefined);
@@ -5461,6 +5480,10 @@ function CreditApplicationDialog({ form, startingQuoteId, customers, products, p
               }} />
               <TextField required select disabled={!!selectedQuote} label="Cliente" value={v.customerId} onChange={(e) => set({ customerId: e.target.value })} helperText={selectedQuote ? 'Cliente asociado a la cotización seleccionada.' : undefined}>{customers.map((x) => <MenuItem key={x.id} value={x.id}>{x.firstNames || x.name} {x.lastNames}</MenuItem>)}</TextField>
             </FieldGrid>
+            <Alert severity="info">
+              Vendedor: {selectedQuote?.advisorName || v.formDetails?.advisor || form.item?.sellerName || currentUser?.fullName || 'Sin asignar'}
+              {' · '}Punto de venta: {selectedQuote?.salesPointName || v.formDetails?.salesPoint || form.item?.salesPointName || currentUser?.salesPointName || 'Sin asignar'}
+            </Alert>
             <Box sx={{
               display: 'grid',
               gridTemplateColumns: { xs: '1fr', md: '260px minmax(260px, 1fr) auto' },
@@ -5651,6 +5674,7 @@ function DocumentSummary({ application, onUpdate, onUpload, onDownload, onDelete
   const documentsEditable = ![5, 6, 7, 9].includes(application.status);
   const canChangeFiles = documentsEditable && application.status !== 4;
   const hasRejectedDocuments = application.documents.some((document) => document.status === 4);
+  const hasOpenReturn = (application.returnHistory ?? []).some((entry) => !entry.resubmittedAt);
   const [owner, setOwner] = useState('client');
   useEffect(() => setOwner('client'), [application.id]);
   const ownerDocuments = application.documents.filter((document) => owner === 'client' ? !document.coDebtorId : document.coDebtorId === owner);
@@ -5686,11 +5710,11 @@ function DocumentSummary({ application, onUpdate, onUpload, onDownload, onDelete
     </Alert>
     <Stack direction={{ xs: 'column', sm: 'row' }} gap={1} alignItems={{ sm: 'center' }} justifyContent="space-between">
       <Typography variant="body2">{application.documents.filter((d) => d.hasFile).length} archivos cargados · Sin fechas de vencimiento</Typography>
-      <Button variant={application.documentationCompleted ? 'outlined' : 'contained'} disabled={saving || !canChangeFiles || hasRejectedDocuments} onClick={() => setConfirmComplete(true)}>{application.documentationCompleted ? 'Reabrir documentación' : 'Documentación completa'}</Button>
+      <Button variant={application.documentationCompleted ? 'outlined' : 'contained'} disabled={saving || !canChangeFiles || hasRejectedDocuments} onClick={() => setConfirmComplete(true)}>{application.documentationCompleted ? 'Reabrir documentación' : hasOpenReturn ? 'Reenviar correcciones' : 'Documentación completa'}</Button>
     </Stack>
     {hasRejectedDocuments && <Typography variant="caption" color="error">Corrija los documentos rechazados antes de confirmar que la documentación está completa.</Typography>}
     {completionError && <Alert severity="error">{completionError}</Alert>}
-    <ConfirmDialog open={confirmComplete} title={application.documentationCompleted ? 'Reabrir documentación' : 'Confirmar documentación completa'} text={application.documentationCompleted ? 'La documentación volverá a quedar pendiente de confirmación. No se borrará ningún archivo.' : 'Confirmo que recibí todos los documentos necesarios para esta solicitud. No es necesario cargar todas las opciones del listado.'} confirmLabel="Confirmar" onClose={() => setConfirmComplete(false)} onConfirm={async () => {
+    <ConfirmDialog open={confirmComplete} title={application.documentationCompleted ? 'Reabrir documentación' : hasOpenReturn ? 'Reenviar solicitud corregida' : 'Confirmar documentación completa'} text={application.documentationCompleted ? 'La documentación volverá a quedar pendiente de confirmación. No se borrará ningún archivo.' : hasOpenReturn ? 'Confirmo que corregí los puntos devueltos y que recibí los documentos necesarios. Se avisará de nuevo al equipo de crédito.' : 'Confirmo que recibí todos los documentos necesarios para esta solicitud. No es necesario cargar todas las opciones del listado.'} confirmLabel="Confirmar" onClose={() => setConfirmComplete(false)} onConfirm={async () => {
       setSaving(true);
       setCompletionError('');
       try { await onComplete(!application.documentationCompleted); setConfirmComplete(false); }
@@ -6103,7 +6127,7 @@ function EntityTable({ headers, rows, empty, compact = false }: { headers: strin
 
 function ReportTable({ headers, rows, empty }: { headers: string[]; rows: ReactNode[][]; empty: string }) {
   return <TableContainer className="responsiveTableScroll" sx={{ width: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch', border: `1px solid ${uiBorder}`, borderRadius: 2, bgcolor: '#fff', boxShadow: '0 10px 28px rgba(15, 23, 42, .045)' }}>
-    <Table size="small" sx={{ minWidth: 560, borderCollapse: 'separate', borderSpacing: 0 }}>
+    <Table size="small" sx={{ minWidth: headers.length > 8 ? 1150 : 560, borderCollapse: 'separate', borderSpacing: 0 }}>
       <TableHead><TableRow>{headers.map((h) => <TableCell key={h} sx={{ whiteSpace: 'nowrap', fontWeight: 900, py: .9, bgcolor: '#eef6f8', color: '#155e75', textTransform: 'uppercase', fontSize: 11 }}>{h}</TableCell>)}</TableRow></TableHead>
       <TableBody>{rows.length ? rows.map((row, i) => <TableRow key={i} sx={{ bgcolor: i % 2 === 0 ? '#fff' : '#fbfdff', '&:hover': { bgcolor: '#eef9fb' } }}>{row.map((c, j) => <TableCell key={j} sx={{ verticalAlign: 'top', py: .85 }}>{c ?? '-'}</TableCell>)}</TableRow>) : <TableRow><TableCell colSpan={headers.length}><EmptyState text={empty} /></TableCell></TableRow>}</TableBody>
     </Table>

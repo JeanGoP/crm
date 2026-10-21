@@ -38,6 +38,7 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
     public DbSet<Cotizacion> Cotizaciones => Set<Cotizacion>();
     public DbSet<CotizacionItem> CotizacionItems => Set<CotizacionItem>();
     public DbSet<SolicitudCredito> SolicitudesCredito => Set<SolicitudCredito>();
+    public DbSet<DevolucionSolicitudCredito> DevolucionesSolicitudCredito => Set<DevolucionSolicitudCredito>();
     public DbSet<CodeudorSolicitudCredito> CodeudoresSolicitudCredito => Set<CodeudorSolicitudCredito>();
     public DbSet<DocumentoSolicitudCredito> DocumentosSolicitudCredito => Set<DocumentoSolicitudCredito>();
     public DbSet<EntregaMoto> EntregasMoto => Set<EntregaMoto>();
@@ -83,6 +84,13 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
         modelBuilder.Entity<Cotizacion>().ToTable("Cotizaciones");
         modelBuilder.Entity<CotizacionItem>().ToTable("CotizacionItems");
         modelBuilder.Entity<SolicitudCredito>().ToTable("SolicitudesCredito");
+        modelBuilder.Entity<DevolucionSolicitudCredito>().ToTable("DevolucionesSolicitudCredito");
+        modelBuilder.Entity<DevolucionSolicitudCredito>().HasOne(x => x.SolicitudCredito)
+            .WithMany(x => x.Devoluciones).HasForeignKey(x => x.SolicitudCreditoId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<DevolucionSolicitudCredito>().Property(x => x.Motivo).HasMaxLength(1000);
+        modelBuilder.Entity<DevolucionSolicitudCredito>().Property(x => x.UsuarioDevolucion).HasMaxLength(180);
+        modelBuilder.Entity<DevolucionSolicitudCredito>().Property(x => x.UsuarioReenvio).HasMaxLength(180);
+        modelBuilder.Entity<SolicitudCredito>().Navigation(x => x.Devoluciones).AutoInclude();
         modelBuilder.Entity<CodeudorSolicitudCredito>().ToTable("CodeudoresSolicitudCredito");
         modelBuilder.Entity<CodeudorSolicitudCredito>().Property(x => x.IngresosMensuales).HasPrecision(18, 2);
         modelBuilder.Entity<CodeudorSolicitudCredito>().HasOne(x => x.SolicitudCredito)
@@ -362,6 +370,7 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
         modelBuilder.Entity<Cotizacion>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<CotizacionItem>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<SolicitudCredito>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
+        modelBuilder.Entity<DevolucionSolicitudCredito>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<CodeudorSolicitudCredito>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<DocumentoSolicitudCredito>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<EntregaMoto>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);

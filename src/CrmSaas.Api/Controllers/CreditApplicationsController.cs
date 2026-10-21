@@ -80,6 +80,17 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
                 ?? throw new KeyNotFoundException("Cotizacion no encontrada.")
             : null;
         var dealId = await ResolveQuoteDealAsync(quote, dto.CustomerId, cancellationToken);
+        var sellerEmail = quote?.UsuarioCreacion ?? tenantContext.UsuarioActual;
+        var seller = await db.Usuarios.Include(x => x.PuntoVenta)
+            .FirstOrDefaultAsync(x => x.Email == sellerEmail, cancellationToken);
+        var sellerName = seller?.NombreCompleto ?? sellerEmail;
+        var salesPointName = quote?.NombreSede ?? seller?.PuntoVenta?.Nombre;
+        var formDetails = (dto.FormDetails ?? new CreditFormDetailsDto()) with
+        {
+            Advisor = sellerName,
+            SalesPoint = salesPointName,
+            Zone = dto.FormDetails?.Zone ?? salesPointName
+        };
 
         var entity = new SolicitudCredito
         {
@@ -119,7 +130,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             CodeudorReferencia2Relacion = Normalize(dto.CoDebtorReference2Relationship),
             Estado = EstadoSolicitudCredito.Borrador,
             Observaciones = dto.Notes,
-            FormDetailsJson = CreditFormDetails.Save(dto.FormDetails)
+            FormDetailsJson = CreditFormDetails.Save(formDetails)
         };
 
         AddChecklistDocuments(entity, null);
@@ -295,25 +306,35 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
     }
 
     [HttpPost("{id:guid}/study/step0")]
-    [Authorize(Roles = CreditRoles.Managers)]
+    [Authorize(Roles = "Vendedor")]
     public async Task<ActionResult<CreditApplicationDto>> SaveStep0(Guid id, CreditStudyStep0Dto dto, CancellationToken cancellationToken)
     {
-        var entity = await db.SolicitudesCredito
+        var entity = await VisibleApplications()
             .Include(x => x.Cliente)
             .Include(x => x.Producto)
+            .Include(x => x.Cotizacion)
             .Include(x => x.PerfilRequisito)
             .Include(x => x.Documentos).Include(x => x.Codeudores)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
             ?? throw new KeyNotFoundException("Solicitud de credito no encontrada.");
 
-        if (IsPostApprovalStatus(entity.Estado) && !CanManageAfterApproval()) return Forbid();
+        if (entity.UsuarioCreacion != tenantContext.UsuarioActual && entity.Cotizacion?.UsuarioCreacion != tenantContext.UsuarioActual)
+            return Forbid();
+        if (entity.Estado is EstadoSolicitudCredito.EnEstudio or EstadoSolicitudCredito.Aprobada or
+            EstadoSolicitudCredito.Rechazada or EstadoSolicitudCredito.Desembolsada or EstadoSolicitudCredito.Desistida)
+            throw new ValidationException("La validación inicial debe completarla el vendedor antes de enviar la solicitud a estudio.");
 
+        var wasReady = entity.RuntConsultado && entity.SimitConsultado && entity.IdentidadValidada;
         entity.RuntConsultado = dto.RuntChecked;
         entity.SimitConsultado = dto.SimitChecked;
         entity.IdentidadValidada = dto.IdentityValidated;
         entity.ObservacionPaso0 = Normalize(dto.Notes);
         entity.UsuarioPaso0 = tenantContext.UsuarioActual;
         entity.FechaRevisionPaso0 = ColombiaTime.Now;
+
+        if (!wasReady && entity.RuntConsultado && entity.SimitConsultado && entity.IdentidadValidada && entity.DocumentacionCompleta)
+            await notifications.QueueForCreditReviewAsync(entity, "ValidacionInicialLista", "Validación inicial lista",
+                $"{entity.Numero} · {entity.Cliente?.Nombres} {entity.Cliente?.Apellidos} · El vendedor completó RUNT, SIMIT e identidad. Continúe con Datacrédito y estudio.", cancellationToken);
 
         await db.SaveChangesAsync(cancellationToken);
         await notifications.PublishApplicationChangedAsync(entity, cancellationToken);
@@ -539,6 +560,8 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
 
         var entity = await LoadApplicationAsync(id, cancellationToken);
         if (IsPostApprovalStatus(entity.Estado) && !CanManageAfterApproval()) return Forbid();
+        if (!entity.RuntConsultado || !entity.SimitConsultado || !entity.IdentidadValidada)
+            throw new ValidationException("El vendedor debe completar RUNT, SIMIT e identidad antes de la consulta de Datacrédito.");
         if (dto.CoDebtorChecked && string.IsNullOrWhiteSpace(entity.CodeudorNombre))
         {
             throw new ValidationException("La solicitud no tiene un codeudor registrado.");
@@ -849,6 +872,14 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         entity.MotivoDevolucion = reason.Trim();
         entity.FechaDevolucion = ColombiaTime.Now;
         entity.UsuarioDevolucion = returnedBy;
+        entity.Devoluciones.Add(new DevolucionSolicitudCredito
+        {
+            EmpresaId = entity.EmpresaId,
+            SolicitudCreditoId = entity.Id,
+            Motivo = entity.MotivoDevolucion,
+            FechaDevolucion = entity.FechaDevolucion.Value,
+            UsuarioDevolucion = returnedBy
+        });
     }
 
     [HttpPost("{id:guid}/workflow/documentation")]
@@ -872,6 +903,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             entity.UsuarioDocumentacionCompleta = tenantContext.UsuarioActual;
             if (entity.Estado is EstadoSolicitudCredito.Borrador or EstadoSolicitudCredito.Cotizado or EstadoSolicitudCredito.Interesado or EstadoSolicitudCredito.DocumentosPendientes)
                 entity.Estado = EstadoSolicitudCredito.DocumentosRecibidos;
+            MarkReturnsResubmitted(entity, tenantContext.UsuarioActual);
             if (!wasComplete)
                 await notifications.QueueForCreditReviewAsync(entity, "DocumentacionLista", "Documentación lista",
                     $"{entity.Numero} · {entity.Cliente?.Nombres} {entity.Cliente?.Apellidos} · El expediente ya puede revisarse.", cancellationToken);
@@ -880,6 +912,15 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         await db.SaveChangesAsync(cancellationToken);
         await notifications.PublishApplicationChangedAsync(entity, cancellationToken);
         return Ok(ToDto(entity));
+    }
+
+    private static void MarkReturnsResubmitted(SolicitudCredito entity, string user)
+    {
+        foreach (var pendingReturn in entity.Devoluciones.Where(x => !x.FechaReenvio.HasValue))
+        {
+            pendingReturn.FechaReenvio = ColombiaTime.Now;
+            pendingReturn.UsuarioReenvio = user;
+        }
     }
 
     private bool CanValidateDocuments() => CreditRoles.CanManage(User);
@@ -1134,6 +1175,7 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         var customerName = x.Cliente is null ? "Cliente" : $"{x.Cliente.Nombres} {x.Cliente.Apellidos}".Trim();
         if (string.IsNullOrWhiteSpace(customerName) && x.Cliente is not null) customerName = x.Cliente.Nombre;
         var productName = x.Producto is null ? "Producto" : ProductName(x.Producto);
+        var details = CreditFormDetails.Read(x.FormDetailsJson);
         return new CreditApplicationDto(
             x.Id,
             x.Numero,
@@ -1216,7 +1258,10 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
             x.UsuarioBienvenida,
             x.ObservacionBienvenida,
             x.Documentos.OrderBy(d => Array.IndexOf(CreditDocumentCatalog.Names, d.Nombre) is var index && index >= 0 ? index : 999).ThenBy(d => d.Nombre).Select(ToDocumentDto).ToList(),
-            x.DocumentacionCompleta, x.FechaDocumentacionCompleta, x.UsuarioDocumentacionCompleta, x.FechaPrimerVencimiento, x.Codeudores.OrderBy(c => c.Orden).Select(CreditCoDebtorService.ToDto).ToList(), CreditFormDetails.Read(x.FormDetailsJson), x.MotivoDevolucion, x.FechaDevolucion, x.UsuarioDevolucion);
+            x.DocumentacionCompleta, x.FechaDocumentacionCompleta, x.UsuarioDocumentacionCompleta, x.FechaPrimerVencimiento, x.Codeudores.OrderBy(c => c.Orden).Select(CreditCoDebtorService.ToDto).ToList(), details, x.MotivoDevolucion, x.FechaDevolucion, x.UsuarioDevolucion,
+            x.Devoluciones.OrderByDescending(d => d.FechaDevolucion).Select(d => new CreditReturnDto(d.Id, d.Motivo, d.FechaDevolucion, d.UsuarioDevolucion, d.FechaReenvio, d.UsuarioReenvio)).ToList(),
+            details?.Advisor ?? x.Cotizacion?.UsuarioCreacion ?? x.UsuarioCreacion,
+            details?.SalesPoint ?? x.Cotizacion?.NombreSede);
     }
 
     private static CreditDocumentDto ToDocumentDto(DocumentoSolicitudCredito d) =>

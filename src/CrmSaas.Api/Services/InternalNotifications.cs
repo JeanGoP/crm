@@ -39,8 +39,9 @@ public sealed class InternalNotificationService(CrmDbContext db, ITenantContext 
 {
     public async Task PublishApplicationChangedAsync(SolicitudCredito application, CancellationToken cancellationToken)
     {
+        var sellerEmails = await SellerEmailsAsync(application, cancellationToken);
         var recipients = await db.Usuarios
-            .Where(user => user.Activo && (user.Email == application.UsuarioCreacion || user.UsuarioRoles.Any(role =>
+            .Where(user => user.Activo && (sellerEmails.Contains(user.Email) || user.UsuarioRoles.Any(role =>
                 role.Rol != null && (role.Rol.Nombre == "Administrador" || role.Rol.Nombre == "Supervisor" || role.Rol.Nombre == CreditRoles.Approver))))
             .Select(user => user.Id).ToListAsync(cancellationToken);
         broadcaster.Notify(recipients, application.Id);
@@ -61,10 +62,21 @@ public sealed class InternalNotificationService(CrmDbContext db, ITenantContext 
     public async Task<IReadOnlyList<Guid>> QueueForCreatorAsync(SolicitudCredito application, string type,
         string title, string message, CancellationToken cancellationToken)
     {
+        var sellerEmails = await SellerEmailsAsync(application, cancellationToken);
         var recipients = await db.Usuarios
-            .Where(user => user.Activo && user.Email == application.UsuarioCreacion)
+            .Where(user => user.Activo && sellerEmails.Contains(user.Email))
             .Select(user => user.Id).ToListAsync(cancellationToken);
         return await QueueForRecipientsAsync(application, recipients, type, title, message, deduplicate: false, cancellationToken);
+    }
+
+    private async Task<string[]> SellerEmailsAsync(SolicitudCredito application, CancellationToken cancellationToken)
+    {
+        var quoteSeller = application.CotizacionId.HasValue
+            ? await db.Cotizaciones.Where(quote => quote.Id == application.CotizacionId.Value)
+                .Select(quote => quote.UsuarioCreacion).FirstOrDefaultAsync(cancellationToken)
+            : null;
+        return new[] { application.UsuarioCreacion, quoteSeller }
+            .Where(email => !string.IsNullOrWhiteSpace(email)).Select(email => email!).Distinct().ToArray();
     }
 
     private async Task<IReadOnlyList<Guid>> QueueAsync(SolicitudCredito application, string type,
