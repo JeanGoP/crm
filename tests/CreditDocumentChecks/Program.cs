@@ -51,6 +51,16 @@ Check(decisionRoles == CreditRoles.Managers, "El aprobador, supervisor y adminis
 Check(typeof(CreditApplicationsController).GetMethod("SaveStep0")!
     .GetCustomAttribute<AuthorizeAttribute>()?.Roles == "Vendedor",
     "RUNT, SIMIT e identidad corresponden al vendedor.");
+var duplicateAdvisors = new[]
+{
+    new Usuario { Email = "casanovaayapel@gmail.com", NombreCompleto = "Cuenta anterior", Activo = false },
+    new Usuario { Email = "CasanovaAyapel@gmail.com", NombreCompleto = "Asesor activo", Activo = true }
+};
+var advisorNames = (Dictionary<string, string>)typeof(QuotesController)
+    .GetMethod("BuildAdvisorNames", BindingFlags.NonPublic | BindingFlags.Static)!
+    .Invoke(null, [duplicateAdvisors])!;
+Check(advisorNames.Count == 1 && advisorNames["casanovaayapel@gmail.com"] == "Asesor activo",
+    "Cotizaciones debe tolerar correos repetidos y preferir la cuenta activa.");
 foreach (var role in new[] { "Administrador", "Supervisor", CreditRoles.Approver })
 {
     var user = new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.Role, role)], "test"));

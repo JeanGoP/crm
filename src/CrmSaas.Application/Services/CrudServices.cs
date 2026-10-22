@@ -622,10 +622,19 @@ public sealed class CommercialReportService(ICrmDbContext db) : ICommercialRepor
                 Converted = x.Count(quote => db.SolicitudesCredito.Any(application => application.CotizacionId == quote.Id)) })
             .ToListAsync(cancellationToken);
         var sellerEmails = salesRows.Select(x => x.SellerEmail).Concat(quoteRowsBySeller.Select(x => x.SellerEmail)).Distinct().ToArray();
-        var sellerNames = await db.Usuarios
+        var matchingSellers = await db.Usuarios
             .Where(x => sellerEmails.Contains(x.Email))
-            .Select(x => new { x.Email, x.NombreCompleto })
-            .ToDictionaryAsync(x => x.Email, x => x.NombreCompleto, cancellationToken);
+            .Select(x => new { x.Email, x.NombreCompleto, x.Activo, x.FechaCreacion, x.FechaActualizacion, x.Id })
+            .ToListAsync(cancellationToken);
+        var sellerNames = matchingSellers
+            .Where(x => !string.IsNullOrWhiteSpace(x.Email))
+            .GroupBy(x => x.Email.Trim(), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key,
+                group => group.OrderByDescending(x => x.Activo)
+                    .ThenByDescending(x => x.FechaActualizacion ?? x.FechaCreacion)
+                    .ThenBy(x => x.Id)
+                    .First().NombreCompleto,
+                StringComparer.OrdinalIgnoreCase);
         var salesByEmail = salesRows.ToDictionary(x => x.SellerEmail);
         var quotesByEmail = quoteRowsBySeller.ToDictionary(x => x.SellerEmail);
         var salesBySeller = sellerEmails

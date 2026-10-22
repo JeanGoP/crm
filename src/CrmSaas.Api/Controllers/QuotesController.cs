@@ -64,8 +64,8 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             .ToDictionary(group => group.Key, group => group.OrderByDescending(x => x.FechaActualizacion ?? x.FechaCreacion).First().Descripcion);
         var advisorEmails = quotes.Select(x => x.UsuarioCreacion).Distinct().ToArray();
         var advisors = await db.Usuarios.Where(x => advisorEmails.Contains(x.Email))
-            .Select(x => new { x.Email, x.NombreCompleto }).ToListAsync(cancellationToken);
-        var advisorNames = advisors.ToDictionary(x => x.Email, x => x.NombreCompleto, StringComparer.OrdinalIgnoreCase);
+            .ToListAsync(cancellationToken);
+        var advisorNames = BuildAdvisorNames(advisors);
         return Ok(quotes.Select(x =>
         {
             var application = latestApplications.GetValueOrDefault(x.Id);
@@ -82,7 +82,7 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             return ToDto(x) with
             {
                 Status = quoteStatus,
-                AdvisorName = advisorNames.GetValueOrDefault(x.UsuarioCreacion, x.UsuarioCreacion),
+                AdvisorName = advisorNames.GetValueOrDefault(x.UsuarioCreacion.Trim(), x.UsuarioCreacion),
                 CreditApplicationId = application?.Id,
                 NextAction = next.Action,
                 NextActionAt = next.At,
@@ -90,6 +90,16 @@ public sealed class QuotesController(CrmDbContext db, ITenantContext tenantConte
             };
         }).ToList());
     }
+
+    private static Dictionary<string, string> BuildAdvisorNames(IEnumerable<Usuario> advisors) => advisors
+        .Where(x => !string.IsNullOrWhiteSpace(x.Email))
+        .GroupBy(x => x.Email.Trim(), StringComparer.OrdinalIgnoreCase)
+        .ToDictionary(group => group.Key,
+            group => group.OrderByDescending(x => x.Activo)
+                .ThenByDescending(x => x.FechaActualizacion ?? x.FechaCreacion)
+                .ThenBy(x => x.Id)
+                .First().NombreCompleto,
+            StringComparer.OrdinalIgnoreCase);
 
     private static (string? Action, DateTime? At, string? Url) QuoteNextAction(
         EstadoSolicitudCredito? status, bool? documentsComplete, DateTime? followUpAt) => status switch
