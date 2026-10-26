@@ -17,7 +17,7 @@ namespace CrmSaas.Api.Controllers;
 [ApiController]
 [Authorize]
 [Route("api/credit-applications")]
-public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnvironment env, ITenantContext tenantContext, InternalNotificationService notifications) : ControllerBase
+public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnvironment env, ITenantContext tenantContext, InternalNotificationService notifications, ErpCreditExportService erpExports) : ControllerBase
 {
     private static readonly HashSet<string> AllowedFileExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -297,8 +297,11 @@ public sealed class CreditApplicationsController(CrmDbContext db, IWebHostEnviro
         entity.Estado = dto.Status;
         ApplyDecision(entity, dto.Status, dto.Notes);
         if (dto.Status == EstadoSolicitudCredito.Aprobada)
+        {
+            await erpExports.QueueApprovedAsync(entity, cancellationToken);
             await notifications.QueueForPostApprovalManagersAsync(entity, "ListaParaFirmas", "Crédito listo para firmas",
                 $"{entity.Numero} · {entity.Cliente?.Nombres} {entity.Cliente?.Apellidos} · El crédito fue aprobado. Gestione las firmas del negocio.", cancellationToken);
+        }
         await SyncPipelineAsync(entity, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         await notifications.PublishApplicationChangedAsync(entity, cancellationToken);

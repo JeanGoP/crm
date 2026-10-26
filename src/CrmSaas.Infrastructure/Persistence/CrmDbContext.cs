@@ -38,6 +38,7 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
     public DbSet<Cotizacion> Cotizaciones => Set<Cotizacion>();
     public DbSet<CotizacionItem> CotizacionItems => Set<CotizacionItem>();
     public DbSet<SolicitudCredito> SolicitudesCredito => Set<SolicitudCredito>();
+    public DbSet<ErpCreditExport> ErpCreditExports => Set<ErpCreditExport>();
     public DbSet<DevolucionSolicitudCredito> DevolucionesSolicitudCredito => Set<DevolucionSolicitudCredito>();
     public DbSet<CodeudorSolicitudCredito> CodeudoresSolicitudCredito => Set<CodeudorSolicitudCredito>();
     public DbSet<DocumentoSolicitudCredito> DocumentosSolicitudCredito => Set<DocumentoSolicitudCredito>();
@@ -84,6 +85,13 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
         modelBuilder.Entity<Cotizacion>().ToTable("Cotizaciones");
         modelBuilder.Entity<CotizacionItem>().ToTable("CotizacionItems");
         modelBuilder.Entity<SolicitudCredito>().ToTable("SolicitudesCredito");
+        modelBuilder.Entity<ErpCreditExport>().ToTable("ErpCreditExports");
+        modelBuilder.Entity<ErpCreditExport>().Property(x => x.Estado).HasMaxLength(20);
+        modelBuilder.Entity<ErpCreditExport>().Property(x => x.UltimoError).HasMaxLength(500);
+        modelBuilder.Entity<ErpCreditExport>().HasIndex(x => new { x.EmpresaId, x.SolicitudCreditoId }).IsUnique();
+        modelBuilder.Entity<ErpCreditExport>().HasIndex(x => new { x.Estado, x.ProximoIntentoUtc });
+        modelBuilder.Entity<ErpCreditExport>().HasOne<SolicitudCredito>().WithMany()
+            .HasForeignKey(x => x.SolicitudCreditoId).OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<DevolucionSolicitudCredito>().ToTable("DevolucionesSolicitudCredito");
         modelBuilder.Entity<DevolucionSolicitudCredito>().HasOne(x => x.SolicitudCredito)
             .WithMany(x => x.Devoluciones).HasForeignKey(x => x.SolicitudCreditoId).OnDelete(DeleteBehavior.Restrict);
@@ -370,6 +378,7 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
         modelBuilder.Entity<Cotizacion>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<CotizacionItem>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<SolicitudCredito>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
+        modelBuilder.Entity<ErpCreditExport>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<DevolucionSolicitudCredito>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<CodeudorSolicitudCredito>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);
         modelBuilder.Entity<DocumentoSolicitudCredito>().HasQueryFilter(x => tenantContext.EmpresaId.HasValue && x.EmpresaId == tenantContext.EmpresaId.Value);

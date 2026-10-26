@@ -166,6 +166,12 @@ Check(db.Model.FindEntityType(typeof(AlertaInterna))!.GetQueryFilter() != null, 
 Check(db.AlertasInternas.Where(x => x.UsuarioId == Guid.NewGuid()).ToQueryString().Contains("EmpresaId"), "La bandeja filtra por empresa y usuario.");
 Check(db.Model.FindEntityType(typeof(DevolucionSolicitudCredito))!.GetQueryFilter() != null,
     "El historial de devoluciones debe estar aislado por empresa.");
+Check(db.Model.FindEntityType(typeof(ErpCreditExport))!.GetQueryFilter() != null,
+    "Los envíos al ERP deben estar aislados por empresa.");
+Check(db.Model.FindEntityType(typeof(ErpCreditExport))!.GetIndexes().Any(index =>
+    index.IsUnique && index.Properties.Select(property => property.Name)
+        .SequenceEqual(new[] { nameof(ErpCreditExport.EmpresaId), nameof(ErpCreditExport.SolicitudCreditoId) })),
+    "Una solicitud no debe generar dos eventos de exportación al ERP.");
 Check(db.Cotizaciones.GroupBy(x => x.UsuarioCreacion)
     .Select(group => new { Seller = group.Key,
         Converted = group.Count(quote => db.SolicitudesCredito.Any(application => application.CotizacionId == quote.Id)) })
@@ -184,7 +190,9 @@ broadcaster.Unsubscribe(anotherUser, otherSubscription);
 var tracked = new SolicitudCredito { EmpresaId = tenant.EmpresaId!.Value, ClienteId = Guid.NewGuid() };
 Invoke("AddChecklistDocuments", tracked, null);
 db.Attach(tracked);
-var controller = new CreditApplicationsController(db, null!, tenant, new InternalNotificationService(db, tenant, new NotificationBroadcaster()));
+var controller = new CreditApplicationsController(db, null!, tenant,
+    new InternalNotificationService(db, tenant, new NotificationBroadcaster()),
+    new ErpCreditExportService(db, new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build()));
 var sync = typeof(CreditApplicationsController).GetMethod("SyncCoDebtors", BindingFlags.Instance | BindingFlags.NonPublic)!;
 sync.Invoke(controller, [tracked, new[] { Person("400"), Person("500") }]);
 db.ChangeTracker.DetectChanges();

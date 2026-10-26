@@ -29,7 +29,11 @@ builder.Host.UseSerilog((context, services, configuration) => configuration
 builder.Services.AddControllers();
 builder.Services.AddSingleton<NotificationBroadcaster>();
 builder.Services.AddScoped<InternalNotificationService>();
+builder.Services.AddScoped<ErpCreditExportService>();
+builder.Services.AddHostedService<ErpCreditExportWorker>();
 builder.Services.AddHttpClient();
+builder.Services.AddHttpClient(nameof(ErpCreditExportWorker))
+    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddScoped<ICustomerService, CustomerService>();
 builder.Services.AddScoped<ILeadService, LeadService>();

@@ -471,6 +471,18 @@ public sealed class SolicitudCredito : AuditableTenantEntity
     public string? UsuarioDocumentacionCompleta { get; set; }
 }
 
+public sealed class ErpCreditExport : AuditableTenantEntity
+{
+    public Guid SolicitudCreditoId { get; set; }
+    public string PayloadJson { get; set; } = string.Empty;
+    public string Estado { get; set; } = "Pendiente";
+    public int Intentos { get; set; }
+    public DateTime ProximoIntentoUtc { get; set; } = DateTime.UtcNow;
+    public DateTime? EnviadoUtc { get; set; }
+    public long? ReciboErpId { get; set; }
+    public string? UltimoError { get; set; }
+}
+
 public sealed class DevolucionSolicitudCredito : AuditableTenantEntity
 {
     public Guid SolicitudCreditoId { get; set; }

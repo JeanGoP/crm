@@ -1354,6 +1354,72 @@ namespace CrmSaas.Infrastructure.Persistence.Migrations
                     b.ToTable("EntregasMoto", (string)null);
                 });
 
+            modelBuilder.Entity("CrmSaas.Domain.Entities.ErpCreditExport", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("EmpresaId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("EnviadoUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Estado")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTime?>("FechaActualizacion")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("FechaCreacion")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Intentos")
+                        .HasColumnType("int");
+
+                    b.Property<string>("PayloadJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("ProximoIntentoUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<long?>("ReciboErpId")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("SolicitudCreditoId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("UltimoError")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("UsuarioActualizacion")
+                        .HasMaxLength(180)
+                        .HasColumnType("nvarchar(180)");
+
+                    b.Property<string>("UsuarioCreacion")
+                        .IsRequired()
+                        .HasMaxLength(180)
+                        .HasColumnType("nvarchar(180)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EmpresaId");
+
+                    b.HasIndex("SolicitudCreditoId");
+
+                    b.HasIndex("EmpresaId", "SolicitudCreditoId")
+                        .IsUnique();
+
+                    b.HasIndex("Estado", "ProximoIntentoUtc");
+
+                    b.ToTable("ErpCreditExports", (string)null);
+                });
+
             modelBuilder.Entity("CrmSaas.Domain.Entities.EtapaNegocio", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3234,6 +3300,15 @@ namespace CrmSaas.Infrastructure.Persistence.Migrations
                     b.Navigation("Producto");
 
                     b.Navigation("SolicitudCredito");
+                });
+
+            modelBuilder.Entity("CrmSaas.Domain.Entities.ErpCreditExport", b =>
+                {
+                    b.HasOne("CrmSaas.Domain.Entities.SolicitudCredito", null)
+                        .WithMany()
+                        .HasForeignKey("SolicitudCreditoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("CrmSaas.Domain.Entities.IngresoPlataforma", b =>
