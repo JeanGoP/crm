@@ -7,15 +7,14 @@ using Microsoft.EntityFrameworkCore;
 
 namespace CrmSaas.Api.Services;
 
-public sealed class ErpCreditExportService(CrmDbContext db, IConfiguration configuration)
+public sealed class ErpCreditExportService(CrmDbContext db)
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     public async Task QueueApprovedAsync(SolicitudCredito application, CancellationToken ct)
     {
-        if (!Guid.TryParse(configuration["ErpIntegration:CrmCompanyId"], out var companyId)
-            || companyId == Guid.Empty || companyId != application.EmpresaId)
-            return;
+        var company = await db.Empresas.FirstOrDefaultAsync(x => x.Id == application.EmpresaId, ct);
+        if (company?.ErpEmpresaId is null || string.IsNullOrWhiteSpace(company.ErpEmpresaNit)) return;
         if (await db.ErpCreditExports.AnyAsync(x => x.SolicitudCreditoId == application.Id, ct)) return;
 
         var quote = application.CotizacionId.HasValue
@@ -42,7 +41,7 @@ public sealed class ErpCreditExportService(CrmDbContext db, IConfiguration confi
             .Where(x => !string.IsNullOrWhiteSpace(x))).Trim();
         if (customerName.Length == 0) customerName = application.Cliente?.Nombre ?? string.Empty;
         export.PayloadJson = JsonSerializer.Serialize(new ErpApprovedCredit(
-            export.Id, application.EmpresaId, configuration["ErpIntegration:CompanyNit"] ?? string.Empty,
+            export.Id, application.EmpresaId, company.ErpEmpresaId.Value, company.ErpEmpresaNit,
             application.Id, application.Numero, DateTime.UtcNow,
             new ErpCreditCustomer(application.TipoIdentificacion.ToString(), application.NumeroIdentificacion,
                 customerName, application.Celular), items,
@@ -59,7 +58,7 @@ public sealed class ErpCreditExportService(CrmDbContext db, IConfiguration confi
 
     private sealed record ErpCreditCustomer(string IdentificationType, string IdentificationNumber, string Name, string? Phone);
     private sealed record ErpCreditItem(string Reference, string Name, decimal Price, int Quantity);
-    private sealed record ErpApprovedCredit(Guid EventId, Guid CrmCompanyId, string CompanyNit,
+    private sealed record ErpApprovedCredit(Guid EventId, Guid CrmCompanyId, long ErpCompanyId, string CompanyNit,
         Guid ApplicationId, string ApplicationNumber, DateTime ApprovedAtUtc,
         ErpCreditCustomer Customer, ErpCreditItem[] Items, decimal ApprovedAmount,
         decimal DownPayment, decimal FinancedAmount, int TermMonths, DateTime? FirstDueDate,
@@ -84,8 +83,6 @@ public sealed class ErpCreditExportWorker(
     private async Task SendPendingAsync(CancellationToken ct)
     {
         if (!configuration.GetValue<bool>("ErpIntegration:Enabled")) return;
-        if (!Guid.TryParse(configuration["ErpIntegration:CrmCompanyId"], out var companyId)
-            || companyId == Guid.Empty) return;
         var baseUrl = configuration["ErpIntegration:BaseUrl"];
         var host = configuration["ErpIntegration:HostHeader"];
         var key = configuration["ErpIntegration:SharedKey"];
@@ -102,6 +99,16 @@ public sealed class ErpCreditExportWorker(
 
         using var scope = scopes.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<CrmDbContext>();
+        var linkedCompanies = await db.Empresas.IgnoreQueryFilters()
+            .Where(x => x.Activa && x.ErpEmpresaId != null)
+            .Select(x => x.Id).Take(2).ToListAsync(ct);
+        if (linkedCompanies.Count == 0) return;
+        if (linkedCompanies.Count != 1)
+        {
+            logger.LogError("El piloto CRM → ERP admite una sola empresa vinculada; se suspendió el envío.");
+            return;
+        }
+        var companyId = linkedCompanies[0];
         var due = await db.ErpCreditExports.IgnoreQueryFilters()
             .Where(x => x.EmpresaId == companyId && x.Estado == "Pendiente" && x.ProximoIntentoUtc <= DateTime.UtcNow)
             .OrderBy(x => x.ProximoIntentoUtc).Take(10).ToListAsync(ct);

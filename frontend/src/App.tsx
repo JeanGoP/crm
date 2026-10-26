@@ -46,7 +46,7 @@ import { CompactRecordsTable } from './CompactRecordsTable';
 import { CreditFormDetailsFields, type CreditFormDetails } from './CreditFormDetailsFields';
 import { NotificationCenter } from './NotificationCenter';
 import { useAuthStore } from './store';
-import { Activity, ColombianIdentityLookup, CollectionOrder, CommercialInventory, CommercialInventorySummary, CommercialReports, Company, CreditApplication, CreditCoDebtor, CreditDocument, Customer, Customer360, CustomerAiAnalysis, CustomerTimelineItem, Dashboard, Deal, DealStage, ExternalInventoryItem, ExternalInventoryWarehouse, FinancialSettings, Lead, LoginAccessReport, MotorcycleDelivery, Procedure, Product, ProductCategory, ProductPhoto, Promotion, Quote, QuoteChargeConcept, QuoteSalesPoint, QuoteSimulationResult, SalesPoint, SalesPointRate, User } from './types';
+import { Activity, ColombianIdentityLookup, CollectionOrder, CommercialInventory, CommercialInventorySummary, CommercialReports, Company, CreditApplication, CreditCoDebtor, CreditDocument, Customer, Customer360, CustomerAiAnalysis, CustomerTimelineItem, Dashboard, Deal, DealStage, ErpIntegrationState, ExternalInventoryItem, ExternalInventoryWarehouse, FinancialSettings, Lead, LoginAccessReport, MotorcycleDelivery, Procedure, Product, ProductCategory, ProductPhoto, Promotion, Quote, QuoteChargeConcept, QuoteSalesPoint, QuoteSimulationResult, SalesPoint, SalesPointRate, User } from './types';
 
 const drawerWidth = 272;
 const today = new Date().toISOString().slice(0, 10);
@@ -3578,6 +3578,42 @@ function SettingsPage() {
   const [notice, setNotice] = useState<Notice>();
   const currentCompanyId = isGlobalAdmin ? activeCompanyId ?? user?.companyId : user?.companyId;
   const currentCompanyName = companies.find((company) => company.id === currentCompanyId)?.name ?? currentCompanyId ?? '';
+  const [erpIntegration, setErpIntegration] = useState<ErpIntegrationState>();
+  const [erpSelection, setErpSelection] = useState<number | ''>('');
+  const [erpLoading, setErpLoading] = useState(false);
+  const [erpSaving, setErpSaving] = useState(false);
+  const [erpError, setErpError] = useState('');
+
+  const reloadErpIntegration = useCallback(async () => {
+    if (!isAdmin || !currentCompanyId) return;
+    setErpLoading(true);
+    setErpError('');
+    try {
+      const { data } = await api.get<ErpIntegrationState>('/api/erp-integration');
+      setErpIntegration(data);
+      setErpSelection(data.selectedCompanyId ?? '');
+    } catch (error) {
+      setErpError(apiError(error));
+    } finally {
+      setErpLoading(false);
+    }
+  }, [currentCompanyId, isAdmin]);
+
+  useEffect(() => { void reloadErpIntegration(); }, [reloadErpIntegration]);
+
+  const saveErpIntegration = async () => {
+    if (erpSelection === '') return;
+    setErpSaving(true);
+    try {
+      const { data } = await api.put<ErpIntegrationState>('/api/erp-integration/company', { erpCompanyId: erpSelection });
+      setErpIntegration(data);
+      setNotice({ type: 'success', text: `Empresa vinculada con ${data.selectedCompanyName ?? 'el ERP'}.` });
+    } catch (error) {
+      setNotice({ type: 'error', text: apiError(error) });
+    } finally {
+      setErpSaving(false);
+    }
+  };
 
   useEffect(() => {
     if (isGlobalAdmin && !activeCompanyId && user?.companyId) {
@@ -3756,7 +3792,7 @@ function SettingsPage() {
   const userDialogCompanies = activeCompanies;
 
   return <Stack spacing={3}>
-    <Header title="Configuracion" onRefresh={() => { reloadCompanies(); reloadUsers(); reloadProductCategories(); reloadFinancialSettings(); reloadQuoteChargeConcepts(); reloadSalesPoints();  reloadPromotions(); }} />
+    <Header title="Configuracion" onRefresh={() => { reloadCompanies(); reloadUsers(); reloadProductCategories(); reloadFinancialSettings(); reloadQuoteChargeConcepts(); reloadSalesPoints(); reloadPromotions(); void reloadErpIntegration(); }} />
     <Card><CardContent><Grid container spacing={2}>
       <Grid item xs={12} md={6}><TextField fullWidth label="API URL" value={import.meta.env.VITE_API_URL ?? ''} InputProps={{ readOnly: true }} /></Grid>
       <Grid item xs={12} md={6}>{isGlobalAdmin
@@ -3778,6 +3814,28 @@ function SettingsPage() {
       </Button>
       <StatusBar loading={loadingFinancialSettings} error={financialSettingsError} />
     </Box>}
+    {isAdmin && <Card><CardContent><Stack spacing={2}>
+      <Box>
+        <Typography variant="h5" fontWeight={900}>Conexión con el ERP</Typography>
+        <Typography color="text.secondary" fontSize={14}>Escoge una vez la empresa del ERP que recibirá los créditos aprobados de {currentCompanyName}.</Typography>
+      </Box>
+      {erpIntegration?.selectedCompanyId && <Alert severity="success">Vinculada con {erpIntegration.selectedCompanyName} · NIT {erpIntegration.selectedCompanyNit}</Alert>}
+      {erpIntegration?.selectedCompanyId && !erpIntegration.sendingEnabled && <Alert severity="warning">Empresa vinculada. El envío automático está pendiente de habilitar en el servidor.</Alert>}
+      {!erpIntegration?.available && <Alert severity="info">{erpIntegration?.message ?? 'Consultando empresas disponibles en el ERP.'}</Alert>}
+      <StatusBar loading={erpLoading} error={erpError} />
+      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems={{ sm: 'center' }}>
+        <TextField fullWidth select label="Empresa del ERP" value={erpSelection}
+          disabled={!erpIntegration?.available || erpLoading || erpSaving || erpIntegration.companies.length === 0}
+          onChange={(event) => setErpSelection(Number(event.target.value))}>
+          {erpIntegration?.companies.map((company) => <MenuItem key={company.id} value={company.id}>{company.name} · NIT {company.nit}</MenuItem>)}
+        </TextField>
+        <Button variant="contained" onClick={() => void saveErpIntegration()}
+          disabled={erpSelection === '' || erpSaving || erpLoading || !erpIntegration?.available || erpSelection === erpIntegration.selectedCompanyId}>
+          {erpSaving ? 'Guardando...' : 'Guardar conexión'}
+        </Button>
+        <Button variant="outlined" onClick={() => void reloadErpIntegration()} disabled={erpLoading}>Comprobar</Button>
+      </Stack>
+    </Stack></CardContent></Card>}
     <Card><CardContent>
       <Stack spacing={2}>
         <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', sm: 'center' }} gap={1}>

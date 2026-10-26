@@ -24,6 +24,22 @@ export interface Company {
   active: boolean;
 }
 
+export interface ErpCompanyChoice {
+  id: number;
+  name: string;
+  nit: string;
+}
+
+export interface ErpIntegrationState {
+  available: boolean;
+  sendingEnabled: boolean;
+  selectedCompanyId?: number | null;
+  selectedCompanyName?: string | null;
+  selectedCompanyNit?: string | null;
+  companies: ErpCompanyChoice[];
+  message?: string | null;
+}
+
 export interface Customer {
   id: string;
   name: string;

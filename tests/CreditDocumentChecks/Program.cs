@@ -168,6 +168,9 @@ Check(db.Model.FindEntityType(typeof(DevolucionSolicitudCredito))!.GetQueryFilte
     "El historial de devoluciones debe estar aislado por empresa.");
 Check(db.Model.FindEntityType(typeof(ErpCreditExport))!.GetQueryFilter() != null,
     "Los envíos al ERP deben estar aislados por empresa.");
+Check(db.Model.FindEntityType(typeof(Empresa))!.GetIndexes().Any(index =>
+    index.IsUnique && index.Properties.Count == 1 && index.Properties[0].Name == nameof(Empresa.ErpEmpresaId)),
+    "La empresa ERP seleccionada no debe asignarse a dos empresas CRM.");
 Check(db.Model.FindEntityType(typeof(ErpCreditExport))!.GetIndexes().Any(index =>
     index.IsUnique && index.Properties.Select(property => property.Name)
         .SequenceEqual(new[] { nameof(ErpCreditExport.EmpresaId), nameof(ErpCreditExport.SolicitudCreditoId) })),
@@ -192,7 +195,7 @@ Invoke("AddChecklistDocuments", tracked, null);
 db.Attach(tracked);
 var controller = new CreditApplicationsController(db, null!, tenant,
     new InternalNotificationService(db, tenant, new NotificationBroadcaster()),
-    new ErpCreditExportService(db, new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build()));
+    new ErpCreditExportService(db));
 var sync = typeof(CreditApplicationsController).GetMethod("SyncCoDebtors", BindingFlags.Instance | BindingFlags.NonPublic)!;
 sync.Invoke(controller, [tracked, new[] { Person("400"), Person("500") }]);
 db.ChangeTracker.DetectChanges();

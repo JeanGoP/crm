@@ -50,6 +50,9 @@ public sealed class CrmDbContext(DbContextOptions<CrmDbContext> options, ITenant
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Empresa>().ToTable("Empresas");
+        modelBuilder.Entity<Empresa>().Property(x => x.ErpEmpresaNit).HasMaxLength(20);
+        modelBuilder.Entity<Empresa>().Property(x => x.ErpEmpresaNombre).HasMaxLength(200);
+        modelBuilder.Entity<Empresa>().HasIndex(x => x.ErpEmpresaId).IsUnique().HasFilter("[ErpEmpresaId] IS NOT NULL");
         modelBuilder.Entity<Usuario>().ToTable("Usuarios");
         modelBuilder.Entity<Rol>().ToTable("Roles");
         modelBuilder.Entity<UsuarioRol>().ToTable("UsuariosRoles");

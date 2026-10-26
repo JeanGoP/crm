@@ -1,6 +1,7 @@
 using System.Text;
 using AutoMapper;
 using CrmSaas.Api.Middleware;
+using CrmSaas.Api.Controllers;
 using CrmSaas.Api.Services;
 using CrmSaas.Application.DTOs;
 using CrmSaas.Application.Mapping;
@@ -33,6 +34,8 @@ builder.Services.AddScoped<ErpCreditExportService>();
 builder.Services.AddHostedService<ErpCreditExportWorker>();
 builder.Services.AddHttpClient();
 builder.Services.AddHttpClient(nameof(ErpCreditExportWorker))
+    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+builder.Services.AddHttpClient(nameof(ErpIntegrationController))
     .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddScoped<ICustomerService, CustomerService>();

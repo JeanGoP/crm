@@ -1187,6 +1187,17 @@ namespace CrmSaas.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("EmpresaId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<long?>("ErpEmpresaId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("ErpEmpresaNit")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("ErpEmpresaNombre")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
                     b.Property<DateTime?>("FechaActualizacion")
                         .HasColumnType("datetime2");
 
@@ -1221,6 +1232,10 @@ namespace CrmSaas.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("EmpresaId");
+
+                    b.HasIndex("ErpEmpresaId")
+                        .IsUnique()
+                        .HasFilter("[ErpEmpresaId] IS NOT NULL");
 
                     b.HasIndex("Subdominio")
                         .IsUnique();
