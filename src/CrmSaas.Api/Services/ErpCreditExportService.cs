@@ -67,7 +67,7 @@ public sealed class ErpCreditExportService(CrmDbContext db)
 
 public sealed class ErpCreditExportWorker(
     IServiceScopeFactory scopes, IHttpClientFactory clients, IConfiguration configuration,
-    ILogger<ErpCreditExportWorker> logger) : BackgroundService
+    CrmErpTokenService tokens, ILogger<ErpCreditExportWorker> logger) : BackgroundService
 {
     public static bool PayloadMatchesCompany(string payloadJson, Guid crmCompanyId, long erpCompanyId, string? erpNit)
     {
@@ -97,20 +97,7 @@ public sealed class ErpCreditExportWorker(
 
     private async Task SendPendingAsync(CancellationToken ct)
     {
-        if (!configuration.GetValue<bool>("ErpIntegration:Enabled")) return;
-        var baseUrl = configuration["ErpIntegration:BaseUrl"];
-        var host = configuration["ErpIntegration:HostHeader"];
-        var key = configuration["ErpIntegration:SharedKey"];
-        if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var uri)
-            || uri.Scheme != Uri.UriSchemeHttp || !IPAddress.IsLoopback(uri.HostNameType == UriHostNameType.IPv4
-                || uri.HostNameType == UriHostNameType.IPv6 ? IPAddress.Parse(uri.Host) : IPAddress.None)
-            || !uri.AbsolutePath.Equals("/ERP/", StringComparison.OrdinalIgnoreCase)
-            || uri.Query.Length != 0 || uri.Fragment.Length != 0 || uri.UserInfo.Length != 0
-            || string.IsNullOrWhiteSpace(host) || string.IsNullOrWhiteSpace(key) || key.Length < 32)
-        {
-            logger.LogError("La integración ERP está habilitada sin una URL HTTP loopback, HostHeader y clave válidos.");
-            return;
-        }
+        var (uri, host) = ErpLoopback.Resolve(configuration);
 
         using var scope = scopes.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<CrmDbContext>();
@@ -138,10 +125,11 @@ public sealed class ErpCreditExportWorker(
                     }
                     else
                     {
-                        using var request = new HttpRequestMessage(HttpMethod.Post,
-                            new Uri(uri, "api/v1/integrations/crm/approved-credits"));
+                        const string path = "/api/v1/integrations/crm/approved-credits";
+                        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(uri, path.TrimStart('/')));
                         request.Headers.Host = host;
-                        request.Headers.Add("X-Crm-Integration-Key", key);
+                        request.Headers.Add("X-Crm-Integration-Token", tokens.Create("POST", path,
+                            CrmErpTokenService.HashBody(item.PayloadJson)));
                         request.Content = new StringContent(item.PayloadJson, System.Text.Encoding.UTF8, "application/json");
                         using var response = await client.SendAsync(request, ct);
                         if (response.IsSuccessStatusCode)

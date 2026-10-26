@@ -4,6 +4,7 @@ using System.Security.Claims;
 using System.Text.Json;
 using CrmSaas.Application.Abstractions;
 using CrmSaas.Infrastructure.Persistence;
+using CrmSaas.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -20,7 +21,7 @@ public sealed record SelectErpCompanyRequest(long ErpCompanyId);
 [Route("api/erp-integration")]
 public sealed class ErpIntegrationController(
     CrmDbContext db, ITenantContext tenant, IConfiguration configuration,
-    IHttpClientFactory clients, ILogger<ErpIntegrationController> logger) : ControllerBase
+    IHttpClientFactory clients, CrmErpTokenService tokens, ILogger<ErpIntegrationController> logger) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<ErpIntegrationState>> Get(CancellationToken ct)
@@ -30,18 +31,18 @@ public sealed class ErpIntegrationController(
         try
         {
             var choices = await AvailableCompaniesAsync(ct);
-            return Ok(new ErpIntegrationState(true, configuration.GetValue<bool>("ErpIntegration:Enabled"), company.ErpEmpresaId, company.ErpEmpresaNombre,
+            return Ok(new ErpIntegrationState(true, company.ErpEmpresaId is not null, company.ErpEmpresaId, company.ErpEmpresaNombre,
                 company.ErpEmpresaNit, choices, null));
         }
         catch (InvalidOperationException error)
         {
-            return Ok(new ErpIntegrationState(false, configuration.GetValue<bool>("ErpIntegration:Enabled"), company.ErpEmpresaId, company.ErpEmpresaNombre,
+            return Ok(new ErpIntegrationState(false, company.ErpEmpresaId is not null, company.ErpEmpresaId, company.ErpEmpresaNombre,
                 company.ErpEmpresaNit, [], error.Message));
         }
         catch (Exception error) when (error is HttpRequestException or TaskCanceledException or JsonException)
         {
             logger.LogWarning(error, "No se pudo consultar el catálogo de empresas ERP.");
-            return Ok(new ErpIntegrationState(false, configuration.GetValue<bool>("ErpIntegration:Enabled"), company.ErpEmpresaId, company.ErpEmpresaNombre,
+            return Ok(new ErpIntegrationState(false, company.ErpEmpresaId is not null, company.ErpEmpresaId, company.ErpEmpresaNombre,
                 company.ErpEmpresaNit, [], "No se pudo contactar el ERP desde el servidor CRM."));
         }
     }
@@ -70,7 +71,7 @@ public sealed class ErpIntegrationController(
         company.ErpEmpresaNombre = selected.Name;
         company.ErpEmpresaNit = selected.Nit;
         await db.SaveChangesAsync(ct);
-        return Ok(new ErpIntegrationState(true, configuration.GetValue<bool>("ErpIntegration:Enabled"), selected.Id, selected.Name, selected.Nit, choices, null));
+        return Ok(new ErpIntegrationState(true, true, selected.Id, selected.Name, selected.Nit, choices, null));
     }
 
     private async Task<CrmSaas.Domain.Entities.Empresa> CurrentCompanyAsync(CancellationToken ct)
@@ -85,19 +86,11 @@ public sealed class ErpIntegrationController(
 
     private async Task<IReadOnlyList<ErpCompanyChoice>> AvailableCompaniesAsync(CancellationToken ct)
     {
-        var url = configuration["ErpIntegration:BaseUrl"];
-        var host = configuration["ErpIntegration:HostHeader"];
-        var key = configuration["ErpIntegration:SharedKey"];
-        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)
-            || uri.Scheme != Uri.UriSchemeHttp || uri.AbsolutePath != "/ERP/"
-            || uri.Query.Length != 0 || uri.Fragment.Length != 0 || uri.UserInfo.Length != 0
-            || !IPAddress.TryParse(uri.Host, out var address) || !IPAddress.IsLoopback(address)
-            || string.IsNullOrWhiteSpace(host) || string.IsNullOrWhiteSpace(key) || key.Length < 32)
-            throw new InvalidOperationException("La conexión interna con el ERP aún no está configurada en el servidor.");
-
-        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(uri, "api/v1/integrations/crm/companies"));
+        var (uri, host) = ErpLoopback.Resolve(configuration);
+        const string path = "/api/v1/integrations/crm/companies";
+        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(uri, path.TrimStart('/')));
         request.Headers.Host = host;
-        request.Headers.Add("X-Crm-Integration-Key", key);
+        request.Headers.Add("X-Crm-Integration-Token", tokens.Create("GET", path, CrmErpTokenService.HashBody("")));
         var client = clients.CreateClient(nameof(ErpIntegrationController));
         client.Timeout = TimeSpan.FromSeconds(8);
         using var response = await client.SendAsync(request, ct);

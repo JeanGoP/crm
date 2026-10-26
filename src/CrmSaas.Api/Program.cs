@@ -31,6 +31,7 @@ builder.Services.AddControllers();
 builder.Services.AddSingleton<NotificationBroadcaster>();
 builder.Services.AddScoped<InternalNotificationService>();
 builder.Services.AddScoped<ErpCreditExportService>();
+builder.Services.AddSingleton<CrmErpTokenService>();
 builder.Services.AddHostedService<ErpCreditExportWorker>();
 builder.Services.AddHttpClient();
 builder.Services.AddHttpClient(nameof(ErpCreditExportWorker))
