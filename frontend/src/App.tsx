@@ -3585,7 +3585,7 @@ function SettingsPage() {
   const [erpError, setErpError] = useState('');
 
   const reloadErpIntegration = useCallback(async () => {
-    if (!isAdmin || !currentCompanyId) return;
+    if (!isGlobalAdmin || !currentCompanyId) return;
     setErpLoading(true);
     setErpError('');
     try {
@@ -3597,7 +3597,7 @@ function SettingsPage() {
     } finally {
       setErpLoading(false);
     }
-  }, [currentCompanyId, isAdmin]);
+  }, [currentCompanyId, isGlobalAdmin]);
 
   useEffect(() => { void reloadErpIntegration(); }, [reloadErpIntegration]);
 
@@ -3814,7 +3814,7 @@ function SettingsPage() {
       </Button>
       <StatusBar loading={loadingFinancialSettings} error={financialSettingsError} />
     </Box>}
-    {isAdmin && <Card><CardContent><Stack spacing={2}>
+    {isGlobalAdmin && <Card><CardContent><Stack spacing={2}>
       <Box>
         <Typography variant="h5" fontWeight={900}>Conexión con el ERP</Typography>
         <Typography color="text.secondary" fontSize={14}>Escoge una vez la empresa del ERP que recibirá los créditos aprobados de {currentCompanyName}.</Typography>

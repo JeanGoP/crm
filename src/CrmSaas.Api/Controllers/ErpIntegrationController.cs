@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Security.Claims;
 using System.Text.Json;
 using CrmSaas.Application.Abstractions;
 using CrmSaas.Infrastructure.Persistence;
@@ -24,6 +25,7 @@ public sealed class ErpIntegrationController(
     [HttpGet]
     public async Task<ActionResult<ErpIntegrationState>> Get(CancellationToken ct)
     {
+        if (!IsPlatformAdmin()) return Forbid();
         var company = await CurrentCompanyAsync(ct);
         try
         {
@@ -47,6 +49,7 @@ public sealed class ErpIntegrationController(
     [HttpPut("company")]
     public async Task<ActionResult<ErpIntegrationState>> SelectCompany(SelectErpCompanyRequest request, CancellationToken ct)
     {
+        if (!IsPlatformAdmin()) return Forbid();
         if (request.ErpCompanyId < 1) return BadRequest(new { detail = "Selecciona una empresa del ERP." });
         var company = await CurrentCompanyAsync(ct);
         IReadOnlyList<ErpCompanyChoice> choices;
@@ -62,8 +65,6 @@ public sealed class ErpIntegrationController(
         {
             if (await db.ErpCreditExports.AnyAsync(x => x.EmpresaId == company.Id, ct))
                 return Conflict(new { detail = "Esta empresa ya tiene créditos enviados o pendientes. No se puede cambiar el destino automáticamente." });
-            if (await db.Empresas.IgnoreQueryFilters().AnyAsync(x => x.Id != company.Id && x.ErpEmpresaId != null, ct))
-                return Conflict(new { detail = "El piloto admite una sola empresa CRM vinculada al ERP." });
         }
         company.ErpEmpresaId = selected.Id;
         company.ErpEmpresaNombre = selected.Name;
@@ -78,6 +79,9 @@ public sealed class ErpIntegrationController(
         return await db.Empresas.FirstOrDefaultAsync(x => x.Id == id, ct)
             ?? throw new KeyNotFoundException("Empresa CRM no encontrada.");
     }
+
+    private bool IsPlatformAdmin() =>
+        string.Equals(User.FindFirstValue(ClaimTypes.Email), "admin@demo.com", StringComparison.OrdinalIgnoreCase);
 
     private async Task<IReadOnlyList<ErpCompanyChoice>> AvailableCompaniesAsync(CancellationToken ct)
     {

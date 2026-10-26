@@ -69,6 +69,21 @@ public sealed class ErpCreditExportWorker(
     IServiceScopeFactory scopes, IHttpClientFactory clients, IConfiguration configuration,
     ILogger<ErpCreditExportWorker> logger) : BackgroundService
 {
+    public static bool PayloadMatchesCompany(string payloadJson, Guid crmCompanyId, long erpCompanyId, string? erpNit)
+    {
+        try
+        {
+            using var payload = JsonDocument.Parse(payloadJson);
+            var root = payload.RootElement;
+            return root.TryGetProperty("crmCompanyId", out var crmValue) && crmValue.TryGetGuid(out var payloadCrmId)
+                && payloadCrmId == crmCompanyId
+                && root.TryGetProperty("erpCompanyId", out var erpValue) && erpValue.TryGetInt64(out var payloadErpId)
+                && payloadErpId == erpCompanyId
+                && root.TryGetProperty("companyNit", out var nitValue) && nitValue.GetString() == erpNit;
+        }
+        catch (JsonException) { return false; }
+    }
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         using var timer = new PeriodicTimer(TimeSpan.FromSeconds(30));
@@ -101,53 +116,64 @@ public sealed class ErpCreditExportWorker(
         var db = scope.ServiceProvider.GetRequiredService<CrmDbContext>();
         var linkedCompanies = await db.Empresas.IgnoreQueryFilters()
             .Where(x => x.Activa && x.ErpEmpresaId != null)
-            .Select(x => x.Id).Take(2).ToListAsync(ct);
+            .Select(x => new { x.Id, x.ErpEmpresaId, x.ErpEmpresaNit }).ToListAsync(ct);
         if (linkedCompanies.Count == 0) return;
-        if (linkedCompanies.Count != 1)
-        {
-            logger.LogError("El piloto CRM → ERP admite una sola empresa vinculada; se suspendió el envío.");
-            return;
-        }
-        var companyId = linkedCompanies[0];
-        var due = await db.ErpCreditExports.IgnoreQueryFilters()
-            .Where(x => x.EmpresaId == companyId && x.Estado == "Pendiente" && x.ProximoIntentoUtc <= DateTime.UtcNow)
-            .OrderBy(x => x.ProximoIntentoUtc).Take(10).ToListAsync(ct);
-        if (due.Count == 0) return;
         var client = clients.CreateClient(nameof(ErpCreditExportWorker));
         client.Timeout = TimeSpan.FromSeconds(10);
-        foreach (var item in due)
+        foreach (var linkedCompany in linkedCompanies)
         {
-            try
+            var companyId = linkedCompany.Id;
+            var due = await db.ErpCreditExports.IgnoreQueryFilters()
+                .Where(x => x.EmpresaId == companyId && x.Estado == "Pendiente" && x.ProximoIntentoUtc <= DateTime.UtcNow)
+                .OrderBy(x => x.ProximoIntentoUtc).Take(10).ToListAsync(ct);
+            foreach (var item in due)
             {
-                using var request = new HttpRequestMessage(HttpMethod.Post,
-                    new Uri(uri, "api/v1/integrations/crm/approved-credits"));
-                request.Headers.Host = host;
-                request.Headers.Add("X-Crm-Integration-Key", key);
-                request.Content = new StringContent(item.PayloadJson, System.Text.Encoding.UTF8, "application/json");
-                using var response = await client.SendAsync(request, ct);
-                if (response.IsSuccessStatusCode)
+                try
                 {
-                    using var receipt = await response.Content.ReadFromJsonAsync<JsonDocument>(cancellationToken: ct);
-                    item.ReciboErpId = receipt?.RootElement.GetProperty("receiptId").GetInt64();
-                    item.Estado = "Enviado";
-                    item.EnviadoUtc = DateTime.UtcNow;
-                    item.UltimoError = null;
-                }
-                else
-                {
-                    item.UltimoError = $"ERP HTTP {(int)response.StatusCode}";
-                    if (response.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.Conflict)
+                    if (!PayloadMatchesCompany(item.PayloadJson, linkedCompany.Id,
+                        linkedCompany.ErpEmpresaId!.Value, linkedCompany.ErpEmpresaNit))
+                    {
                         item.Estado = "Revisar";
+                        item.UltimoError = "El destino del evento no coincide con la empresa CRM vinculada.";
+                    }
+                    else
+                    {
+                        using var request = new HttpRequestMessage(HttpMethod.Post,
+                            new Uri(uri, "api/v1/integrations/crm/approved-credits"));
+                        request.Headers.Host = host;
+                        request.Headers.Add("X-Crm-Integration-Key", key);
+                        request.Content = new StringContent(item.PayloadJson, System.Text.Encoding.UTF8, "application/json");
+                        using var response = await client.SendAsync(request, ct);
+                        if (response.IsSuccessStatusCode)
+                        {
+                            using var receipt = await response.Content.ReadFromJsonAsync<JsonDocument>(cancellationToken: ct);
+                            item.ReciboErpId = receipt?.RootElement.GetProperty("receiptId").GetInt64();
+                            item.Estado = "Enviado";
+                            item.EnviadoUtc = DateTime.UtcNow;
+                            item.UltimoError = null;
+                        }
+                        else
+                        {
+                            item.UltimoError = $"ERP HTTP {(int)response.StatusCode}";
+                            if (response.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.Conflict)
+                                item.Estado = "Revisar";
+                        }
+                    }
                 }
+                catch (JsonException)
+                {
+                    item.Estado = "Revisar";
+                    item.UltimoError = "El evento ERP contiene datos inválidos.";
+                }
+                catch (Exception error) when (error is HttpRequestException or TaskCanceledException)
+                {
+                    item.UltimoError = $"Error de transporte: {error.GetType().Name}";
+                }
+                item.Intentos++;
+                item.ProximoIntentoUtc = DateTime.UtcNow.AddMinutes(Math.Min(30, Math.Pow(2, Math.Min(item.Intentos, 5))));
+                await db.SaveChangesAsync(ct);
+                if (item.Estado != "Enviado") logger.LogWarning("Exportación ERP pendiente o en revisión: {ApplicationId}, {Error}", item.SolicitudCreditoId, item.UltimoError);
             }
-            catch (Exception error) when (error is HttpRequestException or TaskCanceledException or JsonException)
-            {
-                item.UltimoError = $"Error de transporte: {error.GetType().Name}";
-            }
-            item.Intentos++;
-            item.ProximoIntentoUtc = DateTime.UtcNow.AddMinutes(Math.Min(30, Math.Pow(2, Math.Min(item.Intentos, 5))));
-            await db.SaveChangesAsync(ct);
-            if (item.Estado != "Enviado") logger.LogWarning("Exportación ERP pendiente o en revisión: {ApplicationId}, {Error}", item.SolicitudCreditoId, item.UltimoError);
         }
     }
 }

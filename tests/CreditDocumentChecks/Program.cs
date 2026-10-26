@@ -171,6 +171,14 @@ Check(db.Model.FindEntityType(typeof(ErpCreditExport))!.GetQueryFilter() != null
 Check(db.Model.FindEntityType(typeof(Empresa))!.GetIndexes().Any(index =>
     index.IsUnique && index.Properties.Count == 1 && index.Properties[0].Name == nameof(Empresa.ErpEmpresaId)),
     "La empresa ERP seleccionada no debe asignarse a dos empresas CRM.");
+var mappedCrm = Guid.NewGuid();
+var mappedPayload = $"{{\"crmCompanyId\":\"{mappedCrm}\",\"erpCompanyId\":3,\"companyNit\":\"91452546-1\"}}";
+Check(ErpCreditExportWorker.PayloadMatchesCompany(mappedPayload, mappedCrm, 3, "91452546-1"),
+    "El envío debe aceptar su propia empresa CRM y ERP vinculada.");
+Check(!ErpCreditExportWorker.PayloadMatchesCompany(mappedPayload, Guid.NewGuid(), 3, "91452546-1")
+    && !ErpCreditExportWorker.PayloadMatchesCompany(mappedPayload, mappedCrm, 4, "91452546-1")
+    && !ErpCreditExportWorker.PayloadMatchesCompany(mappedPayload, mappedCrm, 3, "99999999-9"),
+    "El envío debe rechazar una empresa CRM, ERP o NIT diferente.");
 Check(db.Model.FindEntityType(typeof(ErpCreditExport))!.GetIndexes().Any(index =>
     index.IsUnique && index.Properties.Select(property => property.Name)
         .SequenceEqual(new[] { nameof(ErpCreditExport.EmpresaId), nameof(ErpCreditExport.SolicitudCreditoId) })),
